@@ -10,7 +10,7 @@ export const Response = memo(
   ({ className, ...props }: ResponseProps) => (
     <Streamdown
       className={cn(
-        "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 break-words overflow-wrap-anywhere",
+        "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 break-words overflow-hidden [overflow-wrap:anywhere]",
         // Enhanced spacing and readability for reasoning content
         "leading-relaxed", // Relaxed line height for better readability
         "[&>p]:mb-4 [&>p]:last:mb-0", // Paragraph spacing

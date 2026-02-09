@@ -246,7 +246,7 @@ const ExpandableUserMessage = ({
       <>
         <div className="relative w-full">
           <div className="bg-card text-card-foreground border rounded-xl shadow-sm overflow-hidden w-full flex flex-col">
-            <div className="p-4 break-words overflow-wrap-anywhere">
+            <div className="p-4 break-words overflow-hidden" style={{ overflowWrap: 'anywhere' }}>
               {/* Image previews */}
               {images && images.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-3">
@@ -5150,9 +5150,9 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
   }
 
   return (
-    <div className={`flex flex-col ${isMobile ? 'h-[calc(100vh-9.5rem)]' : 'h-full'}`}>
+    <div className={`flex flex-col overflow-hidden ${isMobile ? 'h-[calc(100vh-9.5rem)]' : 'h-full'}`}>
       {/* Messages Area - Scrollable container */}
-      <div className={`flex-1 min-h-0 overflow-y-auto space-y-4 ${isMobile ? 'p-4 pb-20' : 'p-4'}`}>
+      <div className={`flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden space-y-4 ${isMobile ? 'p-4 pb-20' : 'p-4'}`}>
         {messages.length === 0 && (
           <div className="flex items-center justify-center h-full text-muted-foreground">
             <p>Start a conversation with PiPilot...</p>
@@ -5182,12 +5182,12 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 />
               </div>
             ) : (
-              <Card className={cn("w-full",
+              <Card className={cn("w-full overflow-hidden",
                 message.reasoning || message.content || (message.toolInvocations && message.toolInvocations.length > 0)
                   ? "bg-muted"
                   : "bg-transparent border-0"
               )}>
-                <div className="p-4 break-words overflow-wrap-anywhere">
+                <div className="p-4 break-words overflow-hidden" style={{ overflowWrap: 'anywhere' }}>
                   {/* Special Rendering: Supabase Connection Card */}
                   {(() => {
                     const toolCalls = activeToolCalls.get(message.id)
