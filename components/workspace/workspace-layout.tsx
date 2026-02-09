@@ -910,7 +910,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   }
 
   return (
-    <div className="h-screen flex bg-background relative">
+    <div className="h-screen flex overflow-hidden bg-background relative">
       {/* Desktop Layout */}
       {!isMobile && (
         <>
@@ -924,7 +924,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           />
 
           {/* Main Content */}
-          <div className="flex-1 flex flex-col min-w-0">
+          <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
             {/* Project Header */}
             <ProjectHeader
               project={selectedProject}
@@ -1026,7 +1026,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
                 {/* Left Panel - Chat (Resizable) */}
                 <ResizablePanel defaultSize={40} minSize={20} maxSize={40}>
-                  <div className="h-full flex flex-col border-r border-border">
+                  <div className="h-full flex flex-col overflow-hidden border-r border-border">
                     <ChatPanelV2
                       key={`chat-${selectedProject.id}-${chatSessionKey}`}
                       project={selectedProject}
@@ -1316,7 +1316,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
       {/* Mobile Layout */}
       {isMobile && (
-        <div className="h-full w-full flex flex-col">
+        <div className="h-full w-full flex flex-col overflow-hidden">
           {/* Always use ModernSidebar for mobile */}
           <ModernSidebar
             user={user}
