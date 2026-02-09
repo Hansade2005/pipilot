@@ -1043,7 +1043,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
                 {/* Right Panel - Code/Preview Area */}
                 <ResizablePanel defaultSize={60} minSize={30}>
-                  <div className="h-full flex flex-col">
+                  <div className="h-full flex flex-col overflow-hidden">
                     {/* Tab Switcher with Preview Controls - Hidden when in preview mode */}
                     {activeTab !== "preview" && (
                       <div className="border-b border-border bg-card p-2 flex-shrink-0">
@@ -1237,7 +1237,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
             {/* Status Bar */}
             {selectedProject && (
-              <div className="h-8 border-t border-border bg-muted/50 flex items-center justify-between px-4 text-xs">
+              <div className="h-8 flex-shrink-0 border-t border-border bg-muted/50 flex items-center justify-between px-4 text-xs">
                 <div className="flex items-center space-x-4">
                   {/* GitHub Status */}
                   <div className="flex items-center space-x-1">
