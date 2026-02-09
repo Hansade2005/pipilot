@@ -56,7 +56,7 @@ export default function AboutPage() {
             </p>
             <div className="mt-6 flex items-center justify-center">
               <a href="https://e2b.dev/startups" target="_blank" rel="noopener noreferrer" className="opacity-80 hover:opacity-100 transition-opacity">
-                <img src="/Black-2.png" alt="Sponsored by E2B for Startups" className="h-8 md:h-10 w-auto rounded" />
+                <img src="/e2b-badge.svg" alt="Sponsored by E2B for Startups" className="h-8 md:h-10 w-auto rounded" />
               </a>
             </div>
           </div>
