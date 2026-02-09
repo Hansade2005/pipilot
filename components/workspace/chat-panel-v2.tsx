@@ -5154,7 +5154,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
   }
 
   return (
-    <div className={`flex flex-col overflow-hidden ${isMobile ? 'h-[calc(100vh-9.5rem)]' : 'h-full'}`}>
+    <div className={`flex flex-col ${isMobile ? 'h-[calc(100vh-9.5rem)]' : 'h-full'}`}>
       {/* Messages Area - Scrollable container */}
       <div className={`flex-1 min-h-0 overflow-y-auto space-y-4 ${isMobile ? 'p-4 pb-20' : 'p-4'}`}>
         {messages.length === 0 && (
@@ -5167,7 +5167,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
           <div
             key={message.id}
             className={cn(
-              'flex min-h-0',
+              'flex',
               message.role === 'user' ? 'justify-end' : 'justify-start'
             )}
           >
