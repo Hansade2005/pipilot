@@ -2835,9 +2835,13 @@ export function ChatPanelV2({
     }
   }, [error, toast])
 
-  // Auto-scroll on new messages
+  // Auto-scroll only when new messages are added (not on every streaming token)
+  const prevMessageCountRef = useRef(messages.length)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (messages.length !== prevMessageCountRef.current) {
+      prevMessageCountRef.current = messages.length
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
   }, [messages])
 
   // Fetch credit balance
@@ -5150,7 +5154,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
   }
 
   return (
-    <div className={`flex flex-col ${isMobile ? 'h-[calc(100vh-9.5rem)]' : 'h-full'}`}>
+    <div className={`flex flex-col overflow-hidden ${isMobile ? 'h-[calc(100vh-9.5rem)]' : 'h-full'}`}>
       {/* Messages Area - Scrollable container */}
       <div className={`flex-1 min-h-0 overflow-y-auto space-y-4 ${isMobile ? 'p-4 pb-20' : 'p-4'}`}>
         {messages.length === 0 && (
@@ -5163,7 +5167,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
           <div
             key={message.id}
             className={cn(
-              'flex',
+              'flex min-h-0',
               message.role === 'user' ? 'justify-end' : 'justify-start'
             )}
           >
@@ -5182,7 +5186,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 />
               </div>
             ) : (
-              <Card className={cn("w-full",
+              <Card className={cn("w-full overflow-hidden",
                 message.reasoning || message.content || (message.toolInvocations && message.toolInvocations.length > 0)
                   ? "bg-muted"
                   : "bg-transparent border-0"
