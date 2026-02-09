@@ -285,6 +285,13 @@ export default function EnterprisePage() {
               and dedicated support. Trusted by Fortune 500 companies worldwide.
             </p>
 
+            {/* E2B Sponsor Badge */}
+            <div className="mb-8 flex items-center justify-center">
+              <a href="https://e2b.dev/startups" target="_blank" rel="noopener noreferrer" className="opacity-80 hover:opacity-100 transition-opacity">
+                <img src="/e2b-badge.svg" alt="Sponsored by E2B for Startups" className="h-8 md:h-10 w-auto rounded" />
+              </a>
+            </div>
+
             {/* Key Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12 max-w-4xl mx-auto">
               <div className="text-center">
