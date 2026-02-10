@@ -2242,6 +2242,9 @@ export async function POST(req: Request) {
       supabaseUserId = metadata.supabaseUserId || supabaseUserId
       stripeApiKey = metadata.stripeApiKey || stripeApiKey
       mcpServers = metadata.mcpServers || mcpServers
+      if (mcpServers && mcpServers.length > 0) {
+        console.log(`[Chat-V2] 🔍 MCP servers from metadata:`, JSON.stringify(mcpServers.map((s: any) => ({ name: s.name, url: s.url?.slice(0, 40), hasHeaders: !!s.headers, headerKeys: Object.keys(s.headers || {}) }))))
+      }
     }
 
     // Use fileTree from binary metadata if available, otherwise from JSON
@@ -10370,6 +10373,7 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
         try {
           if (!server.url) continue
           const headers: Record<string, string> = { ...(server.headers || {}) }
+          console.log(`[Chat-V2] 🔌 Server "${server.name}" headers keys: [${Object.keys(headers).join(', ')}], has auth: ${!!headers['Authorization']}`)
           const transportType = server.transport === 'sse' ? 'sse' : 'http'
           const client = await createMCPClient({
             transport: {
