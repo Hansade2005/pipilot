@@ -5390,7 +5390,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
       </div>
 
       {/* Input Area - Fixed at bottom */}
-      <div className={`border-t bg-background flex-shrink-0 ${isMobile
+      <div className={`border-t bg-background p-4 ${isMobile
         ? 'fixed bottom-12 left-0 right-0 p-4 z-[60] border-b'
         : 'p-4'
         }`}>
