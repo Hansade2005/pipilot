@@ -381,10 +381,19 @@ export default function ProjectPage() {
       toast({ title: "Command required", description: "Please provide a command for stdio transport", variant: "destructive" })
       return
     }
+    // Auto-capture any pending header/env inputs the user typed but didn't click "+"
+    const finalHeaders = { ...(newMCPServer.headers || {}) }
+    if (newMCPHeaderKey && newMCPHeaderValue) {
+      finalHeaders[newMCPHeaderKey] = newMCPHeaderValue
+    }
+    const finalEnv = { ...(newMCPServer.env || {}) }
+    if (newMCPEnvKey && newMCPEnvValue) {
+      finalEnv[newMCPEnvKey] = newMCPEnvValue
+    }
     // Merge headers into env for HTTP servers (env is the unified storage, headers is the UI concept)
     const mergedEnv = newMCPServer.transport === 'http'
-      ? { ...(newMCPServer.env || {}), ...(newMCPServer.headers || {}) }
-      : (newMCPServer.env || {})
+      ? { ...finalEnv, ...finalHeaders }
+      : finalEnv
     const server: MCPServerConfig = {
       id: crypto.randomUUID(),
       name: newMCPServer.name!,
@@ -392,7 +401,7 @@ export default function ProjectPage() {
       command: newMCPServer.command,
       args: newMCPArgs ? newMCPArgs.split('\n').map(a => a.trim()).filter(Boolean) : [],
       url: newMCPServer.url,
-      headers: newMCPServer.transport === 'http' ? (newMCPServer.headers || {}) : undefined,
+      headers: newMCPServer.transport === 'http' ? finalHeaders : undefined,
       env: mergedEnv,
       enabled: true,
     }
@@ -1063,10 +1072,15 @@ export default function ProjectPage() {
                           name: s.name.toLowerCase().replace(/\s+/g, '-'),
                           transport: 'http',
                           url: s.url,
-                          headers: s.headerKey ? { [s.headerKey]: s.headerValue } : {},
+                          headers: {},
                           env: {},
                           enabled: true,
                         })
+                        // Pre-fill header input fields so user just completes the token
+                        if (s.headerKey) {
+                          setNewMCPHeaderKey(s.headerKey)
+                          setNewMCPHeaderValue(s.headerValue || '')
+                        }
                         setNewMCPArgs('')
                       } else {
                         setNewMCPServer({
