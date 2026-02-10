@@ -58,6 +58,9 @@ import {
   RotateCw,
   FileCode,
   Box,
+  AlertTriangle,
+  Upload,
+  Info,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { storageManager, type Workspace as Project, type Deployment, type EnvironmentVariable } from "@/lib/storage-manager"
@@ -117,17 +120,22 @@ export default function ProjectPage() {
   const [isAddMCPOpen, setIsAddMCPOpen] = useState(false)
   const [newMCPServer, setNewMCPServer] = useState<Partial<MCPServerConfig>>({
     name: '',
-    transport: 'stdio',
+    transport: 'http',
     command: '',
     args: [],
     url: '',
+    headers: {},
     env: {},
     enabled: true,
   })
   const [newMCPArgs, setNewMCPArgs] = useState('')
   const [newMCPEnvKey, setNewMCPEnvKey] = useState('')
   const [newMCPEnvValue, setNewMCPEnvValue] = useState('')
+  const [newMCPHeaderKey, setNewMCPHeaderKey] = useState('')
+  const [newMCPHeaderValue, setNewMCPHeaderValue] = useState('')
   const [expandedMCP, setExpandedMCP] = useState<string | null>(null)
+  const [isImportConfigOpen, setIsImportConfigOpen] = useState(false)
+  const [importConfigText, setImportConfigText] = useState('')
 
   useEffect(() => {
     getCurrentUser()
@@ -361,23 +369,46 @@ export default function ProjectPage() {
       toast({ title: "Name required", description: "Please provide a server name", variant: "destructive" })
       return
     }
+    if (newMCPServer.transport === 'http' && !newMCPServer.url) {
+      toast({ title: "URL required", description: "Please provide a server URL for HTTP transport", variant: "destructive" })
+      return
+    }
+    if (newMCPServer.transport === 'http' && newMCPServer.url && !newMCPServer.url.startsWith('http')) {
+      toast({ title: "Invalid URL", description: "URL must start with http:// or https://", variant: "destructive" })
+      return
+    }
+    if (newMCPServer.transport === 'stdio' && !newMCPServer.command) {
+      toast({ title: "Command required", description: "Please provide a command for stdio transport", variant: "destructive" })
+      return
+    }
+    // Merge headers into env for HTTP servers (env is the unified storage, headers is the UI concept)
+    const mergedEnv = newMCPServer.transport === 'http'
+      ? { ...(newMCPServer.env || {}), ...(newMCPServer.headers || {}) }
+      : (newMCPServer.env || {})
     const server: MCPServerConfig = {
       id: crypto.randomUUID(),
       name: newMCPServer.name!,
-      transport: newMCPServer.transport || 'stdio',
+      transport: newMCPServer.transport || 'http',
       command: newMCPServer.command,
       args: newMCPArgs ? newMCPArgs.split('\n').map(a => a.trim()).filter(Boolean) : [],
       url: newMCPServer.url,
-      env: newMCPServer.env || {},
+      headers: newMCPServer.transport === 'http' ? (newMCPServer.headers || {}) : undefined,
+      env: mergedEnv,
       enabled: true,
     }
     saveMCPServers([...mcpServers, server])
     setIsAddMCPOpen(false)
-    setNewMCPServer({ name: '', transport: 'stdio', command: '', args: [], url: '', env: {}, enabled: true })
+    resetMCPForm()
+    toast({ title: "Server Added", description: `${server.name} has been configured` })
+  }
+
+  const resetMCPForm = () => {
+    setNewMCPServer({ name: '', transport: 'http', command: '', args: [], url: '', headers: {}, env: {}, enabled: true })
     setNewMCPArgs('')
     setNewMCPEnvKey('')
     setNewMCPEnvValue('')
-    toast({ title: "Server Added", description: `${server.name} has been configured` })
+    setNewMCPHeaderKey('')
+    setNewMCPHeaderValue('')
   }
 
   const removeMCPServer = (id: string) => {
@@ -403,6 +434,58 @@ export default function ProjectPage() {
       delete env[key]
       return { ...prev, env }
     })
+  }
+
+  const addMCPHeader = () => {
+    if (newMCPHeaderKey && newMCPHeaderValue) {
+      setNewMCPServer(prev => ({ ...prev, headers: { ...prev.headers, [newMCPHeaderKey]: newMCPHeaderValue } }))
+      setNewMCPHeaderKey('')
+      setNewMCPHeaderValue('')
+    }
+  }
+
+  const removeMCPHeader = (key: string) => {
+    setNewMCPServer(prev => {
+      const headers = { ...prev.headers }
+      delete headers[key]
+      return { ...prev, headers }
+    })
+  }
+
+  const importMCPConfig = () => {
+    try {
+      const parsed = JSON.parse(importConfigText)
+      const servers = parsed.mcpServers || parsed
+      let count = 0
+      const newServers: MCPServerConfig[] = [...mcpServers]
+
+      for (const [name, config] of Object.entries(servers) as [string, any][]) {
+        const isHttp = config.url || config.type === 'http' || config.type === 'sse'
+        const server: MCPServerConfig = {
+          id: crypto.randomUUID(),
+          name,
+          transport: isHttp ? 'http' : 'stdio',
+          command: config.command,
+          args: config.args || [],
+          url: config.url,
+          headers: config.headers || {},
+          env: isHttp ? (config.headers || {}) : (config.env || {}),
+          enabled: true,
+        }
+        // Skip duplicates
+        if (!newServers.find(s => s.name === name)) {
+          newServers.push(server)
+          count++
+        }
+      }
+
+      saveMCPServers(newServers)
+      setIsImportConfigOpen(false)
+      setImportConfigText('')
+      toast({ title: "Imported", description: `Added ${count} server${count !== 1 ? 's' : ''} from config` })
+    } catch {
+      toast({ title: "Invalid JSON", description: "Could not parse the configuration. Please check the format.", variant: "destructive" })
+    }
   }
 
   const copyMCPConfig = () => {
@@ -820,10 +903,14 @@ export default function ProjectPage() {
                 <p className="text-sm text-gray-400 mt-0.5">Configure Model Context Protocol servers to extend AI capabilities</p>
               </div>
               <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setIsImportConfigOpen(true)} className="bg-transparent border-gray-700 text-gray-300 hover:bg-gray-800 h-8 text-xs">
+                  <Upload className="h-3.5 w-3.5 mr-1.5" />
+                  Import
+                </Button>
                 {mcpServers.length > 0 && (
                   <Button variant="outline" size="sm" onClick={copyMCPConfig} className="bg-transparent border-gray-700 text-gray-300 hover:bg-gray-800 h-8 text-xs">
                     <Copy className="h-3.5 w-3.5 mr-1.5" />
-                    Copy JSON
+                    Export
                   </Button>
                 )}
                 <Button onClick={() => setIsAddMCPOpen(true)} className="bg-indigo-600 hover:bg-indigo-500 h-8 text-xs">
@@ -904,9 +991,24 @@ export default function ProjectPage() {
                             <code className="text-xs text-gray-300 bg-gray-800 px-2 py-0.5 rounded font-mono">{server.url}</code>
                           </div>
                         )}
-                        {server.env && Object.keys(server.env).length > 0 && (
+                        {server.headers && Object.keys(server.headers).length > 0 && server.transport === 'http' && (
                           <div>
-                            <span className="text-xs text-gray-500 block mb-1.5">{server.transport === 'stdio' ? 'Environment Variables' : 'Headers'}</span>
+                            <span className="text-xs text-gray-500 block mb-1.5">Headers</span>
+                            <div className="space-y-1">
+                              {Object.entries(server.headers).map(([k, v]) => (
+                                <div key={k} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-gray-800/50">
+                                  <code className="text-xs text-indigo-400 font-mono">{k}</code>
+                                  <code className="text-xs text-gray-500 font-mono">
+                                    {k.toLowerCase() === 'authorization' ? `${v.slice(0, 10)}${'*'.repeat(Math.min(v.length - 10, 15))}` : '*'.repeat(Math.min(v.length, 20))}
+                                  </code>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {server.env && Object.keys(server.env).length > 0 && server.transport === 'stdio' && (
+                          <div>
+                            <span className="text-xs text-gray-500 block mb-1.5">Environment Variables</span>
                             <div className="space-y-1">
                               {Object.entries(server.env).map(([k, v]) => (
                                 <div key={k} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-gray-800/50">
@@ -946,25 +1048,53 @@ export default function ProjectPage() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-5">
                 {[
-                  { name: 'Brave Search', desc: 'Web search with privacy', command: 'npx', args: '-y @anthropic/brave-search-mcp', env: 'BRAVE_API_KEY' },
-                  { name: 'GitHub', desc: 'Repository & issue management', command: 'npx', args: '-y @modelcontextprotocol/server-github', env: 'GITHUB_PERSONAL_ACCESS_TOKEN' },
-                  { name: 'Filesystem', desc: 'Read/write local files', command: 'npx', args: '-y @modelcontextprotocol/server-filesystem /path', env: '' },
-                  { name: 'PostgreSQL', desc: 'Database queries & schema', command: 'npx', args: '-y @modelcontextprotocol/server-postgres', env: 'DATABASE_URL' },
-                  { name: 'Memory', desc: 'Persistent knowledge graph', command: 'npx', args: '-y @modelcontextprotocol/server-memory', env: '' },
-                  { name: 'Fetch', desc: 'Web content retrieval', command: 'npx', args: '-y @modelcontextprotocol/server-fetch', env: '' },
+                  { name: 'Supabase', desc: 'Database, auth & storage', transport: 'http' as const, url: 'https://mcp.supabase.com/mcp?project_ref=YOUR_PROJECT_REF', headerKey: 'Authorization', headerValue: 'Bearer ' },
+                  { name: 'Context7', desc: 'Up-to-date library docs', transport: 'http' as const, url: 'https://mcp.context7.com/mcp', headerKey: '', headerValue: '' },
+                  { name: 'Brave Search', desc: 'Web search with privacy', transport: 'stdio' as const, command: 'npx', args: '-y @anthropic/brave-search-mcp', env: 'BRAVE_API_KEY' },
+                  { name: 'GitHub', desc: 'Repository & issue management', transport: 'stdio' as const, command: 'npx', args: '-y @modelcontextprotocol/server-github', env: 'GITHUB_PERSONAL_ACCESS_TOKEN' },
+                  { name: 'Filesystem', desc: 'Read/write local files', transport: 'stdio' as const, command: 'npx', args: '-y @modelcontextprotocol/server-filesystem /path', env: '' },
+                  { name: 'PostgreSQL', desc: 'Database queries & schema', transport: 'stdio' as const, command: 'npx', args: '-y @modelcontextprotocol/server-postgres', env: 'DATABASE_URL' },
                 ].map((s) => (
                   <button
                     key={s.name}
                     onClick={() => {
-                      setNewMCPServer({ name: s.name.toLowerCase().replace(/\s+/g, '-'), transport: 'stdio', command: s.command, env: s.env ? { [s.env]: '' } : {}, enabled: true })
-                      setNewMCPArgs(s.args)
+                      if (s.transport === 'http') {
+                        setNewMCPServer({
+                          name: s.name.toLowerCase().replace(/\s+/g, '-'),
+                          transport: 'http',
+                          url: s.url,
+                          headers: s.headerKey ? { [s.headerKey]: s.headerValue } : {},
+                          env: {},
+                          enabled: true,
+                        })
+                        setNewMCPArgs('')
+                      } else {
+                        setNewMCPServer({
+                          name: s.name.toLowerCase().replace(/\s+/g, '-'),
+                          transport: 'stdio',
+                          command: s.command,
+                          env: s.env ? { [s.env]: '' } : {},
+                          headers: {},
+                          enabled: true,
+                        })
+                        setNewMCPArgs(s.args || '')
+                      }
                       setIsAddMCPOpen(true)
                     }}
                     className="flex items-start gap-3 p-3 rounded-lg bg-gray-800/30 border border-gray-800 hover:border-gray-700 hover:bg-gray-800/50 transition-all text-left"
                   >
-                    <Terminal className="h-4 w-4 text-gray-500 mt-0.5 shrink-0" />
+                    {s.transport === 'http' ? (
+                      <Wifi className="h-4 w-4 text-indigo-400 mt-0.5 shrink-0" />
+                    ) : (
+                      <Terminal className="h-4 w-4 text-gray-500 mt-0.5 shrink-0" />
+                    )}
                     <div>
-                      <p className="text-sm font-medium text-white">{s.name}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-medium text-white">{s.name}</p>
+                        {s.transport === 'http' && (
+                          <Badge variant="outline" className="text-[9px] h-3.5 px-1 border-indigo-500/30 text-indigo-400 bg-indigo-500/5">HTTP</Badge>
+                        )}
+                      </div>
                       <p className="text-xs text-gray-500">{s.desc}</p>
                     </div>
                   </button>
@@ -1153,7 +1283,7 @@ export default function ProjectPage() {
       </Dialog>
 
       {/* Add MCP Server Dialog */}
-      <Dialog open={isAddMCPOpen} onOpenChange={setIsAddMCPOpen}>
+      <Dialog open={isAddMCPOpen} onOpenChange={(open) => { setIsAddMCPOpen(open); if (!open) resetMCPForm() }}>
         <DialogContent className="sm:max-w-lg bg-gray-900 border-gray-800 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-white flex items-center gap-2">
@@ -1169,7 +1299,7 @@ export default function ProjectPage() {
               <Input
                 value={newMCPServer.name}
                 onChange={(e) => setNewMCPServer(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="brave-search"
+                placeholder="supabase"
                 className="bg-gray-800 border-gray-700 text-white font-mono text-sm"
               />
             </div>
@@ -1178,16 +1308,6 @@ export default function ProjectPage() {
             <div>
               <Label className="text-xs text-gray-400 mb-1.5 block">Transport</Label>
               <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => setNewMCPServer(prev => ({ ...prev, transport: 'stdio' }))}
-                  className={`flex items-center gap-2 p-3 rounded-lg border transition-colors ${newMCPServer.transport === 'stdio' ? 'border-indigo-500 bg-indigo-500/10 text-white' : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'}`}
-                >
-                  <Terminal className="h-4 w-4" />
-                  <div className="text-left">
-                    <p className="text-sm font-medium">Local (stdio)</p>
-                    <p className="text-xs text-gray-500">Run as child process</p>
-                  </div>
-                </button>
                 <button
                   onClick={() => setNewMCPServer(prev => ({ ...prev, transport: 'http' }))}
                   className={`flex items-center gap-2 p-3 rounded-lg border transition-colors ${newMCPServer.transport === 'http' ? 'border-indigo-500 bg-indigo-500/10 text-white' : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'}`}
@@ -1198,7 +1318,25 @@ export default function ProjectPage() {
                     <p className="text-xs text-gray-500">Connect via URL</p>
                   </div>
                 </button>
+                <button
+                  onClick={() => setNewMCPServer(prev => ({ ...prev, transport: 'stdio' }))}
+                  className={`flex items-center gap-2 p-3 rounded-lg border transition-colors ${newMCPServer.transport === 'stdio' ? 'border-amber-500 bg-amber-500/10 text-white' : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'}`}
+                >
+                  <Terminal className="h-4 w-4" />
+                  <div className="text-left">
+                    <p className="text-sm font-medium">Local (stdio)</p>
+                    <p className="text-xs text-gray-500">Run as child process</p>
+                  </div>
+                </button>
               </div>
+              {newMCPServer.transport === 'stdio' && (
+                <div className="flex items-start gap-2 mt-2 p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-400 mt-0.5 shrink-0" />
+                  <p className="text-xs text-amber-400/80">
+                    stdio servers require a local runtime and won't work in PiPilot's cloud environment. Use HTTP transport for cloud-hosted MCP servers.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Conditional Fields */}
@@ -1223,62 +1361,169 @@ export default function ProjectPage() {
                     className="bg-gray-800 border-gray-700 text-white font-mono text-sm"
                   />
                 </div>
+                {/* Environment Variables for stdio */}
+                <div>
+                  <Label className="text-xs text-gray-400 mb-1.5 block">Environment Variables</Label>
+                  {newMCPServer.env && Object.keys(newMCPServer.env).length > 0 && (
+                    <div className="space-y-1.5 mb-3">
+                      {Object.entries(newMCPServer.env).map(([k, v]) => (
+                        <div key={k} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-800/50 border border-gray-800">
+                          <code className="text-xs text-indigo-400 font-mono flex-1">{k}</code>
+                          <code className="text-xs text-gray-500 font-mono">{v ? '***' : '(empty)'}</code>
+                          <button onClick={() => removeMCPEnvVar(k)} className="text-gray-600 hover:text-red-400">
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={newMCPEnvKey}
+                      onChange={(e) => setNewMCPEnvKey(e.target.value)}
+                      placeholder="KEY"
+                      className="bg-gray-800 border-gray-700 text-white font-mono text-xs h-8 flex-1"
+                    />
+                    <Input
+                      value={newMCPEnvValue}
+                      onChange={(e) => setNewMCPEnvValue(e.target.value)}
+                      placeholder="Value"
+                      type="password"
+                      className="bg-gray-800 border-gray-700 text-white font-mono text-xs h-8 flex-1"
+                    />
+                    <Button variant="outline" size="sm" onClick={addMCPEnvVar} className="h-8 px-3 bg-transparent border-gray-700 text-gray-300 hover:bg-gray-800">
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
               </>
             ) : (
-              <div>
-                <Label className="text-xs text-gray-400 mb-1.5 block">Server URL</Label>
-                <Input
-                  value={newMCPServer.url}
-                  onChange={(e) => setNewMCPServer(prev => ({ ...prev, url: e.target.value }))}
-                  placeholder="https://api.example.com/mcp"
-                  className="bg-gray-800 border-gray-700 text-white font-mono text-sm"
-                />
-              </div>
-            )}
-
-            {/* Environment Variables / Headers */}
-            <div>
-              <Label className="text-xs text-gray-400 mb-1.5 block">
-                {newMCPServer.transport === 'stdio' ? 'Environment Variables' : 'Headers'}
-              </Label>
-              {newMCPServer.env && Object.keys(newMCPServer.env).length > 0 && (
-                <div className="space-y-1.5 mb-3">
-                  {Object.entries(newMCPServer.env).map(([k, v]) => (
-                    <div key={k} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-800/50 border border-gray-800">
-                      <code className="text-xs text-indigo-400 font-mono flex-1">{k}</code>
-                      <code className="text-xs text-gray-500 font-mono">{v ? '***' : '(empty)'}</code>
-                      <button onClick={() => removeMCPEnvVar(k)} className="text-gray-600 hover:text-red-400">
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
+              <>
+                <div>
+                  <Label className="text-xs text-gray-400 mb-1.5 block">Server URL</Label>
+                  <Input
+                    value={newMCPServer.url}
+                    onChange={(e) => setNewMCPServer(prev => ({ ...prev, url: e.target.value }))}
+                    placeholder="https://mcp.supabase.com/mcp?project_ref=..."
+                    className="bg-gray-800 border-gray-700 text-white font-mono text-sm"
+                  />
                 </div>
-              )}
-              <div className="flex items-center gap-2">
-                <Input
-                  value={newMCPEnvKey}
-                  onChange={(e) => setNewMCPEnvKey(e.target.value)}
-                  placeholder="KEY"
-                  className="bg-gray-800 border-gray-700 text-white font-mono text-xs h-8 flex-1"
-                />
-                <Input
-                  value={newMCPEnvValue}
-                  onChange={(e) => setNewMCPEnvValue(e.target.value)}
-                  placeholder="Value"
-                  type="password"
-                  className="bg-gray-800 border-gray-700 text-white font-mono text-xs h-8 flex-1"
-                />
-                <Button variant="outline" size="sm" onClick={addMCPEnvVar} className="h-8 px-3 bg-transparent border-gray-700 text-gray-300 hover:bg-gray-800">
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
+
+                {/* Authorization / Headers for HTTP */}
+                <div>
+                  <Label className="text-xs text-gray-400 mb-1.5 block flex items-center gap-1.5">
+                    Headers
+                    <span className="text-gray-600 font-normal">(Authentication & custom headers)</span>
+                  </Label>
+
+                  {/* Quick auth helper */}
+                  {!newMCPServer.headers?.['Authorization'] && (
+                    <button
+                      onClick={() => {
+                        setNewMCPHeaderKey('Authorization')
+                        setNewMCPHeaderValue('Bearer ')
+                      }}
+                      className="flex items-center gap-1.5 mb-3 px-2.5 py-1.5 rounded-md bg-indigo-500/5 border border-indigo-500/20 text-xs text-indigo-400 hover:bg-indigo-500/10 transition-colors"
+                    >
+                      <Key className="h-3 w-3" />
+                      Add Bearer Token
+                    </button>
+                  )}
+
+                  {/* Existing headers list */}
+                  {newMCPServer.headers && Object.keys(newMCPServer.headers).length > 0 && (
+                    <div className="space-y-1.5 mb-3">
+                      {Object.entries(newMCPServer.headers).map(([k, v]) => (
+                        <div key={k} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-800/50 border border-gray-800">
+                          <code className="text-xs text-indigo-400 font-mono shrink-0">{k}</code>
+                          <code className="text-xs text-gray-500 font-mono truncate flex-1">
+                            {k.toLowerCase() === 'authorization' ? `${v.slice(0, 10)}${'*'.repeat(Math.min(v.length - 10, 20))}` : (v ? '***' : '(empty)')}
+                          </code>
+                          <button onClick={() => removeMCPHeader(k)} className="text-gray-600 hover:text-red-400 shrink-0">
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add header inputs */}
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={newMCPHeaderKey}
+                      onChange={(e) => setNewMCPHeaderKey(e.target.value)}
+                      placeholder="Header name"
+                      className="bg-gray-800 border-gray-700 text-white font-mono text-xs h-8 flex-[0.8]"
+                    />
+                    <Input
+                      value={newMCPHeaderValue}
+                      onChange={(e) => setNewMCPHeaderValue(e.target.value)}
+                      placeholder={newMCPHeaderKey === 'Authorization' ? 'Bearer your-token-here' : 'Value'}
+                      type={newMCPHeaderKey.toLowerCase() === 'authorization' ? 'text' : 'password'}
+                      className="bg-gray-800 border-gray-700 text-white font-mono text-xs h-8 flex-1"
+                    />
+                    <Button variant="outline" size="sm" onClick={addMCPHeader} className="h-8 px-3 bg-transparent border-gray-700 text-gray-300 hover:bg-gray-800">
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                  <p className="text-[11px] text-gray-600 mt-1.5">
+                    Most MCP servers need an Authorization header: <code className="text-gray-500">Bearer your-token</code>
+                  </p>
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddMCPOpen(false)} className="bg-transparent border-gray-700 text-gray-300">Cancel</Button>
+            <Button variant="outline" onClick={() => { setIsAddMCPOpen(false); resetMCPForm() }} className="bg-transparent border-gray-700 text-gray-300">Cancel</Button>
             <Button onClick={addMCPServer} className="bg-indigo-600 hover:bg-indigo-500">
               <Plus className="h-4 w-4 mr-1.5" />
               Add Server
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import MCP Config Dialog */}
+      <Dialog open={isImportConfigOpen} onOpenChange={setIsImportConfigOpen}>
+        <DialogContent className="sm:max-w-lg bg-gray-900 border-gray-800">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <Upload className="h-5 w-5 text-indigo-400" />
+              Import MCP Config
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Paste your MCP configuration JSON from VS Code, Claude Desktop, or Cursor
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea
+              value={importConfigText}
+              onChange={(e) => setImportConfigText(e.target.value)}
+              placeholder={`{
+  "mcpServers": {
+    "supabase": {
+      "url": "https://mcp.supabase.com/mcp?project_ref=...",
+      "headers": {
+        "Authorization": "Bearer sbp_..."
+      }
+    }
+  }
+}`}
+              rows={10}
+              className="bg-gray-800 border-gray-700 text-white font-mono text-xs"
+            />
+            <div className="flex items-start gap-2 mt-3 p-2.5 rounded-lg bg-gray-800/50 border border-gray-800">
+              <Info className="h-3.5 w-3.5 text-gray-500 mt-0.5 shrink-0" />
+              <p className="text-xs text-gray-500">
+                Supports standard MCP config format. HTTP servers with <code className="text-gray-400">url</code> and <code className="text-gray-400">headers</code> fields, or stdio servers with <code className="text-gray-400">command</code> and <code className="text-gray-400">args</code>.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIsImportConfigOpen(false); setImportConfigText('') }} className="bg-transparent border-gray-700 text-gray-300">Cancel</Button>
+            <Button onClick={importMCPConfig} disabled={!importConfigText.trim()} className="bg-indigo-600 hover:bg-indigo-500">
+              <Upload className="h-4 w-4 mr-1.5" />
+              Import
             </Button>
           </DialogFooter>
         </DialogContent>
