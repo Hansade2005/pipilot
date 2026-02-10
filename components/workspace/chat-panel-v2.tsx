@@ -4291,6 +4291,27 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
       // Compress project files for efficient transfer (only for initial requests, not continuations)
       console.log(`[ChatPanelV2] 📦 Compressing ${projectFiles.length} project files...`)
       const isInitialPrompt = messages.length === 0 // No previous messages (first prompt)
+      // Load MCP server configs from localStorage for this project
+      let mcpServersForProject: any[] = []
+      if (project?.id) {
+        try {
+          const stored = localStorage.getItem(`pipilot-mcp-servers-${project.id}`)
+          if (stored) {
+            const parsed = JSON.parse(stored)
+            // Only include enabled HTTP/SSE servers (stdio can't run in serverless)
+            mcpServersForProject = parsed
+              .filter((s: any) => s.enabled && s.transport !== 'stdio' && s.url)
+              .map((s: any) => ({
+                name: s.name,
+                url: s.url,
+                transport: s.transport || 'http',
+                apiKey: s.env?.Authorization || s.env?.AUTHORIZATION || undefined,
+                headers: s.env || {},
+              }))
+          }
+        } catch {}
+      }
+
       const metadata = {
         project,
         databaseId,
@@ -4299,7 +4320,8 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
         supabase_projectId: supabaseProjectDetails?.supabaseProjectId,
         supabaseUserId,
         stripeApiKey,
-        isInitialPrompt
+        isInitialPrompt,
+        mcpServers: mcpServersForProject.length > 0 ? mcpServersForProject : undefined,
       }
       const compressedData = await compressProjectFiles(projectFiles, fileTree, messagesToSend, metadata)
 
