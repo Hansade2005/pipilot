@@ -910,7 +910,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   }
 
   return (
-    <div className="h-screen max-h-screen flex bg-background relative overflow-hidden">
+    <div className="h-screen flex bg-background relative">
       {/* Desktop Layout */}
       {!isMobile && (
         <>
@@ -1025,7 +1025,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             {!isLoadingProjects && clientProjects.length > 0 && selectedProject && (
               <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
                 {/* Left Panel - Chat (Resizable) */}
-                <ResizablePanel defaultSize={40} minSize={20} maxSize={40} className="overflow-hidden">
+                <ResizablePanel defaultSize={40} minSize={20} maxSize={40}>
                   <div className="h-full flex flex-col overflow-hidden border-r border-border">
                     <ChatPanelV2
                       key={`chat-${selectedProject.id}-${chatSessionKey}`}
