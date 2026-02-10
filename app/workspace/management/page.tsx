@@ -1105,7 +1105,7 @@ export default function ManagementPage() {
                       </div>
                       <div className="text-3xl font-bold text-yellow-400">
                         {projects.filter(p => {
-                          const envVars = envVariables[p.id] || []
+                          const envVars = p.environmentVariables || []
                           return envVars.some((v: any) => v.key?.toLowerCase().includes('secret') || v.key?.toLowerCase().includes('password'))
                         }).length}
                       </div>
@@ -1171,7 +1171,7 @@ export default function ManagementPage() {
                 <CardContent>
                   <div className="space-y-3">
                     {projects.map((project) => {
-                      const envVars = envVariables[project.id] || []
+                      const envVars = project.environmentVariables || []
                       const hasSensitiveKeys = envVars.some((v: any) => {
                         const key = (v.key || '').toLowerCase()
                         return key.includes('secret') || key.includes('password') || key.includes('private')
