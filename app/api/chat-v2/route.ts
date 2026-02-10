@@ -2221,7 +2221,8 @@ export async function POST(req: Request) {
       supabase_projectId, // Extracted Supabase project ID to avoid conflicts
       supabaseUserId, // Authenticated Supabase user ID from client
       stripeApiKey, // Stripe API key from client for payment operations
-      mcpServers // MCP server configurations from client [{url, name, apiKey?}]
+      mcpServers, // MCP server configurations from client [{url, name, headers?}]
+      disabledToolCategories = [] as string[] // Tool categories disabled by user preferences
     } = body || {}
 
     // For binary requests, extract metadata from compressed data
@@ -2242,9 +2243,7 @@ export async function POST(req: Request) {
       supabaseUserId = metadata.supabaseUserId || supabaseUserId
       stripeApiKey = metadata.stripeApiKey || stripeApiKey
       mcpServers = metadata.mcpServers || mcpServers
-      if (mcpServers && mcpServers.length > 0) {
-        console.log(`[Chat-V2] 🔍 MCP servers from metadata:`, JSON.stringify(mcpServers.map((s: any) => ({ name: s.name, url: s.url?.slice(0, 40), hasHeaders: !!s.headers, headerKeys: Object.keys(s.headers || {}) }))))
-      }
+      disabledToolCategories = metadata.disabledToolCategories || disabledToolCategories
     }
 
     // Use fileTree from binary metadata if available, otherwise from JSON
@@ -10355,11 +10354,31 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
         unavailableTools.push('node_machine')
       }
 
+      // User tool preferences - filter by disabled categories
+      if (disabledToolCategories && Array.isArray(disabledToolCategories) && disabledToolCategories.length > 0) {
+        const categoryToolMap: Record<string, string[]> = {
+          file_ops: ['write_file', 'read_file', 'edit_file', 'delete_file', 'delete_folder', 'client_replace_string_in_file'],
+          code_search: ['grep_search', 'semantic_code_navigator', 'list_files'],
+          web_tools: ['web_search', 'web_extract'],
+          dev_tools: ['check_dev_errors', 'node_machine', 'remove_package'],
+          pipilot_db: ['create_database', 'query_database', 'manipulate_table_data', 'manage_api_keys', 'list_tables', 'read_table', 'delete_table', 'create_table'],
+          supabase: ['supabase_fetch_api_keys', 'supabase_create_table', 'supabase_insert_data', 'supabase_delete_data', 'supabase_read_table', 'supabase_drop_table', 'supabase_execute_sql', 'supabase_list_tables_rls', 'request_supabase_connection'],
+          stripe: ['stripe_validate_key', 'stripe_list_products', 'stripe_create_product', 'stripe_update_product', 'stripe_delete_product', 'stripe_list_prices', 'stripe_create_price', 'stripe_update_price', 'stripe_list_customers', 'stripe_create_customer', 'stripe_update_customer', 'stripe_delete_customer', 'stripe_create_payment_intent', 'stripe_update_payment_intent', 'stripe_cancel_payment_intent', 'stripe_list_charges', 'stripe_list_subscriptions', 'stripe_update_subscription', 'stripe_cancel_subscription', 'stripe_list_coupons', 'stripe_create_coupon', 'stripe_update_coupon', 'stripe_delete_coupon', 'stripe_create_refund', 'stripe_search'],
+          docs_quality: ['generate_report', 'pipilot_get_docs', 'auto_documentation', 'code_review', 'code_quality_analysis'],
+          image_gen: ['generate_image'],
+        }
+        for (const category of disabledToolCategories) {
+          const tools = categoryToolMap[category]
+          if (tools) unavailableTools.push(...tools)
+        }
+        console.log(`[Chat-V2] User disabled ${disabledToolCategories.length} tool categories:`, disabledToolCategories)
+      }
+
       if (unavailableTools.length > 0) {
         toolsToUse = Object.fromEntries(
           Object.entries(allTools).filter(([toolName]) => !unavailableTools.includes(toolName))
         )
-        console.log(`[Chat-V2] Agent mode - filtered out ${unavailableTools.length} unavailable tools (missing keys/config):`, unavailableTools)
+        console.log(`[Chat-V2] Agent mode - filtered out ${unavailableTools.length} unavailable tools`, unavailableTools)
       } else {
         toolsToUse = allTools
       }
@@ -10373,7 +10392,6 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
         try {
           if (!server.url) continue
           const headers: Record<string, string> = { ...(server.headers || {}) }
-          console.log(`[Chat-V2] 🔌 Server "${server.name}" headers keys: [${Object.keys(headers).join(', ')}], has auth: ${!!headers['Authorization']}`)
           const transportType = server.transport === 'sse' ? 'sse' : 'http'
           const client = await createMCPClient({
             transport: {
