@@ -1,5 +1,5 @@
 import { streamText, tool } from 'ai'
-import { createMCPClient, type MCPTransport } from '@ai-sdk/mcp'
+import { experimental_createMCPClient as createMCPClient } from '@ai-sdk/mcp'
 import { z } from 'zod'
 
 // Use Vercel AI Gateway for Devstral 2
@@ -130,7 +130,7 @@ Use the available tools when they would help answer the user's question. Always 
       },
     })
 
-    return result.toDataStreamResponse()
+    return result.toUIMessageStreamResponse()
   } catch (error) {
     console.error('[MCP-Test] Error:', error)
     // Close any open clients on error

@@ -1,5 +1,5 @@
 import { streamText, tool, stepCountIs } from 'ai'
-import { createMCPClient } from '@ai-sdk/mcp'
+import { experimental_createMCPClient as createMCPClient } from '@ai-sdk/mcp'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { getModel, needsMistralVisionProvider, getDevstralVisionModel } from '@/lib/ai-providers'
