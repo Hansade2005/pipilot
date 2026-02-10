@@ -174,42 +174,36 @@ export default function MCPTestPage() {
         lineBuffer = lines.pop() || ''
 
         for (const line of lines) {
-          if (!line.trim()) continue
+          const trimmed = line.trim()
+          if (!trimmed) continue
 
-          // AI SDK data stream protocol parsing
-          const colonIdx = line.indexOf(':')
-          if (colonIdx === -1) continue
-
-          const type = line.substring(0, colonIdx)
-          const data = line.substring(colonIdx + 1)
+          // SSE format: "data: {...}" or "data: [DONE]"
+          if (!trimmed.startsWith('data: ')) continue
+          const jsonStr = trimmed.slice(6)
+          if (jsonStr === '[DONE]') break
 
           try {
-            switch (type) {
-              case '0': // text delta
-                const text = JSON.parse(data)
-                fullContent += text
+            const part = JSON.parse(jsonStr)
+            switch (part.type) {
+              case 'text-delta':
+                fullContent += part.textDelta || ''
                 setStreamingContent(fullContent)
                 break
-              case '9': // tool call
-                const toolCall = JSON.parse(data)
+              case 'tool-call':
                 toolCalls.push({
-                  name: toolCall.toolName,
-                  args: toolCall.args,
+                  name: part.toolName,
+                  args: part.args,
                 })
                 break
-              case 'a': // tool result
-                const toolResult = JSON.parse(data)
+              case 'tool-result':
                 const matchingCall = toolCalls.find(tc => !tc.result)
                 if (matchingCall) {
-                  matchingCall.result = toolResult.result
+                  matchingCall.result = part.result
                 }
                 break
-              case 'e': // error
-                const error = JSON.parse(data)
-                fullContent += `\n\nError: ${error.message || JSON.stringify(error)}`
+              case 'error':
+                fullContent += `\n\nError: ${part.message || JSON.stringify(part)}`
                 setStreamingContent(fullContent)
-                break
-              case 'd': // done
                 break
             }
           } catch {}

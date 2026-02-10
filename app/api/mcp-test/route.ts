@@ -130,7 +130,7 @@ Use the available tools when they would help answer the user's question. Always 
       },
     })
 
-    return result.toDataStreamResponse()
+    return result.toUIMessageStreamResponse()
   } catch (error) {
     console.error('[MCP-Test] Error:', error)
     // Close any open clients on error
