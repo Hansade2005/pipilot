@@ -136,6 +136,8 @@ export default function ProjectPage() {
   const [expandedMCP, setExpandedMCP] = useState<string | null>(null)
   const [isImportConfigOpen, setIsImportConfigOpen] = useState(false)
   const [importConfigText, setImportConfigText] = useState('')
+  const [globalMcpServers, setGlobalMcpServers] = useState<MCPServerConfig[]>([])
+  const [addServerScope, setAddServerScope] = useState<'project' | 'global'>('project')
 
   useEffect(() => {
     getCurrentUser()
@@ -147,13 +149,17 @@ export default function ProjectPage() {
     }
   }, [currentUserId, slug])
 
-  // Load MCP servers from localStorage
+  // Load MCP servers from localStorage (project-specific + global)
   useEffect(() => {
     if (project?.id) {
       const stored = localStorage.getItem(`pipilot-mcp-servers-${project.id}`)
       if (stored) {
         try { setMcpServers(JSON.parse(stored)) } catch {}
       }
+    }
+    const globalStored = localStorage.getItem('pipilot-mcp-servers-global')
+    if (globalStored) {
+      try { setGlobalMcpServers(JSON.parse(globalStored)) } catch {}
     }
   }, [project?.id])
 
@@ -163,6 +169,11 @@ export default function ProjectPage() {
     if (project?.id) {
       localStorage.setItem(`pipilot-mcp-servers-${project.id}`, JSON.stringify(servers))
     }
+  }
+
+  const saveGlobalMCPServers = (servers: MCPServerConfig[]) => {
+    setGlobalMcpServers(servers)
+    localStorage.setItem('pipilot-mcp-servers-global', JSON.stringify(servers))
   }
 
   const getCurrentUser = async () => {
@@ -405,10 +416,14 @@ export default function ProjectPage() {
       env: mergedEnv,
       enabled: true,
     }
-    saveMCPServers([...mcpServers, server])
+    if (addServerScope === 'global') {
+      saveGlobalMCPServers([...globalMcpServers, server])
+    } else {
+      saveMCPServers([...mcpServers, server])
+    }
     setIsAddMCPOpen(false)
     resetMCPForm()
-    toast({ title: "Server Added", description: `${server.name} has been configured` })
+    toast({ title: "Server Added", description: `${server.name} added to ${addServerScope === 'global' ? 'all projects' : 'this project'}` })
   }
 
   const resetMCPForm = () => {
@@ -420,13 +435,21 @@ export default function ProjectPage() {
     setNewMCPHeaderValue('')
   }
 
-  const removeMCPServer = (id: string) => {
-    saveMCPServers(mcpServers.filter(s => s.id !== id))
+  const removeMCPServer = (id: string, scope: 'project' | 'global') => {
+    if (scope === 'global') {
+      saveGlobalMCPServers(globalMcpServers.filter(s => s.id !== id))
+    } else {
+      saveMCPServers(mcpServers.filter(s => s.id !== id))
+    }
     toast({ title: "Server Removed" })
   }
 
-  const toggleMCPServer = (id: string) => {
-    saveMCPServers(mcpServers.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s))
+  const toggleMCPServer = (id: string, scope: 'project' | 'global') => {
+    if (scope === 'global') {
+      saveGlobalMCPServers(globalMcpServers.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s))
+    } else {
+      saveMCPServers(mcpServers.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s))
+    }
   }
 
   const addMCPEnvVar = () => {
@@ -930,122 +953,149 @@ export default function ProjectPage() {
             </div>
 
             {/* Server List */}
-            {mcpServers.length > 0 ? (
-              <div className="space-y-3">
-                {mcpServers.map((server) => (
-                  <div key={server.id} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-                    <div className="flex items-center justify-between px-5 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg ${server.enabled ? 'bg-green-500/10' : 'bg-gray-800'}`}>
-                          {server.transport === 'stdio' ? (
-                            <Terminal className={`h-4 w-4 ${server.enabled ? 'text-green-400' : 'text-gray-500'}`} />
-                          ) : (
-                            <Wifi className={`h-4 w-4 ${server.enabled ? 'text-green-400' : 'text-gray-500'}`} />
+            {(() => {
+              const renderServerCard = (server: MCPServerConfig, scope: 'project' | 'global') => (
+                <div key={server.id} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+                  <div className="flex items-center justify-between px-5 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${server.enabled ? 'bg-green-500/10' : 'bg-gray-800'}`}>
+                        {server.transport === 'stdio' ? (
+                          <Terminal className={`h-4 w-4 ${server.enabled ? 'text-green-400' : 'text-gray-500'}`} />
+                        ) : (
+                          <Wifi className={`h-4 w-4 ${server.enabled ? 'text-green-400' : 'text-gray-500'}`} />
+                        )}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-white text-sm">{server.name}</span>
+                          <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-gray-700 text-gray-500">
+                            {server.transport}
+                          </Badge>
+                          {scope === 'global' && (
+                            <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-purple-500/30 text-purple-400 bg-purple-500/5">
+                              Global
+                            </Badge>
                           )}
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-white text-sm">{server.name}</span>
-                            <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-gray-700 text-gray-500">
-                              {server.transport}
-                            </Badge>
-                          </div>
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            {server.transport === 'stdio'
-                              ? `${server.command} ${(server.args || []).join(' ')}`.trim()
-                              : server.url}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Switch checked={server.enabled} onCheckedChange={() => toggleMCPServer(server.id)} />
-                        <button
-                          onClick={() => setExpandedMCP(expandedMCP === server.id ? null : server.id)}
-                          className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-500 hover:text-white transition-colors"
-                        >
-                          {expandedMCP === server.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                        </button>
-                        <button
-                          onClick={() => removeMCPServer(server.id)}
-                          className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-500 hover:text-red-400 transition-colors"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {server.transport === 'stdio'
+                            ? `${server.command} ${(server.args || []).join(' ')}`.trim()
+                            : server.url}
+                        </p>
                       </div>
                     </div>
-
-                    {/* Expanded details */}
-                    {expandedMCP === server.id && (
-                      <div className="px-5 pb-4 pt-1 border-t border-gray-800/50 space-y-3">
-                        {server.transport === 'stdio' ? (
-                          <>
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-gray-500">Command</span>
-                              <code className="text-xs text-gray-300 bg-gray-800 px-2 py-0.5 rounded font-mono">{server.command}</code>
-                            </div>
-                            {server.args && server.args.length > 0 && (
-                              <div>
-                                <span className="text-xs text-gray-500 block mb-1.5">Arguments</span>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {server.args.map((arg, i) => (
-                                    <code key={i} className="text-xs text-gray-300 bg-gray-800 px-2 py-0.5 rounded font-mono">{arg}</code>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-500">URL</span>
-                            <code className="text-xs text-gray-300 bg-gray-800 px-2 py-0.5 rounded font-mono">{server.url}</code>
-                          </div>
-                        )}
-                        {server.headers && Object.keys(server.headers).length > 0 && server.transport === 'http' && (
-                          <div>
-                            <span className="text-xs text-gray-500 block mb-1.5">Headers</span>
-                            <div className="space-y-1">
-                              {Object.entries(server.headers).map(([k, v]) => (
-                                <div key={k} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-gray-800/50">
-                                  <code className="text-xs text-indigo-400 font-mono">{k}</code>
-                                  <code className="text-xs text-gray-500 font-mono">
-                                    {k.toLowerCase() === 'authorization' ? `${v.slice(0, 10)}${'*'.repeat(Math.max(0, Math.min(v.length - 10, 15)))}` : '*'.repeat(Math.max(0, Math.min(v.length, 20)))}
-                                  </code>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {server.env && Object.keys(server.env).length > 0 && server.transport === 'stdio' && (
-                          <div>
-                            <span className="text-xs text-gray-500 block mb-1.5">Environment Variables</span>
-                            <div className="space-y-1">
-                              {Object.entries(server.env).map(([k, v]) => (
-                                <div key={k} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-gray-800/50">
-                                  <code className="text-xs text-indigo-400 font-mono">{k}</code>
-                                  <code className="text-xs text-gray-500 font-mono">{'*'.repeat(Math.min(v.length, 20))}</code>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <Switch checked={server.enabled} onCheckedChange={() => toggleMCPServer(server.id, scope)} />
+                      <button
+                        onClick={() => setExpandedMCP(expandedMCP === server.id ? null : server.id)}
+                        className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-500 hover:text-white transition-colors"
+                      >
+                        {expandedMCP === server.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      </button>
+                      <button
+                        onClick={() => removeMCPServer(server.id, scope)}
+                        className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-500 hover:text-red-400 transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
-                ))}
+                  {expandedMCP === server.id && (
+                    <div className="px-5 pb-4 pt-1 border-t border-gray-800/50 space-y-3">
+                      {server.transport === 'stdio' ? (
+                        <>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-gray-500">Command</span>
+                            <code className="text-xs text-gray-300 bg-gray-800 px-2 py-0.5 rounded font-mono">{server.command}</code>
+                          </div>
+                          {server.args && server.args.length > 0 && (
+                            <div>
+                              <span className="text-xs text-gray-500 block mb-1.5">Arguments</span>
+                              <div className="flex flex-wrap gap-1.5">
+                                {server.args.map((arg, i) => (
+                                  <code key={i} className="text-xs text-gray-300 bg-gray-800 px-2 py-0.5 rounded font-mono">{arg}</code>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-500">URL</span>
+                          <code className="text-xs text-gray-300 bg-gray-800 px-2 py-0.5 rounded font-mono truncate max-w-[300px]">{server.url}</code>
+                        </div>
+                      )}
+                      {server.headers && Object.keys(server.headers).length > 0 && server.transport === 'http' && (
+                        <div>
+                          <span className="text-xs text-gray-500 block mb-1.5">Headers</span>
+                          <div className="space-y-1">
+                            {Object.entries(server.headers).map(([k, v]) => (
+                              <div key={k} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-gray-800/50">
+                                <code className="text-xs text-indigo-400 font-mono">{k}</code>
+                                <code className="text-xs text-gray-500 font-mono">
+                                  {k.toLowerCase() === 'authorization' ? `${v.slice(0, 10)}${'*'.repeat(Math.max(0, Math.min(v.length - 10, 15)))}` : '*'.repeat(Math.max(0, Math.min(v.length, 20)))}
+                                </code>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {server.env && Object.keys(server.env).length > 0 && server.transport === 'stdio' && (
+                        <div>
+                          <span className="text-xs text-gray-500 block mb-1.5">Environment Variables</span>
+                          <div className="space-y-1">
+                            {Object.entries(server.env).map(([k, v]) => (
+                              <div key={k} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-gray-800/50">
+                                <code className="text-xs text-indigo-400 font-mono">{k}</code>
+                                <code className="text-xs text-gray-500 font-mono">{'*'.repeat(Math.max(0, Math.min(v.length, 20)))}</code>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+
+              const hasAny = mcpServers.length > 0 || globalMcpServers.length > 0
+              return hasAny ? (
+                <div className="space-y-4">
+                  {globalMcpServers.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Globe className="h-3.5 w-3.5 text-purple-400" />
+                        <span className="text-xs font-medium text-purple-400 uppercase tracking-wider">Global Servers (All Projects)</span>
+                      </div>
+                      {globalMcpServers.map(s => renderServerCard(s, 'global'))}
+                    </div>
+                  )}
+                  {mcpServers.length > 0 && (
+                    <div className="space-y-3">
+                      {globalMcpServers.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <Box className="h-3.5 w-3.5 text-indigo-400" />
+                          <span className="text-xs font-medium text-indigo-400 uppercase tracking-wider">Project Servers</span>
+                        </div>
+                      )}
+                      {mcpServers.map(s => renderServerCard(s, 'project'))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-gray-900 border border-gray-800 border-dashed rounded-xl p-10 text-center">
+                  <Server className="h-10 w-10 text-gray-700 mx-auto mb-3" />
+                  <h4 className="text-white font-medium mb-1">No MCP servers configured</h4>
+                  <p className="text-sm text-gray-500 mb-4 max-w-md mx-auto">
+                    Add MCP servers to give your AI assistant access to external tools like file systems, databases, web search, and more.
+                  </p>
+                  <Button onClick={() => setIsAddMCPOpen(true)} className="bg-indigo-600 hover:bg-indigo-500 h-9 text-sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Your First Server
+                  </Button>
               </div>
-            ) : (
-              <div className="bg-gray-900 border border-gray-800 border-dashed rounded-xl p-10 text-center">
-                <Server className="h-10 w-10 text-gray-700 mx-auto mb-3" />
-                <h4 className="text-white font-medium mb-1">No MCP servers configured</h4>
-                <p className="text-sm text-gray-500 mb-4 max-w-md mx-auto">
-                  Add MCP servers to give your AI assistant access to external tools like file systems, databases, web search, and more.
-                </p>
-                <Button onClick={() => setIsAddMCPOpen(true)} className="bg-indigo-600 hover:bg-indigo-500 h-9 text-sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Your First Server
-                </Button>
-              </div>
-            )}
+              )
+            })()}
 
             {/* Popular Servers Suggestions */}
             <div className="bg-gray-900 border border-gray-800 rounded-xl">
@@ -1307,6 +1357,31 @@ export default function ProjectPage() {
             <DialogDescription className="text-gray-400">Configure a new Model Context Protocol server</DialogDescription>
           </DialogHeader>
           <div className="space-y-5 py-4">
+            {/* Scope Toggle */}
+            <div>
+              <Label className="text-xs text-gray-400 mb-1.5 block">Availability</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setAddServerScope('project')}
+                  className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors text-left ${addServerScope === 'project' ? 'border-indigo-500 bg-indigo-500/10 text-white' : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'}`}
+                >
+                  <Box className="h-3.5 w-3.5" />
+                  <div>
+                    <p className="text-xs font-medium">This Project</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setAddServerScope('global')}
+                  className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors text-left ${addServerScope === 'global' ? 'border-purple-500 bg-purple-500/10 text-white' : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'}`}
+                >
+                  <Globe className="h-3.5 w-3.5" />
+                  <div>
+                    <p className="text-xs font-medium">All Projects</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+
             {/* Server Name */}
             <div>
               <Label className="text-xs text-gray-400 mb-1.5 block">Server Name</Label>

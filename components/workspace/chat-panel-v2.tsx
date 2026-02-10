@@ -4292,24 +4292,49 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
       console.log(`[ChatPanelV2] 📦 Compressing ${projectFiles.length} project files...`)
       const isInitialPrompt = messages.length === 0 // No previous messages (first prompt)
       // Load MCP server configs from localStorage for this project
+      // Load MCP servers: project-specific + global
       let mcpServersForProject: any[] = []
+      const mapServer = (s: any) => ({
+        name: s.name,
+        url: s.url,
+        transport: s.transport || 'http',
+        headers: { ...(s.headers || {}), ...(s.env || {}) },
+      })
+      const filterServer = (s: any) => s.enabled && s.transport !== 'stdio' && s.url
+
+      // Load global MCP servers first
+      try {
+        const globalStored = localStorage.getItem('pipilot-mcp-servers-global')
+        if (globalStored) {
+          const globalParsed = JSON.parse(globalStored)
+          mcpServersForProject.push(...globalParsed.filter(filterServer).map(mapServer))
+        }
+      } catch {}
+
+      // Then project-specific (may overlap names - project takes priority)
       if (project?.id) {
         try {
           const stored = localStorage.getItem(`pipilot-mcp-servers-${project.id}`)
           if (stored) {
             const parsed = JSON.parse(stored)
-            // Only include enabled HTTP/SSE servers (stdio can't run in serverless)
-            mcpServersForProject = parsed
-              .filter((s: any) => s.enabled && s.transport !== 'stdio' && s.url)
-              .map((s: any) => ({
-                name: s.name,
-                url: s.url,
-                transport: s.transport || 'http',
-                headers: { ...(s.headers || {}), ...(s.env || {}) },
-              }))
+            const projectServers = parsed.filter(filterServer).map(mapServer)
+            // Deduplicate: project servers override global with same name
+            const projectNames = new Set(projectServers.map((s: any) => s.name))
+            mcpServersForProject = mcpServersForProject.filter((s: any) => !projectNames.has(s.name))
+            mcpServersForProject.push(...projectServers)
           }
         } catch {}
       }
+
+      // Load tool preferences
+      let disabledToolCategories: string[] = []
+      try {
+        const toolPrefs = localStorage.getItem('pipilot-tool-preferences')
+        if (toolPrefs) {
+          const parsed = JSON.parse(toolPrefs)
+          disabledToolCategories = parsed.disabledCategories || []
+        }
+      } catch {}
 
       const metadata = {
         project,
@@ -4321,6 +4346,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
         stripeApiKey,
         isInitialPrompt,
         mcpServers: mcpServersForProject.length > 0 ? mcpServersForProject : undefined,
+        disabledToolCategories: disabledToolCategories.length > 0 ? disabledToolCategories : undefined,
       }
       const compressedData = await compressProjectFiles(projectFiles, fileTree, messagesToSend, metadata)
 
