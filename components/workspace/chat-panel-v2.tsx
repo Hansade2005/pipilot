@@ -316,7 +316,7 @@ const ExpandableUserMessage = ({
     <>
     <div className="relative w-full">
       <div className="bg-card text-card-foreground border rounded-xl overflow-hidden relative shadow-sm w-full flex flex-col">
-        <div className="p-4 break-words overflow-wrap-anywhere">
+        <div className="p-4 break-words overflow-hidden" style={{ overflowWrap: 'anywhere' }}>
           {/* Image previews */}
           {images && images.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-3">
@@ -344,7 +344,7 @@ const ExpandableUserMessage = ({
             /* Show full content when expanded with scrollable area */
             <div
               ref={contentRef}
-              className="max-h-[300px] overflow-y-auto"
+              className="max-h-[300px] overflow-y-auto overflow-x-hidden"
               style={{
                 scrollBehavior: 'smooth',
                 WebkitOverflowScrolling: 'touch'
@@ -5163,12 +5163,12 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
           <div
             key={message.id}
             className={cn(
-              'flex',
+              'flex min-w-0',
               message.role === 'user' ? 'justify-end' : 'justify-start'
             )}
           >
             {message.role === 'user' ? (
-              <div className="w-full">
+              <div className="w-full min-w-0">
                 <ExpandableUserMessage
                   content={message.content}
                   messageId={message.id}
