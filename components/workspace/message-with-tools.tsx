@@ -515,7 +515,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
   
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 overflow-hidden min-w-0">
       {/* OLD PILL SYSTEM - DISABLED IN FAVOR OF NEW INLINE PILL SYSTEM IN CHAT-PANEL-V2 */}
       {/* {hasTools && (
         <div className="space-y-2">
