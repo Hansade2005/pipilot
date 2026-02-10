@@ -381,10 +381,19 @@ export default function ProjectPage() {
       toast({ title: "Command required", description: "Please provide a command for stdio transport", variant: "destructive" })
       return
     }
+    // Auto-capture any pending header/env inputs the user typed but didn't click "+"
+    const finalHeaders = { ...(newMCPServer.headers || {}) }
+    if (newMCPHeaderKey && newMCPHeaderValue) {
+      finalHeaders[newMCPHeaderKey] = newMCPHeaderValue
+    }
+    const finalEnv = { ...(newMCPServer.env || {}) }
+    if (newMCPEnvKey && newMCPEnvValue) {
+      finalEnv[newMCPEnvKey] = newMCPEnvValue
+    }
     // Merge headers into env for HTTP servers (env is the unified storage, headers is the UI concept)
     const mergedEnv = newMCPServer.transport === 'http'
-      ? { ...(newMCPServer.env || {}), ...(newMCPServer.headers || {}) }
-      : (newMCPServer.env || {})
+      ? { ...finalEnv, ...finalHeaders }
+      : finalEnv
     const server: MCPServerConfig = {
       id: crypto.randomUUID(),
       name: newMCPServer.name!,
@@ -392,7 +401,7 @@ export default function ProjectPage() {
       command: newMCPServer.command,
       args: newMCPArgs ? newMCPArgs.split('\n').map(a => a.trim()).filter(Boolean) : [],
       url: newMCPServer.url,
-      headers: newMCPServer.transport === 'http' ? (newMCPServer.headers || {}) : undefined,
+      headers: newMCPServer.transport === 'http' ? finalHeaders : undefined,
       env: mergedEnv,
       enabled: true,
     }
@@ -999,7 +1008,7 @@ export default function ProjectPage() {
                                 <div key={k} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-gray-800/50">
                                   <code className="text-xs text-indigo-400 font-mono">{k}</code>
                                   <code className="text-xs text-gray-500 font-mono">
-                                    {k.toLowerCase() === 'authorization' ? `${v.slice(0, 10)}${'*'.repeat(Math.min(v.length - 10, 15))}` : '*'.repeat(Math.min(v.length, 20))}
+                                    {k.toLowerCase() === 'authorization' ? `${v.slice(0, 10)}${'*'.repeat(Math.max(0, Math.min(v.length - 10, 15)))}` : '*'.repeat(Math.max(0, Math.min(v.length, 20)))}
                                   </code>
                                 </div>
                               ))}
@@ -1063,10 +1072,15 @@ export default function ProjectPage() {
                           name: s.name.toLowerCase().replace(/\s+/g, '-'),
                           transport: 'http',
                           url: s.url,
-                          headers: s.headerKey ? { [s.headerKey]: s.headerValue } : {},
+                          headers: {},
                           env: {},
                           enabled: true,
                         })
+                        // Pre-fill header input fields so user just completes the token
+                        if (s.headerKey) {
+                          setNewMCPHeaderKey(s.headerKey)
+                          setNewMCPHeaderValue(s.headerValue || '')
+                        }
                         setNewMCPArgs('')
                       } else {
                         setNewMCPServer({
@@ -1437,7 +1451,7 @@ export default function ProjectPage() {
                         <div key={k} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-800/50 border border-gray-800">
                           <code className="text-xs text-indigo-400 font-mono shrink-0">{k}</code>
                           <code className="text-xs text-gray-500 font-mono truncate flex-1">
-                            {k.toLowerCase() === 'authorization' ? `${v.slice(0, 10)}${'*'.repeat(Math.min(v.length - 10, 20))}` : (v ? '***' : '(empty)')}
+                            {k.toLowerCase() === 'authorization' ? `${v.slice(0, 10)}${'*'.repeat(Math.max(0, Math.min(v.length - 10, 20)))}` : (v ? '***' : '(empty)')}
                           </code>
                           <button onClick={() => removeMCPHeader(k)} className="text-gray-600 hover:text-red-400 shrink-0">
                             <X className="h-3.5 w-3.5" />
