@@ -1008,7 +1008,7 @@ export default function ProjectPage() {
                                 <div key={k} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-gray-800/50">
                                   <code className="text-xs text-indigo-400 font-mono">{k}</code>
                                   <code className="text-xs text-gray-500 font-mono">
-                                    {k.toLowerCase() === 'authorization' ? `${v.slice(0, 10)}${'*'.repeat(Math.min(v.length - 10, 15))}` : '*'.repeat(Math.min(v.length, 20))}
+                                    {k.toLowerCase() === 'authorization' ? `${v.slice(0, 10)}${'*'.repeat(Math.max(0, Math.min(v.length - 10, 15)))}` : '*'.repeat(Math.max(0, Math.min(v.length, 20)))}
                                   </code>
                                 </div>
                               ))}
@@ -1451,7 +1451,7 @@ export default function ProjectPage() {
                         <div key={k} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-800/50 border border-gray-800">
                           <code className="text-xs text-indigo-400 font-mono shrink-0">{k}</code>
                           <code className="text-xs text-gray-500 font-mono truncate flex-1">
-                            {k.toLowerCase() === 'authorization' ? `${v.slice(0, 10)}${'*'.repeat(Math.min(v.length - 10, 20))}` : (v ? '***' : '(empty)')}
+                            {k.toLowerCase() === 'authorization' ? `${v.slice(0, 10)}${'*'.repeat(Math.max(0, Math.min(v.length - 10, 20)))}` : (v ? '***' : '(empty)')}
                           </code>
                           <button onClick={() => removeMCPHeader(k)} className="text-gray-600 hover:text-red-400 shrink-0">
                             <X className="h-3.5 w-3.5" />
