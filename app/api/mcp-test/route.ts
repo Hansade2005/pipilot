@@ -1,5 +1,5 @@
 import { streamText, tool } from 'ai'
-import { createMCPClient, type MCPTransport } from '@ai-sdk/mcp'
+import { experimental_createMCPClient as createMCPClient } from '@ai-sdk/mcp'
 import { z } from 'zod'
 
 // Use Vercel AI Gateway for Devstral 2
