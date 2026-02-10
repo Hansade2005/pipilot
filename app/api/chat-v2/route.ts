@@ -10370,9 +10370,6 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
         try {
           if (!server.url) continue
           const headers: Record<string, string> = { ...(server.headers || {}) }
-          if (server.apiKey && !headers['Authorization']) {
-            headers['Authorization'] = `Bearer ${server.apiKey}`
-          }
           const transportType = server.transport === 'sse' ? 'sse' : 'http'
           const client = await createMCPClient({
             transport: {

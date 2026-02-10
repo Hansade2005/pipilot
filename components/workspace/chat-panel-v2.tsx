@@ -4305,8 +4305,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 name: s.name,
                 url: s.url,
                 transport: s.transport || 'http',
-                apiKey: s.env?.Authorization || s.env?.AUTHORIZATION || undefined,
-                headers: s.env || {},
+                headers: { ...(s.headers || {}), ...(s.env || {}) },
               }))
           }
         } catch {}
