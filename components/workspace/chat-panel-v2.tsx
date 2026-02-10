@@ -1191,8 +1191,63 @@ export function ChatPanelV2({
     }
   }, [isLoading])
 
-  // Chat mode state - true for Ask mode, false for Agent mode
+  // Process prompt queue when AI finishes loading
+  useEffect(() => {
+    if (!isLoading && promptQueueRef.current.length > 0 && !isProcessingQueueRef.current) {
+      isProcessingQueueRef.current = true
+      const nextItem = promptQueueRef.current[0]
+      // Small delay to let the UI settle after previous response
+      const timer = setTimeout(() => {
+        setPromptQueue(prev => prev.slice(1))
+        setInput(nextItem.text)
+        // Trigger submit after input is set
+        setTimeout(() => {
+          const form = document.querySelector('form[data-chat-form]') as HTMLFormElement
+          if (form) {
+            form.requestSubmit()
+          }
+          isProcessingQueueRef.current = false
+        }, 100)
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [isLoading])
+
+  // Chat mode state - true for Plan mode, false for Agent mode
   const [isAskMode, setIsAskMode] = useState(false)
+
+  // Prompt Queue - queue messages when AI is busy, persist to localStorage
+  const [promptQueue, setPromptQueue] = useState<Array<{ id: string; text: string; timestamp: number }>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('pipilot-prompt-queue')
+        return stored ? JSON.parse(stored) : []
+      } catch { return [] }
+    }
+    return []
+  })
+  const promptQueueRef = useRef(promptQueue)
+  promptQueueRef.current = promptQueue
+  const isProcessingQueueRef = useRef(false)
+
+  // Persist prompt queue to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('pipilot-prompt-queue', JSON.stringify(promptQueue))
+    }
+  }, [promptQueue])
+
+  const addToQueue = useCallback((text: string) => {
+    setPromptQueue(prev => [...prev, { id: Date.now().toString(), text, timestamp: Date.now() }])
+  }, [])
+
+  const removeFromQueue = useCallback((id: string) => {
+    setPromptQueue(prev => prev.filter(item => item.id !== id))
+  }, [])
+
+  const clearQueue = useCallback(() => {
+    setPromptQueue([])
+  }, [])
 
   // Supabase token management - automatic refresh
   const { token: supabaseToken, isLoading: tokenLoading, isExpired: tokenExpired, error: tokenError } = useSupabaseToken()
@@ -3920,6 +3975,23 @@ export function ChatPanelV2({
       return
     }
 
+    // If AI is busy and not processing from queue, add to queue instead
+    if (isLoading && !isProcessingQueueRef.current) {
+      const messageText = input.trim()
+      if (messageText) {
+        addToQueue(messageText)
+        setInput('')
+        if (textareaRef.current) {
+          textareaRef.current.style.height = '48px'
+        }
+        toast({
+          title: 'Added to queue',
+          description: 'Your message will be sent when the current response completes',
+        })
+      }
+      return
+    }
+
     // Check if images are still processing
     if (attachedImages.some((img: AttachedImage) => img.isProcessing)) {
       toast({
@@ -5322,6 +5394,41 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
         ? 'fixed bottom-12 left-0 right-0 p-4 z-[60] border-b'
         : 'p-4'
         }`}>
+        {/* Prompt Queue Pills */}
+        {promptQueue.length > 0 && (
+          <div className="mb-2 flex items-center gap-2 overflow-x-auto min-w-0">
+            <div className="flex items-center gap-1.5 flex-nowrap min-w-0 overflow-hidden">
+              {promptQueue.map((item, index) => (
+                <div
+                  key={item.id}
+                  className="flex items-center gap-1 px-2 py-1 rounded-full text-xs border max-w-[200px] flex-shrink-0 bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800"
+                >
+                  <span className="relative flex h-2 w-2 flex-shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                  </span>
+                  <span className="text-red-700 dark:text-red-300 font-medium flex-shrink-0">#{index + 1}</span>
+                  <span className="truncate text-red-600 dark:text-red-400">{item.text}</span>
+                  <button
+                    onClick={() => removeFromQueue(item.id)}
+                    className="ml-0.5 hover:bg-red-200 dark:hover:bg-red-800 rounded-full p-0.5 flex-shrink-0"
+                  >
+                    <X className="size-3 text-red-500" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            {promptQueue.length > 1 && (
+              <button
+                onClick={clearQueue}
+                className="text-xs text-red-500 hover:text-red-700 dark:hover:text-red-300 flex-shrink-0 underline"
+              >
+                Clear all
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Tagged Component Context Pill */}
         {taggedComponent && (
           <div className="mb-2">
@@ -5458,7 +5565,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
             </div>
           )}
 
-          <form onSubmit={handleEnhancedSubmit}>
+          <form data-chat-form onSubmit={handleEnhancedSubmit}>
             <Textarea
               ref={textareaRef}
               value={input}
@@ -5815,12 +5922,12 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
 
           {/* Bottom Right: Mode Toggle and Send/Stop Button */}
           <div className="absolute bottom-2 right-2 flex items-center gap-2">
-            {/* Ask Mode Toggle */}
+            {/* Plan Mode Toggle */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <div className="flex items-center gap-2">
                   <label htmlFor="ask-mode-switch" className="text-xs text-gray-400 cursor-pointer select-none">
-                    Ask
+                    Plan
                   </label>
                   <Switch
                     id="ask-mode-switch"
@@ -5831,7 +5938,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 </div>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Chat with PiPilot for guidance and research without making file changes</p>
+                <p>Plan mode - AI reasons and plans before writing code, without making file changes</p>
               </TooltipContent>
             </Tooltip>
 
