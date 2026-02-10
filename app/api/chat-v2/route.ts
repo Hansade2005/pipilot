@@ -1,4 +1,5 @@
 import { streamText, tool, stepCountIs } from 'ai'
+import { createMCPClient } from '@ai-sdk/mcp'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { getModel, needsMistralVisionProvider, getDevstralVisionModel } from '@/lib/ai-providers'
@@ -2219,7 +2220,8 @@ export async function POST(req: Request) {
       supabaseProjectDetails, // Supabase project details from client
       supabase_projectId, // Extracted Supabase project ID to avoid conflicts
       supabaseUserId, // Authenticated Supabase user ID from client
-      stripeApiKey // Stripe API key from client for payment operations
+      stripeApiKey, // Stripe API key from client for payment operations
+      mcpServers // MCP server configurations from client [{url, name, apiKey?}]
     } = body || {}
 
     // For binary requests, extract metadata from compressed data
@@ -5878,6 +5880,28 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
             title,
             description
           }, projectId, toolCallId);
+        }
+      }),
+
+      generate_image: tool({
+        description: 'Generate an AI image from a text description. Returns a URL that can be used directly in <img> tags. Use this when the user needs placeholder images, illustrations, icons, backgrounds, or any visual asset for their app. Describe the image in detail for best results.',
+        inputSchema: z.object({
+          prompt: z.string().describe('Detailed description of the image to generate (e.g., "modern minimalist dashboard with dark theme and blue accents")'),
+          aspect: z.enum(['1:1', '16:9']).optional().describe('Aspect ratio of the image. Use 1:1 for icons/avatars/squares, 16:9 for banners/heroes/backgrounds. Defaults to 16:9'),
+          seed: z.number().optional().describe('Seed number for reproducible results. Use same seed to get same image.')
+        }),
+        execute: async ({ prompt, aspect, seed }) => {
+          const aspectRatio = aspect || '16:9'
+          const seedValue = seed || Math.floor(Math.random() * 10000)
+          const imageUrl = `https://api.a0.dev/assets/image?text=${encodeURIComponent(prompt)}&aspect=${aspectRatio}&seed=${seedValue}`
+          return {
+            success: true,
+            imageUrl,
+            prompt,
+            aspect: aspectRatio,
+            seed: seedValue,
+            usage: `Use this URL directly in an <img> tag: ${imageUrl}`
+          }
         }
       }),
 
@@ -10270,7 +10294,7 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
     }
 
     // Filter tools based on chat mode and UI initial prompt detection
-    const readOnlyTools = ['read_file', 'grep_search', 'list_files', 'web_search', 'web_extract']
+    const readOnlyTools = ['read_file', 'grep_search', 'list_files', 'web_search', 'web_extract', 'generate_image']
     const uiInitialPromptTools = [
       'list_files', 'check_dev_errors', 'grep_search', 'semantic_code_navigator',
       'web_search', 'web_extract', 'remove_package',
@@ -10334,6 +10358,43 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
         console.log(`[Chat-V2] Agent mode - filtered out ${unavailableTools.length} unavailable tools (missing keys/config):`, unavailableTools)
       } else {
         toolsToUse = allTools
+      }
+    }
+
+    // MCP Server Integration - connect to user-configured MCP servers and merge their tools
+    const mcpClients: any[] = []
+    if (mcpServers && Array.isArray(mcpServers) && mcpServers.length > 0) {
+      console.log(`[Chat-V2] 🔌 Connecting to ${mcpServers.length} MCP server(s)...`)
+      for (const server of mcpServers) {
+        try {
+          if (!server.url) continue
+          const headers: Record<string, string> = {}
+          if (server.apiKey) {
+            headers['Authorization'] = `Bearer ${server.apiKey}`
+          }
+          const client = await createMCPClient({
+            transport: {
+              type: server.transport || 'sse',
+              url: server.url,
+              headers,
+            },
+          })
+          mcpClients.push(client)
+          const mcpTools = await client.tools()
+          const toolCount = Object.keys(mcpTools).length
+          console.log(`[Chat-V2] 🔌 Connected to MCP server "${server.name || server.url}" - ${toolCount} tools`)
+          // Merge MCP tools into toolsToUse (local tools take priority)
+          toolsToUse = { ...mcpTools, ...toolsToUse }
+        } catch (err) {
+          console.error(`[Chat-V2] ❌ Failed to connect to MCP server "${server.name || server.url}":`, err)
+        }
+      }
+    }
+
+    // Helper to close all MCP clients
+    const closeMCPClients = async () => {
+      for (const client of mcpClients) {
+        try { await client.close() } catch {}
       }
     }
 
@@ -10572,13 +10633,16 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
       tools: toolsToUse,
       stopWhen: stepCountIs(maxStepsAllowed), // Stop when max steps reached
       ...(isAnthropicModel && anthropicProviderOptions ? { providerOptions: anthropicProviderOptions } : {}),
-      onFinish: ({ response }: any) => {
+      onFinish: async ({ response }: any) => {
         console.log(`[Chat-V2] Finished with ${response.messages.length} messages`)
-        
+
         // Log Anthropic metadata if available
         if (isAnthropicModel && response?.providerMetadata?.anthropic) {
           console.log('[Chat-V2] Anthropic metadata:', response.providerMetadata.anthropic)
         }
+
+        // Close MCP clients
+        await closeMCPClients()
       }
     })
 
