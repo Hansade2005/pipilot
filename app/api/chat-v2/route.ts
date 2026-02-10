@@ -2241,6 +2241,7 @@ export async function POST(req: Request) {
       supabase_projectId = metadata.supabase_projectId || supabase_projectId
       supabaseUserId = metadata.supabaseUserId || supabaseUserId
       stripeApiKey = metadata.stripeApiKey || stripeApiKey
+      mcpServers = metadata.mcpServers || mcpServers
     }
 
     // Use fileTree from binary metadata if available, otherwise from JSON
@@ -10368,21 +10369,22 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
       for (const server of mcpServers) {
         try {
           if (!server.url) continue
-          const headers: Record<string, string> = {}
-          if (server.apiKey) {
+          const headers: Record<string, string> = { ...(server.headers || {}) }
+          if (server.apiKey && !headers['Authorization']) {
             headers['Authorization'] = `Bearer ${server.apiKey}`
           }
+          const transportType = server.transport === 'sse' ? 'sse' : 'http'
           const client = await createMCPClient({
             transport: {
-              type: server.transport || 'sse',
+              type: transportType as 'http' | 'sse',
               url: server.url,
-              headers,
+              headers: Object.keys(headers).length > 0 ? headers : undefined,
             },
           })
           mcpClients.push(client)
           const mcpTools = await client.tools()
           const toolCount = Object.keys(mcpTools).length
-          console.log(`[Chat-V2] 🔌 Connected to MCP server "${server.name || server.url}" - ${toolCount} tools`)
+          console.log(`[Chat-V2] 🔌 Connected to MCP server "${server.name || server.url}" - ${toolCount} tools available`)
           // Merge MCP tools into toolsToUse (local tools take priority)
           toolsToUse = { ...mcpTools, ...toolsToUse }
         } catch (err) {
