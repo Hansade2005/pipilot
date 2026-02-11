@@ -5638,186 +5638,156 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
       </div>
 
       {/* Input Area - Fixed at bottom */}
-      <div className={`border-t bg-background p-4 ${isMobile
-        ? 'fixed bottom-12 left-0 right-0 p-4 z-[60] border-b'
-        : 'p-4'
+      <div className={`bg-background px-3 pb-3 pt-2 ${isMobile
+        ? 'fixed bottom-12 left-0 right-0 z-[60]'
+        : ''
         }`}>
-        {/* Prompt Queue Pills */}
+
+        {/* Prompt Queue - Collapsible accordion with Claude-style badges */}
         {promptQueue.length > 0 && (
-          <div className="mb-2 flex items-center gap-2 overflow-x-auto min-w-0">
-            <div className="flex items-center gap-1.5 flex-nowrap min-w-0 overflow-hidden">
+          <div className="mb-2">
+            <button
+              className="flex items-center gap-2 text-xs text-gray-400 hover:text-gray-300 transition-colors mb-1"
+              onClick={() => {
+                const el = document.getElementById('queue-accordion')
+                if (el) el.classList.toggle('hidden')
+              }}
+            >
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-800 text-gray-300 text-[11px] font-medium">
+                {promptQueue.length} queued
+              </span>
+              {promptQueue.length > 1 && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); clearQueue() }}
+                  className="text-[11px] text-gray-500 hover:text-red-400 transition-colors"
+                >
+                  Clear all
+                </button>
+              )}
+            </button>
+            <div id="queue-accordion" className="flex flex-col gap-1">
               {promptQueue.map((item, index) => (
                 <div
                   key={item.id}
-                  className="flex items-center gap-1 px-2 py-1 rounded-full text-xs border max-w-[200px] flex-shrink-0 bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800"
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-gray-800/60 text-xs group"
                 >
-                  <span className="relative flex h-2 w-2 flex-shrink-0">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                  </span>
-                  <span className="text-red-700 dark:text-red-300 font-medium flex-shrink-0">#{index + 1}</span>
-                  <span className="truncate text-red-600 dark:text-red-400">{item.text}</span>
+                  <span className="text-gray-500 font-mono text-[10px] flex-shrink-0">#{index + 1}</span>
+                  <span className="truncate text-gray-300 flex-1">{item.text}</span>
                   <button
                     onClick={() => removeFromQueue(item.id)}
-                    className="ml-0.5 hover:bg-red-200 dark:hover:bg-red-800 rounded-full p-0.5 flex-shrink-0"
+                    className="opacity-0 group-hover:opacity-100 hover:text-red-400 text-gray-500 transition-all flex-shrink-0"
                   >
-                    <X className="size-3 text-red-500" />
+                    <X className="size-3" />
                   </button>
                 </div>
               ))}
             </div>
-            {promptQueue.length > 1 && (
-              <button
-                onClick={clearQueue}
-                className="text-xs text-red-500 hover:text-red-700 dark:hover:text-red-300 flex-shrink-0 underline"
-              >
-                Clear all
-              </button>
-            )}
           </div>
         )}
 
-        {/* Tagged Component Context Pill */}
-        {taggedComponent && (
-          <div className="mb-2">
-            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800 px-3 py-1.5 rounded-full text-xs">
-              <Square className="size-3 text-blue-600 dark:text-blue-400" />
-              <span className="font-medium text-blue-800 dark:text-blue-200">
-                &lt;{taggedComponent.tagName}&gt;
-              </span>
-              {taggedComponent.sourceFile && (
-                <span className="text-blue-600/70 dark:text-blue-400/70">
-                  {taggedComponent.sourceFile}
-                  {taggedComponent.sourceLine && `:${taggedComponent.sourceLine}`}
-                </span>
-              )}
-              {taggedComponent.textContent && (
-                <span className="text-blue-600/60 dark:text-blue-400/60 truncate max-w-[100px]" title={taggedComponent.textContent}>
-                  "{taggedComponent.textContent.slice(0, 20)}{taggedComponent.textContent.length > 20 ? '...' : ''}"
-                </span>
-              )}
-              <button
-                onClick={onClearTaggedComponent}
-                className="ml-1 hover:bg-blue-200 dark:hover:bg-blue-800 rounded-full p-0.5"
-              >
-                <X className="size-3 text-blue-600 dark:text-blue-400" />
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Main Input Container - Claude-style rounded card */}
+        <div className="relative rounded-2xl border border-gray-700/60 bg-gray-900/80 focus-within:border-gray-600 transition-colors overflow-hidden">
 
-        {/* Attachments Display */}
-        {(attachedFiles.length > 0 || attachedImages.length > 0 || attachedUploadedFiles.length > 0 || attachedUrls.length > 0 || attachedSearchContexts.length > 0) && (
-          <div className="mb-2 flex flex-wrap gap-2">
-            {attachedFiles.map((file: AttachedFile) => (
-              <div key={file.id} className="flex items-center gap-1 bg-secondary px-2 py-1 rounded text-xs">
-                <FileText className="size-3" />
-                <span>{file.name}</span>
-                <button onClick={() => setAttachedFiles((prev: AttachedFile[]) => prev.filter((f: AttachedFile) => f.id !== file.id))}>
+          {/* Tagged Component Context */}
+          {taggedComponent && (
+            <div className="px-3 pt-2.5">
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-blue-950/30 border border-blue-800/40 text-xs">
+                <Square className="size-3 text-blue-400" />
+                <span className="font-medium text-blue-300">&lt;{taggedComponent.tagName}&gt;</span>
+                {taggedComponent.sourceFile && (
+                  <span className="text-blue-400/60">{taggedComponent.sourceFile}{taggedComponent.sourceLine && `:${taggedComponent.sourceLine}`}</span>
+                )}
+                <button onClick={onClearTaggedComponent} className="hover:text-red-400 text-blue-400/60 transition-colors">
                   <X className="size-3" />
                 </button>
               </div>
-            ))}
-            {attachedImages.map((img: AttachedImage) => (
-              <div key={img.id} className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${img.isProcessing ? 'bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700' : 'bg-secondary'}`}>
-                <ImageIcon className="size-3" />
-                <span>{img.name}</span>
-                {img.isProcessing ? (
-                  <>
-                    <Loader2 className="size-3 animate-spin text-blue-500" />
-                    <button
-                      onClick={() => {
-                        // Cancel the processing
-                        if (img.abortController) {
-                          img.abortController.abort()
-                        }
-                      }}
-                      className="ml-1 text-red-500 hover:text-red-700"
-                      title="Cancel processing"
-                    >
-                      <X className="size-3" />
-                    </button>
-                  </>
-                ) : (
-                  <button onClick={() => setAttachedImages((prev: AttachedImage[]) => prev.filter((i: AttachedImage) => i.id !== img.id))}>
+            </div>
+          )}
+
+          {/* Attachments inside the card */}
+          {(attachedFiles.length > 0 || attachedImages.length > 0 || attachedUploadedFiles.length > 0 || attachedUrls.length > 0 || attachedSearchContexts.length > 0) && (
+            <div className="px-3 pt-2.5 flex flex-wrap gap-1.5">
+              {attachedFiles.map((file: AttachedFile) => (
+                <div key={file.id} className="flex items-center gap-1.5 bg-gray-800 px-2 py-1 rounded-lg text-xs text-gray-300 group">
+                  <FileText className="size-3 text-gray-500" />
+                  <span className="truncate max-w-[120px]">{file.name}</span>
+                  <button className="opacity-0 group-hover:opacity-100 hover:text-red-400 text-gray-500 transition-all" onClick={() => setAttachedFiles((prev: AttachedFile[]) => prev.filter((f: AttachedFile) => f.id !== file.id))}>
                     <X className="size-3" />
                   </button>
-                )}
-              </div>
-            ))}
-            {attachedUploadedFiles.map((file: AttachedUploadedFile) => (
-              <div key={file.id} className="flex items-center gap-1 bg-secondary px-2 py-1 rounded text-xs">
-                <FileText className="size-3" />
-                <span>{file.name}</span>
-                <button onClick={() => setAttachedUploadedFiles((prev: AttachedUploadedFile[]) => prev.filter((f: AttachedUploadedFile) => f.id !== file.id))}>
-                  <X className="size-3" />
-                </button>
-              </div>
-            ))}
-            {attachedUrls.map((url: AttachedUrl) => (
-              <div key={url.id} className="flex items-center gap-1 bg-secondary px-2 py-1 rounded text-xs">
-                <LinkIcon className="size-3" />
-                <span>{url.title || url.url}</span>
-                {url.isProcessing && <Loader2 className="size-3 animate-spin" />}
-                <button onClick={() => setAttachedUrls((prev: AttachedUrl[]) => prev.filter((u: AttachedUrl) => u.id !== url.id))}>
-                  <X className="size-3" />
-                </button>
-              </div>
-            ))}
-            {/* Search Context Attachments */}
-            {attachedSearchContexts.map((ctx: AttachedSearchContext) => (
-              <SearchContextPill
-                key={ctx.id}
-                context={ctx}
-                onRemove={() => handleRemoveSearchContext(ctx.id)}
-                onClick={() => handleOpenFileFromSearch(ctx.filePath, ctx.lineNumber)}
-              />
-            ))}
-          </div>
-        )}
+                </div>
+              ))}
+              {attachedImages.map((img: AttachedImage) => (
+                <div key={img.id} className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs group ${img.isProcessing ? 'bg-blue-900/30 text-blue-300' : 'bg-gray-800 text-gray-300'}`}>
+                  <ImageIcon className="size-3 text-gray-500" />
+                  <span className="truncate max-w-[120px]">{img.name}</span>
+                  {img.isProcessing ? (
+                    <>
+                      <Loader2 className="size-3 animate-spin text-blue-400" />
+                      <button onClick={() => { if (img.abortController) img.abortController.abort() }} className="hover:text-red-400 text-blue-400/60 transition-colors">
+                        <X className="size-3" />
+                      </button>
+                    </>
+                  ) : (
+                    <button className="opacity-0 group-hover:opacity-100 hover:text-red-400 text-gray-500 transition-all" onClick={() => setAttachedImages((prev: AttachedImage[]) => prev.filter((i: AttachedImage) => i.id !== img.id))}>
+                      <X className="size-3" />
+                    </button>
+                  )}
+                </div>
+              ))}
+              {attachedUploadedFiles.map((file: AttachedUploadedFile) => (
+                <div key={file.id} className="flex items-center gap-1.5 bg-gray-800 px-2 py-1 rounded-lg text-xs text-gray-300 group">
+                  <FileText className="size-3 text-gray-500" />
+                  <span className="truncate max-w-[120px]">{file.name}</span>
+                  <button className="opacity-0 group-hover:opacity-100 hover:text-red-400 text-gray-500 transition-all" onClick={() => setAttachedUploadedFiles((prev: AttachedUploadedFile[]) => prev.filter((f: AttachedUploadedFile) => f.id !== file.id))}>
+                    <X className="size-3" />
+                  </button>
+                </div>
+              ))}
+              {attachedUrls.map((url: AttachedUrl) => (
+                <div key={url.id} className="flex items-center gap-1.5 bg-gray-800 px-2 py-1 rounded-lg text-xs text-gray-300 group">
+                  <LinkIcon className="size-3 text-gray-500" />
+                  <span className="truncate max-w-[120px]">{url.title || url.url}</span>
+                  {url.isProcessing && <Loader2 className="size-3 animate-spin text-gray-400" />}
+                  <button className="opacity-0 group-hover:opacity-100 hover:text-red-400 text-gray-500 transition-all" onClick={() => setAttachedUrls((prev: AttachedUrl[]) => prev.filter((u: AttachedUrl) => u.id !== url.id))}>
+                    <X className="size-3" />
+                  </button>
+                </div>
+              ))}
+              {attachedSearchContexts.map((ctx: AttachedSearchContext) => (
+                <SearchContextPill
+                  key={ctx.id}
+                  context={ctx}
+                  onRemove={() => handleRemoveSearchContext(ctx.id)}
+                  onClick={() => handleOpenFileFromSearch(ctx.filePath, ctx.lineNumber)}
+                />
+              ))}
+            </div>
+          )}
 
-        <div className="relative">
-          {/* Credit Alert Pill - Positioned inside the textarea area */}
+          {/* Credit Alert - inside card top */}
           {!loadingCredits && creditBalance !== null && creditBalance <= 3 && (
-            <div className="absolute top-2 right-16 z-10">
-              <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20 border border-yellow-200 dark:border-yellow-800">
-                <AlertTriangle className="h-3 w-3 text-yellow-600 dark:text-yellow-400" />
-                <span className="text-xs font-medium text-yellow-800 dark:text-yellow-200">
-                  {creditBalance.toFixed(1)} credits
-                </span>
+            <div className="px-3 pt-2">
+              <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-yellow-950/20 border border-yellow-800/30 text-xs">
+                <AlertTriangle className="h-3 w-3 text-yellow-500" />
+                <span className="text-yellow-400 font-medium">{creditBalance.toFixed(1)} credits</span>
                 {(() => {
                   const planConfig = PRODUCT_CONFIGS[currentPlan]
                   const canPurchase = planConfig ? planConfig.limits.canPurchaseCredits : false
                   return canPurchase ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-5 px-2 text-xs border-yellow-300 text-yellow-700 hover:bg-yellow-50 dark:border-yellow-700 dark:text-yellow-300 dark:hover:bg-yellow-950 ml-1"
-                      onClick={() => setShowTopUpDialog(true)}
-                    >
-                      <CreditCard className="h-2.5 w-2.5 mr-1" />
-                      Buy
-                    </Button>
+                    <button className="text-yellow-500 hover:text-yellow-300 font-medium ml-1 transition-colors" onClick={() => setShowTopUpDialog(true)}>Buy</button>
                   ) : (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-5 px-2 text-xs border-yellow-300 text-yellow-700 hover:bg-yellow-50 dark:border-yellow-700 dark:text-yellow-300 dark:hover:bg-yellow-950 ml-1"
-                      onClick={() => window.location.href = '/pricing'}
-                    >
-                      Upgrade
-                    </Button>
+                    <button className="text-yellow-500 hover:text-yellow-300 font-medium ml-1 transition-colors" onClick={() => window.location.href = '/pricing'}>Upgrade</button>
                   )
                 })()}
               </div>
             </div>
           )}
 
+          {/* Textarea */}
           <form data-chat-form onSubmit={handleEnhancedSubmit}>
             <Textarea
               ref={textareaRef}
               value={input}
-              disabled={isLoading}
               onChange={(e) => {
                 const newValue = e.target.value
                 setInput(newValue)
@@ -5862,7 +5832,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 }, 0)
               }}
               placeholder="Type, @ for files, paste images or URLs, or attach..."
-              className="min-h-[48px] max-h-[140px] resize-none pr-12 pb-12"
+              className="min-h-[44px] max-h-[140px] resize-none border-0 bg-transparent text-gray-100 placeholder:text-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0 px-3.5 pt-3 pb-2 text-sm"
               onKeyDown={(e: any) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
@@ -6099,34 +6069,18 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
           </form>
 
           {/* Hidden file inputs */}
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={handleImageUpload}
-            className="hidden"
-            id="image-upload"
-          />
-          <input
-            type="file"
-            multiple
-            onChange={handleFileUpload}
-            className="hidden"
-            id="file-upload"
-          />
+          <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" id="image-upload" />
+          <input type="file" multiple onChange={handleFileUpload} className="hidden" id="file-upload" />
 
-          {/* Bottom Bar: [+] [Mic] left | [Model] [Plan] [Send] right */}
-          <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+          {/* Bottom Bar inside the card */}
+          <div className="flex items-center justify-between px-2 pb-2">
             {/* Left Side: + Command Menu and Voice */}
             <div className="flex items-center gap-1">
               {/* + Command Menu Button */}
               <div className="relative" ref={commandMenuRef}>
-                <Button
+                <button
                   type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  disabled={isLoading}
+                  className="h-8 w-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
                   onClick={() => {
                     setShowCommandMenu(!showCommandMenu)
                     setCommandMenuSubmenu('none')
@@ -6134,7 +6088,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                   }}
                 >
                   <Plus className={`size-4 transition-transform ${showCommandMenu ? 'rotate-45' : ''}`} />
-                </Button>
+                </button>
 
                 {/* Command Menu Palette */}
                 {showCommandMenu && (
@@ -6575,13 +6529,11 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
               </div>
 
               {/* Voice Button - Waveform icon */}
-              <Button
+              <button
                 type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
+                className="h-8 w-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                 onClick={handleMicrophoneClick}
-                disabled={isTranscribing || isLoading}
+                disabled={isTranscribing}
               >
                 {isRecording ? (
                   <svg width="16" height="16" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-red-400 animate-pulse">
@@ -6602,7 +6554,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                     <rect x="20" y="7.5" height="6" fill="currentColor" fillOpacity="0.5" width="1" rx="0.5" ry="0.5" />
                   </svg>
                 )}
-              </Button>
+              </button>
             </div>
 
             {/* Right Side: Model Selector, Plan Toggle, Send/Stop */}
@@ -6639,26 +6591,23 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
 
               {/* Send/Stop Button */}
               {isLoading ? (
-                <Button
+                <button
                   type="button"
-                  variant="default"
-                  size="icon"
-                  className="h-8 w-8 rounded-full"
+                  className="h-7 w-7 rounded-lg bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors"
                   onClick={handleStop}
                 >
-                  <Square className="w-4 h-4 bg-red-500 animate-pulse" />
-                </Button>
+                  <Square className="w-3.5 h-3.5 text-white fill-white" />
+                </button>
               ) : (
-                <Button
+                <button
                   ref={sendButtonRef}
                   type="button"
-                  size="icon"
-                  className="h-8 w-8 rounded-full"
+                  className="h-7 w-7 rounded-lg bg-orange-600 hover:bg-orange-500 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
                   disabled={(!input.trim() && attachedFiles.length === 0 && attachedImages.length === 0) || attachedImages.some((img: AttachedImage) => img.isProcessing)}
                   onClick={handleEnhancedSubmit}
                 >
-                  <ArrowUp className="size-4" />
-                </Button>
+                  <ArrowUp className="size-4 text-white" />
+                </button>
               )}
             </div>
           </div>
