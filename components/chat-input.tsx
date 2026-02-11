@@ -19,6 +19,7 @@ import { toast } from "sonner"
 import { filterUnwantedFiles } from "@/lib/utils"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Suggestions, Suggestion } from "@/components/ai-elements/suggestion"
+import { getRandomSuggestions } from "@/lib/project-suggestions"
 
 // Load JSZip from CDN (same as file explorer)
 if (typeof window !== 'undefined' && !window.JSZip) {
@@ -185,9 +186,9 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   const isWebSpeechSupported = typeof window !== 'undefined' && 
     ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)
 
-  // Fetch prompt suggestions on component mount
+  // Load suggestions from static data on mount
   useEffect(() => {
-    fetchPromptSuggestions()
+    setSuggestions(getRandomSuggestions(15))
   }, [])
 
   // Close template dropdown on outside click
@@ -202,34 +203,8 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     return () => document.removeEventListener('mousedown', handleClick)
   }, [showTemplateDropdown])
 
-  const fetchPromptSuggestions = async () => {
-    try {
-      const response = await fetch('/api/prompt-suggestions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ count: 15 }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success && data.suggestions) {
-          setSuggestions(data.suggestions)
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch prompt suggestions:', error)
-      // Fallback suggestions
-      setSuggestions([
-        { display: "Landing page", prompt: "Create a modern landing page for my startup" },
-        { display: "Portfolio site", prompt: "Build a portfolio website to showcase my work" },
-        { display: "Restaurant menu", prompt: "Design a restaurant website with menu" },
-        { display: "E-commerce store", prompt: "Make an e-commerce store for clothing" },
-        { display: "Blog with dark mode", prompt: "Create a blog website with dark mode" },
-        { display: "Business website", prompt: "Build a business website with contact forms" }
-      ])
-    }
+  const refreshSuggestions = () => {
+    setSuggestions(getRandomSuggestions(15))
   }
 
   // Prompt enhancement using Pixtral AI
@@ -1543,7 +1518,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
             ))}
             <Suggestion
               suggestion="Refresh Suggestions"
-              onClick={() => fetchPromptSuggestions()}
+              onClick={() => refreshSuggestions()}
               disabled={isGenerating}
               title="Generate new prompt suggestions"
             >
