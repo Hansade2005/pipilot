@@ -542,14 +542,14 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
               >
                 <div className={cn(
                   'prose prose-sm dark:prose-invert max-w-none mt-2',
-                  'prose-pre:bg-muted prose-pre:text-foreground prose-pre:overflow-x-auto',
-                  'prose-code:text-foreground prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded',
-                  'prose-p:text-muted-foreground prose-p:break-words',
-                  'prose-headings:text-foreground',
-                  'prose-strong:text-foreground',
-                  'prose-ul:text-muted-foreground',
-                  'prose-ol:text-muted-foreground',
-                  'prose-a:break-all',
+                  'prose-pre:bg-gray-800/60 prose-pre:text-gray-200 prose-pre:overflow-x-auto',
+                  'prose-code:text-gray-200 prose-code:bg-gray-800/60 prose-code:px-1 prose-code:py-0.5 prose-code:rounded',
+                  'prose-p:text-gray-300 prose-p:break-words',
+                  'prose-headings:text-gray-100',
+                  'prose-strong:text-gray-100',
+                  'prose-ul:text-gray-300',
+                  'prose-ol:text-gray-300',
+                  'prose-a:break-all prose-a:text-blue-400',
                   'overflow-hidden break-words [overflow-wrap:anywhere]'
                 )}>
                   {inlineToolCalls && inlineToolCalls.length > 0 ? (
@@ -604,9 +604,12 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
       {hasResponse && (
         <div className={cn(
           'prose prose-sm dark:prose-invert max-w-none',
-          'prose-pre:bg-muted prose-pre:text-foreground prose-pre:overflow-x-auto',
-          'prose-code:text-foreground prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded',
-          'prose-a:break-all',
+          'prose-pre:bg-gray-800/60 prose-pre:text-gray-200 prose-pre:overflow-x-auto',
+          'prose-code:text-gray-200 prose-code:bg-gray-800/60 prose-code:px-1 prose-code:py-0.5 prose-code:rounded',
+          'prose-p:text-gray-300 prose-p:break-words',
+          'prose-headings:text-gray-100',
+          'prose-strong:text-gray-100',
+          'prose-a:break-all prose-a:text-blue-400',
           'overflow-hidden break-words [overflow-wrap:anywhere]'
         )}>
           {(() => {
@@ -697,9 +700,12 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
 
       {/* Show loading indicator if streaming and no content yet */}
       {isStreaming && !hasReasoning && !hasResponse && !hasTools && (
-        <div className="flex items-center justify-start gap-2 text-muted-foreground text-sm bg-transparent h-fit">
-          <Loader2 className="size-4 animate-spin" />
-          <span>Thinking...</span>
+        <div className="flex items-center justify-start gap-2.5 text-gray-400 text-sm bg-transparent h-fit py-1">
+          <div className="flex gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
         </div>
       )}
     </div>

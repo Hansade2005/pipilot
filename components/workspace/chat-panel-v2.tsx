@@ -21,7 +21,7 @@ import { MessageWithTools } from './message-with-tools'
 import {
   Send, Paperclip, Mic, MicOff, X, FileText, Image as ImageIcon,
   Link as LinkIcon, Loader2, ChevronDown, ChevronUp, StopCircle, Trash2, Plus,
-  Copy, ArrowUp, Undo2, Redo2, Check, AlertTriangle, Zap, Package, PackageMinus,
+  Copy, ArrowUp, ArrowDown, Undo2, Redo2, Check, AlertTriangle, Zap, Package, PackageMinus,
   Search, Globe, Eye, FolderOpen, Settings, Edit3, CheckCircle2, XCircle,
   Square, Database, CornerDownLeft, Table, Key, Code, Server, BarChart3,
   CreditCard, Coins, GitBranch, ChevronRight, ChevronLeft, Wrench,
@@ -247,8 +247,8 @@ const ExpandableUserMessage = ({
     return (
       <>
         <div className="relative w-full">
-          <div className="bg-card text-card-foreground border rounded-xl shadow-sm overflow-hidden w-full flex flex-col">
-            <div className="p-4 break-words overflow-hidden" style={{ overflowWrap: 'anywhere' }}>
+          <div className="bg-gray-800/70 rounded-2xl overflow-hidden w-full flex flex-col">
+            <div className="px-4 py-3.5 break-words overflow-hidden" style={{ overflowWrap: 'anywhere' }}>
               {/* Image previews */}
               {images && images.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-3">
@@ -257,38 +257,36 @@ const ExpandableUserMessage = ({
                       key={img.id}
                       src={img.base64}
                       alt={img.name}
-                      className="max-w-[120px] max-h-[90px] rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity border border-border"
+                      className="max-w-[120px] max-h-[90px] rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity border border-gray-700/50"
                       onClick={() => setPreviewImage(img.base64)}
                       title={img.name}
                     />
                   ))}
                 </div>
               )}
-              <p className="text-card-foreground text-sm leading-[1.5] whitespace-pre-wrap text-left">
+              <p className="text-gray-100 text-sm leading-[1.6] whitespace-pre-wrap text-left">
                 {content}
               </p>
             </div>
-          <div className="px-4 pb-2 flex justify-end">
-            <Actions>
-              <Action tooltip="Retry message" onClick={handleIconClick}>
-                <ArrowUp className="w-4 h-4" />
+          </div>
+          <div className="flex items-center justify-end gap-0.5 mt-1 opacity-0 hover:opacity-100 transition-opacity">
+            <Action tooltip="Retry message" onClick={handleIconClick}>
+              <ArrowUp className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
+            </Action>
+            {renderCheckpointButton()}
+            {onBranch && (
+              <Action tooltip="Branch from here" onClick={handleBranch}>
+                <GitBranch className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
               </Action>
-              {renderCheckpointButton()}
-              {onBranch && (
-                <Action tooltip="Branch from here" onClick={handleBranch}>
-                  <GitBranch className="w-4 h-4" />
-                </Action>
-              )}
-              <Action tooltip="Copy message" onClick={handleCopy}>
-                <Copy className="w-4 h-4" />
-              </Action>
-              <Action tooltip="Delete message" onClick={handleDelete}>
-                <Trash2 className="w-4 h-4" />
-              </Action>
-            </Actions>
+            )}
+            <Action tooltip="Copy message" onClick={handleCopy}>
+              <Copy className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
+            </Action>
+            <Action tooltip="Delete message" onClick={handleDelete}>
+              <Trash2 className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
+            </Action>
           </div>
         </div>
-      </div>
 
       {/* Image preview modal */}
       {previewImage && (
@@ -317,8 +315,8 @@ const ExpandableUserMessage = ({
   return (
     <>
     <div className="relative w-full">
-      <div className="bg-card text-card-foreground border rounded-xl overflow-hidden relative shadow-sm w-full flex flex-col">
-        <div className="p-4 break-words overflow-hidden" style={{ overflowWrap: 'anywhere' }}>
+      <div className="bg-gray-800/70 rounded-2xl overflow-hidden relative w-full flex flex-col">
+        <div className="px-4 py-3.5 break-words overflow-hidden" style={{ overflowWrap: 'anywhere' }}>
           {/* Image previews */}
           {images && images.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-3">
@@ -327,7 +325,7 @@ const ExpandableUserMessage = ({
                   key={img.id}
                   src={img.base64}
                   alt={img.name}
-                  className="max-w-[120px] max-h-[90px] rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity border border-border"
+                  className="max-w-[120px] max-h-[90px] rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity border border-gray-700/50"
                   onClick={() => setPreviewImage(img.base64)}
                   title={img.name}
                 />
@@ -337,7 +335,7 @@ const ExpandableUserMessage = ({
           {/* Show truncated content when collapsed */}
           {!isExpanded ? (
             <div>
-              <p className="text-card-foreground text-sm leading-[1.5] whitespace-pre-wrap text-left">
+              <p className="text-gray-100 text-sm leading-[1.6] whitespace-pre-wrap text-left">
                 {content.substring(0, CHAR_LIMIT)}
                 {content.length > CHAR_LIMIT && '...'}
               </p>
@@ -352,7 +350,7 @@ const ExpandableUserMessage = ({
                 WebkitOverflowScrolling: 'touch'
               }}
             >
-              <p className="text-card-foreground text-sm leading-[1.5] whitespace-pre-wrap text-left">
+              <p className="text-gray-100 text-sm leading-[1.6] whitespace-pre-wrap text-left">
                 {content}
               </p>
             </div>
@@ -361,38 +359,35 @@ const ExpandableUserMessage = ({
 
         {/* Expand/Collapse trigger */}
         <div
-          className="flex items-center justify-center px-4 py-2 border-t hover:bg-muted transition-colors cursor-pointer"
+          className="flex items-center justify-center px-4 py-2 border-t border-gray-700/40 hover:bg-gray-700/30 transition-colors cursor-pointer"
           onClick={() => setIsExpanded(!isExpanded)}
         >
-          <span className="text-xs text-muted-foreground mr-2">
+          <span className="text-xs text-gray-400 mr-2">
             {isExpanded ? 'Show less' : 'Show more'}
           </span>
           {isExpanded ? (
-            <ChevronUp className="w-3 h-3 text-muted-foreground" />
+            <ChevronUp className="w-3 h-3 text-gray-400" />
           ) : (
-            <ChevronDown className="w-3 h-3 text-muted-foreground" />
+            <ChevronDown className="w-3 h-3 text-gray-400" />
           )}
         </div>
-
-        <div className="px-4 pb-2 flex justify-end">
-          <Actions>
-            <Action tooltip="Retry message" onClick={handleIconClick}>
-              <ArrowUp className="w-4 h-4" />
-            </Action>
-            {renderCheckpointButton()}
-            {onBranch && (
-              <Action tooltip="Branch from here" onClick={handleBranch}>
-                <GitBranch className="w-4 h-4" />
-              </Action>
-            )}
-            <Action tooltip="Copy message" onClick={handleCopy}>
-              <Copy className="w-4 h-4" />
-            </Action>
-            <Action tooltip="Delete message" onClick={handleDelete}>
-              <Trash2 className="w-4 h-4" />
-            </Action>
-          </Actions>
-        </div>
+      </div>
+      <div className="flex items-center justify-end gap-0.5 mt-1 opacity-0 hover:opacity-100 transition-opacity">
+        <Action tooltip="Retry message" onClick={handleIconClick}>
+          <ArrowUp className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
+        </Action>
+        {renderCheckpointButton()}
+        {onBranch && (
+          <Action tooltip="Branch from here" onClick={handleBranch}>
+            <GitBranch className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
+          </Action>
+        )}
+        <Action tooltip="Copy message" onClick={handleCopy}>
+          <Copy className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
+        </Action>
+        <Action tooltip="Delete message" onClick={handleDelete}>
+          <Trash2 className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
+        </Action>
       </div>
     </div>
 
@@ -1121,8 +1116,11 @@ export function ChatPanelV2({
 }: ChatPanelV2Props) {
   const { toast } = useToast()
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const sendButtonRef = useRef<HTMLButtonElement>(null)
+  const [showScrollButton, setShowScrollButton] = useState(false)
+  const userIsNearBottomRef = useRef(true)
 
   // Debounce utility function
   const debounce = (func: Function, wait: number) => {
@@ -3113,10 +3111,31 @@ export function ChatPanelV2({
     }
   }, [error, toast])
 
-  // Auto-scroll on new messages
+  // Smart scroll: only auto-scroll when user is near the bottom
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (userIsNearBottomRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
   }, [messages])
+
+  // Track scroll position to show/hide scroll-to-bottom button
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight
+      const isNearBottom = distanceFromBottom < 120
+      userIsNearBottomRef.current = isNearBottom
+      setShowScrollButton(!isNearBottom)
+    }
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    return () => container.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [])
 
   // Fetch credit balance
   useEffect(() => {
@@ -5470,11 +5489,16 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
   }
 
   return (
-    <div className={`flex flex-col overflow-hidden ${isMobile ? 'h-[calc(100vh-9.5rem)]' : 'h-full'}`}>
+    <div className={`flex flex-col overflow-hidden ${isMobile ? 'h-[calc(100vh-9.5rem)]' : 'h-full'}`} style={{ backgroundColor: 'rgba(17, 24, 39, 0.8)' }}>
       {/* Messages Area - Scrollable container */}
-      <div className={`flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden space-y-4 ${isMobile ? 'p-4 pb-20' : 'p-4'}`}>
+      <div className="relative flex-1 min-h-0">
+        <div
+          ref={scrollContainerRef}
+          className={`h-full min-w-0 overflow-y-auto overflow-x-hidden space-y-5 ${isMobile ? 'px-4 pt-4 pb-20' : 'px-4 pt-4 pb-4'}`}
+          style={{ backgroundColor: 'rgba(17, 24, 39, 0.8)' }}
+        >
         {messages.length === 0 && (
-          <div className="flex items-center justify-center h-full text-muted-foreground">
+          <div className="flex items-center justify-center h-full text-gray-500">
             <p>Start a conversation with PiPilot...</p>
           </div>
         )}
@@ -5488,7 +5512,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
             )}
           >
             {message.role === 'user' ? (
-              <div className="w-full min-w-0">
+              <div className="max-w-[85%] min-w-0 ml-auto">
                 <ExpandableUserMessage
                   content={message.content}
                   messageId={message.id}
@@ -5502,12 +5526,8 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 />
               </div>
             ) : (
-              <Card className={cn("w-full overflow-hidden",
-                message.reasoning || message.content || (message.toolInvocations && message.toolInvocations.length > 0)
-                  ? "bg-muted"
-                  : "bg-transparent border-0"
-              )}>
-                <div className="p-4 break-words overflow-hidden" style={{ overflowWrap: 'anywhere' }}>
+              <div className="w-full">
+                <div className="py-1 break-words overflow-hidden" style={{ overflowWrap: 'anywhere' }}>
                   {/* Special Rendering: Supabase Connection Card */}
                   {(() => {
                     const toolCalls = activeToolCalls.get(message.id)
@@ -5610,24 +5630,22 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 </div>
                 {/* AI Message Actions - Only show if message has content */}
                 {message.content && message.content.trim().length > 0 && (
-                  <div className="px-4 pb-2 flex justify-end">
-                    <Actions>
-                      <Action
-                        tooltip="Copy message"
-                        onClick={() => handleCopyMessage(message.id, message.content)}
-                      >
-                        <Copy className="w-4 h-4" />
-                      </Action>
-                      <Action
-                        tooltip="Delete message"
-                        onClick={() => handleDeleteMessage(message.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Action>
-                    </Actions>
+                  <div className="pt-1 flex items-center gap-1">
+                    <Action
+                      tooltip="Copy message"
+                      onClick={() => handleCopyMessage(message.id, message.content)}
+                    >
+                      <Copy className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
+                    </Action>
+                    <Action
+                      tooltip="Delete message"
+                      onClick={() => handleDeleteMessage(message.id)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
+                    </Action>
                   </div>
                 )}
-              </Card>
+              </div>
             )}
           </div>
         ))}
@@ -5635,13 +5653,25 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
         {/* Don't show separate loading spinner - MessageWithTools handles it */}
 
         <div ref={messagesEndRef} />
+        </div>
+
+        {/* Scroll to bottom button - Claude style */}
+        {showScrollButton && (
+          <button
+            onClick={scrollToBottom}
+            className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 h-8 w-8 rounded-full bg-gray-700/90 border border-gray-600/50 text-gray-300 hover:bg-gray-600/90 hover:text-white flex items-center justify-center shadow-lg backdrop-blur-sm transition-all"
+            aria-label="Scroll to bottom"
+          >
+            <ArrowDown className="size-4" />
+          </button>
+        )}
       </div>
 
       {/* Input Area - Fixed at bottom */}
-      <div className={`bg-background px-3 pb-3 pt-2 ${isMobile
+      <div className={`px-3 pb-3 pt-2 ${isMobile
         ? 'fixed bottom-12 left-0 right-0 z-[60]'
         : ''
-        }`}>
+        }`} style={{ backgroundColor: 'rgba(17, 24, 39, 0.8)' }}>
 
         {/* Prompt Queue - Collapsible accordion with Claude-style badges */}
         {promptQueue.length > 0 && (
