@@ -1534,7 +1534,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           </div>
 
           {/* Mobile Content with top padding for fixed header and bottom padding for fixed tabs */}
-          <div className="flex-1 min-h-0 pt-14 pb-12">
+          <div className="flex-1 min-h-0 pt-14 pb-14">
             {clientProjects.length === 0 || !selectedProject ? (
               searchParams.get('view') === 'templates' ? (
                 <TemplatesView userId={user.id} />
@@ -1679,51 +1679,51 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           {/* Fixed Mobile Bottom Tab Navigation - only show when project is selected */}
           {selectedProject && (
             <div className="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800/60 z-50">
-              <div className="grid grid-cols-5 h-12">
+              <div className="flex items-center justify-around h-14 px-2">
                 <button
                   onClick={() => setMobileTab("chat")}
-                  className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
-                    mobileTab === "chat" ? "bg-gray-800 text-white" : "text-gray-500 hover:text-gray-300"
+                  className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-xl transition-all ${
+                    mobileTab === "chat" ? "text-blue-400" : "text-gray-500 hover:text-gray-300"
                   }`}
                 >
-                  <MessageSquare className="h-4 w-4" />
-                  <span className="text-[10px]">Chat</span>
+                  <MessageSquare className={`h-5 w-5 ${mobileTab === "chat" ? "stroke-[2.5]" : ""}`} />
+                  <span className={`text-[10px] font-medium ${mobileTab === "chat" ? "text-blue-400" : ""}`}>Chat</span>
                 </button>
                 <button
                   onClick={() => setMobileTab("files")}
-                  className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
-                    mobileTab === "files" ? "bg-gray-800 text-white" : "text-gray-500 hover:text-gray-300"
+                  className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-xl transition-all ${
+                    mobileTab === "files" ? "text-blue-400" : "text-gray-500 hover:text-gray-300"
                   }`}
                 >
-                  <FileText className="h-4 w-4" />
-                  <span className="text-[10px]">Files</span>
+                  <FileText className={`h-5 w-5 ${mobileTab === "files" ? "stroke-[2.5]" : ""}`} />
+                  <span className={`text-[10px] font-medium ${mobileTab === "files" ? "text-blue-400" : ""}`}>Files</span>
                 </button>
                 <button
                   onClick={() => setMobileTab("editor")}
-                  className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
-                    mobileTab === "editor" ? "bg-gray-800 text-white" : "text-gray-500 hover:text-gray-300"
+                  className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-xl transition-all ${
+                    mobileTab === "editor" ? "text-blue-400" : "text-gray-500 hover:text-gray-300"
                   }`}
                 >
-                  <Code className="h-4 w-4" />
-                  <span className="text-[10px]">Editor</span>
+                  <Code className={`h-5 w-5 ${mobileTab === "editor" ? "stroke-[2.5]" : ""}`} />
+                  <span className={`text-[10px] font-medium ${mobileTab === "editor" ? "text-blue-400" : ""}`}>Editor</span>
                 </button>
                 <button
                   onClick={() => setMobileTab("preview")}
-                  className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
-                    mobileTab === "preview" ? "bg-gray-800 text-white" : "text-gray-500 hover:text-gray-300"
+                  className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-xl transition-all ${
+                    mobileTab === "preview" ? "text-blue-400" : "text-gray-500 hover:text-gray-300"
                   }`}
                 >
-                  <Eye className="h-4 w-4" />
-                  <span className="text-[10px]">Preview</span>
+                  <Eye className={`h-5 w-5 ${mobileTab === "preview" ? "stroke-[2.5]" : ""}`} />
+                  <span className={`text-[10px] font-medium ${mobileTab === "preview" ? "text-blue-400" : ""}`}>Preview</span>
                 </button>
                 <button
                   onClick={() => setMobileTab("audit")}
-                  className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
-                    mobileTab === "audit" ? "bg-gray-800 text-white" : "text-gray-500 hover:text-gray-300"
+                  className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-xl transition-all ${
+                    mobileTab === "audit" ? "text-blue-400" : "text-gray-500 hover:text-gray-300"
                   }`}
                 >
-                  <Shield className="h-4 w-4" />
-                  <span className="text-[10px]">Audit</span>
+                  <Shield className={`h-5 w-5 ${mobileTab === "audit" ? "stroke-[2.5]" : ""}`} />
+                  <span className={`text-[10px] font-medium ${mobileTab === "audit" ? "text-blue-400" : ""}`}>Audit</span>
                 </button>
               </div>
             </div>
