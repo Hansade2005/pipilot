@@ -6623,9 +6623,9 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    className={`relative px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 ${isAskMode
-                      ? 'bg-blue-500 text-white shadow-sm shadow-blue-500/25'
-                      : 'bg-gray-800 text-gray-400 hover:text-gray-300 hover:bg-gray-700'
+                    className={`text-sm font-medium transition-colors ${isAskMode
+                      ? 'text-blue-400'
+                      : 'text-gray-400 hover:text-gray-200'
                     }`}
                     onClick={() => setIsAskMode(!isAskMode)}
                   >
