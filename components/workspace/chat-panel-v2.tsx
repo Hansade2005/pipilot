@@ -6639,26 +6639,23 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
 
               {/* Send/Stop Button */}
               {isLoading ? (
-                <Button
+                <button
                   type="button"
-                  variant="default"
-                  size="icon"
-                  className="h-8 w-8 rounded-full"
+                  className="h-7 w-7 rounded-lg bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors"
                   onClick={handleStop}
                 >
-                  <Square className="w-4 h-4 bg-red-500 animate-pulse" />
-                </Button>
+                  <Square className="w-3.5 h-3.5 text-white fill-white" />
+                </button>
               ) : (
-                <Button
+                <button
                   ref={sendButtonRef}
                   type="button"
-                  size="icon"
-                  className="h-8 w-8 rounded-full"
+                  className="h-7 w-7 rounded-lg bg-orange-600 hover:bg-orange-500 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
                   disabled={(!input.trim() && attachedFiles.length === 0 && attachedImages.length === 0) || attachedImages.some((img: AttachedImage) => img.isProcessing)}
                   onClick={handleEnhancedSubmit}
                 >
-                  <ArrowUp className="size-4" />
-                </Button>
+                  <ArrowUp className="size-4 text-white" />
+                </button>
               )}
             </div>
           </div>
