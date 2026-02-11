@@ -2222,7 +2222,8 @@ export async function POST(req: Request) {
       supabaseUserId, // Authenticated Supabase user ID from client
       stripeApiKey, // Stripe API key from client for payment operations
       mcpServers, // MCP server configurations from client [{url, name, headers?}]
-      disabledToolCategories = [] as string[] // Tool categories disabled by user preferences
+      disabledToolCategories = [] as string[], // Tool categories disabled by user preferences
+      disabledTools = [] as string[] // Individual tools disabled by user
     } = body || {}
 
     // For binary requests, extract metadata from compressed data
@@ -2244,6 +2245,7 @@ export async function POST(req: Request) {
       stripeApiKey = metadata.stripeApiKey || stripeApiKey
       mcpServers = metadata.mcpServers || mcpServers
       disabledToolCategories = metadata.disabledToolCategories || disabledToolCategories
+      disabledTools = metadata.disabledTools || disabledTools
     }
 
     // Use fileTree from binary metadata if available, otherwise from JSON
@@ -10372,6 +10374,12 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
           if (tools) unavailableTools.push(...tools)
         }
         console.log(`[Chat-V2] User disabled ${disabledToolCategories.length} tool categories:`, disabledToolCategories)
+      }
+
+      // Individual tool disabling (granular per-tool control)
+      if (disabledTools && Array.isArray(disabledTools) && disabledTools.length > 0) {
+        unavailableTools.push(...disabledTools)
+        console.log(`[Chat-V2] User disabled ${disabledTools.length} individual tools:`, disabledTools)
       }
 
       if (unavailableTools.length > 0) {
