@@ -623,7 +623,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
           </p>
           <Link
             href="/auth/login"
-            className="inline-flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200"
+            className="inline-flex items-center px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white font-semibold rounded-lg transition-colors duration-200"
           >
             Sign In to Continue
           </Link>
@@ -644,7 +644,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
           </p>
           <Link
             href="/pc-workspace"
-            className="inline-flex items-center px-6 py-3 mt-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors duration-200"
+            className="inline-flex items-center px-6 py-3 mt-4 bg-orange-600 hover:bg-orange-500 text-white font-semibold rounded-lg transition-colors duration-200"
           >
             Create Your First Project
           </Link>
@@ -673,7 +673,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
           <div key={project.id} className="relative group">
             <Link href={`/workspace?projectId=${project.id}`} className="group">
               <Card className="bg-white/5 border-white/10 hover:bg-white/10 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl cursor-pointer overflow-hidden">
-                <div className="relative aspect-video overflow-hidden bg-gradient-to-br from-blue-900/50 via-purple-900/50 to-pink-900/50">
+                <div className="relative aspect-video overflow-hidden bg-gradient-to-br from-orange-950/30 via-gray-900/50 to-gray-950/50">
                   <Image
                     src={project.thumbnail}
                     alt={project.name}
@@ -687,13 +687,13 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
                     </Badge>
                   </div>
                   <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
-                    <div className="p-2 bg-blue-500 rounded-full shadow-lg">
+                    <div className="p-2 bg-orange-600 rounded-full shadow-lg">
                       <ExternalLink className="w-4 h-4 text-white" />
                     </div>
                   </div>
                 </div>
                 <CardContent className="p-5 bg-gradient-to-b from-white/5 to-transparent">
-                  <h3 className="text-white font-bold text-lg mb-2 group-hover:text-blue-400 transition-colors line-clamp-1">
+                  <h3 className="text-white font-bold text-lg mb-2 group-hover:text-orange-400 transition-colors line-clamp-1">
                     {project.name}
                   </h3>
                   <p className="text-white/60 text-sm line-clamp-2 mb-3">
@@ -707,7 +707,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
                       {timeAgo(project.createdAt)}
                     </div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <span className="text-xs text-blue-400 font-medium">Open →</span>
+                      <span className="text-xs text-orange-400 font-medium">Open →</span>
                     </div>
                   </div>
                 </CardContent>
@@ -722,7 +722,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
             </button>
             <button
               onClick={(e) => handleCloneProject(project.id, e)}
-              className="absolute top-3 left-16 p-2 bg-blue-500/90 hover:bg-blue-600 backdrop-blur-sm text-white rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 z-10 shadow-lg hover:scale-110"
+              className="absolute top-3 left-16 p-2 bg-orange-500/90 hover:bg-orange-600 backdrop-blur-sm text-white rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 z-10 shadow-lg hover:scale-110"
               title="Clone project"
             >
               <Copy className="w-4 h-4" />
@@ -810,7 +810,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
       }}>
         <DialogContent className="bg-gray-900 border-gray-800 text-white">
           <DialogHeader>
-            <DialogTitle className="text-blue-400">Clone Project</DialogTitle>
+            <DialogTitle className="text-orange-400">Clone Project</DialogTitle>
             <DialogDescription className="text-gray-300">
               Create a copy of <span className="font-semibold text-white">"{cloneProject?.name}"</span> with all its files.
             </DialogDescription>
@@ -841,7 +841,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
             <Button
               onClick={confirmCloneProject}
               disabled={!cloneName.trim()}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-orange-600 hover:bg-orange-500"
             >
               Clone Project
             </Button>
