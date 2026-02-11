@@ -5686,7 +5686,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
         )}
 
         {/* Main Input Container - Claude-style rounded card */}
-        <div className="relative rounded-2xl border border-gray-700/60 bg-gray-900/80 focus-within:border-gray-600 transition-colors overflow-hidden">
+        <div className="relative rounded-2xl border border-gray-700/60 bg-gray-900/80 focus-within:border-gray-600 transition-colors">
 
           {/* Tagged Component Context */}
           {taggedComponent && (
