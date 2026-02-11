@@ -1652,7 +1652,8 @@ export function ChatPanelV2({
     assistantMessageId: string,
     accumulatedContent: string,
     accumulatedReasoning: string,
-    accumulatedToolInvocations: any[]
+    accumulatedToolInvocations: any[],
+    reasoningBlocks?: { content: string, textPosition: number }[]
   ) => {
     if (!project) {
       console.warn('[ChatPanelV2] Cannot save assistant message: no project selected')
@@ -1693,6 +1694,7 @@ export function ChatPanelV2({
         metadata: {
           toolInvocations: accumulatedToolInvocations,
           reasoning: accumulatedReasoning,
+          reasoningBlocks: reasoningBlocks || [],
           hasToolCalls: accumulatedToolInvocations.length > 0,
           durationSeconds: elapsedSeconds  // Save the actual elapsed time
         }
@@ -2342,7 +2344,8 @@ export function ChatPanelV2({
     continuationState: any,
     originalAssistantMessageId: string,
     accumulatedContent: string,
-    accumulatedReasoning: string
+    accumulatedReasoning: string,
+    reasoningBlocks: { content: string, textPosition: number }[] = []
   ) => {
     if (!continuationState || !project) {
       console.error('[ChatPanelV2][Continuation] Invalid continuation state or no project')
@@ -2369,7 +2372,8 @@ export function ChatPanelV2({
           ? {
             ...msg,
             content: accumulatedContent, // Remove thinking indicator
-            reasoning: accumulatedReasoning
+            reasoning: accumulatedReasoning,
+            reasoningBlocks: [...reasoningBlocks]
           }
           : msg
       ))
@@ -2419,6 +2423,10 @@ export function ChatPanelV2({
       let continuationAccumulatedReasoning = ''
       let lineBuffer = ''
 
+      // Track reasoning blocks with text positions for inline rendering (continuation)
+      let continuationReasoningBlocks: { content: string, textPosition: number }[] = []
+      let continuationLastDeltaType: 'text' | 'reasoning' | null = null
+
       // Track tool calls locally during continuation to avoid React state race conditions
       // Include position tracking for inline pill display
       const continuationLocalToolCalls: Array<{
@@ -2466,21 +2474,27 @@ export function ChatPanelV2({
                 // CRITICAL FIX: Filter out tool result JSON that shouldn't be displayed
                 // Some models output tool results as text instead of keeping them internal
                 const textToAdd = parsed.text
-                
+
                 // Check if this text looks like a tool result JSON
                 const trimmedText = textToAdd.trim()
                 const looksLikeToolResult = (
-                  (trimmedText.startsWith('{') || trimmedText.startsWith('Assistant:')) && 
-                  (trimmedText.includes('"success"') || trimmedText.includes('"toolCallId"') || 
+                  (trimmedText.startsWith('{') || trimmedText.startsWith('Assistant:')) &&
+                  (trimmedText.includes('"success"') || trimmedText.includes('"toolCallId"') ||
                    trimmedText.includes('"executionTimeMs"') || trimmedText.includes('"databaseId"'))
                 )
-                
+
                 // Skip text that appears to be a raw tool result JSON
                 if (!looksLikeToolResult) {
                   continuationAccumulatedContent += textToAdd
+                  continuationLastDeltaType = 'text'
+                  // Merge reasoning blocks: original blocks + continuation blocks (with offset)
+                  const mergedBlocks = [...reasoningBlocks, ...continuationReasoningBlocks.map(b => ({
+                    content: b.content,
+                    textPosition: accumulatedContent.length + b.textPosition
+                  }))]
                   setMessages(prev => prev.map(msg =>
                     msg.id === originalAssistantMessageId
-                      ? { ...msg, content: accumulatedContent + continuationAccumulatedContent, reasoning: accumulatedReasoning + continuationAccumulatedReasoning }
+                      ? { ...msg, content: accumulatedContent + continuationAccumulatedContent, reasoning: accumulatedReasoning + continuationAccumulatedReasoning, reasoningBlocks: mergedBlocks }
                       : msg
                   ))
                 } else {
@@ -2489,10 +2503,22 @@ export function ChatPanelV2({
               }
             } else if (parsed.type === 'reasoning-delta') {
               if (parsed.text) {
+                // Start a new reasoning block when transitioning from text/null to reasoning
+                if (continuationLastDeltaType !== 'reasoning') {
+                  continuationReasoningBlocks.push({ content: '', textPosition: continuationAccumulatedContent.length })
+                }
+                continuationReasoningBlocks[continuationReasoningBlocks.length - 1].content += parsed.text
+                continuationLastDeltaType = 'reasoning'
+
                 continuationAccumulatedReasoning += parsed.text
+                // Merge reasoning blocks: original blocks + continuation blocks (with offset)
+                const mergedBlocks = [...reasoningBlocks, ...continuationReasoningBlocks.map(b => ({
+                  content: b.content,
+                  textPosition: accumulatedContent.length + b.textPosition
+                }))]
                 setMessages(prev => prev.map(msg =>
                   msg.id === originalAssistantMessageId
-                    ? { ...msg, content: accumulatedContent + continuationAccumulatedContent, reasoning: accumulatedReasoning + continuationAccumulatedReasoning }
+                    ? { ...msg, content: accumulatedContent + continuationAccumulatedContent, reasoning: accumulatedReasoning + continuationAccumulatedReasoning, reasoningBlocks: mergedBlocks }
                     : msg
                 ))
               }
@@ -2639,6 +2665,11 @@ export function ChatPanelV2({
       // Continuation complete - update the original message with combined content
       const finalContent = accumulatedContent + continuationAccumulatedContent
       const finalReasoning = accumulatedReasoning + continuationAccumulatedReasoning
+      // Merge reasoning blocks: original + continuation (with text position offset)
+      const finalReasoningBlocks = [...reasoningBlocks, ...continuationReasoningBlocks.map(b => ({
+        content: b.content,
+        textPosition: accumulatedContent.length + b.textPosition
+      }))]
 
       // Use local tool tracking instead of state (avoids React state race conditions)
       const toolInvocationsForMessage = continuationLocalToolCalls
@@ -2667,7 +2698,7 @@ export function ChatPanelV2({
         // Update the original message with the complete content
         setMessages(prev => prev.map(msg =>
           msg.id === originalAssistantMessageId
-            ? { ...msg, content: finalContent, reasoning: finalReasoning }
+            ? { ...msg, content: finalContent, reasoning: finalReasoning, reasoningBlocks: finalReasoningBlocks }
             : msg
         ))
 
@@ -2676,7 +2707,8 @@ export function ChatPanelV2({
           originalAssistantMessageId,
           finalContent,
           finalReasoning,
-          toolInvocationsData
+          toolInvocationsData,
+          finalReasoningBlocks
         )
       }
 
@@ -2694,7 +2726,8 @@ export function ChatPanelV2({
           ? {
             ...msg,
             content: accumulatedContent, // Remove thinking indicator
-            reasoning: accumulatedReasoning
+            reasoning: accumulatedReasoning,
+            reasoningBlocks: [...reasoningBlocks]
           }
           : msg
       ))
@@ -2999,8 +3032,9 @@ export function ChatPanelV2({
             role: msg.role,
             content: msg.content,
             createdAt: msg.createdAt,
-            // Extract reasoning and toolInvocations from metadata for UI compatibility
+            // Extract reasoning, reasoningBlocks and toolInvocations from metadata for UI compatibility
             reasoning: msg.metadata?.reasoning || '',
+            reasoningBlocks: msg.metadata?.reasoningBlocks || [],
             toolInvocations: msg.metadata?.toolInvocations || [],
             metadata: msg.metadata || {}
           }
@@ -3228,6 +3262,10 @@ export function ChatPanelV2({
       let accumulatedReasoning = ''
       let lineBuffer = ''
 
+      // Track reasoning blocks with text positions for inline rendering (recovery)
+      let recoveryReasoningBlocks: { content: string, textPosition: number }[] = []
+      let recoveryLastDeltaType: 'text' | 'reasoning' | null = null
+
       console.log('[ChatPanelV2][ClientTool] 📥 Processing tool result continuation stream')
 
       while (true) {
@@ -3262,18 +3300,26 @@ export function ChatPanelV2({
             if (parsed.type === 'text-delta') {
               if (parsed.text) {
                 accumulatedContent += parsed.text
+                recoveryLastDeltaType = 'text'
                 setMessages(prev => prev.map(msg =>
                   msg.id === assistantMessageId
-                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
+                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, reasoningBlocks: [...recoveryReasoningBlocks] }
                     : msg
                 ))
               }
             } else if (parsed.type === 'reasoning-delta') {
               if (parsed.text) {
+                // Start a new reasoning block when transitioning from text/null to reasoning
+                if (recoveryLastDeltaType !== 'reasoning') {
+                  recoveryReasoningBlocks.push({ content: '', textPosition: accumulatedContent.length })
+                }
+                recoveryReasoningBlocks[recoveryReasoningBlocks.length - 1].content += parsed.text
+                recoveryLastDeltaType = 'reasoning'
+
                 accumulatedReasoning += parsed.text
                 setMessages(prev => prev.map(msg =>
                   msg.id === assistantMessageId
-                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
+                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, reasoningBlocks: [...recoveryReasoningBlocks] }
                     : msg
                 ))
               }
@@ -3352,7 +3398,7 @@ export function ChatPanelV2({
       if (accumulatedContent.trim() || toolInvocationsData.length > 0) {
         setMessages(prev => prev.map(msg =>
           msg.id === assistantMessageId
-            ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
+            ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, reasoningBlocks: [...recoveryReasoningBlocks] }
             : msg
         ))
 
@@ -3361,7 +3407,8 @@ export function ChatPanelV2({
           assistantMessageId,
           accumulatedContent,
           accumulatedReasoning,
-          toolInvocationsData
+          toolInvocationsData,
+          recoveryReasoningBlocks
         )
       }
 
@@ -3632,6 +3679,10 @@ export function ChatPanelV2({
       let continuationReasoning = ''
       let lineBuffer = ''
 
+      // Track reasoning blocks with text positions for inline rendering (stream recovery)
+      let streamRecoveryReasoningBlocks: { content: string, textPosition: number }[] = []
+      let streamRecoveryLastDeltaType: 'text' | 'reasoning' | null = null
+
       // Start with existing accumulated content
       let fullContent = stream.accumulatedContent
       let fullReasoning = stream.accumulatedReasoning
@@ -3684,10 +3735,11 @@ export function ChatPanelV2({
               if (!looksLikeToolResult) {
                 continuationContent += parsed.text
                 fullContent = stream.accumulatedContent + continuationContent
+                streamRecoveryLastDeltaType = 'text'
                 setStreamingContent(fullContent)
                 setMessages(prev => prev.map(msg =>
                   msg.id === stream.id
-                    ? { ...msg, content: fullContent, reasoning: fullReasoning }
+                    ? { ...msg, content: fullContent, reasoning: fullReasoning, reasoningBlocks: [...streamRecoveryReasoningBlocks] }
                     : msg
                 ))
                 // Update recovery progress
@@ -3699,12 +3751,19 @@ export function ChatPanelV2({
                 })
               }
             } else if (parsed.type === 'reasoning-delta' && parsed.text) {
+              // Start a new reasoning block when transitioning from text/null to reasoning
+              if (streamRecoveryLastDeltaType !== 'reasoning') {
+                streamRecoveryReasoningBlocks.push({ content: '', textPosition: fullContent.length })
+              }
+              streamRecoveryReasoningBlocks[streamRecoveryReasoningBlocks.length - 1].content += parsed.text
+              streamRecoveryLastDeltaType = 'reasoning'
+
               continuationReasoning += parsed.text
               fullReasoning = stream.accumulatedReasoning + continuationReasoning
               setStreamingReasoning(fullReasoning)
               setMessages(prev => prev.map(msg =>
                 msg.id === stream.id
-                  ? { ...msg, content: fullContent, reasoning: fullReasoning }
+                  ? { ...msg, content: fullContent, reasoning: fullReasoning, reasoningBlocks: [...streamRecoveryReasoningBlocks] }
                   : msg
               ))
               // Update recovery progress
@@ -3782,6 +3841,7 @@ export function ChatPanelV2({
         createdAt: new Date().toISOString(),
         metadata: {
           reasoning: fullReasoning,
+          reasoningBlocks: streamRecoveryReasoningBlocks,
           toolInvocations: continuationToolCalls,
           hasToolCalls: continuationToolCalls.length > 0,
           wasRecovered: true
@@ -4654,6 +4714,11 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
       let accumulatedReasoning = ''
       let lineBuffer = '' // Buffer for incomplete lines across chunks
 
+      // Track reasoning blocks with their text positions for inline rendering
+      // Each block captures a contiguous reasoning segment and where in the text it occurred
+      let reasoningBlocks: { content: string, textPosition: number }[] = []
+      let lastDeltaType: 'text' | 'reasoning' | null = null
+
       // Track tool calls locally during this stream to avoid React state race conditions
       // textPosition tracks where in the text stream the tool was called (for inline rendering)
       // reasoningPosition tracks where in the reasoning stream the tool was called
@@ -4727,10 +4792,11 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 // Skip text that appears to be a raw tool result JSON
                 if (!looksLikeToolResult) {
                   accumulatedContent += textToAdd
+                  lastDeltaType = 'text'
                   setStreamingContent(accumulatedContent) // Store in component state
                   setMessages(prev => prev.map(msg =>
                     msg.id === assistantMessageId
-                      ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
+                      ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, reasoningBlocks: [...reasoningBlocks] }
                       : msg
                   ))
                   // Update stream recovery progress (debounced)
@@ -4745,13 +4811,20 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 }
               }
             } else if (parsed.type === 'reasoning-delta') {
-              // Reasoning delta - accumulate reasoning separately
+              // Reasoning delta - accumulate reasoning separately and track position
               if (parsed.text) {
+                // Start a new reasoning block when transitioning from text/null to reasoning
+                if (lastDeltaType !== 'reasoning') {
+                  reasoningBlocks.push({ content: '', textPosition: accumulatedContent.length })
+                }
+                reasoningBlocks[reasoningBlocks.length - 1].content += parsed.text
+                lastDeltaType = 'reasoning'
+
                 accumulatedReasoning += parsed.text
                 setStreamingReasoning(accumulatedReasoning) // Store in component state
                 setMessages(prev => prev.map(msg =>
                   msg.id === assistantMessageId
-                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
+                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, reasoningBlocks: [...reasoningBlocks] }
                     : msg
                 ))
                 // Update stream recovery progress (debounced)
@@ -4780,7 +4853,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
 
               // Automatically trigger continuation after a brief delay
               setTimeout(async () => {
-                await handleStreamContinuation(parsed.continuationState, assistantMessageId, accumulatedContent, accumulatedReasoning)
+                await handleStreamContinuation(parsed.continuationState, assistantMessageId, accumulatedContent, accumulatedReasoning, reasoningBlocks)
               }, 1000)
 
               // Don't process any more chunks after continuation signal
@@ -5003,7 +5076,8 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
           assistantMessageId,
           accumulatedContent,
           accumulatedReasoning,
-          toolInvocationsData
+          toolInvocationsData,
+          reasoningBlocks
         )
       }
 

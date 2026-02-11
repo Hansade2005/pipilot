@@ -130,7 +130,6 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
 
   // Template selection state
   const [selectedTemplate, setSelectedTemplate] = useState<'vite-react' | 'nextjs' | 'expo' | 'html'>('vite-react')
-  const [hasUserSelectedTemplate, setHasUserSelectedTemplate] = useState(false)
   const [showTemplateDropdown, setShowTemplateDropdown] = useState(false)
   const templateDropdownRef = useRef<HTMLDivElement>(null)
 
@@ -811,39 +810,6 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     }
   }
 
-  // Smart template selection based on prompt content
-  const detectFrameworkFromPrompt = (promptText: string): 'vite-react' | 'nextjs' | 'expo' | 'html' | null => {
-    const lowerPrompt = promptText.toLowerCase()
-
-    // Framework detection patterns - ONLY match explicit framework mentions
-    const frameworkPatterns = [
-      // Next.js - only when explicitly mentioned
-      { regex: /\bnext\.?js\b/i, template: 'nextjs' as const },
-      { regex: /\bnextjs\b/i, template: 'nextjs' as const },
-
-      // Expo/React Native - only when explicitly mentioned
-      { regex: /\bexpo\b/i, template: 'expo' as const },
-      { regex: /\breact\s+native\b/i, template: 'expo' as const },
-      { regex: /\bmobile\s+app\b/i, template: 'expo' as const },
-
-      // HTML - only when explicitly mentioned
-      { regex: /\bhtml\b/i, template: 'html' as const },
-      { regex: /\bvanilla\s+js\b/i, template: 'html' as const },
-    ]
-
-    // Check patterns - only return if explicit framework is mentioned
-    for (const { regex, template } of frameworkPatterns) {
-      if (regex.test(lowerPrompt)) {
-        console.log(`🎯 Framework explicitly detected: "${template}" from pattern: ${regex}`)
-        return template
-      }
-    }
-
-    // No explicit framework mentioned - return null to not auto-select
-    console.log('🎯 No explicit framework mentioned, no auto-selection')
-    return null
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -873,25 +839,6 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         return
       }
 
-      // Smart template selection based on prompt (excluding GitHub/GitLab imports)
-      // Only auto-detect if user hasn't manually selected a template
-      let detectedTemplate = selectedTemplate
-      if (!hasUserSelectedTemplate) {
-        const frameworkDetection = detectFrameworkFromPrompt(prompt)
-        if (frameworkDetection !== null) {
-          detectedTemplate = frameworkDetection
-          console.log(`🎯 Smart template selection: Explicitly detected "${detectedTemplate}" from prompt, auto-selecting`)
-          setSelectedTemplate(detectedTemplate)
-          toast.info(`🎯 Auto-selected ${detectedTemplate === 'nextjs' ? 'Next.js' : detectedTemplate === 'expo' ? 'Expo' : detectedTemplate === 'html' ? 'HTML' : 'Vite React'} template based on your prompt`)
-        } else {
-          console.log('🎯 No explicit framework detected, using current selection')
-          detectedTemplate = selectedTemplate
-        }
-      } else {
-        console.log(`👤 User manually selected template: "${selectedTemplate}", skipping auto-detection`)
-        detectedTemplate = selectedTemplate
-      }
-
       console.log('🚀 ChatInput: Generating project details with Pixtral for prompt:', prompt)
       
       // Generate project name and description using Pixtral
@@ -903,7 +850,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         body: JSON.stringify({
           prompt: prompt,
           userId: user.id,
-          template: detectedTemplate, // Use detected template instead of selectedTemplate
+          template: selectedTemplate,
         }),
       })
 
@@ -985,15 +932,15 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
             throw githubError
           }
         } else {
-          // Apply template files based on detected framework
+          // Apply template files based on selected framework
           const { TemplateService } = await import('@/lib/template-service')
-          if (detectedTemplate === 'nextjs') {
+          if (selectedTemplate === 'nextjs') {
             console.log('🎯 Applying Next.js template')
             await TemplateService.applyNextJSTemplate(workspace.id)
-          } else if (detectedTemplate === 'expo') {
+          } else if (selectedTemplate === 'expo') {
             console.log('🎯 Applying Expo template')
             await TemplateService.applyExpoTemplate(workspace.id)
-          } else if (detectedTemplate === 'html') {
+          } else if (selectedTemplate === 'html') {
             console.log('🎯 Applying HTML template')
             await TemplateService.applyHtmlTemplate(workspace.id)
           } else {
@@ -1336,10 +1283,10 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                   {showTemplateDropdown && (
                     <div className="absolute bottom-8 left-0 w-[180px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[100] overflow-hidden py-1">
                       {([
-                        { id: 'vite-react' as const, name: 'Vite', desc: 'React SPA with Vite' },
-                        { id: 'nextjs' as const, name: 'Next.js', desc: 'Full-stack with SSR' },
-                        { id: 'expo' as const, name: 'Expo', desc: 'Cross-platform mobile' },
-                        { id: 'html' as const, name: 'HTML', desc: 'Vanilla HTML/CSS/JS' },
+                        { id: 'vite-react' as const, name: 'Vite', desc: 'Frontend sites' },
+                        { id: 'nextjs' as const, name: 'Next.js', desc: 'Fullstack apps with SSR' },
+                        { id: 'expo' as const, name: 'Expo', desc: 'IOS and Android apps' },
+                        { id: 'html' as const, name: 'HTML', desc: 'Static html websites' },
                       ]).map((tpl) => {
                         const isSelected = tpl.id === selectedTemplate
                         return (
@@ -1349,7 +1296,6 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                             className={`w-full flex items-center justify-between px-4 py-2.5 text-left transition-colors hover:bg-gray-800 cursor-pointer ${isSelected ? 'bg-gray-800/50' : ''}`}
                             onClick={() => {
                               setSelectedTemplate(tpl.id)
-                              setHasUserSelectedTemplate(true)
                               setShowTemplateDropdown(false)
                             }}
                           >
