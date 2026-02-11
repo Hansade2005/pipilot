@@ -6643,7 +6643,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                   type="button"
                   variant="default"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-8 w-8 rounded-full"
                   onClick={handleStop}
                 >
                   <Square className="w-4 h-4 bg-red-500 animate-pulse" />
@@ -6653,11 +6653,11 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                   ref={sendButtonRef}
                   type="button"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-8 w-8 rounded-full"
                   disabled={(!input.trim() && attachedFiles.length === 0 && attachedImages.length === 0) || attachedImages.some((img: AttachedImage) => img.isProcessing)}
                   onClick={handleEnhancedSubmit}
                 >
-                  <CornerDownLeft className="size-4" />
+                  <ArrowUp className="size-4" />
                 </Button>
               )}
             </div>
