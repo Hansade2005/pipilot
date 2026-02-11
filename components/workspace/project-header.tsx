@@ -252,8 +252,8 @@ export function ProjectHeader({
         <div className="flex items-center space-x-4">
           <Logo variant="icon" size="sm" />
           <div>
-            <h1 className="text-lg font-semibold text-card-foreground">Time to Ship something new?</h1>
-            <p className="text-sm text-muted-foreground">Ask PiPilot to build your next app</p>
+            <h1 className="text-lg font-semibold text-gray-100">Time to Ship something new?</h1>
+            <p className="text-sm text-gray-500">Ask PiPilot to build your next app</p>
           </div>
         </div>
         <div className="flex items-center space-x-2">
@@ -327,7 +327,7 @@ export function ProjectHeader({
           {editing ? (
             <input
               type="text"
-              className="text-lg font-semibold text-gray-100 bg-gray-800 border border-gray-700 rounded px-2 py-1 w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="text-lg font-semibold text-gray-100 bg-gray-800 border border-gray-700 rounded px-2 py-1 w-40 focus:outline-none focus:ring-2 focus:ring-orange-500"
               value={nameInput}
               autoFocus
               onChange={e => setNameInput(e.target.value)}
@@ -339,7 +339,7 @@ export function ProjectHeader({
             />
           ) : (
             <h1
-              className="text-lg font-semibold text-card-foreground cursor-pointer hover:underline"
+              className="text-lg font-semibold text-gray-100 cursor-pointer hover:underline"
               title="Click to edit project name"
               onClick={() => setEditing(true)}
             >
@@ -463,10 +463,10 @@ export function ProjectHeader({
                 size="sm" 
                 onClick={handleBackupToCloud}
                 disabled={!project || isBackingUp}
-                className="h-8 w-8 p-0 sm:w-auto sm:px-3 bg-blue-600/10 border-blue-500 hover:bg-blue-600/20"
+                className="h-8 w-8 p-0 sm:w-auto sm:px-3 bg-orange-600/10 border-orange-500/50 hover:bg-orange-600/20"
               >
-                <Cloud className={`h-4 w-4 text-blue-400 ${isBackingUp ? 'animate-pulse' : ''}`} />
-                <span className="hidden sm:inline ml-2 text-blue-400">
+                <Cloud className={`h-4 w-4 text-orange-400 ${isBackingUp ? 'animate-pulse' : ''}`} />
+                <span className="hidden sm:inline ml-2 text-orange-400">
                   {isBackingUp ? "Backing up..." : "Backup"}
                 </span>
               </Button>
@@ -511,10 +511,10 @@ export function ProjectHeader({
                 size="sm" 
                 onClick={onDatabase}
                 disabled={!project}
-                className="h-8 w-8 p-0 sm:w-auto sm:px-3 bg-purple-600/10 border-purple-500 hover:bg-purple-600/20"
+                className="h-8 w-8 p-0 sm:w-auto sm:px-3 bg-orange-600/10 border-orange-500/50 hover:bg-orange-600/20"
               >
-                <Database className="h-4 w-4 text-purple-400" />
-                <span className="hidden sm:inline ml-2 text-purple-400">Database</span>
+                <Database className="h-4 w-4 text-orange-400" />
+                <span className="hidden sm:inline ml-2 text-orange-400">Database</span>
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">
@@ -527,11 +527,11 @@ export function ProjectHeader({
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button 
-                size="sm" 
-                onClick={onDeploy} 
+              <Button
+                size="sm"
+                onClick={onDeploy}
                 disabled={!project}
-                className="h-8 px-3"
+                className="h-8 px-3 bg-orange-600 hover:bg-orange-500 text-white border-0"
               >
                 <Rocket className="h-4 w-4" />
                 <span className="hidden sm:inline ml-2">Deploy</span>

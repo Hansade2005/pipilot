@@ -5659,7 +5659,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
         {showScrollButton && (
           <button
             onClick={scrollToBottom}
-            className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 h-8 w-8 rounded-full bg-gray-700/90 border border-gray-600/50 text-gray-300 hover:bg-gray-600/90 hover:text-white flex items-center justify-center shadow-lg backdrop-blur-sm transition-all"
+            className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 h-8 w-8 rounded-full bg-orange-600 text-white hover:bg-orange-500 flex items-center justify-center shadow-lg transition-all"
             aria-label="Scroll to bottom"
           >
             <ArrowDown className="size-4" />

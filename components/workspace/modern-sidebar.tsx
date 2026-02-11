@@ -314,7 +314,7 @@ export function ModernSidebar({
                         onClick={() => handleProjectSelect(project)}
                         className={`w-full flex items-start gap-2 p-2 rounded-md transition-colors ${
                           selectedProject?.id === project.id
-                            ? 'bg-blue-600/20 text-blue-400'
+                            ? 'bg-orange-600/20 text-orange-400'
                             : 'text-gray-400 hover:text-white hover:bg-gray-800'
                         }`}
                       >
@@ -339,7 +339,7 @@ export function ModernSidebar({
             >
               <Folder size={18} />
               {projects.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-orange-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
                   {projects.length > 9 ? '9+' : projects.length}
                 </span>
               )}
@@ -476,7 +476,7 @@ export function ModernSidebar({
                       onClick={() => handleProjectSelect(project)}
                       className="w-full flex items-start gap-3 p-3 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors text-left"
                     >
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex-shrink-0 flex items-center justify-center">
+                      <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-amber-600 rounded-lg flex-shrink-0 flex items-center justify-center">
                         <Folder className="h-6 w-6 text-white" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -566,7 +566,7 @@ export function ModernSidebar({
                     onClick={() => handleProjectSelect(project)}
                     className="w-full flex items-start gap-3 p-3 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors text-left"
                   >
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex-shrink-0 flex items-center justify-center">
+                    <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-amber-600 rounded-lg flex-shrink-0 flex items-center justify-center">
                       <Folder className="h-6 w-6 text-white" />
                     </div>
                     <div className="flex-1 min-w-0">

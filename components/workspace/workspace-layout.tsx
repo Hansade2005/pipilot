@@ -1048,41 +1048,47 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                   <div className="h-full flex flex-col overflow-hidden">
                     {/* Tab Switcher with Preview Controls - Hidden when in preview mode */}
                     {activeTab !== "preview" && (
-                      <div className="border-b border-gray-800/60 bg-gray-900/80 p-2 flex-shrink-0">
+                      <div className="border-b border-gray-800/60 bg-gray-900/80 px-3 py-2 flex-shrink-0">
                         <div className="flex items-center justify-between">
-                          <div className="flex space-x-1">
-                            <Button
-                              variant={activeTab === "code" ? "secondary" : "ghost"}
-                              size="sm"
+                          <div className="flex items-center gap-1">
+                            <button
                               onClick={() => setActiveTab("code")}
                               title="Code Editor"
+                              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                activeTab === "code" ? "bg-orange-600/15 text-orange-400" : "text-gray-400 hover:text-gray-200 hover:bg-gray-800/60"
+                              }`}
                             >
-                              <Code className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
+                              <Code className="h-3.5 w-3.5" />
+                              <span>Code</span>
+                            </button>
+                            <button
                               onClick={() => setActiveTab("preview")}
                               title="Live Preview"
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-gray-200 hover:bg-gray-800/60 transition-colors"
                             >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant={activeTab === "cloud" ? "secondary" : "ghost"}
-                              size="sm"
+                              <Eye className="h-3.5 w-3.5" />
+                              <span>Preview</span>
+                            </button>
+                            <button
                               onClick={() => setActiveTab("cloud")}
                               title="Cloud Services"
+                              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                activeTab === "cloud" ? "bg-orange-600/15 text-orange-400" : "text-gray-400 hover:text-gray-200 hover:bg-gray-800/60"
+                              }`}
                             >
-                              <Cloud className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant={activeTab === "audit" ? "secondary" : "ghost"}
-                              size="sm"
+                              <Cloud className="h-3.5 w-3.5" />
+                              <span>Cloud</span>
+                            </button>
+                            <button
                               onClick={() => setActiveTab("audit")}
                               title="Code Audit & Quality"
+                              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                activeTab === "audit" ? "bg-orange-600/15 text-orange-400" : "text-gray-400 hover:text-gray-200 hover:bg-gray-800/60"
+                              }`}
                             >
-                              <Shield className="h-4 w-4" />
-                            </Button>
+                              <Shield className="h-3.5 w-3.5" />
+                              <span>Audit</span>
+                            </button>
                           </div>
 
 
@@ -1250,7 +1256,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                           return <span className="text-green-600 dark:text-green-400">Connected</span>
                         }
                         if (gitHubConnected) {
-                          return <span className="text-blue-600 dark:text-blue-400">Account Connected</span>
+                          return <span className="text-blue-600 dark:text-orange-400">Account Connected</span>
                         }
                         return <span className="text-gray-500">Not Connected</span>
                       })()}
@@ -1683,47 +1689,47 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 <button
                   onClick={() => setMobileTab("chat")}
                   className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-xl transition-all ${
-                    mobileTab === "chat" ? "text-blue-400" : "text-gray-500 hover:text-gray-300"
+                    mobileTab === "chat" ? "text-orange-400" : "text-gray-500 hover:text-gray-300"
                   }`}
                 >
                   <MessageSquare className={`h-5 w-5 ${mobileTab === "chat" ? "stroke-[2.5]" : ""}`} />
-                  <span className={`text-[10px] font-medium ${mobileTab === "chat" ? "text-blue-400" : ""}`}>Chat</span>
+                  <span className={`text-[10px] font-medium ${mobileTab === "chat" ? "text-orange-400" : ""}`}>Chat</span>
                 </button>
                 <button
                   onClick={() => setMobileTab("files")}
                   className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-xl transition-all ${
-                    mobileTab === "files" ? "text-blue-400" : "text-gray-500 hover:text-gray-300"
+                    mobileTab === "files" ? "text-orange-400" : "text-gray-500 hover:text-gray-300"
                   }`}
                 >
                   <FileText className={`h-5 w-5 ${mobileTab === "files" ? "stroke-[2.5]" : ""}`} />
-                  <span className={`text-[10px] font-medium ${mobileTab === "files" ? "text-blue-400" : ""}`}>Files</span>
+                  <span className={`text-[10px] font-medium ${mobileTab === "files" ? "text-orange-400" : ""}`}>Files</span>
                 </button>
                 <button
                   onClick={() => setMobileTab("editor")}
                   className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-xl transition-all ${
-                    mobileTab === "editor" ? "text-blue-400" : "text-gray-500 hover:text-gray-300"
+                    mobileTab === "editor" ? "text-orange-400" : "text-gray-500 hover:text-gray-300"
                   }`}
                 >
                   <Code className={`h-5 w-5 ${mobileTab === "editor" ? "stroke-[2.5]" : ""}`} />
-                  <span className={`text-[10px] font-medium ${mobileTab === "editor" ? "text-blue-400" : ""}`}>Editor</span>
+                  <span className={`text-[10px] font-medium ${mobileTab === "editor" ? "text-orange-400" : ""}`}>Editor</span>
                 </button>
                 <button
                   onClick={() => setMobileTab("preview")}
                   className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-xl transition-all ${
-                    mobileTab === "preview" ? "text-blue-400" : "text-gray-500 hover:text-gray-300"
+                    mobileTab === "preview" ? "text-orange-400" : "text-gray-500 hover:text-gray-300"
                   }`}
                 >
                   <Eye className={`h-5 w-5 ${mobileTab === "preview" ? "stroke-[2.5]" : ""}`} />
-                  <span className={`text-[10px] font-medium ${mobileTab === "preview" ? "text-blue-400" : ""}`}>Preview</span>
+                  <span className={`text-[10px] font-medium ${mobileTab === "preview" ? "text-orange-400" : ""}`}>Preview</span>
                 </button>
                 <button
                   onClick={() => setMobileTab("audit")}
                   className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-xl transition-all ${
-                    mobileTab === "audit" ? "text-blue-400" : "text-gray-500 hover:text-gray-300"
+                    mobileTab === "audit" ? "text-orange-400" : "text-gray-500 hover:text-gray-300"
                   }`}
                 >
                   <Shield className={`h-5 w-5 ${mobileTab === "audit" ? "stroke-[2.5]" : ""}`} />
-                  <span className={`text-[10px] font-medium ${mobileTab === "audit" ? "text-blue-400" : ""}`}>Audit</span>
+                  <span className={`text-[10px] font-medium ${mobileTab === "audit" ? "text-orange-400" : ""}`}>Audit</span>
                 </button>
               </div>
             </div>

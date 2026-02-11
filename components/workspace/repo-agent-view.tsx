@@ -1658,7 +1658,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
             {/* Hero Section */}
             <div className="text-center mb-8 max-w-3xl">
               <h1 className="text-5xl sm:text-6xl font-bold mb-3">
-                <span className="bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-orange-400 via-orange-500 to-amber-500 bg-clip-text text-transparent">
                   PiPilot SWE Agent
                 </span>
               </h1>
@@ -1781,13 +1781,13 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                         className="absolute top-full mt-2 right-0 w-72 rounded-xl overflow-hidden z-50"
                         style={{
                           background: 'rgba(17, 24, 39, 0.95)',
-                          border: '1px solid rgba(59, 130, 246, 0.2)',
+                          border: '1px solid rgba(234, 88, 12, 0.2)',
                           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6)',
                           backdropFilter: 'blur(20px)',
                           maxHeight: '300px'
                         }}
                       >
-                        <div className="p-3 border-b border-blue-500/20">
+                        <div className="p-3 border-b border-orange-500/20">
                           <p className="text-xs text-gray-400 font-medium">Conversation History</p>
                         </div>
                         <div className="overflow-y-auto max-h-64">
@@ -1810,10 +1810,10 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                                     setCurrentView('workspace')
                                     setShowHistoryDropdown(false)
                                   }}
-                                  className="w-full text-left p-3 transition-all border-none cursor-pointer hover:bg-blue-500/10"
+                                  className="w-full text-left p-3 transition-all border-none cursor-pointer hover:bg-orange-500/10"
                                   style={{
-                                    background: isCurrent ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
-                                    borderBottom: '1px solid rgba(59, 130, 246, 0.1)'
+                                    background: isCurrent ? 'rgba(234, 88, 12, 0.1)' : 'transparent',
+                                    borderBottom: '1px solid rgba(234, 88, 12, 0.1)'
                                   }}
                                 >
                                   <div className="flex items-start gap-2">
@@ -1867,7 +1867,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                     <Button
                       onClick={handleLandingSubmit}
                       disabled={!landingInput.trim() || !selectedRepo || isLandingLoading || !storedTokens.github}
-                      className="h-9 px-4 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium"
+                      className="h-9 px-4 rounded-lg bg-orange-600 hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium"
                     >
                       {isLandingLoading ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -1931,7 +1931,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
             <select
               value={selectedRepo}
               onChange={(e) => setSelectedRepo(e.target.value)}
-              className="selector bg-gray-800/60 border border-blue-500/30 rounded-lg px-3.5 py-2 text-gray-200 text-sm cursor-pointer outline-none transition-all hover:border-blue-500"
+              className="selector bg-gray-800/60 border border-orange-500/30 rounded-lg px-3.5 py-2 text-gray-200 text-sm cursor-pointer outline-none transition-all hover:border-orange-500"
               style={{
                 appearance: 'none',
                 backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239ca3af' d='M6 8.5l-4-4h8l-4 4z'/%3E%3C/svg%3E")`,
@@ -1950,7 +1950,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
             <select
               value={selectedBranch}
               onChange={(e) => setSelectedBranch(e.target.value)}
-              className="selector bg-gray-800/60 border border-blue-500/30 rounded-lg px-3.5 py-2 text-gray-200 text-sm cursor-pointer outline-none transition-all hover:border-blue-500"
+              className="selector bg-gray-800/60 border border-orange-500/30 rounded-lg px-3.5 py-2 text-gray-200 text-sm cursor-pointer outline-none transition-all hover:border-orange-500"
               style={{
                 appearance: 'none',
                 backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239ca3af' d='M6 8.5l-4-4h8l-4 4z'/%3E%3C/svg%3E")`,
@@ -1998,7 +1998,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                   color: 'white',
                   borderBottomRightRadius: message.isUser ? '4px' : '16px',
                   borderBottomLeftRadius: message.isUser ? '16px' : '4px',
-                  boxShadow: message.isUser ? '0 4px 20px rgba(59, 130, 246, 0.3)' : 'none',
+                  boxShadow: message.isUser ? '0 4px 20px rgba(234, 88, 12, 0.15)' : 'none',
                   animation: 'messageSlide 0.4s ease-out'
                 }}
               >
@@ -2008,7 +2008,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                     {isLongMessage && (
                       <button
                         onClick={() => toggleMessageExpansion(message.id)}
-                        className="mt-2 text-xs text-blue-200 hover:text-white flex items-center gap-1 transition-colors"
+                        className="mt-2 text-xs text-orange-200 hover:text-white flex items-center gap-1 transition-colors"
                       >
                         {isExpanded ? (
                           <>
@@ -2091,7 +2091,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
         <div className="input-area p-5 absolute bottom-0 left-0 right-0 z-10" style={{
           background: 'linear-gradient(180deg, rgba(17, 24, 39, 0.95), rgba(10, 14, 20, 0.98))',
           backdropFilter: 'blur(20px)',
-          borderTop: '1px solid rgba(59, 130, 246, 0.2)',
+          borderTop: '1px solid rgba(234, 88, 12, 0.2)',
           boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.6)'
         }}>
           {/* Attachment Badges */}
@@ -2102,7 +2102,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                   key={attachment.id}
                   className="flex items-center gap-2 px-3 py-1.5 bg-gray-700/50 rounded-lg text-sm border border-gray-600/50"
                 >
-                  {attachment.type === 'file' && <FileText className="w-3.5 h-3.5 text-blue-400" />}
+                  {attachment.type === 'file' && <FileText className="w-3.5 h-3.5 text-orange-400" />}
                   {attachment.type === 'image' && <ImageIcon className="w-3.5 h-3.5 text-green-400" />}
                   {attachment.type === 'url' && <LinkIcon className="w-3.5 h-3.5 text-purple-400" />}
                   <span className="text-gray-300 truncate max-w-[150px]">
@@ -2127,7 +2127,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
           <div className="input-wrapper flex items-end gap-3 relative">
             <div className="input-container flex-1 relative overflow-hidden rounded-2xl flex flex-col min-w-0" style={{
               background: 'rgba(17, 24, 39, 0.8)',
-              border: '2px solid rgba(59, 130, 246, 0.3)',
+              border: '2px solid rgba(234, 88, 12, 0.3)',
               boxShadow: '0 4px 24px rgba(0, 0, 0, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.05)',
               transition: 'all 0.3s ease'
             }}>
@@ -2178,7 +2178,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                           }}
                           className="w-full justify-start text-sm px-2 py-2 text-gray-300 hover:bg-gray-700/50 rounded transition-colors flex items-center gap-2"
                         >
-                          <FileText className="size-4 text-blue-400" /> Upload File
+                          <FileText className="size-4 text-orange-400" /> Upload File
                         </button>
 
                         <button
@@ -2244,8 +2244,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                   disabled={(!currentInput.trim() && attachments.length === 0) || isLoading}
                   className="send-button w-9 h-9 flex items-center justify-center border-none rounded-full text-white cursor-pointer transition-all flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
-                    background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-                    boxShadow: '0 2px 12px rgba(59, 130, 246, 0.4)'
+                    background: 'linear-gradient(135deg, #ea580c, #c2410c)',
+                    boxShadow: '0 2px 12px rgba(234, 88, 12, 0.4)'
                   }}
               >
                 {isLoading ? (
@@ -2439,7 +2439,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                           <Plus className="w-5 h-5 text-green-400" />
                         )}
                         {['github_edit_file', 'github_replace_string'].includes(tool.toolName) && (
-                          <File className="w-5 h-5 text-blue-400" />
+                          <File className="w-5 h-5 text-orange-400" />
                         )}
                         {tool.toolName === 'github_stage_change' && (
                           <GitBranch className="w-5 h-5 text-yellow-400" />
@@ -2755,7 +2755,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
               type="file"
               multiple
               onChange={(e) => handleFileAttach(e.target.files)}
-              className="w-full text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-600 file:text-white hover:file:bg-blue-700 file:cursor-pointer"
+              className="w-full text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-orange-600 file:text-white hover:file:bg-orange-500 file:cursor-pointer"
               accept=".txt,.md,.json,.js,.ts,.tsx,.jsx,.css,.html,.py,.java,.cpp,.c,.go,.rs,.yaml,.yml,.xml,.sh,.bat,.ps1,.sql"
             />
             <p className="text-xs text-gray-500">
