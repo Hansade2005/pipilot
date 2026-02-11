@@ -1,20 +1,15 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import {
   ArrowUp,
   Plus,
   Image as ImageIcon,
   Zap,
-  Mic,
-  MicOff,
   Square,
   Sparkles,
   Link as LinkIcon,
-  X,CornerDownLeftIcon,
+  X,
   Github,
   Gitlab,
   RefreshCw
@@ -1173,18 +1168,18 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     <div className="w-full max-w-4xl mx-auto">
       {/* Main Chat Input */}
       <div className="relative">
-        <div className="bg-gray-800/80 chat-input-container border border-gray-600/50 rounded-3xl p-4 shadow-2xl">
+        <div className="rounded-2xl border border-gray-700/60 bg-gray-900/80 focus-within:border-gray-600 transition-colors shadow-2xl">
           {/* Loading Overlay */}
           {isGenerating && (
-            <div className="absolute inset-0 bg-gray-800/96 backdrop-blur-sm rounded-3xl flex items-center justify-center z-20 border border-gray-600/50">
+            <div className="absolute inset-0 bg-gray-900/96 backdrop-blur-sm rounded-2xl flex items-center justify-center z-20 border border-gray-700/60">
               <div className="flex items-center gap-3 text-white">
-                <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                <span className="text-lg font-medium">PiPilot is working...</span>
+                <div className="w-4 h-4 border-2 border-orange-400 border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-sm font-medium text-gray-300">PiPilot is working...</span>
               </div>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit}>
             {/* Input Field - Auto-expanding textarea */}
             <div className="relative">
               <textarea
@@ -1196,7 +1191,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                   // Auto-resize textarea
                   const textarea = e.target as HTMLTextAreaElement
                   textarea.style.height = 'auto'
-                  textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px'
+                  textarea.style.height = Math.min(textarea.scrollHeight, 140) + 'px'
                 }}
                 onKeyDown={(e: any) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
@@ -1204,7 +1199,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                     handleSubmit(e)
                   }
                 }}
-                className="w-full bg-transparent outline-none text-lg text-white placeholder-gray-400 py-3 px-4 resize-none overflow-y-auto min-h-[60px] max-h-[200px]"
+                className="w-full min-h-[44px] max-h-[140px] resize-none border-0 bg-transparent text-gray-100 placeholder:text-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none px-3.5 pt-3 pb-2 text-sm"
                 disabled={isGenerating}
                 rows={1}
               />
@@ -1212,13 +1207,13 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
 
             {/* URL Attachment Pills */}
             {attachedUrl && (
-              <div className="flex items-center gap-2 px-4">
-                <div className="flex items-center gap-1 bg-blue-900/20 border border-blue-700/30 px-3 py-1.5 rounded-full text-sm text-blue-300">
+              <div className="flex items-center gap-2 px-3.5 pb-1">
+                <div className="flex items-center gap-1 bg-orange-900/20 border border-orange-700/30 px-2.5 py-1 rounded-full text-xs text-orange-300">
                   <LinkIcon className="w-3 h-3" />
                   <span className="truncate max-w-[200px]">{attachedUrl}</span>
                   <button
                     onClick={handleRemoveUrl}
-                    className="ml-1 text-blue-400 hover:text-blue-200 transition-colors"
+                    className="ml-1 text-orange-400 hover:text-orange-200 transition-colors"
                     title="Remove URL"
                   >
                     <X className="w-3 h-3" />
@@ -1229,8 +1224,8 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
 
             {/* GitHub Repository Attachment Pills */}
             {githubRepoUrl && (
-              <div className="flex items-center gap-2 px-4">
-                <div className="flex items-center gap-1 bg-gray-900/20 border border-gray-700/30 px-3 py-1.5 rounded-full text-sm text-gray-300">
+              <div className="flex items-center gap-2 px-3.5 pb-1">
+                <div className="flex items-center gap-1 bg-gray-800/50 border border-gray-700/30 px-2.5 py-1 rounded-full text-xs text-gray-300">
                   <Github className="w-3 h-3" />
                   <span className="truncate max-w-[200px]">{githubRepoUrl}</span>
                   <button
@@ -1246,8 +1241,8 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
 
             {/* GitLab Repository Attachment Pills */}
             {gitlabRepoUrl && (
-              <div className="flex items-center gap-2 px-4">
-                <div className="flex items-center gap-1 bg-orange-900/20 border border-orange-700/30 px-3 py-1.5 rounded-full text-sm text-orange-300">
+              <div className="flex items-center gap-2 px-3.5 pb-1">
+                <div className="flex items-center gap-1 bg-orange-900/20 border border-orange-700/30 px-2.5 py-1 rounded-full text-xs text-orange-300">
                   <Gitlab className="w-3 h-3" />
                   <span className="truncate max-w-[200px]">{gitlabRepoUrl}</span>
                   <button
@@ -1262,16 +1257,16 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
             )}
 
             {/* Bottom Bar with Buttons */}
-            <div className="flex items-center justify-between pt-2 border-t border-gray-700/50">
+            <div className="flex items-center justify-between px-2 pb-2">
               {/* Left Side - URL Attachment, Mic and Template Selector */}
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center gap-1">
                 {/* URL Attachment Popover */}
                 <Popover open={showUrlPopover} onOpenChange={setShowUrlPopover}>
                   <PopoverTrigger asChild>
-                    <button 
+                    <button
                       type="button"
                       disabled={isGenerating}
-                      className="w-8 h-8 rounded-full flex items-center justify-center transition-all bg-gray-700/50 hover:bg-gray-600/50 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="h-8 w-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                       title="Attach website URL"
                     >
                       <LinkIcon className="w-4 h-4" />
@@ -1291,13 +1286,13 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                           placeholder="https://example.com"
                           value={urlInput}
                           onChange={(e) => setUrlInput(e.target.value)}
-                          className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
                           autoFocus
                         />
                         <button
                           onClick={handleUrlAttachment}
                           disabled={!urlInput.trim()}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                          className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                         >
                           Attach
                         </button>
@@ -1306,25 +1301,40 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                   </PopoverContent>
                 </Popover>
 
-                <button 
+                {/* Voice Button - Waveform icon */}
+                <button
                   type="button"
                   onClick={handleMicrophoneClick}
                   disabled={isTranscribing || isGenerating}
-                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                    isRecording 
-                      ? 'bg-red-600 hover:bg-red-500 text-white animate-pulse' 
+                  className={`h-8 w-8 flex items-center justify-center rounded-lg transition-colors ${
+                    isRecording
+                      ? 'text-red-400 animate-pulse'
                       : isTranscribing
-                      ? 'bg-gray-600/50 cursor-wait'
-                      : 'bg-gray-700/50 hover:bg-gray-600/50 text-gray-400 hover:text-white'
-                  }`}
+                      ? 'opacity-30 cursor-wait'
+                      : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
+                  } disabled:opacity-30 disabled:cursor-not-allowed`}
                   title={isRecording ? "Stop recording" : isTranscribing ? "Transcribing..." : "Start voice input"}
                 >
                   {isTranscribing ? (
                     <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
                   ) : isRecording ? (
-                    <MicOff className="w-4 h-4" />
+                    <svg width="16" height="16" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect x="0" y="7.5" height="6" fill="currentColor" width="1" rx="0.5" ry="0.5" />
+                      <rect x="4" y="5.5" height="10" fill="currentColor" width="1" rx="0.5" ry="0.5" />
+                      <rect x="8" y="2.5" height="16" fill="currentColor" width="1" rx="0.5" ry="0.5" />
+                      <rect x="12" y="5.5" height="10" fill="currentColor" width="1" rx="0.5" ry="0.5" />
+                      <rect x="16" y="2.5" height="16" fill="currentColor" width="1" rx="0.5" ry="0.5" />
+                      <rect x="20" y="7.5" height="6" fill="currentColor" width="1" rx="0.5" ry="0.5" />
+                    </svg>
                   ) : (
-                    <Mic className="w-4 h-4" />
+                    <svg width="16" height="16" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect x="0" y="7.5" height="6" fill="currentColor" fillOpacity="0.5" width="1" rx="0.5" ry="0.5" />
+                      <rect x="4" y="5.5" height="10" fill="currentColor" fillOpacity="0.5" width="1" rx="0.5" ry="0.5" />
+                      <rect x="8" y="2.5" height="16" fill="currentColor" fillOpacity="0.5" width="1" rx="0.5" ry="0.5" />
+                      <rect x="12" y="5.5" height="10" fill="currentColor" fillOpacity="0.5" width="1" rx="0.5" ry="0.5" />
+                      <rect x="16" y="2.5" height="16" fill="currentColor" fillOpacity="0.5" width="1" rx="0.5" ry="0.5" />
+                      <rect x="20" y="7.5" height="6" fill="currentColor" fillOpacity="0.5" width="1" rx="0.5" ry="0.5" />
+                    </svg>
                   )}
                 </button>
 
@@ -1337,7 +1347,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                   }}
                   disabled={isGenerating}
                 >
-                  <SelectTrigger className="w-[100px] h-8 bg-gray-700/50 border-gray-600/50 text-gray-300 text-sm">
+                  <SelectTrigger className="w-[100px] h-8 bg-transparent border-0 text-gray-400 text-xs hover:text-gray-200 hover:bg-gray-800 rounded-lg focus:ring-0">
                     <SelectValue placeholder="Template" />
                   </SelectTrigger>
                   <SelectContent className="bg-gray-800 border-gray-700">
@@ -1370,15 +1380,15 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
               </div>
 
               {/* Right Side - Enhance and Send Buttons */}
-              <div className="flex items-center space-x-3">
-                <button 
+              <div className="flex items-center gap-2">
+                <button
                   type="button"
                   onClick={handlePromptEnhancement}
                   disabled={!prompt.trim() || isEnhancing || isGenerating}
-                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                  className={`h-8 w-8 flex items-center justify-center rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
                     isEnhancing
-                      ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
-                      : 'bg-gray-700/50 hover:bg-gradient-to-r hover:from-purple-600/80 hover:to-blue-600/80 text-gray-400 hover:text-white'
+                      ? 'bg-orange-600 text-white'
+                      : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
                   }`}
                   title="Enhance prompt with AI"
                 >
@@ -1388,18 +1398,24 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                     <Sparkles className="w-4 h-4" />
                   )}
                 </button>
-                <button 
-  type="submit" 
-  disabled={!prompt.trim() && !githubRepoUrl.trim() && !gitlabRepoUrl.trim() || isGenerating}
-  className="w-8 h-8 rounded-md bg-gray-700/50 hover:bg-gray-600/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-gray-400 hover:text-white transition-colors"
->
-  {isGenerating ? (
-    <Square className="w-4 h-4" />
-  ) : (
-    <CornerDownLeftIcon className="w-4 h-4" />
-  )}
-</button>
 
+                {/* Send/Stop Button */}
+                {isGenerating ? (
+                  <button
+                    type="button"
+                    className="h-7 w-7 rounded-lg bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors"
+                  >
+                    <Square className="w-3.5 h-3.5 text-white fill-white" />
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={!prompt.trim() && !githubRepoUrl.trim() && !gitlabRepoUrl.trim()}
+                    className="h-7 w-7 rounded-lg bg-orange-600 hover:bg-orange-500 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+                  >
+                    <ArrowUp className="size-4 text-white" />
+                  </button>
+                )}
               </div>
             </div>
           </form>
@@ -1435,13 +1451,13 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                   placeholder="https://github.com/owner/repo"
                   value={githubInput}
                   onChange={(e) => setGithubInput(e.target.value)}
-                  className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
                   autoFocus
                 />
                 <button
                   onClick={handleGithubAttachment}
                   disabled={!githubInput.trim()}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                 >
                   Import
                 </button>
