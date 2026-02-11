@@ -24,8 +24,10 @@ import {
   Copy, ArrowUp, Undo2, Redo2, Check, AlertTriangle, Zap, Package, PackageMinus,
   Search, Globe, Eye, FolderOpen, Settings, Edit3, CheckCircle2, XCircle,
   Square, Database, CornerDownLeft, Table, Key, Code, Server, BarChart3,
-  CreditCard, Coins, GitBranch
+  CreditCard, Coins, GitBranch, ChevronRight, ChevronLeft, Wrench,
+  ToggleLeft, ToggleRight, Sparkles, FileUp, Hash, ExternalLink
 } from 'lucide-react'
+import { ModelSelector } from '@/components/ui/model-selector'
 import { cn, filterUnwantedFiles } from '@/lib/utils'
 import { Actions, Action } from '@/components/ai-elements/actions'
 import { FileAttachmentDropdown } from "@/components/ui/file-attachment-dropdown"
@@ -1078,10 +1080,23 @@ interface TaggedComponent {
 // Maximum number of images that can be attached
 const MAX_IMAGE_ATTACHMENTS = 5
 
+interface MCPServerConfig {
+  id: string
+  name: string
+  transport: string
+  url?: string
+  headers?: Record<string, string>
+  env?: Record<string, string>
+  enabled: boolean
+}
+
 interface ChatPanelV2Props {
   project: any
   isMobile?: boolean
   selectedModel?: string
+  onModelChange?: (modelId: string) => void
+  userPlan?: string
+  subscriptionStatus?: string
   aiMode?: string
   onModeChange?: (mode: string) => void
   onClearChat?: () => void
@@ -1094,6 +1109,9 @@ export function ChatPanelV2({
   project,
   isMobile = false,
   selectedModel = 'gpt-4o',
+  onModelChange,
+  userPlan = 'free',
+  subscriptionStatus,
   aiMode = 'code',
   onModeChange,
   onClearChat,
@@ -1155,6 +1173,53 @@ export function ChatPanelV2({
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
   const [showUrlDialog, setShowUrlDialog] = useState(false)
   const [urlInput, setUrlInput] = useState('')
+
+  // Command Menu state (rich "+" palette)
+  const [showCommandMenu, setShowCommandMenu] = useState(false)
+  const [commandMenuSubmenu, setCommandMenuSubmenu] = useState<'none' | 'mcp' | 'tools' | 'slash'>('none')
+  const commandMenuRef = useRef<HTMLDivElement>(null)
+
+  // Feature toggles (persisted per-project in localStorage)
+  const [webSearchEnabled, setWebSearchEnabled] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('pipilot-web-search-enabled')
+        return stored !== null ? JSON.parse(stored) : true
+      } catch { return true }
+    }
+    return true
+  })
+  const [imageGenEnabled, setImageGenEnabled] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('pipilot-image-gen-enabled')
+        return stored !== null ? JSON.parse(stored) : true
+      } catch { return true }
+    }
+    return true
+  })
+
+  // MCP server toggles (per-session runtime toggles)
+  const [mcpServerToggles, setMcpServerToggles] = useState<Record<string, boolean>>({})
+  const [loadedMcpServers, setLoadedMcpServers] = useState<MCPServerConfig[]>([])
+
+  // Tool category toggles
+  const [toolCategoryToggles, setToolCategoryToggles] = useState<Record<string, boolean>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const toolPrefs = localStorage.getItem('pipilot-tool-preferences')
+        if (toolPrefs) {
+          const parsed = JSON.parse(toolPrefs)
+          const disabledCats = parsed.disabledCategories || []
+          const toggles: Record<string, boolean> = {}
+          const allCats = ['file_ops', 'code_search', 'web_tools', 'dev_tools', 'pipilot_db', 'supabase', 'stripe', 'docs_quality', 'image_gen']
+          allCats.forEach(cat => { toggles[cat] = !disabledCats.includes(cat) })
+          return toggles
+        }
+      } catch {}
+    }
+    return { file_ops: true, code_search: true, web_tools: true, dev_tools: true, pipilot_db: true, supabase: true, stripe: true, docs_quality: true, image_gen: true }
+  })
 
   // Speech-to-text state (Web Speech API real-time implementation)
   const [isRecording, setIsRecording] = useState(false)
@@ -1236,6 +1301,62 @@ export function ChatPanelV2({
       localStorage.setItem('pipilot-prompt-queue', JSON.stringify(promptQueue))
     }
   }, [promptQueue])
+
+  // Load MCP servers for command menu display
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const servers: MCPServerConfig[] = []
+    try {
+      const globalStored = localStorage.getItem('pipilot-mcp-servers-global')
+      if (globalStored) servers.push(...JSON.parse(globalStored))
+    } catch {}
+    if (project?.id) {
+      try {
+        const stored = localStorage.getItem(`pipilot-mcp-servers-${project.id}`)
+        if (stored) servers.push(...JSON.parse(stored))
+      } catch {}
+    }
+    setLoadedMcpServers(servers)
+    // Initialize toggles from existing enabled state
+    const toggles: Record<string, boolean> = {}
+    servers.forEach(s => { toggles[s.id || s.name] = s.enabled !== false })
+    setMcpServerToggles(toggles)
+  }, [project?.id])
+
+  // Persist feature toggles
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('pipilot-web-search-enabled', JSON.stringify(webSearchEnabled))
+    }
+  }, [webSearchEnabled])
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('pipilot-image-gen-enabled', JSON.stringify(imageGenEnabled))
+    }
+  }, [imageGenEnabled])
+
+  // Persist tool category toggles
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const disabledCategories = Object.entries(toolCategoryToggles)
+        .filter(([, enabled]) => !enabled)
+        .map(([cat]) => cat)
+      localStorage.setItem('pipilot-tool-preferences', JSON.stringify({ disabledCategories }))
+    }
+  }, [toolCategoryToggles])
+
+  // Close command menu on outside click
+  useEffect(() => {
+    if (!showCommandMenu) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (commandMenuRef.current && !commandMenuRef.current.contains(e.target as Node)) {
+        setShowCommandMenu(false)
+        setCommandMenuSubmenu('none')
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showCommandMenu])
 
   const addToQueue = useCallback((text: string) => {
     setPromptQueue(prev => [...prev, { id: Date.now().toString(), text, timestamp: Date.now() }])
@@ -4291,50 +4412,27 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
       // Compress project files for efficient transfer (only for initial requests, not continuations)
       console.log(`[ChatPanelV2] 📦 Compressing ${projectFiles.length} project files...`)
       const isInitialPrompt = messages.length === 0 // No previous messages (first prompt)
-      // Load MCP server configs from localStorage for this project
-      // Load MCP servers: project-specific + global
-      let mcpServersForProject: any[] = []
-      const mapServer = (s: any) => ({
-        name: s.name,
-        url: s.url,
-        transport: s.transport || 'http',
-        headers: { ...(s.headers || {}), ...(s.env || {}) },
-      })
-      const filterServer = (s: any) => s.enabled && s.transport !== 'stdio' && s.url
+      // Build MCP servers list using runtime toggles from command menu
+      const mcpServersForProject: any[] = loadedMcpServers
+        .filter(s => s.transport !== 'stdio' && s.url && (mcpServerToggles[s.id || s.name] !== false))
+        .map(s => ({
+          name: s.name,
+          url: s.url,
+          transport: s.transport || 'http',
+          headers: { ...(s.headers || {}), ...(s.env || {}) },
+        }))
 
-      // Load global MCP servers first
-      try {
-        const globalStored = localStorage.getItem('pipilot-mcp-servers-global')
-        if (globalStored) {
-          const globalParsed = JSON.parse(globalStored)
-          mcpServersForProject.push(...globalParsed.filter(filterServer).map(mapServer))
-        }
-      } catch {}
-
-      // Then project-specific (may overlap names - project takes priority)
-      if (project?.id) {
-        try {
-          const stored = localStorage.getItem(`pipilot-mcp-servers-${project.id}`)
-          if (stored) {
-            const parsed = JSON.parse(stored)
-            const projectServers = parsed.filter(filterServer).map(mapServer)
-            // Deduplicate: project servers override global with same name
-            const projectNames = new Set(projectServers.map((s: any) => s.name))
-            mcpServersForProject = mcpServersForProject.filter((s: any) => !projectNames.has(s.name))
-            mcpServersForProject.push(...projectServers)
-          }
-        } catch {}
+      // Build disabled tool categories from runtime toggles + feature toggles
+      const disabledToolCategories = Object.entries(toolCategoryToggles)
+        .filter(([, enabled]) => !enabled)
+        .map(([cat]) => cat)
+      // Also disable web_tools and image_gen based on feature toggles
+      if (!webSearchEnabled && !disabledToolCategories.includes('web_tools')) {
+        disabledToolCategories.push('web_tools')
       }
-
-      // Load tool preferences
-      let disabledToolCategories: string[] = []
-      try {
-        const toolPrefs = localStorage.getItem('pipilot-tool-preferences')
-        if (toolPrefs) {
-          const parsed = JSON.parse(toolPrefs)
-          disabledToolCategories = parsed.disabledCategories || []
-        }
-      } catch {}
+      if (!imageGenEnabled && !disabledToolCategories.includes('image_gen')) {
+        disabledToolCategories.push('image_gen')
+      }
 
       const metadata = {
         project,
@@ -5897,121 +5995,420 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
             />
           </form>
 
-          {/* Bottom Left: Attachment and Voice Buttons */}
-          <div className="absolute bottom-2 left-2 flex gap-2">
-            {/* Attachment Popover */}
-            <Popover open={showAttachmentMenu} onOpenChange={setShowAttachmentMenu}>
-              <PopoverTrigger asChild>
+          {/* Hidden file inputs */}
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleImageUpload}
+            className="hidden"
+            id="image-upload"
+          />
+          <input
+            type="file"
+            multiple
+            onChange={handleFileUpload}
+            className="hidden"
+            id="file-upload"
+          />
+
+          {/* Bottom Bar: [+] [Mic] left | [Model] [Plan] [Send] right */}
+          <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+            {/* Left Side: + Command Menu and Voice */}
+            <div className="flex items-center gap-1">
+              {/* + Command Menu Button */}
+              <div className="relative" ref={commandMenuRef}>
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8"
                   disabled={isLoading}
+                  onClick={() => {
+                    setShowCommandMenu(!showCommandMenu)
+                    setCommandMenuSubmenu('none')
+                  }}
                 >
-                  <Plus className="size-4" />
+                  <Plus className={`size-4 transition-transform ${showCommandMenu ? 'rotate-45' : ''}`} />
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-48 p-2 z-[70]" side="top" align="start">
-                <div className="flex flex-col gap-1">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={handleImageUpload}
-                    className="hidden"
-                    id="image-upload"
-                  />
-                  <label htmlFor="image-upload">
-                    <Button type="button" variant="ghost" size="sm" className="w-full justify-start" asChild>
-                      <span><ImageIcon className="size-4 mr-2" /> Images</span>
-                    </Button>
-                  </label>
 
-                  <input
-                    type="file"
-                    multiple
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    id="file-upload"
-                  />
-                  <label htmlFor="file-upload">
-                    <Button type="button" variant="ghost" size="sm" className="w-full justify-start" asChild>
-                      <span><FileText className="size-4 mr-2" /> Files</span>
-                    </Button>
-                  </label>
+                {/* Command Menu Palette */}
+                {showCommandMenu && (
+                  <div className="absolute bottom-10 left-0 w-[280px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[80] overflow-hidden">
+                    {commandMenuSubmenu === 'none' && (
+                      <div className="py-1.5">
+                        {/* Attachments Section */}
+                        <button
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                          onClick={() => {
+                            setShowCommandMenu(false)
+                            document.getElementById('image-upload')?.click()
+                          }}
+                        >
+                          <FileUp className="size-4 text-gray-400" />
+                          <span>Add images or files</span>
+                        </button>
+                        <button
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                          onClick={() => {
+                            setShowCommandMenu(false)
+                            setShowUrlDialog(true)
+                          }}
+                        >
+                          <LinkIcon className="size-4 text-gray-400" />
+                          <span>Attach URL</span>
+                        </button>
+                        <button
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                          onClick={() => {
+                            setShowCommandMenu(false)
+                            // Trigger @ file dropdown
+                            if (textareaRef.current) {
+                              const currentVal = input
+                              setInput(currentVal + '@')
+                              textareaRef.current.focus()
+                              setTimeout(() => {
+                                if (textareaRef.current) {
+                                  const pos = textareaRef.current.value.length
+                                  textareaRef.current.selectionStart = pos
+                                  textareaRef.current.selectionEnd = pos
+                                  const atCmd = detectAtCommand(textareaRef.current.value, pos)
+                                  if (atCmd) {
+                                    setFileQuery(atCmd.query)
+                                    setAtCommandStartIndex(atCmd.startIndex)
+                                    const position = calculateDropdownPosition(textareaRef.current, atCmd.startIndex)
+                                    setDropdownPosition(position)
+                                    setShowFileDropdown(true)
+                                  }
+                                }
+                              }, 50)
+                            }
+                          }}
+                        >
+                          <FolderOpen className="size-4 text-gray-400" />
+                          <span>Browse project files</span>
+                        </button>
 
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="w-full justify-start"
-                    onClick={() => setShowUrlDialog(true)}
+                        {/* Separator */}
+                        <div className="my-1.5 border-t border-gray-700/50" />
+
+                        {/* Feature Toggles */}
+                        <button
+                          className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                          onClick={() => setWebSearchEnabled(!webSearchEnabled)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Globe className="size-4 text-gray-400" />
+                            <span>Web search</span>
+                          </div>
+                          {webSearchEnabled && <Check className="size-4 text-green-400" />}
+                        </button>
+                        <button
+                          className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                          onClick={() => setIsAskMode(!isAskMode)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Eye className="size-4 text-gray-400" />
+                            <span>Plan mode</span>
+                          </div>
+                          {isAskMode && <Check className="size-4 text-green-400" />}
+                        </button>
+                        <button
+                          className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                          onClick={() => setImageGenEnabled(!imageGenEnabled)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Sparkles className="size-4 text-gray-400" />
+                            <span>Image generation</span>
+                          </div>
+                          {imageGenEnabled && <Check className="size-4 text-green-400" />}
+                        </button>
+
+                        {/* Separator */}
+                        <div className="my-1.5 border-t border-gray-700/50" />
+
+                        {/* Submenus */}
+                        <button
+                          className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                          onClick={() => setCommandMenuSubmenu('mcp')}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Server className="size-4 text-gray-400" />
+                            <span>MCP Servers</span>
+                            {loadedMcpServers.filter(s => mcpServerToggles[s.id || s.name] !== false).length > 0 && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-green-900/40 text-green-400 rounded-full">
+                                {loadedMcpServers.filter(s => mcpServerToggles[s.id || s.name] !== false).length}
+                              </span>
+                            )}
+                          </div>
+                          <ChevronRight className="size-4 text-gray-500" />
+                        </button>
+                        <button
+                          className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                          onClick={() => setCommandMenuSubmenu('tools')}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Wrench className="size-4 text-gray-400" />
+                            <span>Tool categories</span>
+                          </div>
+                          <ChevronRight className="size-4 text-gray-500" />
+                        </button>
+
+                        {/* Separator */}
+                        <div className="my-1.5 border-t border-gray-700/50" />
+
+                        {/* Slash commands */}
+                        <button
+                          className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                          onClick={() => setCommandMenuSubmenu('slash')}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Hash className="size-4 text-gray-400" />
+                            <span>Slash commands</span>
+                          </div>
+                          <ChevronRight className="size-4 text-gray-500" />
+                        </button>
+
+                        {/* Project Settings */}
+                        <button
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                          onClick={() => {
+                            setShowCommandMenu(false)
+                            if (project?.slug) {
+                              window.open(`/workspace/projects/${project.slug}`, '_blank')
+                            }
+                          }}
+                        >
+                          <Settings className="size-4 text-gray-400" />
+                          <span>Project settings</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* MCP Servers Submenu */}
+                    {commandMenuSubmenu === 'mcp' && (
+                      <div className="py-1.5">
+                        <button
+                          className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors border-b border-gray-700/50"
+                          onClick={() => setCommandMenuSubmenu('none')}
+                        >
+                          <ChevronLeft className="size-4" />
+                          <span className="font-medium">MCP Servers</span>
+                        </button>
+                        {loadedMcpServers.length === 0 ? (
+                          <div className="px-4 py-4 text-sm text-gray-500 text-center">
+                            No MCP servers configured
+                          </div>
+                        ) : (
+                          <div className="max-h-[240px] overflow-y-auto">
+                            {loadedMcpServers.map((server) => {
+                              const key = server.id || server.name
+                              const isOn = mcpServerToggles[key] !== false
+                              return (
+                                <button
+                                  key={key}
+                                  className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                                  onClick={() => setMcpServerToggles(prev => ({ ...prev, [key]: !isOn }))}
+                                >
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <Server className={`size-4 flex-shrink-0 ${isOn ? 'text-green-400' : 'text-gray-500'}`} />
+                                    <span className="truncate">{server.name}</span>
+                                    {server.transport === 'stdio' && (
+                                      <span className="text-[10px] px-1 py-0.5 bg-yellow-900/30 text-yellow-500 rounded flex-shrink-0">local</span>
+                                    )}
+                                  </div>
+                                  <Switch
+                                    checked={isOn}
+                                    onCheckedChange={(checked) => setMcpServerToggles(prev => ({ ...prev, [key]: checked }))}
+                                    className="h-4 w-7 flex-shrink-0"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
+                        <div className="border-t border-gray-700/50 mt-1">
+                          <button
+                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-blue-400 hover:bg-gray-800 transition-colors"
+                            onClick={() => {
+                              setShowCommandMenu(false)
+                              if (project?.slug) {
+                                window.open(`/workspace/projects/${project.slug}?tab=mcp`, '_blank')
+                              }
+                            }}
+                          >
+                            <ExternalLink className="size-4" />
+                            <span>Manage servers</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tool Categories Submenu */}
+                    {commandMenuSubmenu === 'tools' && (
+                      <div className="py-1.5">
+                        <button
+                          className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors border-b border-gray-700/50"
+                          onClick={() => setCommandMenuSubmenu('none')}
+                        >
+                          <ChevronLeft className="size-4" />
+                          <span className="font-medium">Tool Categories</span>
+                        </button>
+                        <div className="max-h-[280px] overflow-y-auto">
+                          {[
+                            { id: 'file_ops', label: 'File Operations', icon: FileText, desc: 'Read, write, edit, delete files' },
+                            { id: 'code_search', label: 'Code Search', icon: Search, desc: 'Grep, semantic nav, list files' },
+                            { id: 'web_tools', label: 'Web Tools', icon: Globe, desc: 'Web search & extraction' },
+                            { id: 'dev_tools', label: 'Dev Tools', icon: Code, desc: 'Error check, Node, packages' },
+                            { id: 'pipilot_db', label: 'PiPilot Database', icon: Database, desc: 'Create/query PiPilot databases' },
+                            { id: 'supabase', label: 'Supabase', icon: Database, desc: 'Supabase tables, auth, storage' },
+                            { id: 'stripe', label: 'Stripe', icon: CreditCard, desc: 'Payments, products, customers' },
+                            { id: 'docs_quality', label: 'Docs & Quality', icon: BarChart3, desc: 'Reports, docs, code review' },
+                            { id: 'image_gen', label: 'Image Generation', icon: Sparkles, desc: 'AI image generation' },
+                          ].map((cat) => {
+                            const isOn = toolCategoryToggles[cat.id] !== false
+                            const Icon = cat.icon
+                            return (
+                              <button
+                                key={cat.id}
+                                className="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                                onClick={() => setToolCategoryToggles(prev => ({ ...prev, [cat.id]: !isOn }))}
+                              >
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <Icon className={`size-4 flex-shrink-0 ${isOn ? 'text-blue-400' : 'text-gray-600'}`} />
+                                  <div className="text-left min-w-0">
+                                    <div className={isOn ? 'text-gray-200' : 'text-gray-500'}>{cat.label}</div>
+                                    <div className="text-[11px] text-gray-500 truncate">{cat.desc}</div>
+                                  </div>
+                                </div>
+                                <Switch
+                                  checked={isOn}
+                                  onCheckedChange={(checked) => setToolCategoryToggles(prev => ({ ...prev, [cat.id]: checked }))}
+                                  className="h-4 w-7 flex-shrink-0"
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </button>
+                            )
+                          })}
+                        </div>
+                        <div className="border-t border-gray-700/50 mt-1">
+                          <button
+                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-blue-400 hover:bg-gray-800 transition-colors"
+                            onClick={() => {
+                              setShowCommandMenu(false)
+                              window.open('/workspace/account', '_blank')
+                            }}
+                          >
+                            <ExternalLink className="size-4" />
+                            <span>Manage in settings</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Slash Commands Submenu */}
+                    {commandMenuSubmenu === 'slash' && (
+                      <div className="py-1.5">
+                        <button
+                          className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors border-b border-gray-700/50"
+                          onClick={() => setCommandMenuSubmenu('none')}
+                        >
+                          <ChevronLeft className="size-4" />
+                          <span className="font-medium">Slash Commands</span>
+                        </button>
+                        <div className="max-h-[240px] overflow-y-auto">
+                          {getDefaultSlashCommands({}).map((cmd: SlashCommand) => (
+                            <button
+                              key={cmd.id}
+                              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                              onClick={() => {
+                                setShowCommandMenu(false)
+                                setInput(`/${cmd.id} `)
+                                textareaRef.current?.focus()
+                              }}
+                            >
+                              <Hash className="size-4 text-gray-500" />
+                              <div className="text-left min-w-0">
+                                <div className="text-gray-200">/{cmd.id}</div>
+                                <div className="text-[11px] text-gray-500 truncate">{cmd.description}</div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Voice Button */}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={handleMicrophoneClick}
+                disabled={isTranscribing || isLoading}
+              >
+                {isRecording ? <MicOff className="size-4 text-red-400" /> : <Mic className="size-4" />}
+              </Button>
+            </div>
+
+            {/* Right Side: Model Selector, Plan Toggle, Send/Stop */}
+            <div className="flex items-center gap-2">
+              {/* Compact Model Selector */}
+              {onModelChange && (
+                <ModelSelector
+                  selectedModel={selectedModel}
+                  onModelChange={onModelChange}
+                  userPlan={userPlan}
+                  subscriptionStatus={subscriptionStatus}
+                  compact={true}
+                  className=""
+                />
+              )}
+
+              {/* Plan Mode Toggle */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs transition-colors ${isAskMode ? 'bg-blue-600/20 text-blue-400 border border-blue-600/30' : 'text-gray-400 hover:bg-gray-800'}`}
+                    onClick={() => setIsAskMode(!isAskMode)}
                   >
-                    <LinkIcon className="size-4 mr-2" /> URL
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
+                    <Eye className="size-3.5" />
+                    <span>Plan</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Plan mode - AI reasons and plans without making file changes</p>
+                </TooltipContent>
+              </Tooltip>
 
-            {/* Voice Button */}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={handleMicrophoneClick}
-              disabled={isTranscribing || isLoading}
-            >
-              {isRecording ? <MicOff className="size-4" /> : <Mic className="size-4" />}
-            </Button>
-          </div>
-
-          {/* Bottom Right: Mode Toggle and Send/Stop Button */}
-          <div className="absolute bottom-2 right-2 flex items-center gap-2">
-            {/* Plan Mode Toggle */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-2">
-                  <label htmlFor="ask-mode-switch" className="text-xs text-gray-400 cursor-pointer select-none">
-                    Plan
-                  </label>
-                  <Switch
-                    id="ask-mode-switch"
-                    checked={isAskMode}
-                    onCheckedChange={setIsAskMode}
-                    className="h-4 w-7"
-                  />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Plan mode - AI reasons and plans before writing code, without making file changes</p>
-              </TooltipContent>
-            </Tooltip>
-
-            {/* Send/Stop Button */}
-            {isLoading ? (
-              <Button
-                type="button"
-                variant="default"
-                size="icon"
-                className="h-8 w-8"
-                onClick={handleStop}
-              >
-                <Square className="w-4 h-4 bg-red-500 animate-pulse" />
-              </Button>
-            ) : (
-              <Button
-                ref={sendButtonRef}
-                type="button"
-                size="icon"
-                className="h-8 w-8"
-                disabled={(!input.trim() && attachedFiles.length === 0 && attachedImages.length === 0) || attachedImages.some((img: AttachedImage) => img.isProcessing)}
-                onClick={handleEnhancedSubmit}
-              >
-                <CornerDownLeft className="size-4" />
-              </Button>
-            )}
+              {/* Send/Stop Button */}
+              {isLoading ? (
+                <Button
+                  type="button"
+                  variant="default"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={handleStop}
+                >
+                  <Square className="w-4 h-4 bg-red-500 animate-pulse" />
+                </Button>
+              ) : (
+                <Button
+                  ref={sendButtonRef}
+                  type="button"
+                  size="icon"
+                  className="h-8 w-8"
+                  disabled={(!input.trim() && attachedFiles.length === 0 && attachedImages.length === 0) || attachedImages.some((img: AttachedImage) => img.isProcessing)}
+                  onClick={handleEnhancedSubmit}
+                >
+                  <CornerDownLeft className="size-4" />
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 

@@ -1031,6 +1031,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       key={`chat-${selectedProject.id}-${chatSessionKey}`}
                       project={selectedProject}
                       selectedModel={selectedModel}
+                      onModelChange={setSelectedModel}
+                      userPlan={userPlan}
+                      subscriptionStatus={subscriptionStatus}
                       aiMode={aiMode}
                       initialPrompt={initialChatPrompt}
                       taggedComponent={taggedComponent}
@@ -1595,6 +1598,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       project={selectedProject}
                       isMobile={true}
                       selectedModel={selectedModel}
+                      onModelChange={setSelectedModel}
+                      userPlan={userPlan}
+                      subscriptionStatus={subscriptionStatus}
                       onClearChat={handleClearChat}
                       aiMode={aiMode}
                       initialPrompt={initialChatPrompt}
