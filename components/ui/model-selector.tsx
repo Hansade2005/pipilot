@@ -173,7 +173,7 @@ export function ModelSelector({
                   </div>
                   <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
                     {!allowed && <Lock className="size-3 text-gray-500" />}
-                    {isSelected && allowed && <Check className="size-4 text-blue-400" />}
+                    {isSelected && allowed && <Check className="size-4 text-orange-400" />}
                   </div>
                 </button>
               )

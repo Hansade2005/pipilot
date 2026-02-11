@@ -3,28 +3,20 @@
 import { useState, useRef, useEffect } from "react"
 import {
   ArrowUp,
-  Plus,
-  Image as ImageIcon,
-  Zap,
   Square,
   Sparkles,
   Link as LinkIcon,
   X,
   Github,
   Gitlab,
-  RefreshCw
+  RefreshCw,
+  ChevronDown,
+  Check
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { filterUnwantedFiles } from "@/lib/utils"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Suggestions, Suggestion } from "@/components/ai-elements/suggestion"
 
@@ -138,6 +130,8 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   // Template selection state
   const [selectedTemplate, setSelectedTemplate] = useState<'vite-react' | 'nextjs' | 'expo' | 'html'>('vite-react')
   const [hasUserSelectedTemplate, setHasUserSelectedTemplate] = useState(false)
+  const [showTemplateDropdown, setShowTemplateDropdown] = useState(false)
+  const templateDropdownRef = useRef<HTMLDivElement>(null)
 
   // URL attachment state
   const [attachedUrl, setAttachedUrl] = useState("")
@@ -195,6 +189,18 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   useEffect(() => {
     fetchPromptSuggestions()
   }, [])
+
+  // Close template dropdown on outside click
+  useEffect(() => {
+    if (!showTemplateDropdown) return
+    const handleClick = (e: MouseEvent) => {
+      if (templateDropdownRef.current && !templateDropdownRef.current.contains(e.target as Node)) {
+        setShowTemplateDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showTemplateDropdown])
 
   const fetchPromptSuggestions = async () => {
     try {
@@ -1338,45 +1344,51 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                   )}
                 </button>
 
-                {/* Template Selector */}
-                <Select
-                  value={selectedTemplate}
-                  onValueChange={(value: 'vite-react' | 'nextjs' | 'expo' | 'html') => {
-                    setSelectedTemplate(value)
-                    setHasUserSelectedTemplate(true)
-                  }}
-                  disabled={isGenerating}
-                >
-                  <SelectTrigger className="w-[100px] h-8 bg-transparent border-0 text-gray-400 text-xs hover:text-gray-200 hover:bg-gray-800 rounded-lg focus:ring-0">
-                    <SelectValue placeholder="Template" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700">
-                    <SelectItem value="vite-react" className="text-gray-300 focus:bg-gray-700 focus:text-white">
-                      <div className="flex items-center gap-2">
-                        <Zap className="w-3 h-3 text-purple-400" />
-                        <span>Vite</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="nextjs" className="text-gray-300 focus:bg-gray-700 focus:text-white">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">▲</span>
-                        <span>Next.js</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="expo" className="text-gray-300 focus:bg-gray-700 focus:text-white">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">📱</span>
-                        <span>Expo</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="html" className="text-gray-300 focus:bg-gray-700 focus:text-white">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">🌐</span>
-                        <span>HTML</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                {/* Template Selector - clean text + chevron like model selector */}
+                <div className="relative" ref={templateDropdownRef}>
+                  <button
+                    type="button"
+                    className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-200 transition-colors disabled:opacity-30"
+                    onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
+                    disabled={isGenerating}
+                  >
+                    <span className="font-medium">
+                      {{ 'vite-react': 'Vite', 'nextjs': 'Next.js', 'expo': 'Expo', 'html': 'HTML' }[selectedTemplate]}
+                    </span>
+                    <ChevronDown className={`size-3 transition-transform ${showTemplateDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {showTemplateDropdown && (
+                    <div className="absolute bottom-8 left-0 w-[180px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[100] overflow-hidden py-1">
+                      {([
+                        { id: 'vite-react' as const, name: 'Vite', desc: 'React SPA with Vite' },
+                        { id: 'nextjs' as const, name: 'Next.js', desc: 'Full-stack with SSR' },
+                        { id: 'expo' as const, name: 'Expo', desc: 'Cross-platform mobile' },
+                        { id: 'html' as const, name: 'HTML', desc: 'Vanilla HTML/CSS/JS' },
+                      ]).map((tpl) => {
+                        const isSelected = tpl.id === selectedTemplate
+                        return (
+                          <button
+                            key={tpl.id}
+                            type="button"
+                            className={`w-full flex items-center justify-between px-4 py-2.5 text-left transition-colors hover:bg-gray-800 cursor-pointer ${isSelected ? 'bg-gray-800/50' : ''}`}
+                            onClick={() => {
+                              setSelectedTemplate(tpl.id)
+                              setHasUserSelectedTemplate(true)
+                              setShowTemplateDropdown(false)
+                            }}
+                          >
+                            <div className="min-w-0">
+                              <div className={`text-sm font-medium ${isSelected ? 'text-white' : 'text-gray-200'}`}>{tpl.name}</div>
+                              <div className="text-[11px] text-gray-500">{tpl.desc}</div>
+                            </div>
+                            {isSelected && <Check className="size-4 text-orange-400 ml-2 flex-shrink-0" />}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Right Side - Enhance and Send Buttons */}
