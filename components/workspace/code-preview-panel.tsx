@@ -2869,11 +2869,11 @@ export default function TodoApp() {
 
   if (!project) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-muted/20">
+      <div className="flex-1 flex items-center justify-center bg-gray-950">
         <div className="text-center">
-          <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Project Selected</h3>
-          <p className="text-muted-foreground">Select a project from the sidebar to start building</p>
+          <FileText className="h-12 w-12 text-gray-600 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-300 mb-2">No Project Selected</h3>
+          <p className="text-gray-500">Select a project from the sidebar to start building</p>
         </div>
       </div>
     )
@@ -2883,7 +2883,7 @@ export default function TodoApp() {
     <div className="flex flex-col h-full">
       {/* Tabs - Hidden on mobile and when in preview tab on desktop */}
       {!isMobile && activeTab !== "preview" && (
-        <div className="border-b border-border bg-card">
+        <div className="border-b border-gray-800/60 bg-gray-900/80">
           <div className="flex items-center justify-between px-4 py-2">
             <div className="flex space-x-1">
               {/* Desktop tabs would go here if needed */}
@@ -2927,7 +2927,7 @@ export default function TodoApp() {
               setPreview(prev => ({ ...prev, url }))
             }}
           >
-            <WebPreviewNavigation className="fixed top-0 left-0 right-0 z-50 bg-card border-b border-border">
+            <WebPreviewNavigation className="fixed top-0 left-0 right-0 z-50 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800/60">
               {/* Chat Session Selector */}
               {project && userId && onSessionChange && (
                 <div className="flex items-center gap-1 ml-2">

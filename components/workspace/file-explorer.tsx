@@ -1556,9 +1556,9 @@ enabled = false`
         <ContextMenu>
             <ContextMenuTrigger>
             <div
-              className={`flex items-center space-x-2 px-2 py-1.5 hover:bg-accent/50 rounded cursor-pointer transition-colors ${
-                isSelected ? "bg-accent text-accent-foreground" : ""
-              } ${isSearchMatch ? "bg-yellow-100 dark:bg-yellow-900/20" : ""} ${node.type === 'folder' && node.path === dragOverFolder ? 'bg-sky-100 dark:bg-sky-900/20 ring-1 ring-sky-300' : ''}`}
+              className={`flex items-center space-x-2 px-2 py-1.5 hover:bg-gray-800/60 rounded cursor-pointer transition-colors ${
+                isSelected ? "bg-gray-800 text-gray-100" : "text-gray-400"
+              } ${isSearchMatch ? "bg-yellow-900/20" : ""} ${node.type === 'folder' && node.path === dragOverFolder ? 'bg-sky-900/20 ring-1 ring-sky-600' : ''}`}
               style={{ paddingLeft: `${depth * 16 + 8}px` }}
               onClick={() => {
                 if (node.type === "folder") {
@@ -1571,9 +1571,9 @@ enabled = false`
               {node.type === "folder" ? (
                 <>
                   {node.expanded ? (
-                    <ChevronDown className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                    <ChevronDown className="h-3 w-3 text-gray-500 flex-shrink-0" />
                   ) : (
-                    <ChevronRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                    <ChevronRight className="h-3 w-3 text-gray-500 flex-shrink-0" />
                   )}
                   {node.expanded ? (
                     <FolderOpen className="h-4 w-4 text-blue-500 flex-shrink-0" />
@@ -1702,7 +1702,7 @@ enabled = false`
 
   if (!project) {
     return (
-      <div className="p-4 text-center text-muted-foreground">
+      <div className="p-4 text-center text-gray-500">
         <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
         <p className="text-sm">Select a project to view files</p>
       </div>
@@ -1710,9 +1710,9 @@ enabled = false`
   }
 
   return (
-    <div className="flex flex-col h-full border-r border-border">
+    <div className="flex flex-col h-full border-r border-gray-800/60 bg-gray-950">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border bg-card">
+      <div className="flex items-center justify-between p-4 border-b border-gray-800/60 bg-gray-900/80">
         <h3 className="text-sm font-semibold flex items-center">
           <Folder className="w-4 h-4 mr-2" />
           Files
@@ -1774,7 +1774,7 @@ enabled = false`
           onDrop={(e) => handleDropUpload(e, null)}
         >
           {files.length === 0 ? (
-            <div className="p-4 text-center text-muted-foreground">
+            <div className="p-4 text-center text-gray-500">
               <Folder className="h-8 w-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm">No files yet</p>
               <p className="text-xs">Create your first file or drag & drop files to get started</p>
@@ -1789,21 +1789,21 @@ enabled = false`
 
       {/* Upload Progress Indicator */}
       {isUploading && (
-        <div className="border-t border-border p-2">
+        <div className="border-t border-gray-800/60 p-2">
           <div className="flex items-center space-x-2">
-            <Upload className="h-4 w-4 text-muted-foreground" />
+            <Upload className="h-4 w-4 text-gray-500" />
             <div className="flex-1">
-              <div className="text-xs text-muted-foreground mb-1">
+              <div className="text-xs text-gray-500 mb-1">
                 Uploading files{uploadInFolder ? ` to ${uploadInFolder}` : ''}...
               </div>
-              <div className="w-full bg-secondary rounded-full h-1.5">
-                <div 
-                  className="bg-primary h-1.5 rounded-full transition-all duration-300"
+              <div className="w-full bg-gray-800 rounded-full h-1.5">
+                <div
+                  className="bg-blue-500 h-1.5 rounded-full transition-all duration-300"
                   style={{ width: `${uploadProgress}%` }}
                 />
               </div>
             </div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-xs text-gray-500">
               {Math.round(uploadProgress)}%
             </div>
           </div>

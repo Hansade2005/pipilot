@@ -269,7 +269,7 @@ const ExpandableUserMessage = ({
               </p>
             </div>
           </div>
-          <div className="flex items-center justify-end gap-0.5 mt-1 opacity-0 hover:opacity-100 transition-opacity">
+          <div className="flex items-center justify-end gap-0.5 mt-1 sm:opacity-0 sm:hover:opacity-100 transition-opacity">
             <Action tooltip="Retry message" onClick={handleIconClick}>
               <ArrowUp className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
             </Action>

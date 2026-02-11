@@ -977,11 +977,11 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
 
   if (!file) {
     return (
-      <div className="h-full flex items-center justify-center bg-muted/20">
+      <div className="h-full flex items-center justify-center bg-gray-950">
         <div className="text-center">
-          <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No File Selected</h3>
-          <p className="text-muted-foreground">Select a file from the explorer to start editing</p>
+          <FileText className="h-12 w-12 text-gray-600 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-300 mb-2">No File Selected</h3>
+          <p className="text-gray-500">Select a file from the explorer to start editing</p>
         </div>
       </div>
     )
@@ -1054,11 +1054,11 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
         `
       }} />
       {/* Editor Header */}
-      <div className="flex items-center justify-between p-3 border-b border-border bg-card flex-shrink-0">
+      <div className="flex items-center justify-between p-3 border-b border-gray-800/60 bg-gray-900/80 flex-shrink-0">
         <div className="flex items-center space-x-2">
-          <FileText className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium">{file.name}</span>
-          {hasChanges && <div className="w-2 h-2 bg-accent rounded-full" />}
+          <FileText className="h-4 w-4 text-gray-500" />
+          <span className="text-sm font-medium text-gray-200">{file.name}</span>
+          {hasChanges && <div className="w-2 h-2 bg-blue-500 rounded-full" />}
         </div>
         <div className="flex items-center space-x-2">
           <Button 
