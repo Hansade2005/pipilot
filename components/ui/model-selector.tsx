@@ -1,8 +1,7 @@
 "use client"
 
-import React from 'react'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Bot, Lock, Crown } from 'lucide-react'
+import React, { useState, useRef, useEffect } from 'react'
+import { Check, Lock, ChevronDown } from 'lucide-react'
 import { chatModels, type ChatModel, getModelById } from '@/lib/ai-models'
 import { getLimits } from '@/lib/stripe-config'
 
@@ -15,7 +14,47 @@ interface ModelSelectorProps {
   compact?: boolean
 }
 
-// No visual badges/colors needed — keep data simple (provider groups and model names)
+// Short, clean display names (like Anthropic's "Opus 4.6", "Sonnet 4.5")
+const shortNameMap = new Map<string, string>([
+  ['auto', 'Auto'],
+  ['mistral/devstral-2', 'Devstral 2'],
+  ['mistral/devstral-small-2', 'Devstral S2'],
+  ['xai/grok-code-fast-1', 'Grok Fast'],
+  ['moonshotai/kimi-k2-thinking', 'Kimi K2'],
+  ['google/gemini-2.5-flash', 'Gemini Flash'],
+  ['google/gemini-2.5-pro', 'Gemini Pro'],
+  ['xai/glm-4.7', 'GLM 4.7'],
+  ['zai/glm-4.7-flash', 'GLM Flash'],
+  ['minimax/minimax-m2.1', 'MiniMax M2'],
+  ['alibaba/qwen3-max', 'Qwen3 Max'],
+  ['anthropic/claude-haiku-4.5', 'Haiku 4.5'],
+  ['anthropic/claude-sonnet-4.5', 'Sonnet 4.5'],
+  ['anthropic/claude-opus-4.5', 'Opus 4.5'],
+  ['openai/gpt-5.1-thinking', 'GPT-5.1'],
+  ['openai/gpt-5.2-codex', 'Codex 5.2'],
+  ['openai/o3', 'O3'],
+])
+
+// Descriptions for dropdown
+const descriptionMap = new Map<string, string>([
+  ['auto', 'Automatically picks the best model'],
+  ['mistral/devstral-2', 'Fast code generation'],
+  ['mistral/devstral-small-2', 'Lightweight and efficient'],
+  ['xai/grok-code-fast-1', 'Fast code with xAI'],
+  ['moonshotai/kimi-k2-thinking', 'Deep reasoning model'],
+  ['google/gemini-2.5-flash', 'Fast multimodal by Google'],
+  ['google/gemini-2.5-pro', 'Most capable Google model'],
+  ['xai/glm-4.7', 'General language model'],
+  ['zai/glm-4.7-flash', 'Fast general language model'],
+  ['minimax/minimax-m2.1', 'Efficient code generation'],
+  ['alibaba/qwen3-max', 'Most capable Qwen model'],
+  ['anthropic/claude-haiku-4.5', 'Fast and lightweight'],
+  ['anthropic/claude-sonnet-4.5', 'Best balance of speed and quality'],
+  ['anthropic/claude-opus-4.5', 'Most capable for ambitious work'],
+  ['openai/gpt-5.1-thinking', 'Deep reasoning by OpenAI'],
+  ['openai/gpt-5.2-codex', 'Specialized for code'],
+  ['openai/o3', 'Advanced reasoning model'],
+])
 
 export function ModelSelector({
   selectedModel,
@@ -25,203 +64,123 @@ export function ModelSelector({
   className = '',
   compact = true
 }: ModelSelectorProps) {
-  // Default subscription status based on plan (matches admin page behavior)
-  const effectiveStatus = subscriptionStatus || (userPlan === 'free' ? 'active' : 'inactive')
+  const [isOpen, setIsOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Set default selected model based on plan
-  // Premium plans: creator/collaborate/scale (or legacy: pro/teams/enterprise)
+  const effectiveStatus = subscriptionStatus || (userPlan === 'free' ? 'active' : 'inactive')
   const isPremium = ['pro', 'creator', 'teams', 'collaborate', 'enterprise', 'scale'].includes(userPlan)
   const defaultSelectedModel: string = isPremium ? 'anthropic/claude-sonnet-4.5' : 'xai/grok-code-fast-1'
   const effectiveSelectedModel = selectedModel || defaultSelectedModel
 
-  const currentModel = getModelById(effectiveSelectedModel)
-
-  const displayNameMap = new Map<string, string>([
-    // Auto/Default Option
-    ['auto', 'PiPilot Auto'],
-    // Vercel AI Gateway Models
-    ['mistral/devstral-2', 'PiPilot Mistral Devstral 2'],
-    ['mistral/devstral-small-2', 'PiPilot Mistral Devstral Small 2'],
-    ['xai/grok-code-fast-1', 'PiPilot xAI Grok Code Fast 1'],
-    ['moonshotai/kimi-k2-thinking', 'PiPilot MoonshotAI Kimi K2 Thinking'],
-    ['google/gemini-2.5-flash', 'PiPilot Google Gemini 2.5 Flash'],
-    ['google/gemini-2.5-pro', 'PiPilot Google Gemini 2.5 Pro'],
-    ['xai/glm-4.7', 'PiPilot xAI GLM 4.7'],
-    ['zai/glm-4.7-flash', 'PiPilot ZAI GLM 4.7 Flash'],
-    ['minimax/minimax-m2.1', 'PiPilot MiniMax M2.1'],
-    ['alibaba/qwen3-max', 'PiPilot Alibaba Qwen3 Max'],
-    ['anthropic/claude-haiku-4.5', 'PiPilot Anthropic Claude Haiku 4.5'],
-    ['anthropic/claude-sonnet-4.5', 'PiPilot Anthropic Claude Sonnet 4.5'],
-    ['anthropic/claude-opus-4.5', 'PiPilot Anthropic Claude Opus 4.5'],
-    ['openai/gpt-5.1-thinking', 'PiPilot OpenAI GPT-5.1 Thinking'],
-    ['openai/gpt-5.2-codex', 'PiPilot OpenAI GPT-5.2 Codex'],
-    ['openai/o3', 'PiPilot OpenAI O3'],
-  ])
-
-  const filteredModels = chatModels.filter(model => displayNameMap.has(model.id))
-
-  // Group models by provider for better organization
-  const modelsByProvider = filteredModels.reduce((acc, model) => {
-    if (!acc[model.provider]) {
-      acc[model.provider] = []
-    }
-    acc[model.provider].push(model)
-    return acc
-  }, {} as Record<string, ChatModel[]>)
-
-  // Determine allowed models based on subscription status and plan
-  const userLimits = getLimits(userPlan)
-
-  // Set specific allowed models per plan
+  // Allowed models per plan
   let allowedModels: string[]
   if (userPlan === 'free') {
     allowedModels = [
-      'xai/grok-code-fast-1',
-      'mistral/devstral-2',
-      'mistral/devstral-small-2',
-      'google/gemini-2.5-flash',
-      'zai/glm-4.7-flash',
-      'anthropic/claude-sonnet-4.5'
-    ];
+      'xai/grok-code-fast-1', 'mistral/devstral-2', 'mistral/devstral-small-2',
+      'google/gemini-2.5-flash', 'zai/glm-4.7-flash', 'anthropic/claude-sonnet-4.5'
+    ]
   } else if (isPremium && effectiveStatus === 'active') {
-    // All premium plans get full access: creator/collaborate/scale (and legacy: pro/teams/enterprise)
     allowedModels = [
-      // Free models (premium users get access to everything)
-      'mistral/devstral-2',
-      'mistral/devstral-small-2',
-      'xai/grok-code-fast-1',
-      'google/gemini-2.5-flash',
-      'zai/glm-4.7-flash',
-      // Premium models
-      'auto',
-      'moonshotai/kimi-k2-thinking',
-      'google/gemini-2.5-pro',
-      'xai/glm-4.7',
-      'minimax/minimax-m2.1',
-      'alibaba/qwen3-max',
-      'anthropic/claude-haiku-4.5',
-      'anthropic/claude-sonnet-4.5',
-      'anthropic/claude-opus-4.5',
-      'openai/gpt-5.1-thinking',
-      'openai/gpt-5.2-codex',
-      'openai/o3'
-    ];
+      'auto', 'mistral/devstral-2', 'mistral/devstral-small-2', 'xai/grok-code-fast-1',
+      'google/gemini-2.5-flash', 'zai/glm-4.7-flash', 'moonshotai/kimi-k2-thinking',
+      'google/gemini-2.5-pro', 'xai/glm-4.7', 'minimax/minimax-m2.1', 'alibaba/qwen3-max',
+      'anthropic/claude-haiku-4.5', 'anthropic/claude-sonnet-4.5', 'anthropic/claude-opus-4.5',
+      'openai/gpt-5.1-thinking', 'openai/gpt-5.2-codex', 'openai/o3'
+    ]
   } else {
-    // Fallback for inactive subscriptions or other cases
+    const userLimits = getLimits(userPlan)
     allowedModels = userLimits.allowedModels || ['auto']
   }
 
-  // Helper function to check if model is allowed
   const isModelAllowed = (modelId: string) => allowedModels.includes(modelId)
 
-  // Function to truncate text to 3 characters for all models
-  const truncateModelName = (text: string | undefined) => {
-    if (!text) return '';
+  // Close on outside click
+  useEffect(() => {
+    if (!isOpen) return
+    const handleClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [isOpen])
 
-    // Strip "PiPilot " prefix for compact display
-    const cleaned = text.replace(/^PiPilot\s+/i, '')
+  // Close on Escape
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false)
+    }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [isOpen])
 
-    // Truncate to 10 characters with ellipsis
-    return cleaned.length > 10 ? cleaned.substring(0, 10) + '...' : cleaned;
-  };
+  const displayName = shortNameMap.get(effectiveSelectedModel) || effectiveSelectedModel.split('/').pop() || effectiveSelectedModel
 
-  if (compact) {
-    return (
-      <div className={`flex items-center ${className}`}>
-        <Select value={effectiveSelectedModel} onValueChange={onModelChange}>
-          {/* Match AiModeSelector compact trigger: small height, tight padding, no border, rely on shared chevron */}
-          <SelectTrigger className="h-6 px-2 min-w-[56px] border-0 bg-transparent text-xs shadow-none focus:ring-0 p-0">
-            <div className="flex items-center justify-center w-full">
-              <SelectValue>
-                <span className="font-medium text-sm leading-none text-center">{truncateModelName(displayNameMap.get(effectiveSelectedModel) || currentModel?.name || effectiveSelectedModel)}</span>
-              </SelectValue>
-            </div>
-          </SelectTrigger>
+  // Ordered model list for the dropdown
+  const modelOrder = [
+    'anthropic/claude-opus-4.5', 'anthropic/claude-sonnet-4.5', 'anthropic/claude-haiku-4.5',
+    'openai/gpt-5.1-thinking', 'openai/gpt-5.2-codex', 'openai/o3',
+    'google/gemini-2.5-pro', 'google/gemini-2.5-flash',
+    'mistral/devstral-2', 'mistral/devstral-small-2',
+    'xai/grok-code-fast-1', 'xai/glm-4.7', 'zai/glm-4.7-flash',
+    'moonshotai/kimi-k2-thinking', 'minimax/minimax-m2.1', 'alibaba/qwen3-max',
+    'auto',
+  ]
+  const orderedModels = modelOrder.filter(id => shortNameMap.has(id))
 
-          <SelectContent align="start" className="w-[260px] bg-popover text-popover-foreground border z-[100]">
-            {Object.entries(modelsByProvider).map(([provider, models]) => (
-              <div key={provider} className="py-1">
-                <div className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  PiPilot
-                </div>
-                {models.map((model) => {
-                  const allowed = isModelAllowed(model.id)
-                  return (
-                    <SelectItem
-                      key={model.id}
-                      value={model.id}
-                      disabled={!allowed}
-                      className={`text-sm px-3 py-1 ${!allowed ? 'opacity-50' : ''}`}
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <span>{displayNameMap.get(model.id) || model.name}</span>
-                        {!allowed && <Lock className="h-3 w-3 text-muted-foreground ml-2" />}
-                        {allowed && isPremium && effectiveStatus === 'active' && (
-                          <Crown className="h-3 w-3 text-yellow-500 ml-2" />
-                        )}
-                      </div>
-                    </SelectItem>
-                  )
-                })}
-              </div>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-    )
-  }
-
-  // Full-size selector for non-compact mode
   return (
-    <div className={`space-y-2 ${className}`}>
-      <div className="flex items-center gap-2">
-        <Bot className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm font-medium">AI Model</span>
-      </div>
+    <div className={`relative ${className}`} ref={dropdownRef}>
+      {/* Trigger: clean text + chevron like Anthropic */}
+      <button
+        type="button"
+        className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-200 transition-colors"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className="font-medium">{displayName}</span>
+        <ChevronDown className={`size-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
 
-      <Select value={effectiveSelectedModel} onValueChange={onModelChange}>
-        <SelectTrigger className="w-full">
-          <div className="flex items-center gap-2">
-            <SelectValue>
-              <span className="font-medium">{truncateModelName(displayNameMap.get(effectiveSelectedModel) || currentModel?.name || effectiveSelectedModel)}</span>
-            </SelectValue>
-          </div>
-        </SelectTrigger>
+      {/* Dropdown */}
+      {isOpen && (
+        <div className="absolute bottom-8 right-0 w-[240px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[100] overflow-hidden">
+          <div className="max-h-[320px] overflow-y-auto py-1">
+            {orderedModels.map((modelId) => {
+              const allowed = isModelAllowed(modelId)
+              const isSelected = modelId === effectiveSelectedModel
+              const name = shortNameMap.get(modelId) || modelId
+              const desc = descriptionMap.get(modelId) || ''
 
-        <SelectContent className="w-[420px] z-[100]">
-          {Object.entries(modelsByProvider).map(([provider, models]) => (
-            <div key={provider} className="py-2">
-              <div className="px-3 py-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide border-b">
-                PiPilot
-              </div>
-              {models.map((model) => {
-                const allowed = isModelAllowed(model.id)
-                return (
-                  <SelectItem
-                    key={model.id}
-                    value={model.id}
-                    disabled={!allowed}
-                    className={`p-3 text-sm ${!allowed ? 'opacity-50' : ''}`}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div>
-                        <div className="font-medium">{displayNameMap.get(model.id) || model.name}</div>
-                        <div className="text-xs text-muted-foreground">{model.description}</div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {!allowed && <Lock className="h-4 w-4 text-muted-foreground" />}
-                        {allowed && isPremium && effectiveStatus === 'active' && (
-                          <Crown className="h-4 w-4 text-yellow-500" />
-                        )}
-                      </div>
+              return (
+                <button
+                  key={modelId}
+                  className={`w-full flex items-center justify-between px-4 py-2.5 text-left transition-colors ${
+                    !allowed ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-800 cursor-pointer'
+                  } ${isSelected ? 'bg-gray-800/50' : ''}`}
+                  onClick={() => {
+                    if (!allowed) return
+                    onModelChange(modelId)
+                    setIsOpen(false)
+                  }}
+                  disabled={!allowed}
+                >
+                  <div className="min-w-0">
+                    <div className={`text-sm font-medium ${isSelected ? 'text-white' : 'text-gray-200'}`}>
+                      {name}
                     </div>
-                  </SelectItem>
-                )
-              })}
-            </div>
-          ))}
-        </SelectContent>
-      </Select>
+                    <div className="text-[11px] text-gray-500 truncate">{desc}</div>
+                  </div>
+                  <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
+                    {!allowed && <Lock className="size-3 text-gray-500" />}
+                    {isSelected && allowed && <Check className="size-4 text-blue-400" />}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

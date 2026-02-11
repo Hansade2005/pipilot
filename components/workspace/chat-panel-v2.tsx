@@ -6623,9 +6623,9 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    className={`relative px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 ${isAskMode
-                      ? 'bg-blue-500 text-white shadow-sm shadow-blue-500/25'
-                      : 'bg-gray-800 text-gray-400 hover:text-gray-300 hover:bg-gray-700'
+                    className={`text-sm font-medium transition-colors ${isAskMode
+                      ? 'text-blue-400'
+                      : 'text-gray-400 hover:text-gray-200'
                     }`}
                     onClick={() => setIsAskMode(!isAskMode)}
                   >
@@ -6643,7 +6643,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                   type="button"
                   variant="default"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-8 w-8 rounded-full"
                   onClick={handleStop}
                 >
                   <Square className="w-4 h-4 bg-red-500 animate-pulse" />
@@ -6653,11 +6653,11 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                   ref={sendButtonRef}
                   type="button"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-8 w-8 rounded-full"
                   disabled={(!input.trim() && attachedFiles.length === 0 && attachedImages.length === 0) || attachedImages.some((img: AttachedImage) => img.isProcessing)}
                   onClick={handleEnhancedSubmit}
                 >
-                  <CornerDownLeft className="size-4" />
+                  <ArrowUp className="size-4" />
                 </Button>
               )}
             </div>
