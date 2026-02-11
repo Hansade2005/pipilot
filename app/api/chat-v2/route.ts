@@ -1957,12 +1957,12 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
         }
       }
 
-      case 'create_database': {
+      case 'pipilotdb_create_database': {
         const { name = 'main' } = input
 
         // Validate inputs
         if (name && typeof name !== 'string') {
-          console.log(`[CONSTRUCT_TOOL_RESULT] create_database failed: Invalid database name - ${name}`)
+          console.log(`[CONSTRUCT_TOOL_RESULT] pipilotdb_create_database failed: Invalid database name - ${name}`)
           return {
             success: false,
             error: `Invalid database name provided`,
@@ -1972,7 +1972,7 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
         }
 
         // Always return success - simple response without IDs or save attempts
-        console.log(`[CONSTRUCT_TOOL_RESULT] create_database: Database "${name}" created for project ${projectId}`)
+        console.log(`[CONSTRUCT_TOOL_RESULT] pipilotdb_create_database: Database "${name}" created for project ${projectId}`)
 
         // Users table schema (matching create route)
         const usersTableSchema = {
@@ -2838,7 +2838,7 @@ Each time you are buiding anything that requires images , you should always use 
   - **The \`node_machine\` tool is ABSOLUTELY FORBIDDEN for running npm install, yarn install, or any package installation commands**
   - **To add packages**: Use \`client_replace_string_in_file\` to update the dependencies/devDependencies section of \`package.json\`. Read the file first, then replace the relevant JSON section with the new packages included.
   - **VIOLATION WILL BREAK THE SYSTEM - Never run npm/yarn install, always edit package.json directly**
-- **PiPilot DB (REST API Database)**: \`create_database\`, \`create_table\`, \`list_tables\`, \`read_table\`, \`query_database\`, \`manipulate_table_data\`, \`manage_api_keys\`
+- **PiPilot DB (REST API Database)**: \`pipilotdb_create_database\`, \`pipilotdb_create_table\`, \`pipilotdb_list_tables\`, \`pipilotdb_read_table\`, \`pipilotdb_query_database\`, \`pipilotdb_manipulate_table_data\`, \`pipilotdb_manage_api_keys\`
   - _These manage DATA in PiPilot's server-side REST API database (NOT IndexedDB)_
 - **Server-Side**: \`web_search\`, \`web_extract\`, \`semantic_code_navigator\` (with line numbers),\`grep_search\`, \`check_dev_errors\`, \`list_files\` (client sync), \`read_file\` (client sync)
 
@@ -2855,14 +2855,14 @@ Each time you are buiding anything that requires images , you should always use 
 - **IndexedDB** = Client-side browser storage (ONLY for project files/code, NOT for database operations)
 
 **Complete database workflow in 7 simple steps:**
-1. **\`create_database\`** - Creates database via PiPilot's REST API with auto-generated users table
-2. **\`create_table\`** - AI-powered schema generation from natural language descriptions
-3. **\`list_tables\`** - Discover all tables in a database with optional schema and record counts
-4. **\`read_table\`** - Get detailed table info, schema, structure, and statistics
-5. **\`delete_table\`** - Delete a table and all its records (destructive, requires confirmation)
-6. **\`query_database\`** - Advanced MySQL-like querying with auto-detection, filtering, sorting, pagination
-7. **\`manipulate_table_data\`** - Full CRUD operations (insert, update, delete) with bulk support
-8. **\`manage_api_keys\`** - Generate secure API keys for external database access and setup in .env.local
+1. **\`pipilotdb_create_database\`** - Creates database via PiPilot's REST API with auto-generated users table
+2. **\`pipilotdb_create_table\`** - AI-powered schema generation from natural language descriptions
+3. **\`pipilotdb_list_tables\`** - Discover all tables in a database with optional schema and record counts
+4. **\`pipilotdb_read_table\`** - Get detailed table info, schema, structure, and statistics
+5. **\`pipilotdb_delete_table\`** - Delete a table and all its records (destructive, requires confirmation)
+6. **\`pipilotdb_query_database\`** - Advanced MySQL-like querying with auto-detection, filtering, sorting, pagination
+7. **\`pipilotdb_manipulate_table_data\`** - Full CRUD operations (insert, update, delete) with bulk support
+8. **\`pipilotdb_manage_api_keys\`** - Generate secure API keys for external database access and setup in .env.local
 
 **Features:**
 - 🤖 **AI Schema Generation**: Describe your table needs, get optimized database schema
@@ -3157,7 +3157,7 @@ const { theme, setTheme } = useTheme();
     const unavailableServices: string[] = []
     if (!stripeApiKey) unavailableServices.push('Stripe (no API key connected)')
     if (!supabaseAccessToken || !supabaseProjectDetails) unavailableServices.push('Supabase remote project (not connected)')
-    if (!databaseId) unavailableServices.push('PiPilot Database (no database created yet - use create_database first if the user needs one)')
+    if (!databaseId) unavailableServices.push('PiPilot Database (no database created yet - use pipilotdb_create_database first if the user needs one)')
     if (!process.env.E2B_API_KEY) unavailableServices.push('Node Machine / terminal (E2B not configured)')
 
     if (unavailableServices.length > 0 && chatMode !== 'ask') {
@@ -5833,7 +5833,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
       }),
 
       // DATABASE MANAGEMENT TOOLS (CLIENT-SIDE)
-      create_database: tool({
+      pipilotdb_create_database: tool({
         description: 'Create a new database for the current project using PiPilot DB - a built-in server-side REST API database service. Automatically creates a database with a default users table for authentication. This is NOT IndexedDB (which is only for project files). PiPilot DB provides full database capabilities including tables, authentication, and storage via REST API.',
         inputSchema: z.object({
           name: z.string().optional().describe('Database name (defaults to "main")')
@@ -5841,7 +5841,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
         execute: async ({ name = 'main' }, { toolCallId }) => {
           // This is a client-side tool - execution will be handled by client
           // The actual implementation will be in the client-side code with IndexedDB access
-          return await constructToolResult('create_database', { name }, projectId, toolCallId);
+          return await constructToolResult('pipilotdb_create_database', { name }, projectId, toolCallId);
         }
       }),
 
@@ -5908,7 +5908,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
         }
       }),
 
-      create_table: tool({
+      pipilotdb_create_table: tool({
         description: 'Create a new table in the database. Can either use AI to generate optimal schema from description, or create table with predefined schema. Supports complex relationships, constraints, and indexes.',
         inputSchema: z.object({
           name: z.string().describe('Table name (should be singular, snake_case)'),
@@ -6035,7 +6035,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
             const result = await response.json();
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['create_table'] = (toolExecutionTimes['create_table'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_create_table'] = (toolExecutionTimes['pipilotdb_create_table'] || 0) + executionTime;
 
             if (!response.ok) {
               console.error('[ERROR] Table creation failed:', result);
@@ -6066,7 +6066,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
           } catch (error) {
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['create_table'] = (toolExecutionTimes['create_table'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_create_table'] = (toolExecutionTimes['pipilotdb_create_table'] || 0) + executionTime;
 
             console.error('[ERROR] Table creation failed:', error);
             return {
@@ -6082,7 +6082,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
         }
       }),
 
-      query_database: tool({
+      pipilotdb_query_database: tool({
         description: 'Advanced database querying tool with MySQL-like capabilities. Supports table data retrieval with sorting, filtering, pagination, column selection, and JSONB field querying.',
         inputSchema: z.object({
           tableId: z.string().describe('The table ID to query records from'),
@@ -6244,7 +6244,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
             const result = await response.json();
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['query_database'] = (toolExecutionTimes['query_database'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_query_database'] = (toolExecutionTimes['pipilotdb_query_database'] || 0) + executionTime;
 
             if (!response.ok) {
               console.error('[ERROR] Enhanced database query failed:', result);
@@ -6322,7 +6322,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
           } catch (error) {
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['query_database'] = (toolExecutionTimes['query_database'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_query_database'] = (toolExecutionTimes['pipilotdb_query_database'] || 0) + executionTime;
 
             console.error('[ERROR] Enhanced database query failed:', error);
             return {
@@ -6338,7 +6338,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
         }
       }),
 
-      manipulate_table_data: tool({
+      pipilotdb_manipulate_table_data: tool({
         description: 'Insert, update, or delete records in database tables. Provides full CRUD operations for table data management.',
         inputSchema: z.object({
           tableId: z.string().describe('The table ID to manipulate data in'),
@@ -6496,7 +6496,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
             const result = await response.json();
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['manipulate_table_data'] = (toolExecutionTimes['manipulate_table_data'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_manipulate_table_data'] = (toolExecutionTimes['pipilotdb_manipulate_table_data'] || 0) + executionTime;
 
             if (!response.ok) {
               console.error('[ERROR] Data manipulation failed:', result);
@@ -6531,7 +6531,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
           } catch (error) {
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['manipulate_table_data'] = (toolExecutionTimes['manipulate_table_data'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_manipulate_table_data'] = (toolExecutionTimes['pipilotdb_manipulate_table_data'] || 0) + executionTime;
 
             console.error('[ERROR] Data manipulation failed:', error);
             return {
@@ -6548,7 +6548,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
         }
       }),
 
-      manage_api_keys: tool({
+      pipilotdb_manage_api_keys: tool({
         description: 'Create and manage API keys for external database access. Enables secure access to database from external applications.',
         inputSchema: z.object({
           action: z.enum(['create', 'list', 'delete']).describe('Action to perform on API keys'),
@@ -6662,7 +6662,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
             const result = await response.json();
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['manage_api_keys'] = (toolExecutionTimes['manage_api_keys'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_manage_api_keys'] = (toolExecutionTimes['pipilotdb_manage_api_keys'] || 0) + executionTime;
 
             if (!response.ok) {
               console.error('[ERROR] API key management failed:', result);
@@ -6706,7 +6706,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
           } catch (error) {
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['manage_api_keys'] = (toolExecutionTimes['manage_api_keys'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_manage_api_keys'] = (toolExecutionTimes['pipilotdb_manage_api_keys'] || 0) + executionTime;
 
             console.error('[ERROR] API key management failed:', error);
             return {
@@ -6722,7 +6722,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
         }
       }),
 
-      list_tables: tool({
+      pipilotdb_list_tables: tool({
         description: 'List all tables in the database with their schemas, IDs, and metadata. Essential for discovering available tables before querying or manipulating data. Returns table IDs needed for other database operations.',
         inputSchema: z.object({
           includeSchema: z.boolean().optional().describe('Include detailed schema information for each table (default: true)'),
@@ -6770,7 +6770,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
             const result = await response.json();
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['list_tables'] = (toolExecutionTimes['list_tables'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_list_tables'] = (toolExecutionTimes['pipilotdb_list_tables'] || 0) + executionTime;
 
             if (!response.ok || !result.success) {
               console.error('[ERROR] List tables failed:', result);
@@ -6828,7 +6828,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
               : undefined;
 
             const summary = totalTables === 0
-              ? 'No tables found in database. Create tables using the create_table tool.'
+              ? 'No tables found in database. Create tables using the pipilotdb_create_table tool.'
               : `Found ${totalTables} table(s)${totalRecords !== undefined ? ` with ${totalRecords} total record(s)` : ''}`;
 
             console.log('[SUCCESS] Tables listed:', { totalTables, totalRecords });
@@ -6846,7 +6846,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
           } catch (error) {
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['list_tables'] = (toolExecutionTimes['list_tables'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_list_tables'] = (toolExecutionTimes['pipilotdb_list_tables'] || 0) + executionTime;
 
             console.error('[ERROR] List tables failed:', error);
             return {
@@ -6861,10 +6861,10 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
         }
       }),
 
-      read_table: tool({
+      pipilotdb_read_table: tool({
         description: 'Get detailed information about a specific table including its schema, structure, metadata, and statistics. Use this to inspect table definition before modifying or querying data.',
         inputSchema: z.object({
-          tableId: z.number().describe('The unique ID of the table to read (get from list_tables tool)'),
+          tableId: z.number().describe('The unique ID of the table to read (get from pipilotdb_list_tables tool)'),
           includeRecordCount: z.boolean().optional().describe('Include total record count in the response (default: true)')
         }),
         execute: async ({ tableId, includeRecordCount = true }, { abortSignal, toolCallId }) => {
@@ -6905,7 +6905,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
             const result = await response.json();
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['read_table'] = (toolExecutionTimes['read_table'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_read_table'] = (toolExecutionTimes['pipilotdb_read_table'] || 0) + executionTime;
 
             if (!response.ok || !result.table) {
               console.error('[ERROR] Read table failed:', result);
@@ -6977,7 +6977,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
           } catch (error) {
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['read_table'] = (toolExecutionTimes['read_table'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_read_table'] = (toolExecutionTimes['pipilotdb_read_table'] || 0) + executionTime;
 
             console.error('[ERROR] Read table failed:', error);
             return {
@@ -6992,10 +6992,10 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
         }
       }),
 
-      delete_table: tool({
+      pipilotdb_delete_table: tool({
         description: 'Delete a table and all its records from the database. THIS IS DESTRUCTIVE and cannot be undone.',
         inputSchema: z.object({
-          tableId: z.number().describe('The unique ID of the table to delete (get from list_tables tool)')
+          tableId: z.number().describe('The unique ID of the table to delete (get from pipilotdb_list_tables tool)')
         }),
         execute: async ({ tableId }, { abortSignal, toolCallId }) => {
           const toolStartTime = Date.now();
@@ -7058,7 +7058,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
             const result = await response.json();
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['delete_table'] = (toolExecutionTimes['delete_table'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_delete_table'] = (toolExecutionTimes['pipilotdb_delete_table'] || 0) + executionTime;
 
             if (!response.ok) {
               console.error('[ERROR] Delete table failed:', result);
@@ -7091,7 +7091,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
           } catch (error) {
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['delete_table'] = (toolExecutionTimes['delete_table'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_delete_table'] = (toolExecutionTimes['pipilotdb_delete_table'] || 0) + executionTime;
 
             console.error('[ERROR] Delete table failed:', error);
             return {
@@ -10361,7 +10361,7 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
           code_search: ['grep_search', 'semantic_code_navigator', 'list_files'],
           web_tools: ['web_search', 'web_extract'],
           dev_tools: ['check_dev_errors', 'node_machine', 'remove_package'],
-          pipilot_db: ['create_database', 'query_database', 'manipulate_table_data', 'manage_api_keys', 'list_tables', 'read_table', 'delete_table', 'create_table'],
+          pipilot_db: ['pipilotdb_create_database', 'pipilotdb_query_database', 'pipilotdb_manipulate_table_data', 'pipilotdb_manage_api_keys', 'pipilotdb_list_tables', 'pipilotdb_read_table', 'pipilotdb_delete_table', 'pipilotdb_create_table'],
           supabase: ['supabase_fetch_api_keys', 'supabase_create_table', 'supabase_insert_data', 'supabase_delete_data', 'supabase_read_table', 'supabase_drop_table', 'supabase_execute_sql', 'supabase_list_tables_rls', 'request_supabase_connection'],
           stripe: ['stripe_validate_key', 'stripe_list_products', 'stripe_create_product', 'stripe_update_product', 'stripe_delete_product', 'stripe_list_prices', 'stripe_create_price', 'stripe_update_price', 'stripe_list_customers', 'stripe_create_customer', 'stripe_update_customer', 'stripe_delete_customer', 'stripe_create_payment_intent', 'stripe_update_payment_intent', 'stripe_cancel_payment_intent', 'stripe_list_charges', 'stripe_list_subscriptions', 'stripe_update_subscription', 'stripe_cancel_subscription', 'stripe_list_coupons', 'stripe_create_coupon', 'stripe_update_coupon', 'stripe_delete_coupon', 'stripe_create_refund', 'stripe_search'],
           docs_quality: ['generate_report', 'pipilot_get_docs', 'auto_documentation', 'code_review', 'code_quality_analysis'],
@@ -10632,7 +10632,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
               keep: { type: 'tool_uses', value: 5 },
               clearAtLeast: { type: 'input_tokens', value: 1000 },
               clearToolInputs: true,
-              excludeTools: ['create_database', 'request_supabase_connection'],
+              excludeTools: ['pipilotdb_create_database', 'request_supabase_connection'],
             },
             {
               type: 'clear_thinking_20251015',

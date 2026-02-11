@@ -2434,7 +2434,7 @@ function AccountSettingsPageContent() {
                       { id: 'code_search', name: 'Code Search & Analysis', desc: 'Grep search, semantic navigator, list files', icon: Search, tools: 'grep_search, semantic_code_navigator, list_files' },
                       { id: 'web_tools', name: 'Web Search & Extract', desc: 'Search the web, extract page content', icon: Globe, tools: 'web_search, web_extract' },
                       { id: 'dev_tools', name: 'Dev Server & Sandbox', desc: 'Check errors, run Node.js commands', icon: Terminal, tools: 'check_dev_errors, node_machine' },
-                      { id: 'pipilot_db', name: 'PiPilot Database', desc: 'Create/query/manage PiPilot DB tables', icon: Database, tools: 'create_database, query_database, create_table, etc.' },
+                      { id: 'pipilot_db', name: 'PiPilot Database', desc: 'Create/query/manage PiPilot DB tables', icon: Database, tools: 'pipilotdb_create_database, pipilotdb_query_database, pipilotdb_create_table, etc.' },
                       { id: 'supabase', name: 'Supabase Integration', desc: 'Remote Supabase table operations', icon: Server, tools: 'supabase_create_table, supabase_execute_sql, etc.' },
                       { id: 'stripe', name: 'Stripe Payments', desc: 'Products, prices, customers, payments', icon: CreditCard, tools: 'stripe_list_products, stripe_create_product, etc.' },
                       { id: 'docs_quality', name: 'Documentation & Reports', desc: 'Generate docs, code review, quality analysis', icon: Code, tools: 'auto_documentation, code_review, code_quality_analysis' },
