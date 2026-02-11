@@ -156,7 +156,7 @@ export function ModernSidebar({
     <>
       <div className="flex flex-col flex-1 w-full">
         {/* Header with Logo and Close Button */}
-        <div className={`flex items-center w-full h-14 px-3 border-b border-gray-800 ${shouldExpand ? 'justify-between' : 'justify-center'}`}>
+        <div className={`flex items-center w-full h-14 px-3 border-b border-gray-800/60 ${shouldExpand ? 'justify-between' : 'justify-center'}`}>
           <div className="flex items-center cursor-pointer" onClick={() => window.location.href = '/'}>
             <div className="w-10 h-10 bg-gradient-to-br rounded-lg flex-shrink-0 flex items-center justify-center">
               <img src="https://pipilot.dev/logo.png" alt="Logo" className="w-8 h-8 object-contain" />
@@ -349,7 +349,7 @@ export function ModernSidebar({
       </div>
 
       {/* Bottom Navigation */}
-      <div className="flex flex-col space-y-1 px-2 pb-3 border-t border-gray-800 pt-3">
+      <div className="flex flex-col space-y-1 px-2 pb-3 border-t border-gray-800/60 pt-3">
         {/* Database */}
         <button
           onClick={() => handleNavigation('/database')}
@@ -437,7 +437,7 @@ export function ModernSidebar({
         {/* Mobile Sidebar - only renders when open */}
         {isMobileOpen && (
           <aside
-            className="lg:hidden fixed inset-y-0 left-0 z-[70] w-64 bg-black flex flex-col border-r border-gray-800"
+            className="lg:hidden fixed inset-y-0 left-0 z-[70] w-64 bg-gray-950 flex flex-col border-r border-gray-800/60"
             role="dialog"
             aria-modal="true"
           >
@@ -526,7 +526,7 @@ export function ModernSidebar({
   return (
     <>
       <aside
-        className={`hidden lg:flex bg-black flex-col border-r border-gray-800 transition-all duration-300 relative ${
+        className={`hidden lg:flex bg-gray-950 flex-col border-r border-gray-800/60 transition-all duration-300 relative ${
           shouldExpand ? 'w-64' : 'w-14'
         }`}
         onMouseEnter={() => setIsHovered(true)}

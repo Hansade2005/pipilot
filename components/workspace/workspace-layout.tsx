@@ -909,7 +909,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   }
 
   return (
-    <div className="h-screen flex bg-background relative">
+    <div className="h-screen flex bg-gray-950 relative">
       {/* Desktop Layout */}
       {!isMobile && (
         <>
@@ -1025,7 +1025,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
                 {/* Left Panel - Chat (Resizable) */}
                 <ResizablePanel defaultSize={40} minSize={20} maxSize={40}>
-                  <div className="h-full flex flex-col overflow-hidden border-r border-border">
+                  <div className="h-full flex flex-col overflow-hidden border-r border-gray-800/60">
                     <ChatPanelV2
                       key={`chat-${selectedProject.id}-${chatSessionKey}`}
                       project={selectedProject}
@@ -1048,7 +1048,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                   <div className="h-full flex flex-col overflow-hidden">
                     {/* Tab Switcher with Preview Controls - Hidden when in preview mode */}
                     {activeTab !== "preview" && (
-                      <div className="border-b border-border bg-card p-2 flex-shrink-0">
+                      <div className="border-b border-gray-800/60 bg-gray-900/80 p-2 flex-shrink-0">
                         <div className="flex items-center justify-between">
                           <div className="flex space-x-1">
                             <Button
@@ -1096,7 +1096,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
                         {/* File Explorer Panel */}
                         <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
-                          <div className="h-full flex flex-col border-r border-border">
+                          <div className="h-full flex flex-col border-r border-gray-800/60">
                             <FileExplorer
                               key={fileExplorerKey}
                               project={selectedProject}
@@ -1239,7 +1239,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
             {/* Status Bar */}
             {selectedProject && (
-              <div className="h-8 flex-shrink-0 border-t border-border bg-muted/50 flex items-center justify-between px-4 text-xs">
+              <div className="h-8 flex-shrink-0 border-t border-gray-800/60 bg-gray-900/60 flex items-center justify-between px-4 text-xs text-gray-400">
                 <div className="flex items-center space-x-4">
                   {/* GitHub Status */}
                   <div className="flex items-center space-x-1">
@@ -1252,7 +1252,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                         if (gitHubConnected) {
                           return <span className="text-blue-600 dark:text-blue-400">Account Connected</span>
                         }
-                        return <span className="text-muted-foreground">Not Connected</span>
+                        return <span className="text-gray-500">Not Connected</span>
                       })()}
                     </span>
                   </div>
@@ -1264,13 +1264,13 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       Deployment: {(() => {
                         switch (selectedProject?.deploymentStatus) {
                           case 'deployed':
-                            return <span className="text-green-600 dark:text-green-400">Live</span>
+                            return <span className="text-green-400">Live</span>
                           case 'in_progress':
-                            return <span className="text-yellow-600 dark:text-yellow-400">In Progress</span>
+                            return <span className="text-yellow-400">In Progress</span>
                           case 'failed':
-                            return <span className="text-red-600 dark:text-red-400">Failed</span>
+                            return <span className="text-red-400">Failed</span>
                           default:
-                            return <span className="text-muted-foreground">Not Deployed</span>
+                            return <span className="text-gray-500">Not Deployed</span>
                         }
                       })()}
                     </span>
@@ -1330,7 +1330,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           />
 
           {/* Fixed Mobile Header */}
-          <div className="fixed top-0 left-0 right-0 h-14 border-b border-border bg-card flex items-center justify-between px-4 z-40">
+          <div className="fixed top-0 left-0 right-0 h-14 border-b border-gray-800/60 bg-gray-900/95 backdrop-blur-sm flex items-center justify-between px-4 z-40">
             <div className="flex items-center space-x-3">
               <Button 
                 variant="ghost" 
@@ -1678,52 +1678,52 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
           {/* Fixed Mobile Bottom Tab Navigation - only show when project is selected */}
           {selectedProject && (
-            <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50">
+            <div className="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800/60 z-50">
               <div className="grid grid-cols-5 h-12">
                 <button
                   onClick={() => setMobileTab("chat")}
                   className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
-                    mobileTab === "chat" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
+                    mobileTab === "chat" ? "bg-gray-800 text-white" : "text-gray-500 hover:text-gray-300"
                   }`}
                 >
                   <MessageSquare className="h-4 w-4" />
-                  <span className="text-xs">Chat</span>
+                  <span className="text-[10px]">Chat</span>
                 </button>
                 <button
                   onClick={() => setMobileTab("files")}
                   className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
-                    mobileTab === "files" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
+                    mobileTab === "files" ? "bg-gray-800 text-white" : "text-gray-500 hover:text-gray-300"
                   }`}
                 >
                   <FileText className="h-4 w-4" />
-                  <span className="text-xs">Files</span>
+                  <span className="text-[10px]">Files</span>
                 </button>
                 <button
                   onClick={() => setMobileTab("editor")}
                   className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
-                    mobileTab === "editor" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
+                    mobileTab === "editor" ? "bg-gray-800 text-white" : "text-gray-500 hover:text-gray-300"
                   }`}
                 >
                   <Code className="h-4 w-4" />
-                  <span className="text-xs">Editor</span>
+                  <span className="text-[10px]">Editor</span>
                 </button>
                 <button
                   onClick={() => setMobileTab("preview")}
                   className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
-                    mobileTab === "preview" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
+                    mobileTab === "preview" ? "bg-gray-800 text-white" : "text-gray-500 hover:text-gray-300"
                   }`}
                 >
                   <Eye className="h-4 w-4" />
-                  <span className="text-xs">Preview</span>
+                  <span className="text-[10px]">Preview</span>
                 </button>
                 <button
                   onClick={() => setMobileTab("audit")}
                   className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
-                    mobileTab === "audit" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
+                    mobileTab === "audit" ? "bg-gray-800 text-white" : "text-gray-500 hover:text-gray-300"
                   }`}
                 >
                   <Shield className="h-4 w-4" />
-                  <span className="text-xs">Audit</span>
+                  <span className="text-[10px]">Audit</span>
                 </button>
               </div>
             </div>

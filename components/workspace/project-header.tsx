@@ -248,7 +248,7 @@ export function ProjectHeader({
   }
   if (!project) {
     return (
-      <div className="h-16 border-b border-border bg-card px-6 flex items-center justify-between">
+      <div className="h-16 border-b border-gray-800/60 bg-gray-900/80 px-6 flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Logo variant="icon" size="sm" />
           <div>
@@ -327,7 +327,7 @@ export function ProjectHeader({
           {editing ? (
             <input
               type="text"
-              className="text-lg font-semibold text-card-foreground bg-background border border-border rounded px-2 py-1 w-40 focus:outline-none focus:ring-2 focus:ring-primary"
+              className="text-lg font-semibold text-gray-100 bg-gray-800 border border-gray-700 rounded px-2 py-1 w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={nameInput}
               autoFocus
               onChange={e => setNameInput(e.target.value)}
