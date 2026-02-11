@@ -58,7 +58,6 @@ import {
   VisualEditorWrapper,
   VisualEditorToggle,
 } from "./visual-editor-wrapper";
-import { ModelSelector } from "@/components/ui/model-selector";
 import { ChatSessionSelector } from "@/components/ui/chat-session-selector";
 import type { StyleChange, Theme } from "@/lib/visual-editor";
 import dynamic from "next/dynamic";
@@ -2929,26 +2928,17 @@ export default function TodoApp() {
             }}
           >
             <WebPreviewNavigation className="fixed top-0 left-0 right-0 z-50 bg-card border-b border-border">
-              {/* Model Selector and Chat Session Selector */}
-              {project && selectedModel && onModelChange && (
+              {/* Chat Session Selector */}
+              {project && userId && onSessionChange && (
                 <div className="flex items-center gap-1 ml-2">
-                  <ModelSelector
-                    selectedModel={selectedModel}
-                    onModelChange={onModelChange}
-                    userPlan={userPlan}
-                    subscriptionStatus={subscriptionStatus}
+                  <ChatSessionSelector
+                    workspaceId={project.id}
+                    userId={userId}
+                    currentSessionId={currentSessionId || null}
+                    onSessionChange={onSessionChange}
+                    onNewSession={onNewSession}
                     compact={true}
                   />
-                  {userId && onSessionChange && (
-                    <ChatSessionSelector
-                      workspaceId={project.id}
-                      userId={userId}
-                      currentSessionId={currentSessionId || null}
-                      onSessionChange={onSessionChange}
-                      onNewSession={onNewSession}
-                      compact={true}
-                    />
-                  )}
                 </div>
               )}
 

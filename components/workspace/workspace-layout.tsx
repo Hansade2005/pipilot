@@ -34,7 +34,6 @@ import { useAutoCloudBackup } from '@/hooks/use-auto-cloud-backup'
 import { useSubscriptionCache } from '@/hooks/use-subscription-cache'
 import { restoreBackupFromCloud, isCloudSyncEnabled } from '@/lib/cloud-sync'
 import { generateFileUpdate, type StyleChange } from '@/lib/visual-editor'
-import { ModelSelector } from "@/components/ui/model-selector"
 import { ChatSessionSelector } from "@/components/ui/chat-session-selector"
 import { AiModeSelector, type AIMode } from "@/components/ui/ai-mode-selector"
 import { DEFAULT_CHAT_MODEL } from "@/lib/ai-models"
@@ -1448,17 +1447,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               </div>
             </div>
             
-            {/* Model Selector and Chat Session Selector for mobile */}
+            {/* Chat Session Selector for mobile */}
             {selectedProject && (
               <div className="flex-1 max-w-56 mx-2 flex items-center gap-1">
-                <ModelSelector
-                  selectedModel={selectedModel}
-                  onModelChange={setSelectedModel}
-                  userPlan={userPlan}
-                  subscriptionStatus={subscriptionStatus}
-                  compact={true}
-                  className="flex-1"
-                />
                 <ChatSessionSelector
                   workspaceId={selectedProject.id}
                   userId={user.id}
