@@ -118,13 +118,11 @@ export function ModelSelector({
   const truncateModelName = (text: string | undefined) => {
     if (!text) return '';
 
-    // For "auto" model, truncate to 3 chars but no ellipsis
-    if (text.toLowerCase() === 'auto') {
-      return text.length > 3 ? text.substring(0, 3) : text;
-    }
+    // Strip "PiPilot " prefix for compact display
+    const cleaned = text.replace(/^PiPilot\s+/i, '')
 
-    // For all other models, truncate to 3 characters with ellipsis
-    return text.length > 3 ? text.substring(0, 3) + '...' : text;
+    // Truncate to 10 characters with ellipsis
+    return cleaned.length > 10 ? cleaned.substring(0, 10) + '...' : cleaned;
   };
 
   if (compact) {

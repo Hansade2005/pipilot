@@ -6623,11 +6623,13 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs transition-colors ${isAskMode ? 'bg-blue-600/20 text-blue-400 border border-blue-600/30' : 'text-gray-400 hover:bg-gray-800'}`}
+                    className={`relative px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 ${isAskMode
+                      ? 'bg-blue-500 text-white shadow-sm shadow-blue-500/25'
+                      : 'bg-gray-800 text-gray-400 hover:text-gray-300 hover:bg-gray-700'
+                    }`}
                     onClick={() => setIsAskMode(!isAskMode)}
                   >
-                    <Eye className="size-3.5" />
-                    <span>Plan</span>
+                    Plan
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>

@@ -7,7 +7,6 @@ import { Logo } from "@/components/ui/logo"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import React, { useState, useEffect } from 'react'
 import type { Workspace as Project } from "@/lib/storage-manager"
-import { ModelSelector } from "@/components/ui/model-selector"
 import { ChatSessionSelector } from "@/components/ui/chat-session-selector"
 import { useGitHubPush } from "@/hooks/use-github-push"
 import {
@@ -258,13 +257,6 @@ export function ProjectHeader({
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          {/* Model selector only when project is selected */}
-          {project && selectedModel && onModelChange && (
-            <ModelSelector
-              selectedModel={selectedModel}
-              onModelChange={onModelChange}
-            />
-          )}
           {/* Create project button */}
           <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
             setIsCreateDialogOpen(open)
@@ -356,20 +348,6 @@ export function ProjectHeader({
           )}
         </div>
        
-        {/* Model label and selector */}
-        {selectedModel && onModelChange && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-muted-foreground">Model:</span>
-            <ModelSelector
-              selectedModel={selectedModel}
-              onModelChange={onModelChange}
-              userPlan={userPlan}
-              subscriptionStatus={subscriptionStatus}
-              compact={true}
-            />
-          </div>
-        )}
-
         {/* Chat Session Selector */}
         {project && user && (
           <ChatSessionSelector
