@@ -1199,9 +1199,9 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                     handleSubmit(e)
                   }
                 }}
-                className="w-full min-h-[44px] max-h-[140px] resize-none border-0 bg-transparent text-gray-100 placeholder:text-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none px-3.5 pt-3 pb-2 text-sm"
+                className="w-full min-h-[100px] max-h-[200px] resize-none border-0 bg-transparent text-gray-100 placeholder:text-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none px-3.5 pt-3 pb-2 text-sm"
                 disabled={isGenerating}
-                rows={1}
+                rows={4}
               />
             </div>
 

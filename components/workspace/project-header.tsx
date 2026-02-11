@@ -262,53 +262,55 @@ export function ProjectHeader({
             setIsCreateDialogOpen(open)
             onDialogOpenChange?.(open)
           }}>
-            <Button variant="default" size="sm" onClick={() => setIsCreateDialogOpen(true)}>
+            <Button size="sm" className="bg-orange-600 hover:bg-orange-500 text-white border-0" onClick={() => setIsCreateDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Create Manually
             </Button>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[425px] bg-gray-900 border-gray-800 text-white">
               <DialogHeader>
-                <DialogTitle>Create New Project</DialogTitle>
-                <DialogDescription>
+                <DialogTitle className="text-gray-100">Create New Project</DialogTitle>
+                <DialogDescription className="text-gray-400">
                   Start building your next app with PiPilot.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="name">Project Name</Label>
+                  <Label htmlFor="name" className="text-gray-200">Project Name</Label>
                   <Input
                     id="name"
                     placeholder="My Awesome App"
                     value={newProjectName}
                     onChange={(e) => setNewProjectName(e.target.value)}
+                    className="bg-gray-800 border-gray-700 text-white placeholder-gray-500"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="description">Description (Optional)</Label>
+                  <Label htmlFor="description" className="text-gray-200">Description (Optional)</Label>
                   <Textarea
                     id="description"
                     placeholder="A brief description of your project"
                     value={newProjectDescription}
                     onChange={(e) => setNewProjectDescription(e.target.value)}
+                    className="bg-gray-800 border-gray-700 text-white placeholder-gray-500"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="template">Template</Label>
+                  <Label htmlFor="template" className="text-gray-200">Template</Label>
                   <Select value={selectedTemplate} onValueChange={(value: 'vite-react' | 'nextjs' | 'expo' | 'html') => setSelectedTemplate(value)}>
-                    <SelectTrigger id="template">
+                    <SelectTrigger id="template" className="bg-gray-800 border-gray-700 text-white">
                       <SelectValue placeholder="Select a template..." />
                     </SelectTrigger>
-                    <SelectContent className="z-[110]">
-                      <SelectItem value="vite-react">Vite</SelectItem>
-                      <SelectItem value="nextjs">Next.js</SelectItem>
-                      <SelectItem value="expo">Expo (Mobile)</SelectItem>
-                      <SelectItem value="html">HTML</SelectItem>
+                    <SelectContent className="z-[110] bg-gray-800 border-gray-700">
+                      <SelectItem value="vite-react" className="text-gray-200">Vite</SelectItem>
+                      <SelectItem value="nextjs" className="text-gray-200">Next.js</SelectItem>
+                      <SelectItem value="expo" className="text-gray-200">Expo (Mobile)</SelectItem>
+                      <SelectItem value="html" className="text-gray-200">HTML</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <DialogFooter>
-                <Button onClick={handleCreateProject} disabled={!newProjectName.trim() || isCreating}>
+                <Button className="bg-orange-600 hover:bg-orange-500 text-white" onClick={handleCreateProject} disabled={!newProjectName.trim() || isCreating}>
                   {isCreating ? "Creating..." : "Create Project"}
                 </Button>
               </DialogFooter>
