@@ -6574,7 +6574,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 )}
               </div>
 
-              {/* Voice Button */}
+              {/* Voice Button - Waveform icon */}
               <Button
                 type="button"
                 variant="ghost"
@@ -6583,7 +6583,25 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 onClick={handleMicrophoneClick}
                 disabled={isTranscribing || isLoading}
               >
-                {isRecording ? <MicOff className="size-4 text-red-400" /> : <Mic className="size-4" />}
+                {isRecording ? (
+                  <svg width="16" height="16" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-red-400 animate-pulse">
+                    <rect x="0" y="7.5" height="6" fill="currentColor" width="1" rx="0.5" ry="0.5" />
+                    <rect x="4" y="5.5" height="10" fill="currentColor" width="1" rx="0.5" ry="0.5" />
+                    <rect x="8" y="2.5" height="16" fill="currentColor" width="1" rx="0.5" ry="0.5" />
+                    <rect x="12" y="5.5" height="10" fill="currentColor" width="1" rx="0.5" ry="0.5" />
+                    <rect x="16" y="2.5" height="16" fill="currentColor" width="1" rx="0.5" ry="0.5" />
+                    <rect x="20" y="7.5" height="6" fill="currentColor" width="1" rx="0.5" ry="0.5" />
+                  </svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="0" y="7.5" height="6" fill="currentColor" fillOpacity="0.5" width="1" rx="0.5" ry="0.5" />
+                    <rect x="4" y="5.5" height="10" fill="currentColor" fillOpacity="0.5" width="1" rx="0.5" ry="0.5" />
+                    <rect x="8" y="2.5" height="16" fill="currentColor" fillOpacity="0.5" width="1" rx="0.5" ry="0.5" />
+                    <rect x="12" y="5.5" height="10" fill="currentColor" fillOpacity="0.5" width="1" rx="0.5" ry="0.5" />
+                    <rect x="16" y="2.5" height="16" fill="currentColor" fillOpacity="0.5" width="1" rx="0.5" ry="0.5" />
+                    <rect x="20" y="7.5" height="6" fill="currentColor" fillOpacity="0.5" width="1" rx="0.5" ry="0.5" />
+                  </svg>
+                )}
               </Button>
             </div>
 
