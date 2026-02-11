@@ -1221,6 +1221,107 @@ export function ChatPanelV2({
     return { file_ops: true, code_search: true, web_tools: true, dev_tools: true, pipilot_db: true, supabase: true, stripe: true, docs_quality: true, image_gen: true }
   })
 
+  // Client-side tool map (mirrors server categoryToolMap)
+  const clientCategoryToolMap: Record<string, { name: string; label: string }[]> = {
+    file_ops: [
+      { name: 'write_file', label: 'Write File' },
+      { name: 'read_file', label: 'Read File' },
+      { name: 'edit_file', label: 'Edit File' },
+      { name: 'delete_file', label: 'Delete File' },
+      { name: 'delete_folder', label: 'Delete Folder' },
+      { name: 'client_replace_string_in_file', label: 'Find & Replace' },
+    ],
+    code_search: [
+      { name: 'grep_search', label: 'Grep Search' },
+      { name: 'semantic_code_navigator', label: 'Semantic Navigator' },
+      { name: 'list_files', label: 'List Files' },
+    ],
+    web_tools: [
+      { name: 'web_search', label: 'Web Search' },
+      { name: 'web_extract', label: 'Web Extract' },
+    ],
+    dev_tools: [
+      { name: 'check_dev_errors', label: 'Check Dev Errors' },
+      { name: 'node_machine', label: 'Node Machine' },
+      { name: 'remove_package', label: 'Remove Package' },
+    ],
+    pipilot_db: [
+      { name: 'pipilotdb_create_database', label: 'Create Database' },
+      { name: 'pipilotdb_create_table', label: 'Create Table' },
+      { name: 'pipilotdb_query_database', label: 'Query Database' },
+      { name: 'pipilotdb_manipulate_table_data', label: 'Manipulate Data' },
+      { name: 'pipilotdb_manage_api_keys', label: 'Manage API Keys' },
+      { name: 'pipilotdb_list_tables', label: 'List Tables' },
+      { name: 'pipilotdb_read_table', label: 'Read Table' },
+      { name: 'pipilotdb_delete_table', label: 'Delete Table' },
+    ],
+    supabase: [
+      { name: 'supabase_fetch_api_keys', label: 'Fetch API Keys' },
+      { name: 'supabase_create_table', label: 'Create Table' },
+      { name: 'supabase_insert_data', label: 'Insert Data' },
+      { name: 'supabase_delete_data', label: 'Delete Data' },
+      { name: 'supabase_read_table', label: 'Read Table' },
+      { name: 'supabase_drop_table', label: 'Drop Table' },
+      { name: 'supabase_execute_sql', label: 'Execute SQL' },
+      { name: 'supabase_list_tables_rls', label: 'List Tables & RLS' },
+      { name: 'request_supabase_connection', label: 'Request Connection' },
+    ],
+    stripe: [
+      { name: 'stripe_validate_key', label: 'Validate Key' },
+      { name: 'stripe_list_products', label: 'List Products' },
+      { name: 'stripe_create_product', label: 'Create Product' },
+      { name: 'stripe_update_product', label: 'Update Product' },
+      { name: 'stripe_delete_product', label: 'Delete Product' },
+      { name: 'stripe_list_prices', label: 'List Prices' },
+      { name: 'stripe_create_price', label: 'Create Price' },
+      { name: 'stripe_update_price', label: 'Update Price' },
+      { name: 'stripe_list_customers', label: 'List Customers' },
+      { name: 'stripe_create_customer', label: 'Create Customer' },
+      { name: 'stripe_update_customer', label: 'Update Customer' },
+      { name: 'stripe_delete_customer', label: 'Delete Customer' },
+      { name: 'stripe_create_payment_intent', label: 'Create Payment' },
+      { name: 'stripe_update_payment_intent', label: 'Update Payment' },
+      { name: 'stripe_cancel_payment_intent', label: 'Cancel Payment' },
+      { name: 'stripe_list_charges', label: 'List Charges' },
+      { name: 'stripe_list_subscriptions', label: 'List Subscriptions' },
+      { name: 'stripe_update_subscription', label: 'Update Subscription' },
+      { name: 'stripe_cancel_subscription', label: 'Cancel Subscription' },
+      { name: 'stripe_list_coupons', label: 'List Coupons' },
+      { name: 'stripe_create_coupon', label: 'Create Coupon' },
+      { name: 'stripe_update_coupon', label: 'Update Coupon' },
+      { name: 'stripe_delete_coupon', label: 'Delete Coupon' },
+      { name: 'stripe_create_refund', label: 'Create Refund' },
+      { name: 'stripe_search', label: 'Search' },
+    ],
+    docs_quality: [
+      { name: 'generate_report', label: 'Generate Report' },
+      { name: 'pipilot_get_docs', label: 'Get Docs' },
+      { name: 'auto_documentation', label: 'Auto Documentation' },
+      { name: 'code_review', label: 'Code Review' },
+      { name: 'code_quality_analysis', label: 'Code Quality' },
+    ],
+    image_gen: [
+      { name: 'generate_image', label: 'Generate Image' },
+    ],
+  }
+
+  // Individual tool toggles (persisted)
+  const [disabledIndividualTools, setDisabledIndividualTools] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const toolPrefs = localStorage.getItem('pipilot-tool-preferences')
+        if (toolPrefs) {
+          const parsed = JSON.parse(toolPrefs)
+          return parsed.disabledTools || []
+        }
+      } catch {}
+    }
+    return []
+  })
+
+  // Which category is drilled-down in tool submenu
+  const [toolDetailCategory, setToolDetailCategory] = useState<string | null>(null)
+
   // Speech-to-text state (Web Speech API real-time implementation)
   const [isRecording, setIsRecording] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
@@ -1335,15 +1436,15 @@ export function ChatPanelV2({
     }
   }, [imageGenEnabled])
 
-  // Persist tool category toggles
+  // Persist tool category toggles + individual tool toggles
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const disabledCategories = Object.entries(toolCategoryToggles)
         .filter(([, enabled]) => !enabled)
         .map(([cat]) => cat)
-      localStorage.setItem('pipilot-tool-preferences', JSON.stringify({ disabledCategories }))
+      localStorage.setItem('pipilot-tool-preferences', JSON.stringify({ disabledCategories, disabledTools: disabledIndividualTools }))
     }
-  }, [toolCategoryToggles])
+  }, [toolCategoryToggles, disabledIndividualTools])
 
   // Close command menu on outside click
   useEffect(() => {
@@ -1352,6 +1453,7 @@ export function ChatPanelV2({
       if (commandMenuRef.current && !commandMenuRef.current.contains(e.target as Node)) {
         setShowCommandMenu(false)
         setCommandMenuSubmenu('none')
+        setToolDetailCategory(null)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -4445,6 +4547,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
         isInitialPrompt,
         mcpServers: mcpServersForProject.length > 0 ? mcpServersForProject : undefined,
         disabledToolCategories: disabledToolCategories.length > 0 ? disabledToolCategories : undefined,
+        disabledTools: disabledIndividualTools.length > 0 ? disabledIndividualTools : undefined,
       }
       const compressedData = await compressProjectFiles(projectFiles, fileTree, messagesToSend, metadata)
 
@@ -6027,6 +6130,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                   onClick={() => {
                     setShowCommandMenu(!showCommandMenu)
                     setCommandMenuSubmenu('none')
+                    setToolDetailCategory(null)
                   }}
                 >
                   <Plus className={`size-4 transition-transform ${showCommandMenu ? 'rotate-45' : ''}`} />
@@ -6245,65 +6349,193 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                       </div>
                     )}
 
-                    {/* Tool Categories Submenu */}
+                    {/* Tool Categories Submenu (with drill-down into individual tools) */}
                     {commandMenuSubmenu === 'tools' && (
                       <div className="py-1.5">
-                        <button
-                          className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors border-b border-gray-700/50"
-                          onClick={() => setCommandMenuSubmenu('none')}
-                        >
-                          <ChevronLeft className="size-4" />
-                          <span className="font-medium">Tool Categories</span>
-                        </button>
-                        <div className="max-h-[280px] overflow-y-auto">
-                          {[
-                            { id: 'file_ops', label: 'File Operations', icon: FileText, desc: 'Read, write, edit, delete files' },
-                            { id: 'code_search', label: 'Code Search', icon: Search, desc: 'Grep, semantic nav, list files' },
-                            { id: 'web_tools', label: 'Web Tools', icon: Globe, desc: 'Web search & extraction' },
-                            { id: 'dev_tools', label: 'Dev Tools', icon: Code, desc: 'Error check, Node, packages' },
-                            { id: 'pipilot_db', label: 'PiPilot Database', icon: Database, desc: 'Create/query PiPilot databases' },
-                            { id: 'supabase', label: 'Supabase', icon: Database, desc: 'Supabase tables, auth, storage' },
-                            { id: 'stripe', label: 'Stripe', icon: CreditCard, desc: 'Payments, products, customers' },
-                            { id: 'docs_quality', label: 'Docs & Quality', icon: BarChart3, desc: 'Reports, docs, code review' },
-                            { id: 'image_gen', label: 'Image Generation', icon: Sparkles, desc: 'AI image generation' },
-                          ].map((cat) => {
-                            const isOn = toolCategoryToggles[cat.id] !== false
-                            const Icon = cat.icon
-                            return (
-                              <button
-                                key={cat.id}
-                                className="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
-                                onClick={() => setToolCategoryToggles(prev => ({ ...prev, [cat.id]: !isOn }))}
-                              >
-                                <div className="flex items-center gap-3 min-w-0">
-                                  <Icon className={`size-4 flex-shrink-0 ${isOn ? 'text-blue-400' : 'text-gray-600'}`} />
-                                  <div className="text-left min-w-0">
-                                    <div className={isOn ? 'text-gray-200' : 'text-gray-500'}>{cat.label}</div>
-                                    <div className="text-[11px] text-gray-500 truncate">{cat.desc}</div>
+                        {/* Category list or individual tools drill-down */}
+                        {toolDetailCategory === null ? (
+                          <>
+                            <button
+                              className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors border-b border-gray-700/50"
+                              onClick={() => setCommandMenuSubmenu('none')}
+                            >
+                              <ChevronLeft className="size-4" />
+                              <span className="font-medium">Tool Categories</span>
+                            </button>
+                            <div className="max-h-[280px] overflow-y-auto">
+                              {[
+                                { id: 'file_ops', label: 'File Operations', icon: FileText, desc: 'Read, write, edit, delete files' },
+                                { id: 'code_search', label: 'Code Search', icon: Search, desc: 'Grep, semantic nav, list files' },
+                                { id: 'web_tools', label: 'Web Tools', icon: Globe, desc: 'Web search & extraction' },
+                                { id: 'dev_tools', label: 'Dev Tools', icon: Code, desc: 'Error check, Node, packages' },
+                                { id: 'pipilot_db', label: 'PiPilot Database', icon: Database, desc: 'Create/query PiPilot databases' },
+                                { id: 'supabase', label: 'Supabase', icon: Database, desc: 'Supabase tables, auth, storage' },
+                                { id: 'stripe', label: 'Stripe', icon: CreditCard, desc: 'Payments, products, customers' },
+                                { id: 'docs_quality', label: 'Docs & Quality', icon: BarChart3, desc: 'Reports, docs, code review' },
+                                { id: 'image_gen', label: 'Image Generation', icon: Sparkles, desc: 'AI image generation' },
+                              ].map((cat) => {
+                                const isOn = toolCategoryToggles[cat.id] !== false
+                                const Icon = cat.icon
+                                const tools = clientCategoryToolMap[cat.id] || []
+                                const disabledCount = isOn ? tools.filter(t => disabledIndividualTools.includes(t.name)).length : tools.length
+                                return (
+                                  <div key={cat.id} className="flex items-center hover:bg-gray-800 transition-colors">
+                                    {/* Category info - click to drill down */}
+                                    <button
+                                      className="flex-1 flex items-center gap-3 px-4 py-2 text-sm text-gray-200 min-w-0"
+                                      onClick={() => setToolDetailCategory(cat.id)}
+                                    >
+                                      <Icon className={`size-4 flex-shrink-0 ${isOn ? 'text-blue-400' : 'text-gray-600'}`} />
+                                      <div className="text-left min-w-0 flex-1">
+                                        <div className="flex items-center gap-2">
+                                          <span className={isOn ? 'text-gray-200' : 'text-gray-500'}>{cat.label}</span>
+                                          {isOn && disabledCount > 0 && (
+                                            <span className="text-[10px] px-1.5 py-0.5 bg-yellow-900/30 text-yellow-500 rounded-full">
+                                              {tools.length - disabledCount}/{tools.length}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="text-[11px] text-gray-500 truncate">{cat.desc}</div>
+                                      </div>
+                                      <ChevronRight className="size-3.5 text-gray-600 flex-shrink-0" />
+                                    </button>
+                                    {/* Category master toggle */}
+                                    <div className="px-3">
+                                      <Switch
+                                        checked={isOn}
+                                        onCheckedChange={(checked) => {
+                                          setToolCategoryToggles(prev => ({ ...prev, [cat.id]: checked }))
+                                          // When enabling category, also re-enable all its individual tools
+                                          if (checked) {
+                                            const toolNames = tools.map(t => t.name)
+                                            setDisabledIndividualTools(prev => prev.filter(t => !toolNames.includes(t)))
+                                          }
+                                        }}
+                                        className="h-4 w-7 flex-shrink-0"
+                                      />
+                                    </div>
                                   </div>
-                                </div>
-                                <Switch
-                                  checked={isOn}
-                                  onCheckedChange={(checked) => setToolCategoryToggles(prev => ({ ...prev, [cat.id]: checked }))}
-                                  className="h-4 w-7 flex-shrink-0"
-                                  onClick={(e) => e.stopPropagation()}
-                                />
+                                )
+                              })}
+                            </div>
+                            <div className="border-t border-gray-700/50 mt-1">
+                              <button
+                                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-blue-400 hover:bg-gray-800 transition-colors"
+                                onClick={() => {
+                                  setShowCommandMenu(false)
+                                  window.open('/workspace/account', '_blank')
+                                }}
+                              >
+                                <ExternalLink className="size-4" />
+                                <span>Manage in settings</span>
                               </button>
-                            )
-                          })}
-                        </div>
-                        <div className="border-t border-gray-700/50 mt-1">
-                          <button
-                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-blue-400 hover:bg-gray-800 transition-colors"
-                            onClick={() => {
-                              setShowCommandMenu(false)
-                              window.open('/workspace/account', '_blank')
-                            }}
-                          >
-                            <ExternalLink className="size-4" />
-                            <span>Manage in settings</span>
-                          </button>
-                        </div>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            {/* Individual tools drill-down */}
+                            {(() => {
+                              const catId = toolDetailCategory
+                              const catLabels: Record<string, string> = {
+                                file_ops: 'File Operations', code_search: 'Code Search', web_tools: 'Web Tools',
+                                dev_tools: 'Dev Tools', pipilot_db: 'PiPilot Database', supabase: 'Supabase',
+                                stripe: 'Stripe', docs_quality: 'Docs & Quality', image_gen: 'Image Generation',
+                              }
+                              const tools = clientCategoryToolMap[catId] || []
+                              const categoryEnabled = toolCategoryToggles[catId] !== false
+                              const enabledToolCount = tools.filter(t => !disabledIndividualTools.includes(t.name)).length
+                              return (
+                                <>
+                                  <button
+                                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors border-b border-gray-700/50"
+                                    onClick={() => setToolDetailCategory(null)}
+                                  >
+                                    <ChevronLeft className="size-4" />
+                                    <span className="font-medium">{catLabels[catId] || catId}</span>
+                                    <span className="text-[11px] text-gray-500 ml-auto">{enabledToolCount}/{tools.length} active</span>
+                                  </button>
+
+                                  {/* Master toggle for this category */}
+                                  <div className="flex items-center justify-between px-4 py-2 border-b border-gray-700/30">
+                                    <span className="text-xs text-gray-400">Enable all</span>
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        className="text-[11px] text-blue-400 hover:text-blue-300"
+                                        onClick={() => {
+                                          // Enable all tools in this category
+                                          const toolNames = tools.map(t => t.name)
+                                          setDisabledIndividualTools(prev => prev.filter(t => !toolNames.includes(t)))
+                                          if (!categoryEnabled) {
+                                            setToolCategoryToggles(prev => ({ ...prev, [catId]: true }))
+                                          }
+                                        }}
+                                      >
+                                        All on
+                                      </button>
+                                      <span className="text-gray-600">|</span>
+                                      <button
+                                        className="text-[11px] text-red-400 hover:text-red-300"
+                                        onClick={() => {
+                                          // Disable all tools in this category
+                                          const toolNames = tools.map(t => t.name)
+                                          setDisabledIndividualTools(prev => [...prev.filter(t => !toolNames.includes(t)), ...toolNames])
+                                        }}
+                                      >
+                                        All off
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  <div className="max-h-[240px] overflow-y-auto">
+                                    {tools.map((tool) => {
+                                      const isToolOn = categoryEnabled && !disabledIndividualTools.includes(tool.name)
+                                      return (
+                                        <button
+                                          key={tool.name}
+                                          className="w-full flex items-center justify-between px-4 py-2 text-sm hover:bg-gray-800 transition-colors"
+                                          onClick={() => {
+                                            if (!categoryEnabled) {
+                                              // Auto-enable category when enabling a tool
+                                              setToolCategoryToggles(prev => ({ ...prev, [catId]: true }))
+                                            }
+                                            setDisabledIndividualTools(prev =>
+                                              prev.includes(tool.name)
+                                                ? prev.filter(t => t !== tool.name)
+                                                : [...prev, tool.name]
+                                            )
+                                          }}
+                                        >
+                                          <div className="flex items-center gap-3 min-w-0">
+                                            <Wrench className={`size-3.5 flex-shrink-0 ${isToolOn ? 'text-green-400' : 'text-gray-600'}`} />
+                                            <div className="text-left min-w-0">
+                                              <div className={`text-sm ${isToolOn ? 'text-gray-200' : 'text-gray-500'}`}>{tool.label}</div>
+                                              <div className="text-[10px] text-gray-600 font-mono truncate">{tool.name}</div>
+                                            </div>
+                                          </div>
+                                          <Switch
+                                            checked={isToolOn}
+                                            onCheckedChange={(checked) => {
+                                              if (!categoryEnabled && checked) {
+                                                setToolCategoryToggles(prev => ({ ...prev, [catId]: true }))
+                                              }
+                                              setDisabledIndividualTools(prev =>
+                                                checked
+                                                  ? prev.filter(t => t !== tool.name)
+                                                  : [...prev, tool.name]
+                                              )
+                                            }}
+                                            className="h-4 w-7 flex-shrink-0"
+                                            onClick={(e) => e.stopPropagation()}
+                                          />
+                                        </button>
+                                      )
+                                    })}
+                                  </div>
+                                </>
+                              )
+                            })()}
+                          </>
+                        )}
                       </div>
                     )}
 
