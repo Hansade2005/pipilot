@@ -320,7 +320,7 @@ export function ProjectHeader({
   }
 
   return (
-    <div className="h-16 border-b border-border bg-card px-6 flex items-center justify-between">
+    <div className="h-16 border-b border-gray-800/60 bg-gray-900/80 px-6 flex items-center justify-between">
       <div className="flex items-center space-x-4">
         <Logo variant="icon" size="md" />
         <div>

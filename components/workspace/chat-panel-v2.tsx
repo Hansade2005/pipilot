@@ -21,7 +21,7 @@ import { MessageWithTools } from './message-with-tools'
 import {
   Send, Paperclip, Mic, MicOff, X, FileText, Image as ImageIcon,
   Link as LinkIcon, Loader2, ChevronDown, ChevronUp, StopCircle, Trash2, Plus,
-  Copy, ArrowUp, ArrowDown, Undo2, Redo2, Check, AlertTriangle, Zap, Package, PackageMinus,
+  Copy, ArrowUp, ArrowDown, RotateCcw, Undo2, Redo2, Check, AlertTriangle, Zap, Package, PackageMinus,
   Search, Globe, Eye, FolderOpen, Settings, Edit3, CheckCircle2, XCircle,
   Square, Database, CornerDownLeft, Table, Key, Code, Server, BarChart3,
   CreditCard, Coins, GitBranch, ChevronRight, ChevronLeft, Wrench,
@@ -271,7 +271,7 @@ const ExpandableUserMessage = ({
           </div>
           <div className="flex items-center justify-end gap-0.5 mt-1 sm:opacity-0 sm:hover:opacity-100 transition-opacity">
             <Action tooltip="Retry message" onClick={handleIconClick}>
-              <ArrowUp className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
+              <RotateCcw className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
             </Action>
             {renderCheckpointButton()}
             {onBranch && (
@@ -374,7 +374,7 @@ const ExpandableUserMessage = ({
       </div>
       <div className="flex items-center justify-end gap-0.5 mt-1 opacity-0 hover:opacity-100 transition-opacity">
         <Action tooltip="Retry message" onClick={handleIconClick}>
-          <ArrowUp className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
+          <RotateCcw className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
         </Action>
         {renderCheckpointButton()}
         {onBranch && (
