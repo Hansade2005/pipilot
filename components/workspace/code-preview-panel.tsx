@@ -1066,12 +1066,14 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
     // When AI streaming ends and files have changed, refresh the preview
     if (!isAIStreaming && filesChangedSincePreviewRef.current && preview.url && !preview.isLoading) {
       console.log('[CodePreviewPanel] AI streaming ended, files changed - auto-refreshing preview')
-      // Use a small delay to ensure all file operations are complete
+      // Use a longer delay (1500ms) to ensure all file writes to IndexedDB are
+      // fully committed before we fetch them. Users reported that auto-refreshed
+      // previews showed stale file states from before the stream.
       const timeoutId = setTimeout(() => {
         if (filesChangedSincePreviewRef.current) {
           refreshPreviewWithLatestFiles()
         }
-      }, 500)
+      }, 1500)
       return () => clearTimeout(timeoutId)
     }
   }, [isAIStreaming])
@@ -1462,9 +1464,12 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
 
       const authUserId = user.id
       const authUsername = user.user_metadata?.full_name || user.email?.split('@')[0] || 'anonymous'
-      // Fetch files from IndexedDB client-side
+      // Fetch latest files from IndexedDB client-side
+      // Re-init storage manager to ensure we get the freshest data after streaming
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
+      // Small yield to allow any pending IndexedDB transactions to flush
+      await new Promise(resolve => setTimeout(resolve, 200))
       const files = await storageManager.getFiles(project.id)
       
       if (!files || files.length === 0) {
@@ -1789,8 +1794,10 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
       console.log('[CodePreviewPanel] Syncing latest files to preview sandbox:', preview.sandboxId)
 
       // Fetch latest files from IndexedDB
+      // Re-init and yield to ensure all pending writes are flushed
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
+      await new Promise(resolve => setTimeout(resolve, 200))
       const files = await storageManager.getFiles(project.id)
 
       if (!files || files.length === 0) {

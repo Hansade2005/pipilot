@@ -444,12 +444,14 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       }
 
       if (shouldCreatePreview) {
-        // Trigger preview creation with a small delay to ensure tab switch is complete
+        // Trigger preview creation with a longer delay to ensure all file writes
+        // to IndexedDB are fully committed before we read them for preview.
+        // Users reported that auto-started previews had stale/old file states.
         setTimeout(() => {
           if (codePreviewRef.current) {
             codePreviewRef.current.createPreview()
           }
-        }, 100)
+        }, 1500)
       }
     }
 
@@ -653,6 +655,19 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       }
     }
   }, [searchParams, clientProjects, selectedProject, router, isLoadingProjects])
+
+  // Update browser tab title based on selected project
+  useEffect(() => {
+    if (selectedProject?.name) {
+      document.title = `${selectedProject.name} - PiPilot Workspace`
+    } else {
+      document.title = 'PiPilot Workspace'
+    }
+    // Restore original title on unmount
+    return () => {
+      document.title = "PiPilot - Canada's First Agentic Vibe Coding Platform | AI App Builder"
+    }
+  }, [selectedProject?.name])
 
   // Also reload when newProjectId changes (in case project was just created)
   useEffect(() => {
