@@ -335,9 +335,13 @@ interface CodeEditorProps {
   file: File | null
   onSave?: (file: File, content: string) => void
   projectFiles?: File[] // Add project files for import resolution
+  // Multi-tab support
+  openFiles?: File[]
+  onCloseFile?: (file: File) => void
+  onSelectFile?: (file: File) => void
 }
 
-export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps) {
+export function CodeEditor({ file, onSave, projectFiles = [], openFiles = [], onCloseFile, onSelectFile }: CodeEditorProps) {
   const { theme } = useTheme()
   const { triggerAutoBackup } = useAutoCloudBackup({
     debounceMs: 1000, // Shorter debounce for code editor saves
@@ -1053,11 +1057,49 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
           }
         `
       }} />
+      {/* Multi-Tab Bar */}
+      {openFiles && openFiles.length > 0 && (
+        <div className="flex items-center bg-gray-950 border-b border-gray-800/60 flex-shrink-0 overflow-x-auto min-h-[35px]">
+          {openFiles.map((f) => {
+            const isActive = f.path === file?.path
+            const ext = f.name.split('.').pop() || ''
+            const extColors: Record<string, string> = {
+              tsx: 'text-blue-400', ts: 'text-blue-400', jsx: 'text-yellow-400', js: 'text-yellow-400',
+              css: 'text-purple-400', scss: 'text-pink-400', html: 'text-orange-400', json: 'text-yellow-300',
+              md: 'text-gray-400', py: 'text-green-400', go: 'text-cyan-400', rs: 'text-orange-300',
+            }
+            return (
+              <div
+                key={f.path}
+                className={`group flex items-center gap-1.5 px-3 h-[35px] text-xs cursor-pointer border-r border-gray-800/40 transition-colors flex-shrink-0 ${
+                  isActive
+                    ? 'bg-gray-900/80 text-gray-100 border-t-2 border-t-orange-500'
+                    : 'bg-gray-950 text-gray-500 hover:text-gray-300 hover:bg-gray-900/40 border-t-2 border-t-transparent'
+                }`}
+                onClick={() => onSelectFile?.(f)}
+              >
+                <FileText className={`size-3.5 ${extColors[ext] || 'text-gray-500'}`} />
+                <span className="truncate max-w-[120px]">{f.name}</span>
+                {onCloseFile && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onCloseFile(f) }}
+                    className={`size-4 flex items-center justify-center rounded-sm transition-colors ${
+                      isActive ? 'hover:bg-gray-700/60 text-gray-400' : 'opacity-0 group-hover:opacity-100 hover:bg-gray-700/60 text-gray-500'
+                    }`}
+                  >
+                    <X className="size-3" />
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {/* Editor Header */}
-      <div className="flex items-center justify-between p-3 border-b border-gray-800/60 bg-gray-900/80 flex-shrink-0">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-800/60 bg-gray-900/80 flex-shrink-0">
         <div className="flex items-center space-x-2">
-          <FileText className="h-4 w-4 text-gray-500" />
-          <span className="text-sm font-medium text-gray-200">{file.name}</span>
+          <span className="text-xs text-gray-400 truncate max-w-[200px]">{file.path || file.name}</span>
           {hasChanges && <div className="w-2 h-2 bg-orange-500 rounded-full" />}
         </div>
         <div className="flex items-center space-x-2">
