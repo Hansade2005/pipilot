@@ -1395,8 +1395,8 @@ export function ChatPanelV2({
     }
   }, [isLoading])
 
-  // Chat mode state - true for Plan mode, false for Agent mode
-  const [isAskMode, setIsAskMode] = useState(false)
+  // Chat mode state - true for Plan mode, false for Agent mode (defaults to Plan)
+  const [isAskMode, setIsAskMode] = useState(true)
 
   // Prompt Queue - queue messages when AI is busy, persist to localStorage
   const [promptQueue, setPromptQueue] = useState<Array<{ id: string; text: string; timestamp: number }>>(() => {
