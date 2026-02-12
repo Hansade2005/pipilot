@@ -1015,49 +1015,23 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
     checkProjectFramework()
   }, [project])
 
-  // Auto-load preview URL from local workspace or external DB on preview tab switch
+  // Auto-load preview URL from project slug on preview tab switch
+  // Projects already have a slug field - use it to construct the preview URL directly
   useEffect(() => {
     if (
       activeTab === 'preview' &&
       isViteProject &&
       !isExpoProject &&
       project?.id &&
+      project?.slug &&
       !preview.url &&
       !preview.isLoading
     ) {
-      const loadPreviewUrl = async () => {
-        try {
-          // First check if the workspace has a locally saved preview URL
-          const { storageManager } = await import('@/lib/storage-manager')
-          await storageManager.init()
-          const workspace = await storageManager.getWorkspace(project.id)
-          if (workspace?.previewUrl) {
-            console.log('[CodePreviewPanel] Loaded preview URL from local workspace:', workspace.previewUrl)
-            setPreview(prev => ({ ...prev, url: workspace.previewUrl! }))
-            return
-          }
-
-          // Fallback: check the external sites table
-          const response = await fetch(`/api/projects/${project.id}/preview-slug`)
-          if (response.ok) {
-            const data = await response.json()
-            if (data.previewUrl) {
-              console.log('[CodePreviewPanel] Loaded preview URL from sites table:', data.previewUrl)
-              setPreview(prev => ({ ...prev, url: data.previewUrl }))
-              // Save locally for faster access next time
-              await storageManager.updateWorkspace(project.id, {
-                previewUrl: data.previewUrl,
-                previewSlug: data.previewSlug
-              })
-            }
-          }
-        } catch (error) {
-          console.error('[CodePreviewPanel] Error loading preview URL:', error)
-        }
-      }
-      loadPreviewUrl()
+      const previewUrl = `https://${project.slug}.pipilot.dev/`
+      console.log('[CodePreviewPanel] Constructed preview URL from project slug:', previewUrl)
+      setPreview(prev => ({ ...prev, url: previewUrl }))
     }
-  }, [activeTab, isViteProject, isExpoProject, project?.id, preview.url, preview.isLoading])
+  }, [activeTab, isViteProject, isExpoProject, project?.id, project?.slug, preview.url, preview.isLoading])
 
   // Track if files have changed since last preview was created
   const filesChangedSincePreviewRef = useRef(false)
