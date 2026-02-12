@@ -5812,7 +5812,29 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                     return null
                   })()}
 
-                  {/* Special Rendering: Plan Card from generate_plan tool */}
+                  {/* Pass inline tool calls with positions to MessageWithTools for inline rendering */}
+                  {(() => {
+                    const toolCalls = activeToolCalls.get(message.id) || []
+                    // Filter out tools with special rendering
+                    const inlineToolCalls = toolCalls.filter(tc =>
+                      tc.toolName !== 'request_supabase_connection' &&
+                      tc.toolName !== 'continue_backend_implementation' &&
+                      tc.toolName !== 'suggest_next_steps' &&
+                      tc.toolName !== 'manage_todos' &&
+                      tc.toolName !== 'generate_plan'
+                    )
+                    return (
+                      <MessageWithTools
+                        message={message}
+                        projectId={project?.id}
+                        isStreaming={(isLoading && message.id === messages[messages.length - 1]?.id) || message.id === continuingMessageId}
+                        onContinueToBackend={onContinueToBackend}
+                        inlineToolCalls={inlineToolCalls}
+                      />
+                    )
+                  })()}
+
+                  {/* Special Rendering: Plan Card from generate_plan tool - shown before Activities */}
                   {(() => {
                     const toolCalls = activeToolCalls.get(message.id)
                     const planCalls = toolCalls?.filter(tc =>
@@ -5859,28 +5881,6 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                       )
                     }
                     return null
-                  })()}
-
-                  {/* Pass inline tool calls with positions to MessageWithTools for inline rendering */}
-                  {(() => {
-                    const toolCalls = activeToolCalls.get(message.id) || []
-                    // Filter out tools with special rendering
-                    const inlineToolCalls = toolCalls.filter(tc =>
-                      tc.toolName !== 'request_supabase_connection' &&
-                      tc.toolName !== 'continue_backend_implementation' &&
-                      tc.toolName !== 'suggest_next_steps' &&
-                      tc.toolName !== 'manage_todos' &&
-                      tc.toolName !== 'generate_plan'
-                    )
-                    return (
-                      <MessageWithTools
-                        message={message}
-                        projectId={project?.id}
-                        isStreaming={(isLoading && message.id === messages[messages.length - 1]?.id) || message.id === continuingMessageId}
-                        onContinueToBackend={onContinueToBackend}
-                        inlineToolCalls={inlineToolCalls}
-                      />
-                    )
                   })()}
 
                   {/* Tool Activity Panel - Always show for summary/tracking purposes */}

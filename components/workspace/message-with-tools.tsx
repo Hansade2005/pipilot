@@ -8,7 +8,6 @@ import { FileText, Edit3, X, Package, PackageMinus, Loader2, CheckCircle2, XCirc
 import { cn } from '@/lib/utils'
 import { SupabaseConnectionCard } from './supabase-connection-card'
 import { ContinueBackendCard } from './continue-backend-card'
-import { PlanCard } from './plan-card'
 
 // Inline tool call type for inline pill display
 interface InlineToolCall {
@@ -26,8 +25,6 @@ interface MessageWithToolsProps {
   projectId?: string
   isStreaming?: boolean
   onContinueToBackend?: (prompt: string) => void
-  onBuildPlan?: (plan: { title: string; description: string; steps: { title: string; description: string }[]; techStack?: string[] }) => void
-  onRefinePlan?: () => void
   inlineToolCalls?: InlineToolCall[] // Optional inline tool calls with positions
 }
 
@@ -328,7 +325,7 @@ const InterleavedContent = ({
   )
 }
 
-export function MessageWithTools({ message, projectId, isStreaming = false, onContinueToBackend, onBuildPlan, onRefinePlan, inlineToolCalls }: MessageWithToolsProps) {
+export function MessageWithTools({ message, projectId, isStreaming = false, onContinueToBackend, inlineToolCalls }: MessageWithToolsProps) {
   // In AI SDK v5, messages have different structure
   // Check for both possible tool structures
   const toolInvocations = (message as any).toolInvocations || []
@@ -728,44 +725,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
         </>
       )}
 
-      {/* Special rendering for generate_plan tool */}
-      {hasTools && toolInvocations?.some((tool: any) =>
-        tool.toolName === 'generate_plan' &&
-        (tool.state === 'result' || tool.state === 'call')
-      ) && (
-        <div className="mt-4">
-          {toolInvocations
-            ?.filter((tool: any) =>
-              tool.toolName === 'generate_plan' &&
-              (tool.state === 'result' || tool.state === 'call')
-            )
-            .map((tool: any) => {
-              const data = tool.state === 'result' ? tool.result : tool.args
-              return (
-                <PlanCard
-                  key={tool.toolCallId}
-                  title={data?.title || 'Plan'}
-                  description={data?.description || ''}
-                  steps={data?.steps || []}
-                  techStack={data?.techStack}
-                  estimatedFiles={data?.estimatedFiles}
-                  isStreaming={tool.state === 'call'}
-                  onBuild={() => {
-                    if (onBuildPlan) {
-                      onBuildPlan({
-                        title: data?.title || '',
-                        description: data?.description || '',
-                        steps: data?.steps || [],
-                        techStack: data?.techStack
-                      })
-                    }
-                  }}
-                  onRefine={onRefinePlan}
-                />
-              )
-            })}
-        </div>
-      )}
+      {/* generate_plan rendering is handled by chat-panel-v2.tsx to avoid duplication */}
 
       {/* Special rendering for request_supabase_connection tool */}
       {hasTools && toolInvocations?.some((tool: any) =>
