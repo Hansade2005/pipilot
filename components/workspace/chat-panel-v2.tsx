@@ -5869,12 +5869,12 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                                   }, 150)
                                 }}
                                 onRefine={() => {
-                                  setInput('Please refine the plan. ')
+                                  setInput('Please refine the plan.')
                                   setTimeout(() => {
-                                    if (textareaRef.current) {
-                                      textareaRef.current.focus()
+                                    if (sendButtonRef.current) {
+                                      sendButtonRef.current.click()
                                     }
-                                  }, 50)
+                                  }, 150)
                                 }}
                               />
                             )
