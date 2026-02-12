@@ -2960,9 +2960,6 @@ export default function TodoApp() {
                 </div>
               )}
 
-              {/* Spacer to push remaining controls right on desktop */}
-              {!isMobile && <div className="flex-1" />}
-
               {/* For Expo: No Visual Editor/Responsive. For others: show icons only */}
               {!isExpoProject && (
                 <>
@@ -2975,7 +2972,8 @@ export default function TodoApp() {
                 </>
               )}
 
-              {!isMobile && <div className="w-4" />}
+              {/* Spacer to push URL bar and play/stop controls right */}
+              {!isMobile && <div className="flex-1" />}
 
               <WebPreviewUrl
                 onRefresh={refreshPreview}
