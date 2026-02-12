@@ -46,6 +46,7 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import { sendTransactionalEmail } from "@/lib/email-client"
 import { formatDistanceToNow } from "date-fns"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface Organization {
   id: string
@@ -78,6 +79,7 @@ interface TeamWorkspace {
 }
 
 export default function TeamsPage() {
+  usePageTitle('Teams')
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null)
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])

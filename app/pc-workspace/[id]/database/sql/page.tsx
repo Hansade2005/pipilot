@@ -21,6 +21,7 @@ import { SQLEditor } from '@/components/database/sql-editor'
 import { AIQueryAssistant } from '@/components/database/ai-query-assistant'
 import { SQLResults } from '@/components/database/sql-results'
 import { useToast } from '@/hooks/use-toast'
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface SQLPanelProps {
   databaseId: string
@@ -35,7 +36,9 @@ interface QueryHistoryItem {
   success: boolean
 }
 
-export default function SQLPanel({ databaseId }: SQLPanelProps) {
+export default function SQLPanel({
+  databaseId }: SQLPanelProps) {
+  usePageTitle('SQL Editor')
   const [currentSQL, setCurrentSQL] = useState('')
   const [isExecuting, setIsExecuting] = useState(false)
   const [results, setResults] = useState<any[] | null>(null)

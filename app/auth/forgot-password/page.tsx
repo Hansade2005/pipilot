@@ -10,8 +10,10 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { Mail, ArrowLeft } from "lucide-react"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function ForgotPasswordPage() {
+  usePageTitle('Forgot Password')
   const [email, setEmail] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)

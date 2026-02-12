@@ -24,6 +24,7 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSearchParams, useRouter } from 'next/navigation'
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface Notification {
     id: string
@@ -435,6 +436,7 @@ function NotificationsPageContent() {
 }
 
 export default function NotificationsPage() {
+  usePageTitle('Notifications')
     return (
         <Suspense fallback={
             <div className="min-h-screen flex items-center justify-center">

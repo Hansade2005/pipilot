@@ -1,4 +1,10 @@
 import React from 'react';
+import type { Metadata } from 'next'
+
+
+export const metadata: Metadata = {
+  title: 'Test Site | PiPilot',
+}
 
 export default function TestSitePage() {
   const iframeSrc = '/testsite/index.html';

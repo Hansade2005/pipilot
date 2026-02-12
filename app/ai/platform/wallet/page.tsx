@@ -18,6 +18,7 @@ import { toast } from "sonner"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from "next/navigation"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface Team {
     id: string
@@ -51,6 +52,7 @@ interface TeamStats {
 }
 
 export default function WalletPage() {
+  usePageTitle('AI Platform Wallet')
     const supabase = createClient()
     const router = useRouter()
     const [currentTeam, setCurrentTeam] = useState<Team | null>(null)

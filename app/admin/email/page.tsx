@@ -39,6 +39,7 @@ import {
   type EmailTemplate
 } from "@/lib/email-templates"
 import { generateEmailContent, improveEmailContent } from "@/lib/ai-email-generator"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface UserData {
   id: string
@@ -55,6 +56,7 @@ const EMAIL_TYPES = [
 ]
 
 export default function AdminEmailPage() {
+  usePageTitle('Email Management')
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [users, setUsers] = useState<UserData[]>([])

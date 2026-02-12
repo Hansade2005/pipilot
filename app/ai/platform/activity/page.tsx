@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner"
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from "next/navigation"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface Team {
     id: string
@@ -34,6 +35,7 @@ interface TeamActivity {
 }
 
 export default function ActivityPage() {
+  usePageTitle('AI Platform Activity')
     const supabase = createClient()
     const router = useRouter()
     const [currentTeam, setCurrentTeam] = useState<Team | null>(null)

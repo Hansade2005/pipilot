@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { usePageTitle } from '@/hooks/use-page-title'
 
 type Mode = 'clone' | 'debug' | 'context'
 
 export default function TestVisionPage() {
+  usePageTitle('Vision Test')
   const [image, setImage] = useState<string | null>(null)
   const [prompt, setPrompt] = useState('')
   const [response, setResponse] = useState('')

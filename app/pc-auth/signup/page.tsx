@@ -12,8 +12,10 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { Github } from "lucide-react"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function SignupPage() {
+  usePageTitle('Sign Up')
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [fullName, setFullName] = useState("")

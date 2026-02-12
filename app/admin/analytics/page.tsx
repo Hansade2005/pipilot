@@ -31,8 +31,10 @@ import {
   Clock,
   Globe
 } from "lucide-react"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function AdminAnalyticsPage() {
+  usePageTitle('Analytics')
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<any>(null)

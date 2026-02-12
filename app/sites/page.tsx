@@ -1,5 +1,11 @@
 import React from 'react';
 import BuiltOnBadge from '@/components/built-on-badge'
+import type { Metadata } from 'next'
+
+
+export const metadata: Metadata = {
+  title: 'Sites | PiPilot',
+}
 
 export default function SitesPage() {
   // This page will be used to display hosted sites

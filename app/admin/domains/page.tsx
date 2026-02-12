@@ -35,6 +35,7 @@ import {
   Monitor,
   Tablet
 } from "lucide-react"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface SiteData {
   id: string
@@ -73,6 +74,7 @@ interface DomainStats {
 }
 
 export default function AdminDomainsPage() {
+  usePageTitle('Domain Management')
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [sites, setSites] = useState<SiteData[]>([])

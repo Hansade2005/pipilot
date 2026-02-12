@@ -14,6 +14,7 @@ import { getWorkspaceDatabaseId } from "@/lib/get-current-workspace";
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import type { Table } from "@/lib/supabase";
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface RecordData {
   id: number;
@@ -21,6 +22,7 @@ interface RecordData {
 }
 
 export default function TableRecordsPage() {
+  usePageTitle('Database Table')
   const params = useParams();
   const router = useRouter();
   const [table, setTable] = useState<Table | null>(null);

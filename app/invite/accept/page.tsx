@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast"
 import { CheckCircle, XCircle, Loader2, Users, ArrowRight } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { sendTransactionalEmail } from "@/lib/email-client"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface InvitationData {
   id: string
@@ -396,6 +397,7 @@ function AcceptInvitationContent() {
 }
 
 export default function AcceptInvitationPage() {
+  usePageTitle('Accept Invitation')
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center">

@@ -26,6 +26,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface UserWallet {
     id: string
@@ -77,6 +78,7 @@ interface CreditStats {
 }
 
 export default function AdminCreditsPage() {
+  usePageTitle('Credits Management')
     const [wallets, setWallets] = useState<UserWallet[]>([])
     const [loading, setLoading] = useState(true)
     const [stats, setStats] = useState<CreditStats>({ totalUsers: 0, totalCredits: 0, averageCredits: 0, activeWallets: 0 })

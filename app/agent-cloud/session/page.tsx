@@ -31,6 +31,7 @@ import {
 import { useAgentCloud, type TerminalLine } from "../layout"
 import { Response } from "@/components/ai-elements/response"
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 // SSE message types - includes SDK messages plus streaming-specific event types
 interface SSEMessage {
@@ -1712,6 +1713,7 @@ User Request: ${currentPrompt}`
 
 // Wrapper with Suspense for useSearchParams
 export default function SessionPage() {
+  usePageTitle('Agent Session')
   return (
     <Suspense fallback={
       <div className="flex-1 flex items-center justify-center">

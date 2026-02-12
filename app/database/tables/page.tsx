@@ -10,8 +10,10 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import type { TableWithCount, RecordData } from "@/components/workspace/database-tab/types"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function TablesPage() {
+  usePageTitle('Database Tables')
     const [database, setDatabase] = useState<any>(null)
     const [tables, setTables] = useState<TableWithCount[]>([])
     const [selectedTable, setSelectedTable] = useState<TableWithCount | null>(null)

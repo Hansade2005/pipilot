@@ -28,6 +28,7 @@ import {
 import Link from "next/link"
 
 export default function DatabaseProductPage() {
+  usePageTitle('Database')
 
   const features = [
     {
@@ -147,6 +148,7 @@ requests.post(
       language: "SDK (TypeScript)",
       code: `// Install: npm install pipilot-sdk
 import PiPilot, { TableRecord } from 'pipilot-sdk';
+import { usePageTitle } from '@/hooks/use-page-title'
 
 // Initialize with type safety
 const pipilot = new PiPilot('YOUR_API_KEY', 'YOUR_DB_ID');

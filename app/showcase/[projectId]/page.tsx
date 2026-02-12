@@ -32,8 +32,10 @@ import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function ProjectViewPage() {
+  usePageTitle('Project Showcase')
   const params = useParams()
   const router = useRouter()
   const projectId = params.projectId as string

@@ -26,6 +26,7 @@ import {
   Zap,
   AlertCircle,
 } from "lucide-react"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface MCPServer {
   id: string
@@ -48,6 +49,7 @@ interface Message {
 }
 
 export default function MCPTestPage() {
+  usePageTitle('MCP Test')
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)

@@ -68,6 +68,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface ProjectDisplay extends Project {
   url?: string
@@ -77,6 +78,7 @@ interface ProjectDisplay extends Project {
 }
 
 export default function ManagementPage() {
+  usePageTitle('Project Management')
   const { toast } = useToast()
   const router = useRouter()
   const [activeTab, setActiveTab] = useState("overview")

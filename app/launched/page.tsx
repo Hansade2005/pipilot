@@ -6,8 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Rocket, ExternalLink, Star, Eye, Heart, Calendar } from "lucide-react"
 import { Navigation } from "@/components/navigation"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function LaunchedPage() {
+  usePageTitle('Launched Apps')
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Enhanced Gradient Background */}
