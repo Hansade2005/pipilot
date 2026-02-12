@@ -238,6 +238,8 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
 
 // Interleaved Content Component - Renders text with inline tool pills at correct positions
 // positionKey specifies which position field to use: 'textPosition' or 'reasoningPosition'
+// Tool positions are snapped to natural text boundaries (sentence ends, newlines, word boundaries)
+// to prevent splitting words or sentences mid-way
 const InterleavedContent = ({
   content,
   toolCalls,
@@ -263,32 +265,92 @@ const InterleavedContent = ({
     return <>{children(content)}</>
   }
 
+  // Snap a character position to the nearest natural text boundary
+  // Priority: newline > sentence end (. ! ?) > word boundary (space)
+  // This prevents tool pills from splitting words or sentences
+  const snapToBreak = (pos: number): number => {
+    if (pos <= 0) return 0
+    if (pos >= content.length) return content.length
+
+    // Already at a boundary (newline or space)?
+    if (content[pos] === '\n' || content[pos] === ' ') return pos
+    if (pos > 0 && (content[pos - 1] === '\n')) return pos
+
+    // Search backward for a sentence end (. ! ? followed by space/newline) within 120 chars
+    for (let i = pos; i >= Math.max(0, pos - 120); i--) {
+      if ((content[i] === '.' || content[i] === '!' || content[i] === '?') &&
+          (i + 1 >= content.length || content[i + 1] === ' ' || content[i + 1] === '\n')) {
+        return i + 2 <= content.length ? i + 2 : i + 1 // After punctuation + space
+      }
+    }
+
+    // Search forward for a sentence end within 60 chars
+    for (let i = pos; i < Math.min(content.length, pos + 60); i++) {
+      if ((content[i] === '.' || content[i] === '!' || content[i] === '?') &&
+          (i + 1 >= content.length || content[i + 1] === ' ' || content[i + 1] === '\n')) {
+        return i + 2 <= content.length ? i + 2 : i + 1
+      }
+    }
+
+    // Fall back: snap to nearest word boundary (space) backward
+    for (let i = pos; i >= Math.max(0, pos - 40); i--) {
+      if (content[i] === ' ' || content[i] === '\n') return i + 1
+    }
+
+    // Fall back: snap to nearest word boundary forward
+    for (let i = pos; i < Math.min(content.length, pos + 40); i++) {
+      if (content[i] === ' ' || content[i] === '\n') return i + 1
+    }
+
+    return pos
+  }
+
   // Sort tool calls by position
   const sortedTools = [...toolsWithPositions].sort((a, b) => (getPosition(a) || 0) - (getPosition(b) || 0))
 
-  // Build segments: text chunks interleaved with tool pills
-  const segments: Array<{ type: 'text' | 'tool', content?: string, tool?: InlineToolCall }> = []
-  let lastPosition = 0
+  // Snap positions and group tools at the same or very close snapped position
+  const groupedTools: Array<{ position: number, tools: InlineToolCall[] }> = []
 
   for (const tool of sortedTools) {
-    const position = getPosition(tool) || 0
+    const rawPos = getPosition(tool) || 0
+    const snappedPos = snapToBreak(rawPos)
 
-    // Add text segment before this tool (if any)
-    if (position > lastPosition) {
-      const textSegment = content.slice(lastPosition, position)
-      if (textSegment) {
+    // Check if there's already a group at this position (within 10 chars)
+    const existingGroup = groupedTools.find(g => Math.abs(g.position - snappedPos) < 10)
+    if (existingGroup) {
+      existingGroup.tools.push(tool)
+    } else {
+      groupedTools.push({ position: snappedPos, tools: [tool] })
+    }
+  }
+
+  // Sort groups by position
+  groupedTools.sort((a, b) => a.position - b.position)
+
+  // Build segments: text chunks interleaved with tool pill groups
+  const segments: Array<{ type: 'text' | 'tools', content?: string, tools?: InlineToolCall[] }> = []
+  let lastPosition = 0
+
+  for (const group of groupedTools) {
+    // Add text segment before this group (skip if only whitespace)
+    if (group.position > lastPosition) {
+      const textSegment = content.slice(lastPosition, group.position)
+      if (textSegment.trim()) {
         segments.push({ type: 'text', content: textSegment })
       }
     }
 
-    // Add the tool pill
-    segments.push({ type: 'tool', tool })
-    lastPosition = position
+    // Add the tool group
+    segments.push({ type: 'tools', tools: group.tools })
+    lastPosition = group.position
   }
 
-  // Add remaining text after the last tool
+  // Add remaining text after the last tool group
   if (lastPosition < content.length) {
-    segments.push({ type: 'text', content: content.slice(lastPosition) })
+    const remaining = content.slice(lastPosition)
+    if (remaining.trim()) {
+      segments.push({ type: 'text', content: remaining })
+    }
   }
 
   return (
@@ -301,14 +363,17 @@ const InterleavedContent = ({
             </div>
           )
         }
-        if (segment.type === 'tool' && segment.tool) {
+        if (segment.type === 'tools' && segment.tools) {
           return (
-            <div key={`tool-${segment.tool.toolCallId}`} className="my-2">
-              <InlineToolPill
-                toolName={segment.tool.toolName}
-                input={segment.tool.input}
-                status={segment.tool.status}
-              />
+            <div key={`tools-${index}`} className="flex flex-wrap gap-1.5 my-1.5">
+              {segment.tools.map(tool => (
+                <InlineToolPill
+                  key={tool.toolCallId}
+                  toolName={tool.toolName}
+                  input={tool.input}
+                  status={tool.status}
+                />
+              ))}
             </div>
           )
         }
