@@ -2088,195 +2088,164 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
         </div>
 
         {/* Input Area */}
-        <div className="input-area p-5 absolute bottom-0 left-0 right-0 z-10" style={{
-          background: 'linear-gradient(180deg, rgba(17, 24, 39, 0.95), rgba(10, 14, 20, 0.98))',
-          backdropFilter: 'blur(20px)',
-          borderTop: '1px solid rgba(234, 88, 12, 0.2)',
-          boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.6)'
-        }}>
+        <div className="p-3 absolute bottom-0 left-0 right-0 z-10 bg-gray-950/95 backdrop-blur-sm border-t border-gray-800/60">
           {/* Attachment Badges */}
           {attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-3 p-2 bg-gray-800/50 rounded-xl border border-gray-700/50">
+            <div className="flex flex-wrap gap-1.5 mb-2 px-1">
               {attachments.map((attachment) => (
                 <div
                   key={attachment.id}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-gray-700/50 rounded-lg text-sm border border-gray-600/50"
+                  className="flex items-center gap-1.5 bg-gray-800 px-2 py-1 rounded-lg text-xs text-gray-300 group"
                 >
-                  {attachment.type === 'file' && <FileText className="w-3.5 h-3.5 text-orange-400" />}
-                  {attachment.type === 'image' && <ImageIcon className="w-3.5 h-3.5 text-green-400" />}
-                  {attachment.type === 'url' && <LinkIcon className="w-3.5 h-3.5 text-purple-400" />}
-                  <span className="text-gray-300 truncate max-w-[150px]">
+                  {attachment.type === 'file' && <FileText className="w-3 h-3 text-gray-500" />}
+                  {attachment.type === 'image' && <ImageIcon className="w-3 h-3 text-gray-500" />}
+                  {attachment.type === 'url' && <LinkIcon className="w-3 h-3 text-gray-500" />}
+                  <span className="truncate max-w-[120px]">
                     {attachment.name}
                   </span>
                   {attachment.size && (
-                    <span className="text-gray-500 text-xs">
+                    <span className="text-gray-500 text-[10px]">
                       ({(attachment.size / 1024).toFixed(1)}KB)
                     </span>
                   )}
                   <button
                     onClick={() => removeAttachment(attachment.id)}
-                    className="ml-1 text-gray-400 hover:text-red-400 transition-colors"
+                    className="opacity-0 group-hover:opacity-100 hover:text-red-400 text-gray-500 transition-all"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="w-3 h-3" />
                   </button>
                 </div>
               ))}
             </div>
           )}
 
-          <div className="input-wrapper flex items-end gap-3 relative">
-            <div className="input-container flex-1 relative overflow-hidden rounded-2xl flex flex-col min-w-0" style={{
-              background: 'rgba(17, 24, 39, 0.8)',
-              border: '2px solid rgba(234, 88, 12, 0.3)',
-              boxShadow: '0 4px 24px rgba(0, 0, 0, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.05)',
-              transition: 'all 0.3s ease'
-            }}>
-              <div className="textarea-wrapper flex-1 min-w-0 overflow-hidden">
-                <Textarea
-                  ref={textareaRef}
-                  value={currentInput}
-                  onChange={(e) => setCurrentInput(e.target.value)}
-                  placeholder="Describe what you want to build..."
-                  className="w-full bg-transparent border-none text-gray-200 placeholder-gray-500 resize-none outline-none p-3 leading-relaxed"
-                  style={{
-                    maxHeight: '200px',
-                    minHeight: '44px',
-                    whiteSpace: 'pre-wrap',
-                    wordWrap: 'break-word',
-                    overflowWrap: 'break-word'
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey && !isLoading) {
-                      e.preventDefault()
-                      sendMessage(currentInput)
-                    }
-                  }}
-                />
-              </div>
-              <div className="input-actions flex items-center justify-between p-2 border-t border-gray-700/50">
-                <div className="flex items-center gap-2">
-                  <Popover open={showAttachmentMenu} onOpenChange={setShowAttachmentMenu}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-gray-400 hover:text-white hover:bg-gray-700/50"
-                        disabled={isLoading}
+          {/* Input Card - matching chat-panel-v2 style */}
+          <div className="relative rounded-2xl border border-gray-700/60 bg-gray-900/80 focus-within:border-gray-600 transition-colors">
+            <Textarea
+              ref={textareaRef}
+              value={currentInput}
+              onChange={(e) => setCurrentInput(e.target.value)}
+              placeholder="Describe what you want to build..."
+              className="min-h-[44px] max-h-[140px] resize-none border-0 bg-transparent text-sm text-gray-100 placeholder:text-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0 px-3.5 pt-3 pb-2"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && !isLoading) {
+                  e.preventDefault()
+                  sendMessage(currentInput)
+                }
+              }}
+            />
+
+            {/* Bottom action bar */}
+            <div className="flex items-center justify-between px-3 pb-2.5">
+              <div className="flex items-center gap-1">
+                <Popover open={showAttachmentMenu} onOpenChange={setShowAttachmentMenu}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
+                      disabled={isLoading}
+                    >
+                      <Plus className="size-4" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-52 p-2 z-[70] bg-gray-900 border-gray-700" side="top" align="start">
+                    <div className="flex flex-col gap-1">
+                      <div className="px-2 py-1 text-xs font-semibold text-gray-400 uppercase">Attach to message</div>
+
+                      <button
+                        onClick={() => {
+                          setShowFileDialog(true)
+                          setShowAttachmentMenu(false)
+                        }}
+                        className="w-full justify-start text-sm px-2 py-2 text-gray-300 hover:bg-gray-700/50 rounded transition-colors flex items-center gap-2"
                       >
-                        <Plus className="size-4" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-52 p-2 z-[70] bg-gray-900 border-gray-700" side="top" align="start">
-                      <div className="flex flex-col gap-1">
-                        <div className="px-2 py-1 text-xs font-semibold text-gray-400 uppercase">Attach to message</div>
+                        <FileText className="size-4 text-gray-500" /> Upload File
+                      </button>
 
-                        <button
-                          onClick={() => {
-                            setShowFileDialog(true)
-                            setShowAttachmentMenu(false)
-                          }}
-                          className="w-full justify-start text-sm px-2 py-2 text-gray-300 hover:bg-gray-700/50 rounded transition-colors flex items-center gap-2"
-                        >
-                          <FileText className="size-4 text-orange-400" /> Upload File
-                        </button>
+                      <button
+                        onClick={() => {
+                          setShowImageDialog(true)
+                          setShowAttachmentMenu(false)
+                        }}
+                        className="w-full justify-start text-sm px-2 py-2 text-gray-300 hover:bg-gray-700/50 rounded transition-colors flex items-center gap-2"
+                      >
+                        <ImageIcon className="size-4 text-gray-500" /> Upload Image
+                      </button>
 
-                        <button
-                          onClick={() => {
-                            setShowImageDialog(true)
-                            setShowAttachmentMenu(false)
-                          }}
-                          className="w-full justify-start text-sm px-2 py-2 text-gray-300 hover:bg-gray-700/50 rounded transition-colors flex items-center gap-2"
-                        >
-                          <ImageIcon className="size-4 text-green-400" /> Upload Image
-                        </button>
+                      <button
+                        onClick={() => {
+                          setShowUrlDialog(true)
+                          setShowAttachmentMenu(false)
+                        }}
+                        className="w-full justify-start text-sm px-2 py-2 text-gray-300 hover:bg-gray-700/50 rounded transition-colors flex items-center gap-2"
+                      >
+                        <LinkIcon className="size-4 text-gray-500" /> Attach URL
+                      </button>
 
-                        <button
-                          onClick={() => {
-                            setShowUrlDialog(true)
-                            setShowAttachmentMenu(false)
-                          }}
-                          className="w-full justify-start text-sm px-2 py-2 text-gray-300 hover:bg-gray-700/50 rounded transition-colors flex items-center gap-2"
-                        >
-                          <LinkIcon className="size-4 text-purple-400" /> Attach URL
-                        </button>
+                      <div className="border-t border-gray-700/50 my-1"></div>
 
-                        <div className="border-t border-gray-700/50 my-1"></div>
+                      <button
+                        onClick={() => {
+                          setCurrentInput(prev => prev + '\n\n```\n// Code snippet\n```')
+                          setShowAttachmentMenu(false)
+                        }}
+                        className="w-full justify-start text-sm px-2 py-2 text-gray-300 hover:bg-gray-700/50 rounded transition-colors flex items-center gap-2"
+                      >
+                        <Code className="size-4 text-gray-500" /> Code Block
+                      </button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
 
-                        <button
-                          onClick={() => {
-                            setCurrentInput(prev => prev + '\n\n```\n// Code snippet\n```')
-                            setShowAttachmentMenu(false)
-                          }}
-                          className="w-full justify-start text-sm px-2 py-2 text-gray-300 hover:bg-gray-700/50 rounded transition-colors flex items-center gap-2"
-                        >
-                          <Code className="size-4 text-yellow-400" /> Code Block
-                        </button>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
+                {attachments.length > 0 && (
+                  <span className="text-[11px] text-gray-500">{attachments.length} file{attachments.length > 1 ? 's' : ''}</span>
+                )}
+              </div>
 
-                <div className="flex items-center gap-2">
-                  {attachments.length > 0 && (
-                    <span className="text-xs text-gray-500">{attachments.length} attachment{attachments.length > 1 ? 's' : ''}</span>
-                  )}
-                </div>
+              <div className="flex items-center gap-1.5">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={handleClearMessages}
+                        className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-red-400 hover:bg-gray-800 transition-colors"
+                        disabled={isLoading || messages.length === 0}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="bg-gray-800 border-gray-700 text-gray-300 text-xs">
+                      <p>Clear chat</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+
+                {/* Send / Stop Button */}
+                {isStreaming ? (
+                  <button
+                    type="button"
+                    onClick={handleStopStream}
+                    className="h-7 w-7 rounded-lg bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors"
+                    title="Stop generating"
+                  >
+                    <Square className="w-3.5 h-3.5 text-white fill-white" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => sendMessage(currentInput)}
+                    disabled={(!currentInput.trim() && attachments.length === 0) || isLoading}
+                    className="h-7 w-7 rounded-lg bg-orange-600 hover:bg-orange-500 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    ) : (
+                      <ArrowUp className="size-4 text-white" />
+                    )}
+                  </button>
+                )}
               </div>
             </div>
-
-            {/* Send / Stop Button */}
-            {isStreaming ? (
-              <button
-                onClick={handleStopStream}
-                className="send-button w-9 h-9 flex items-center justify-center border-none rounded-full text-white cursor-pointer transition-all flex-shrink-0"
-                style={{
-                  background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-                  boxShadow: '0 2px 12px rgba(239, 68, 68, 0.4)'
-                }}
-                title="Stop generating"
-              >
-                <StopCircle className="w-5 h-5" />
-              </button>
-            ) : (
-              <button
-                  onClick={() => sendMessage(currentInput)}
-                  disabled={(!currentInput.trim() && attachments.length === 0) || isLoading}
-                  className="send-button w-9 h-9 flex items-center justify-center border-none rounded-full text-white cursor-pointer transition-all flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{
-                    background: 'linear-gradient(135deg, #ea580c, #c2410c)',
-                    boxShadow: '0 2px 12px rgba(234, 88, 12, 0.4)'
-                  }}
-              >
-                {isLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Send className="w-5 h-5" />
-                )}
-              </button>
-            )}
-          </div>
-          <div className="input-hint text-xs text-gray-400 p-2 pt-3 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              Press <kbd className="px-2 py-1 bg-gray-800 rounded text-xs border border-gray-700">Enter</kbd> to send, <kbd className="px-2 py-1 bg-gray-800 rounded text-xs border border-gray-700">Shift + Enter</kbd> for new line
-            </div>
-
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={handleClearMessages}
-                    className="text-gray-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-gray-800/50 transition-colors"
-                    disabled={isLoading || messages.length === 0}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="bg-red-900 border-red-800 text-white">
-                  <p>Clear chat history</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
           </div>
         </div>
       </div>
