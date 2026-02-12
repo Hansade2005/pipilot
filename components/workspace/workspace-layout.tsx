@@ -436,6 +436,12 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     const handleAiStreamComplete = (event: CustomEvent) => {
       const { shouldSwitchToPreview, shouldCreatePreview } = event.detail
 
+      // Stream is complete — clear streaming state immediately so the preview panel
+      // doesn't keep showing <AIRespondingView/>. Without this, on mobile there's a
+      // timing gap: mobileTab switches to 'preview' here, but isAIStreaming only
+      // becomes false later (after setIsLoading(false) → useEffect → ai-streaming-state).
+      setIsAIStreaming(false)
+
       if (shouldSwitchToPreview) {
         setActiveTab('preview')
         if (isMobile) {
