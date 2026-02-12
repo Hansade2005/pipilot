@@ -455,18 +455,13 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       }
     }
 
-    // Auto-switch to preview tab when AI starts streaming so the user
-    // sees the AI responding view (rocket + witty messages) immediately.
-    // Skip if a live preview is already loaded to avoid hiding it.
+    // Track AI streaming state without auto-switching tabs.
+    // Let the user watch the chat stream uninterrupted.
+    // The switch to preview happens only when streaming completes
+    // (via handleAiStreamComplete) so the user sees the result.
     const handleAiStreamingState = (event: CustomEvent) => {
       const { isStreaming } = event.detail
       setIsAIStreaming(isStreaming)
-      if (isStreaming && !codePreviewRef.current?.preview?.url) {
-        setActiveTab('preview')
-        if (isMobile) {
-          setMobileTab('preview')
-        }
-      }
     }
 
     // Handle opening file from search results or other sources
@@ -1113,8 +1108,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             {/* Main Workspace */}
             {!isLoadingProjects && clientProjects.length > 0 && selectedProject && (
               <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
-                {/* Left Panel - Chat (Resizable) */}
-                <ResizablePanel defaultSize={40} minSize={20} maxSize={40}>
+                {/* Left Panel - Chat (Resizable) - Chat comes first */}
+                <ResizablePanel defaultSize={50} minSize={25} maxSize={65}>
                   <div className="h-full flex flex-col overflow-hidden border-r border-gray-800/60">
                     <ChatPanelV2
                       key={`chat-${selectedProject.id}-${chatSessionKey}`}
@@ -1134,7 +1129,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 <ResizableHandle withHandle />
 
                 {/* Right Panel - VS Code Layout */}
-                <ResizablePanel defaultSize={60} minSize={30}>
+                <ResizablePanel defaultSize={50} minSize={25}>
                   <div className="h-full flex flex-col overflow-hidden">
                     {/* Content Area */}
                     {activeTab === "code" ? (
