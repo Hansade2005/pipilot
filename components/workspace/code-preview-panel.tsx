@@ -1116,8 +1116,7 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
 
       // Handle legacy console messages
       if (event.data?.type === 'console') {
-        addConsoleLog(event.data.message, 'browser')
-        // Also add to browserLogs for the Browser tab (legacy format)
+        // Only add to browserLogs for the Browser tab (legacy format)
         const level = event.data.level || 'log'
         setBrowserLogs(prev => [...prev, JSON.stringify({
           method: level,
@@ -1130,40 +1129,6 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
       // Handle BROWSER_CONSOLE_LOG from console bridge (both formats)
       if (event.data?.type === 'BROWSER_CONSOLE_LOG' && event.data?.payload) {
         const { method, data, timestamp, id } = event.data.payload
-
-        // Helper to format a single arg (handles both wrapped and direct formats)
-        const formatArg = (arg: any): string => {
-          // Handle wrapped format: { type: 'string', value: ... }
-          if (arg && typeof arg === 'object' && 'type' in arg && 'value' in arg) {
-            if (arg.type === 'string') return String(arg.value)
-            if (arg.type === 'error') return `${arg.value?.name || 'Error'}: ${arg.value?.message || 'Unknown'}`
-            if (arg.type === 'object' || arg.type === 'array') {
-              try { return JSON.stringify(arg.value) } catch { return '[Object]' }
-            }
-            return String(arg.value ?? '')
-          }
-
-          // Handle direct format from console bridge
-          if (arg && typeof arg === 'object' && arg.__isError) {
-            // Error object from console bridge
-            return `${arg.name || 'Error'}: ${arg.message || 'Unknown error'}${arg.stack ? '\n' + arg.stack : ''}`
-          }
-
-          // Handle plain objects and arrays
-          if (arg && typeof arg === 'object') {
-            try { return JSON.stringify(arg, null, 2) } catch { return '[Object]' }
-          }
-
-          // Handle primitives
-          return String(arg ?? '')
-        }
-
-        // Extract a simple message for the unified console log
-        const simpleMessage = Array.isArray(data)
-          ? data.map(formatArg).join(' ')
-          : formatArg(data)
-
-        addConsoleLog(simpleMessage, 'browser')
 
         // Add to browserLogs for the Browser tab (console-feed format)
         // Normalize the data to console-feed format
