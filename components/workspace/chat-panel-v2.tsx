@@ -1114,6 +1114,7 @@ interface ChatPanelV2Props {
   onModeChange?: (mode: string) => void
   onClearChat?: () => void
   initialPrompt?: string
+  initialChatMode?: 'plan' | 'agent'
   taggedComponent?: TaggedComponent | null
   onClearTaggedComponent?: () => void
 }
@@ -1129,6 +1130,7 @@ export function ChatPanelV2({
   onModeChange,
   onClearChat,
   initialPrompt,
+  initialChatMode,
   taggedComponent,
   onClearTaggedComponent
 }: ChatPanelV2Props) {
@@ -1396,7 +1398,7 @@ export function ChatPanelV2({
   }, [isLoading])
 
   // Chat mode state - true for Plan mode, false for Agent mode (defaults to Plan)
-  const [isAskMode, setIsAskMode] = useState(true)
+  const [isAskMode, setIsAskMode] = useState(initialChatMode ? initialChatMode === 'plan' : true)
 
   // Prompt Queue - queue messages when AI is busy, persist to localStorage
   const [promptQueue, setPromptQueue] = useState<Array<{ id: string; text: string; timestamp: number }>>(() => {

@@ -11,8 +11,10 @@ import {
   Gitlab,
   RefreshCw,
   ChevronDown,
-  Check
+  Check,
+  Layers
 } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
@@ -149,6 +151,9 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   const [showGitlabPopover, setShowGitlabPopover] = useState(false)
   const [gitlabInput, setGitlabInput] = useState("")
   const [isImportingGitlab, setIsImportingGitlab] = useState(false)
+
+  // Plan mode state - true for Plan mode (default), false for Agent mode
+  const [isPlanMode, setIsPlanMode] = useState(true)
 
   // Fetch user on mount
   useEffect(() => {
@@ -1025,7 +1030,10 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         // This ensures the complete prompt is sent to the chat panel
         if (typeof window !== 'undefined') {
           sessionStorage.setItem(`initial-prompt-${workspace.id}`, fullPrompt)
-          
+
+          // Store plan mode preference so workspace chat panel picks it up
+          sessionStorage.setItem(`initial-chat-mode-${workspace.id}`, isPlanMode ? 'plan' : 'agent')
+
           // CRITICAL FIX: Clear any cached project/file state to prevent contamination
           // This ensures the workspace loads with a clean slate
           sessionStorage.removeItem('lastSelectedProject')
@@ -1312,8 +1320,9 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                 </div>
               </div>
 
-              {/* Right Side - Enhance and Send Buttons */}
+              {/* Right Side - Enhance, Plan Toggle, and Send Buttons */}
               <div className="flex items-center gap-2">
+                {/* Prompt Enhancement */}
                 <button
                   type="button"
                   onClick={handlePromptEnhancement}
@@ -1331,6 +1340,27 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                     <Sparkles className="w-4 h-4" />
                   )}
                 </button>
+
+                {/* Plan Mode Toggle */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => setIsPlanMode(!isPlanMode)}
+                      disabled={isGenerating}
+                      className={`text-sm font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+                        isPlanMode
+                          ? 'text-orange-400'
+                          : 'text-gray-400 hover:text-gray-200'
+                      }`}
+                    >
+                      Plan
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{isPlanMode ? 'Plan mode ON - AI creates a plan before building' : 'Plan mode OFF - AI builds immediately'}</p>
+                  </TooltipContent>
+                </Tooltip>
 
                 {/* Send/Stop Button */}
                 {isGenerating ? (
