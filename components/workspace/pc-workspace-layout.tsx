@@ -424,13 +424,10 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       console.log('[WorkspaceLayout] AI stream complete event received:', { shouldSwitchToPreview, shouldCreatePreview })
 
       if (shouldSwitchToPreview) {
-        // Switch to preview tab
         setActiveTab('preview')
-        // Also switch mobile tab to preview on mobile devices
         if (isMobile) {
           setMobileTab('preview')
         }
-        console.log('[WorkspaceLayout] Switched to preview tab after AI streaming', { isMobile })
       }
 
       if (shouldCreatePreview) {
