@@ -536,11 +536,6 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
 
   // Load conversations list on mount
   useEffect(() => {
-    loadConversationsList()
-  }, [userId])
-
-  // Load conversations list on mount
-  useEffect(() => {
     if (userId) {
       loadConversationsList()
     }
@@ -1379,6 +1374,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
         setConversationId(newConversation.id)
         console.log('[RepoAgent] Created new conversation:', newConversation.id)
       }
+      // Refresh conversation list so history dropdown stays up to date
+      await loadConversationsList()
     } catch (error) {
       console.error('[RepoAgent] Error saving conversation:', error)
     }

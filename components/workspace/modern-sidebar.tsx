@@ -198,11 +198,11 @@ export function ModernSidebar({
                 <AccordionTrigger className="py-2 px-2 hover:no-underline hover:bg-gray-800 rounded-md transition-colors">
                   <div className="flex items-center justify-between w-full">
                     <div className="flex items-center gap-2">
-                      <Coins className="h-4 w-4 text-green-400" />
+                      <Coins className="h-4 w-4 text-orange-400" />
                       <span className="text-sm text-gray-400">Credits</span>
                     </div>
                     {!loadingCredits && creditBalance !== null && (
-                      <span className="text-xs font-bold text-green-400 mr-2">
+                      <span className="text-xs font-bold text-orange-400 mr-2">
                         {creditBalance.toFixed(2)}
                       </span>
                     )}
@@ -214,12 +214,12 @@ export function ModernSidebar({
                       <>
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-gray-400">~{estimatedMessages} messages</span>
-                          <span className="text-green-400 capitalize">{currentPlan}</span>
+                          <span className="text-orange-400 capitalize">{currentPlan}</span>
                         </div>
                         
                         <div className="flex items-center gap-2">
                           {creditBalance > 10 ? (
-                            <div className="flex items-center gap-1 text-green-400">
+                            <div className="flex items-center gap-1 text-orange-400">
                               <TrendingUp className="h-3 w-3" />
                               <span className="text-xs">Good balance</span>
                             </div>
@@ -238,7 +238,7 @@ export function ModernSidebar({
 
                         <Button
                           size="sm"
-                          className="w-full h-8 text-xs bg-green-600 hover:bg-green-700"
+                          className="w-full h-8 text-xs bg-orange-600 hover:bg-orange-500"
                           onClick={() => handleNavigation('/pricing')}
                         >
                           <CreditCard className="h-3 w-3 mr-1" />
@@ -389,7 +389,7 @@ export function ModernSidebar({
             <button 
               className={`flex items-center w-full h-10 px-2 ${shouldExpand ? 'justify-start' : 'justify-center'} hover:bg-gray-800 rounded-md transition-colors`}
             >
-              <div className="w-8 h-8 bg-pink-600 rounded-full flex items-center justify-center flex-shrink-0">
+              <div className="w-8 h-8 bg-orange-600 rounded-full flex items-center justify-center flex-shrink-0">
                 <span className="text-white text-xs font-bold">
                   {user.email?.charAt(0).toUpperCase() || 'A'}
                 </span>

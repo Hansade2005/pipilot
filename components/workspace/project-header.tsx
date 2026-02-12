@@ -387,47 +387,49 @@ export function ProjectHeader({
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-          <DialogContent className="z-50">
+          <DialogContent className="z-50 bg-gray-900 border-gray-800 text-white">
             <DialogHeader>
-              <DialogTitle>Create New Project</DialogTitle>
-              <DialogDescription>Start building your next app with AI assistance.</DialogDescription>
+              <DialogTitle className="text-white">Create New Project</DialogTitle>
+              <DialogDescription className="text-gray-400">Start building your next app with AI assistance.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="name">Project Name</Label>
+                <Label htmlFor="name" className="text-gray-300">Project Name</Label>
                 <Input
                   id="name"
                   placeholder="My Awesome App"
                   value={newProjectName}
                   onChange={(e) => setNewProjectName(e.target.value)}
+                  className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500"
                 />
               </div>
               <div>
-                <Label htmlFor="description">Description (Optional)</Label>
+                <Label htmlFor="description" className="text-gray-300">Description (Optional)</Label>
                 <Textarea
                   id="description"
                   placeholder="Describe what your app will do..."
                   value={newProjectDescription}
                   onChange={(e) => setNewProjectDescription(e.target.value)}
+                  className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500"
                 />
               </div>
               <div>
-                <Label htmlFor="template">Template</Label>
+                <Label htmlFor="template" className="text-gray-300">Template</Label>
                 <Select value={selectedTemplate} onValueChange={(value: 'vite-react' | 'nextjs' | 'expo' | 'html') => setSelectedTemplate(value)}>
-                  <SelectTrigger id="template">
+                  <SelectTrigger id="template" className="bg-gray-800 border-gray-700 text-white">
                     <SelectValue placeholder="Select a template..." />
                   </SelectTrigger>
-                  <SelectContent className="z-[110]">
-                    <SelectItem value="vite-react">Vite</SelectItem>
-                    <SelectItem value="nextjs">Next.js</SelectItem>
-                    <SelectItem value="expo">Expo (Mobile)</SelectItem>
-                    <SelectItem value="html">HTML</SelectItem>
+                  <SelectContent className="z-[110] bg-gray-800 border-gray-700">
+                    <SelectItem value="vite-react" className="text-gray-200 hover:bg-gray-700">Vite</SelectItem>
+                    <SelectItem value="nextjs" className="text-gray-200 hover:bg-gray-700">Next.js</SelectItem>
+                    <SelectItem value="expo" className="text-gray-200 hover:bg-gray-700">Expo (Mobile)</SelectItem>
+                    <SelectItem value="html" className="text-gray-200 hover:bg-gray-700">HTML</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
             <DialogFooter>
-              <Button onClick={handleCreateProject} disabled={!newProjectName.trim() || isCreating}>
+              <Button onClick={handleCreateProject} disabled={!newProjectName.trim() || isCreating} className="bg-orange-600 hover:bg-orange-500 text-white">
                 {isCreating ? "Creating..." : "Create Project"}
               </Button>
             </DialogFooter>

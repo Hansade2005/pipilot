@@ -254,7 +254,7 @@ function InlineChat({
           <Button 
             size="sm" 
             onClick={handleApplyFix} 
-            className="h-6 px-2 text-xs bg-blue-600 hover:bg-blue-700 text-white border-0 rounded"
+            className="h-6 px-2 text-xs bg-orange-600 hover:bg-orange-500 text-white border-0 rounded"
           >
             Accept
           </Button>
@@ -317,7 +317,7 @@ function InlineChat({
               size="sm" 
               onClick={handleSubmit}
               disabled={!input.trim() || isLoading}
-              className="h-5 px-2 text-[10px] bg-blue-600 hover:bg-blue-700 text-white border-0 rounded"
+              className="h-5 px-2 text-[10px] bg-orange-600 hover:bg-orange-500 text-white border-0 rounded"
             >
               Send
             </Button>
@@ -993,27 +993,27 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
       <style dangerouslySetInnerHTML={{
         __html: `
           .inline-streaming-area {
-            background-color: rgba(59, 130, 246, 0.1) !important;
-            border-left: 3px solid #3b82f6 !important;
+            background-color: rgba(249, 115, 22, 0.1) !important;
+            border-left: 3px solid #f97316 !important;
           }
-          
+
           .inline-streaming-line-decoration {
-            background: linear-gradient(90deg, 
-              rgba(59, 130, 246, 0.2) 0%, 
-              rgba(59, 130, 246, 0.1) 50%, 
+            background: linear-gradient(90deg,
+              rgba(249, 115, 22, 0.2) 0%,
+              rgba(249, 115, 22, 0.1) 50%,
               transparent 100%
             ) !important;
           }
-          
+
           .inline-streaming-cursor {
             position: relative !important;
           }
-          
+
           .inline-streaming-cursor-line {
-            background: linear-gradient(90deg, 
-              #3b82f6 0%, 
-              #60a5fa 50%, 
-              #93c5fd 100%
+            background: linear-gradient(90deg,
+              #f97316 0%,
+              #fb923c 50%,
+              #fdba74 100%
             ) !important;
             animation: streaming-pulse 1.5s ease-in-out infinite !important;
             border-radius: 2px !important;
@@ -1038,7 +1038,7 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
             top: 0;
             bottom: 0;
             width: 2px;
-            background: #3b82f6;
+            background: #f97316;
             animation: streaming-cursor 1s ease-in-out infinite;
             z-index: 10;
           }
@@ -1058,7 +1058,7 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
         <div className="flex items-center space-x-2">
           <FileText className="h-4 w-4 text-gray-500" />
           <span className="text-sm font-medium text-gray-200">{file.name}</span>
-          {hasChanges && <div className="w-2 h-2 bg-blue-500 rounded-full" />}
+          {hasChanges && <div className="w-2 h-2 bg-orange-500 rounded-full" />}
         </div>
         <div className="flex items-center space-x-2">
           <Button 
@@ -1086,9 +1086,9 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
             <Sparkles className="h-4 w-4" />
           </Button>
           {isInlineStreaming && (
-            <div className="flex items-center space-x-2 px-2 py-1 bg-blue-100 dark:bg-blue-900 rounded-md">
-              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-              <span className="text-xs text-blue-700 dark:text-blue-300">
+            <div className="flex items-center space-x-2 px-2 py-1 bg-orange-500/10 rounded-md">
+              <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+              <span className="text-xs text-orange-400">
                 AI Streaming
                 {streamingEditMode === 'search_replace' && ' (Targeted Edit)'}
                 {streamingEditMode === 'full_file' && ' (Full File)'}
