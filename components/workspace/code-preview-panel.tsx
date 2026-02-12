@@ -2925,54 +2925,14 @@ export default function TodoApp() {
             }}
           >
             <WebPreviewNavigation className="fixed top-0 left-0 right-0 z-50 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800/60">
-              {/* Chat Session Selector */}
-              {project && userId && onSessionChange && (
-                <div className="flex items-center gap-1 ml-2">
-                  <ChatSessionSelector
-                    workspaceId={project.id}
-                    userId={userId}
-                    currentSessionId={currentSessionId || null}
-                    onSessionChange={onSessionChange}
-                    onNewSession={onNewSession}
-                    compact={true}
-                  />
-                </div>
-              )}
-
               <div className="flex-1" />
-
-              {/* Tab switching buttons */}
-              <WebPreviewNavigationButton
-                onClick={() => onTabChange("code")}
-                tooltip="Switch to Code View"
-              >
-                <Code className="h-4 w-4" />
-              </WebPreviewNavigationButton>
-              <WebPreviewNavigationButton
-                onClick={() => onTabChange("preview")}
-                disabled={true}
-                tooltip="Current: Preview View"
-              >
-                <Eye className="h-4 w-4" />
-              </WebPreviewNavigationButton>
-              <WebPreviewNavigationButton
-                onClick={() => onTabChange("database")}
-                tooltip="Switch to Database View"
-              >
-                <Database className="h-4 w-4" />
-              </WebPreviewNavigationButton>
-
-              <div className="w-4" />
 
               {/* For Expo: No Visual Editor/Responsive. For others: show icons only */}
               {!isExpoProject && (
-                <>
-                  <VisualEditorToggle
-                    isEnabled={isVisualEditorEnabled}
-                    onToggle={setIsVisualEditorEnabled}
-                  />
-                  <WebPreviewDeviceSelector />
-                </>
+                <VisualEditorToggle
+                  isEnabled={isVisualEditorEnabled}
+                  onToggle={setIsVisualEditorEnabled}
+                />
               )}
 
               <div className="w-4" />
@@ -3004,28 +2964,6 @@ export default function TodoApp() {
                 </WebPreviewNavigationButton>
               )}
 
-              {/* Sandpack Research Preview - Vite projects only */}
-              {isViteProject && !isExpoProject && (
-                <>
-                  <div className="w-px h-5 bg-border mx-1" />
-                  {showSandpackPreview ? (
-                    <WebPreviewNavigationButton
-                      onClick={closeSandpackPreview}
-                      tooltip="Close Sandpack Preview"
-                    >
-                      <XIcon className="h-4 w-4 text-orange-500" />
-                    </WebPreviewNavigationButton>
-                  ) : (
-                    <WebPreviewNavigationButton
-                      onClick={openSandpackPreview}
-                      disabled={!project || sandpackLoading}
-                      tooltip="Try Sandpack Preview (Research)"
-                    >
-                      <FlaskConical className={`h-4 w-4 ${sandpackLoading ? 'animate-pulse text-orange-400' : 'text-orange-500'}`} />
-                    </WebPreviewNavigationButton>
-                  )}
-                </>
-              )}
             </WebPreviewNavigation>
 
             <div className={isExpoProject ? "flex-1 min-h-0 pt-16 relative" : "flex-1 min-h-0 relative"}>
