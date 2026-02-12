@@ -5511,6 +5511,42 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
     }
   }
 
+  // Combined handler: routes images to handleImageUpload, other files to handleFileUpload
+  const handleCombinedUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+
+    const imageFiles: File[] = []
+    const otherFiles: File[] = []
+
+    for (const file of Array.from(files)) {
+      if (file.type.startsWith('image/')) {
+        imageFiles.push(file)
+      } else {
+        otherFiles.push(file)
+      }
+    }
+
+    // Route images through the image pipeline (base64 + AI description)
+    if (imageFiles.length > 0) {
+      const dt = new DataTransfer()
+      imageFiles.forEach(f => dt.items.add(f))
+      const syntheticEvent = { target: { files: dt.files } } as React.ChangeEvent<HTMLInputElement>
+      await handleImageUpload(syntheticEvent)
+    }
+
+    // Route non-image files through the file pipeline (text content)
+    if (otherFiles.length > 0) {
+      const dt = new DataTransfer()
+      otherFiles.forEach(f => dt.items.add(f))
+      const syntheticEvent = { target: { files: dt.files } } as React.ChangeEvent<HTMLInputElement>
+      await handleFileUpload(syntheticEvent)
+    }
+
+    // Reset the input so the same file can be re-selected
+    e.target.value = ''
+  }
+
   const handleUrlAttachment = async () => {
     if (!urlInput.trim()) return
 
@@ -6174,7 +6210,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
 
           {/* Hidden file inputs */}
           <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" id="image-upload" />
-          <input type="file" multiple onChange={handleFileUpload} className="hidden" id="file-upload" />
+          <input type="file" multiple onChange={handleCombinedUpload} className="hidden" id="file-upload" />
 
           {/* Bottom Bar inside the card */}
           <div className="flex items-center justify-between px-2 pb-2">
@@ -6204,7 +6240,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                           className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
                           onClick={() => {
                             setShowCommandMenu(false)
-                            document.getElementById('image-upload')?.click()
+                            document.getElementById('file-upload')?.click()
                           }}
                         >
                           <FileUp className="size-4 text-gray-400" />
