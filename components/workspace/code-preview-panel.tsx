@@ -917,12 +917,20 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
   const [isVisualEditorEnabled, setIsVisualEditorEnabled] = useState(false)
   const previewIframeRef = useRef<HTMLIFrameElement | null>(null)
 
-  // Dispatch preview state changes to parent component
+  // Dispatch preview state changes to parent component + save preview URL locally
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('preview-state-changed', { 
-        detail: { preview } 
+      window.dispatchEvent(new CustomEvent('preview-state-changed', {
+        detail: { preview }
       }))
+    }
+    // Persist preview URL to workspace so it loads instantly on next tab switch
+    if (preview.url && project?.id && !preview.isLoading) {
+      import('@/lib/storage-manager').then(({ storageManager }) => {
+        storageManager.init().then(() => {
+          storageManager.updateWorkspace(project.id, { previewUrl: preview.url! })
+        })
+      }).catch(() => {})
     }
   }, [preview])
 
@@ -1007,34 +1015,23 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
     checkProjectFramework()
   }, [project])
 
-  // Auto-load pipilot.dev preview URL for Vite projects when switching to preview tab
+  // Auto-load preview URL from project slug on preview tab switch
+  // Projects already have a slug field - use it to construct the preview URL directly
   useEffect(() => {
     if (
       activeTab === 'preview' &&
       isViteProject &&
       !isExpoProject &&
       project?.id &&
+      project?.slug &&
       !preview.url &&
       !preview.isLoading
     ) {
-      // Fetch the reserved preview slug from the sites table
-      const fetchPreviewSlug = async () => {
-        try {
-          const response = await fetch(`/api/projects/${project.id}/preview-slug`)
-          if (response.ok) {
-            const data = await response.json()
-            if (data.previewUrl) {
-              console.log('[CodePreviewPanel] Auto-loading Vite project preview URL:', data.previewUrl)
-              setPreview(prev => ({ ...prev, url: data.previewUrl }))
-            }
-          }
-        } catch (error) {
-          console.error('[CodePreviewPanel] Error fetching preview slug:', error)
-        }
-      }
-      fetchPreviewSlug()
+      const previewUrl = `https://${project.slug}.pipilot.dev/`
+      console.log('[CodePreviewPanel] Constructed preview URL from project slug:', previewUrl)
+      setPreview(prev => ({ ...prev, url: previewUrl }))
     }
-  }, [activeTab, isViteProject, isExpoProject, project?.id, preview.url, preview.isLoading])
+  }, [activeTab, isViteProject, isExpoProject, project?.id, project?.slug, preview.url, preview.isLoading])
 
   // Track if files have changed since last preview was created
   const filesChangedSincePreviewRef = useRef(false)
