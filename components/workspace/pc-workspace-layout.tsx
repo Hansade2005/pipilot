@@ -360,6 +360,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
   // Initial prompt to auto-send to chat when project is created
   const [initialChatPrompt, setInitialChatPrompt] = useState<string | undefined>(undefined)
+  // Initial chat mode from homepage selection
+  const [initialChatMode, setInitialChatMode] = useState<'plan' | 'agent' | undefined>(undefined)
 
   // Auto-restore state
   const [isAutoRestoring, setIsAutoRestoring] = useState(false)
@@ -604,8 +606,12 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             const storedPrompt = sessionStorage.getItem(`initial-prompt-${projectId}`)
             if (storedPrompt) {
               setInitialChatPrompt(storedPrompt)
-              // Clean up sessionStorage after retrieving
               sessionStorage.removeItem(`initial-prompt-${projectId}`)
+            }
+            const storedMode = sessionStorage.getItem(`initial-chat-mode-${projectId}`)
+            if (storedMode === 'plan' || storedMode === 'agent') {
+              setInitialChatMode(storedMode)
+              sessionStorage.removeItem(`initial-chat-mode-${projectId}`)
             }
           }
           
@@ -1219,8 +1225,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       project={selectedProject}
                       selectedModel={selectedModel}
                       aiMode={aiMode}
-
                       initialPrompt={initialChatPrompt}
+                      initialChatMode={initialChatMode}
                     />
                   </div>
                 </ResizablePanel>
@@ -2016,13 +2022,14 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               <Tabs value={mobileTab} onValueChange={(value) => setMobileTab(value as any)} className="h-full flex flex-col">
                 <TabsContent value="chat" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
                   <div className="h-full overflow-hidden">
-                    <ChatPanelV2 
-                      project={selectedProject} 
+                    <ChatPanelV2
+                      project={selectedProject}
                       isMobile={true}
                       selectedModel={selectedModel}
                       onClearChat={handleClearChat}
                       aiMode={aiMode}
                       initialPrompt={initialChatPrompt}
+                      initialChatMode={initialChatMode}
                     />
                   </div>
                 </TabsContent>

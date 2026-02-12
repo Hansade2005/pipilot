@@ -56,6 +56,7 @@ import { getWorkspaceDatabaseId, getDatabaseIdFromUrl } from '@/lib/get-current-
 import { useSupabaseToken } from '@/hooks/use-supabase-token'
 import { SupabaseConnectionCard } from './supabase-connection-card'
 import { ContinueBackendCard } from './continue-backend-card'
+import { PlanCard } from './plan-card'
 import { zipSync, strToU8 } from 'fflate'
 import { compress } from 'lz4js'
 import { createClient } from '@/lib/supabase/client'
@@ -1113,6 +1114,7 @@ interface ChatPanelV2Props {
   onModeChange?: (mode: string) => void
   onClearChat?: () => void
   initialPrompt?: string
+  initialChatMode?: 'plan' | 'agent'
   taggedComponent?: TaggedComponent | null
   onClearTaggedComponent?: () => void
 }
@@ -1128,6 +1130,7 @@ export function ChatPanelV2({
   onModeChange,
   onClearChat,
   initialPrompt,
+  initialChatMode,
   taggedComponent,
   onClearTaggedComponent
 }: ChatPanelV2Props) {
@@ -1394,8 +1397,8 @@ export function ChatPanelV2({
     }
   }, [isLoading])
 
-  // Chat mode state - true for Plan mode, false for Agent mode
-  const [isAskMode, setIsAskMode] = useState(false)
+  // Chat mode state - true for Plan mode, false for Agent mode (defaults to Plan)
+  const [isAskMode, setIsAskMode] = useState(initialChatMode ? initialChatMode === 'plan' : true)
 
   // Prompt Queue - queue messages when AI is busy, persist to localStorage
   const [promptQueue, setPromptQueue] = useState<Array<{ id: string; text: string; timestamp: number }>>(() => {
@@ -5809,6 +5812,55 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                     return null
                   })()}
 
+                  {/* Special Rendering: Plan Card from generate_plan tool */}
+                  {(() => {
+                    const toolCalls = activeToolCalls.get(message.id)
+                    const planCalls = toolCalls?.filter(tc =>
+                      tc.toolName === 'generate_plan' && (tc.status === 'completed' || tc.status === 'executing')
+                    )
+
+                    if (planCalls && planCalls.length > 0) {
+                      return (
+                        <div className="space-y-4 mb-4">
+                          {planCalls.map((toolCall) => {
+                            const input = toolCall.input || {}
+                            return (
+                              <PlanCard
+                                key={toolCall.toolCallId}
+                                title={input.title || 'Generating plan...'}
+                                description={input.description || ''}
+                                steps={input.steps || []}
+                                techStack={input.techStack}
+                                estimatedFiles={input.estimatedFiles}
+                                isStreaming={toolCall.status === 'executing'}
+                                onBuild={() => {
+                                  // Switch to agent mode and send the plan as a build command
+                                  setIsAskMode(false)
+                                  const planSteps = (input.steps || []).map((s: any, i: number) => `${i + 1}. ${s.title}: ${s.description}`).join('\n')
+                                  const buildPrompt = `Build the following plan now:\n\n**${input.title}**\n${input.description}\n\nSteps:\n${planSteps}\n\nTech Stack: ${(input.techStack || []).join(', ')}\n\nBuild this complete application following the plan above. Start implementing immediately.`
+                                  setInput(buildPrompt)
+                                  setTimeout(() => {
+                                    const syntheticEvent = { preventDefault: () => {} } as React.FormEvent
+                                    handleEnhancedSubmit(syntheticEvent)
+                                  }, 150)
+                                }}
+                                onRefine={() => {
+                                  setInput('Please refine the plan. ')
+                                  setTimeout(() => {
+                                    if (textareaRef.current) {
+                                      textareaRef.current.focus()
+                                    }
+                                  }, 50)
+                                }}
+                              />
+                            )
+                          })}
+                        </div>
+                      )
+                    }
+                    return null
+                  })()}
+
                   {/* Pass inline tool calls with positions to MessageWithTools for inline rendering */}
                   {(() => {
                     const toolCalls = activeToolCalls.get(message.id) || []
@@ -5817,7 +5869,8 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                       tc.toolName !== 'request_supabase_connection' &&
                       tc.toolName !== 'continue_backend_implementation' &&
                       tc.toolName !== 'suggest_next_steps' &&
-                      tc.toolName !== 'manage_todos'
+                      tc.toolName !== 'manage_todos' &&
+                      tc.toolName !== 'generate_plan'
                     )
                     return (
                       <MessageWithTools
@@ -5833,12 +5886,13 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                   {/* Tool Activity Panel - Always show for summary/tracking purposes */}
                   {(() => {
                     const toolCalls = activeToolCalls.get(message.id)
-                    // Filter out tools with special rendering (like request_supabase_connection, continue_backend_implementation, suggest_next_steps)
+                    // Filter out tools with special rendering (like request_supabase_connection, continue_backend_implementation, suggest_next_steps, generate_plan)
                     const regularToolCalls = toolCalls?.filter(tc =>
                       tc.toolName !== 'request_supabase_connection' &&
                       tc.toolName !== 'continue_backend_implementation' &&
                       tc.toolName !== 'suggest_next_steps' &&
-                      tc.toolName !== 'manage_todos'
+                      tc.toolName !== 'manage_todos' &&
+                      tc.toolName !== 'generate_plan'
                     )
                     return regularToolCalls && regularToolCalls.length > 0 ? (
                       <ToolActivityPanel
@@ -6926,7 +6980,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 <TooltipTrigger asChild>
                   <button
                     className={`text-sm font-medium transition-colors ${isAskMode
-                      ? 'text-blue-400'
+                      ? 'text-orange-400'
                       : 'text-gray-400 hover:text-gray-200'
                     }`}
                     onClick={() => setIsAskMode(!isAskMode)}
@@ -6935,7 +6989,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Plan mode - AI reasons and plans without making file changes</p>
+                  <p>Plan mode - AI creates a strategic plan before building</p>
                 </TooltipContent>
               </Tooltip>
 
