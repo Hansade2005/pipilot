@@ -28,7 +28,7 @@ export type QueueTodo = {
   id: string;
   title: string;
   description?: string;
-  status?: "pending" | "completed";
+  status?: "pending" | "completed" | "in_progress";
 };
 
 export type QueueItemProps = ComponentProps<"li">;
@@ -36,7 +36,7 @@ export type QueueItemProps = ComponentProps<"li">;
 export const QueueItem = ({ className, ...props }: QueueItemProps) => (
   <li
     className={cn(
-      "group flex flex-col gap-1 rounded-md px-3 py-1 text-sm transition-colors hover:bg-muted",
+      "group flex flex-col gap-1 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-gray-800/60",
       className
     )}
     {...props}
@@ -45,19 +45,23 @@ export const QueueItem = ({ className, ...props }: QueueItemProps) => (
 
 export type QueueItemIndicatorProps = ComponentProps<"span"> & {
   completed?: boolean;
+  inProgress?: boolean;
 };
 
 export const QueueItemIndicator = ({
   completed = false,
+  inProgress = false,
   className,
   ...props
 }: QueueItemIndicatorProps) => (
   <span
     className={cn(
-      "mt-0.5 inline-block size-2.5 rounded-full border",
+      "mt-0.5 inline-block size-2.5 shrink-0 rounded-full border",
       completed
-        ? "border-muted-foreground/20 bg-muted-foreground/10"
-        : "border-muted-foreground/50",
+        ? "border-green-500/40 bg-green-500/30"
+        : inProgress
+        ? "border-orange-500/60 bg-orange-500/40 animate-pulse"
+        : "border-gray-500/50 bg-transparent",
       className
     )}
     {...props}
@@ -77,8 +81,8 @@ export const QueueItemContent = ({
     className={cn(
       "line-clamp-1 grow break-words",
       completed
-        ? "text-muted-foreground/50 line-through"
-        : "text-muted-foreground",
+        ? "text-gray-500 line-through"
+        : "text-gray-300",
       className
     )}
     {...props}
@@ -96,10 +100,10 @@ export const QueueItemDescription = ({
 }: QueueItemDescriptionProps) => (
   <div
     className={cn(
-      "ml-6 text-xs",
+      "ml-[1.125rem] text-xs",
       completed
-        ? "text-muted-foreground/40 line-through"
-        : "text-muted-foreground",
+        ? "text-gray-600 line-through"
+        : "text-gray-500",
       className
     )}
     {...props}
@@ -112,7 +116,7 @@ export const QueueItemActions = ({
   className,
   ...props
 }: QueueItemActionsProps) => (
-  <div className={cn("flex gap-1", className)} {...props} />
+  <div className={cn("flex gap-1 shrink-0", className)} {...props} />
 );
 
 export type QueueItemActionProps = Omit<
@@ -126,7 +130,7 @@ export const QueueItemAction = ({
 }: QueueItemActionProps) => (
   <Button
     className={cn(
-      "size-auto rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-muted-foreground/10 hover:text-foreground group-hover:opacity-100",
+      "size-auto rounded p-1 text-gray-500 opacity-0 transition-opacity hover:bg-gray-700/50 hover:text-orange-400 group-hover:opacity-100",
       className
     )}
     size="icon"
@@ -142,7 +146,7 @@ export const QueueItemAttachment = ({
   className,
   ...props
 }: QueueItemAttachmentProps) => (
-  <div className={cn("mt-1 flex flex-wrap gap-2", className)} {...props} />
+  <div className={cn("mt-1 flex flex-wrap gap-2 ml-[1.125rem]", className)} {...props} />
 );
 
 export type QueueItemImageProps = ComponentProps<"img">;
@@ -153,7 +157,7 @@ export const QueueItemImage = ({
 }: QueueItemImageProps) => (
   <img
     alt=""
-    className={cn("h-8 w-8 rounded border object-cover", className)}
+    className={cn("h-8 w-8 rounded border border-gray-700 object-cover", className)}
     height={32}
     width={32}
     {...props}
@@ -169,7 +173,7 @@ export const QueueItemFile = ({
 }: QueueItemFileProps) => (
   <span
     className={cn(
-      "flex items-center gap-1 rounded border bg-muted px-2 py-1 text-xs",
+      "flex items-center gap-1 rounded border border-gray-700 bg-gray-800 px-2 py-1 text-xs text-gray-300",
       className
     )}
     {...props}
@@ -186,7 +190,7 @@ export const QueueList = ({
   className,
   ...props
 }: QueueListProps) => (
-  <ScrollArea className={cn("-mb-1 mt-2", className)} {...props}>
+  <ScrollArea className={cn("-mb-1 mt-1.5", className)} {...props}>
     <div className="max-h-40 pr-4">
       <ul>{children}</ul>
     </div>
@@ -215,7 +219,7 @@ export const QueueSectionTrigger = ({
   <CollapsibleTrigger asChild>
     <button
       className={cn(
-        "group flex w-full items-center justify-between rounded-md bg-muted/40 px-3 py-2 text-left font-medium text-muted-foreground text-sm transition-colors hover:bg-muted",
+        "group/trigger flex w-full items-center justify-between rounded-lg bg-gray-800/40 px-3 py-1.5 text-left font-medium text-gray-400 text-xs transition-colors hover:bg-gray-800/70",
         className
       )}
       type="button"
@@ -241,10 +245,11 @@ export const QueueSectionLabel = ({
   ...props
 }: QueueSectionLabelProps) => (
   <span className={cn("flex items-center gap-2", className)} {...props}>
-    <ChevronDownIcon className="group-data-[state=closed]:-rotate-90 size-4 transition-transform" />
+    <ChevronDownIcon className="group-data-[state=closed]/trigger:-rotate-90 size-3.5 transition-transform text-gray-500" />
     {icon}
-    <span>
-      {count} {label}
+    <span className="text-gray-400">
+      {count !== undefined && <span className="text-orange-400 font-semibold mr-1">{count}</span>}
+      {label}
     </span>
   </span>
 );
@@ -266,7 +271,7 @@ export type QueueProps = ComponentProps<"div">;
 export const Queue = ({ className, ...props }: QueueProps) => (
   <div
     className={cn(
-      "flex flex-col gap-2 rounded-xl border border-border bg-background px-3 pt-2 pb-2 shadow-xs",
+      "flex flex-col gap-1.5 rounded-xl border border-gray-700/60 bg-gray-900/90 px-2 pt-2 pb-2 shadow-lg",
       className
     )}
     {...props}
