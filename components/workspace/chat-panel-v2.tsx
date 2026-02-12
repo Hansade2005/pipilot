@@ -5919,10 +5919,12 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                         isVisible={!isMessageStreaming}
                         onSuggestionClick={(prompt) => {
                           setInput(prompt)
+                          // Use sendButtonRef.click() like build plan to avoid stale closure issue
                           setTimeout(() => {
-                            const syntheticEvent = { preventDefault: () => {} } as React.FormEvent
-                            handleEnhancedSubmit(syntheticEvent)
-                          }, 100)
+                            if (sendButtonRef.current) {
+                              sendButtonRef.current.click()
+                            }
+                          }, 150)
                         }}
                       />
                     ) : null
