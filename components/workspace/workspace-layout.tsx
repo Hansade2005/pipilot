@@ -457,11 +457,10 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
     // Auto-switch to preview tab when AI starts streaming so the user
     // sees the AI responding view (rocket + witty messages) immediately.
-    // Skip if a live preview is already loaded to avoid hiding it.
     const handleAiStreamingState = (event: CustomEvent) => {
       const { isStreaming } = event.detail
       setIsAIStreaming(isStreaming)
-      if (isStreaming && !codePreviewRef.current?.preview?.url) {
+      if (isStreaming) {
         setActiveTab('preview')
         if (isMobile) {
           setMobileTab('preview')
