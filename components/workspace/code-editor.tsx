@@ -5,7 +5,7 @@ import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { Editor } from "@monaco-editor/react"
 import { Button } from "@/components/ui/button"
-import { FileText, Save, Sparkles, Send, X } from "lucide-react"
+import { FileText, Save, Sparkles, Send, X, ChevronRight, Folder } from "lucide-react"
 import { useAutoCloudBackup } from "@/hooks/use-auto-cloud-backup"
 import type { File } from "@/lib/storage-manager"
 import { Textarea } from "@/components/ui/textarea"
@@ -1039,11 +1039,31 @@ export function CodeEditor({ file, onSave, projectFiles = [], openFiles = [], on
         </div>
       )}
 
-      {/* Editor Header */}
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-800/60 bg-gray-900/80 flex-shrink-0">
-        <div className="flex items-center space-x-2">
-          <span className="text-xs text-gray-400 truncate max-w-[200px]">{file.path || file.name}</span>
-          {hasChanges && <div className="w-2 h-2 bg-orange-500 rounded-full" />}
+      {/* Editor Header - Breadcrumb Navigation */}
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-800/60 bg-gray-900/80 flex-shrink-0 min-w-0">
+        <div className="flex items-center min-w-0 overflow-hidden">
+          <div className="flex items-center text-xs min-w-0">
+            {(() => {
+              const filePath = file.path || file.name
+              const segments = filePath.split('/').filter(Boolean)
+              return segments.map((segment, i) => {
+                const isLast = i === segments.length - 1
+                return (
+                  <span key={i} className="flex items-center min-w-0 flex-shrink-0">
+                    {i > 0 && <ChevronRight className="size-3 text-gray-600 mx-0.5 flex-shrink-0" />}
+                    <span className={`truncate ${
+                      isLast
+                        ? 'text-gray-200 font-medium'
+                        : 'text-gray-500 hover:text-gray-300 cursor-default'
+                    }`}>
+                      {isLast ? segment : segment}
+                    </span>
+                  </span>
+                )
+              })
+            })()}
+          </div>
+          {hasChanges && <div className="w-2 h-2 bg-orange-500 rounded-full ml-2 flex-shrink-0" />}
         </div>
         <div className="flex items-center space-x-2">
           {isInlineStreaming && (
@@ -1597,12 +1617,17 @@ export function CodeEditor({ file, onSave, projectFiles = [], openFiles = [], on
       </div>
 
       {/* Status Bar */}
-      <div className="px-4 py-1.5 border-t border-gray-800/60 bg-gray-950 text-xs text-gray-500 flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <span>{file.path}</span>
-          <span>
-            {content.split("\n").length} lines • {content.length} characters
-          </span>
+      <div className="px-4 py-1 border-t border-gray-800/60 bg-gray-950 text-[11px] text-gray-500 flex-shrink-0">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span>{getLanguage(file.name).charAt(0).toUpperCase() + getLanguage(file.name).slice(1)}</span>
+            <span>Spaces: {settings.tabSize}</span>
+            <span>UTF-8</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span>{content.split("\n").length} lines</span>
+            <span>{content.length} chars</span>
+          </div>
         </div>
       </div>
 

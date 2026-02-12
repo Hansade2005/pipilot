@@ -22,6 +22,9 @@ export interface Workspace {
   netlifySiteId?: string
   netlifyDeploymentUrl?: string
   deploymentStatus: 'not_deployed' | 'in_progress' | 'deployed' | 'failed'
+  // Preview tracking
+  previewUrl?: string
+  previewSlug?: string
   // Supabase project connection
   supabaseProjectId?: string
   supabaseProjectName?: string

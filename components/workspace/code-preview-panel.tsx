@@ -917,12 +917,20 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
   const [isVisualEditorEnabled, setIsVisualEditorEnabled] = useState(false)
   const previewIframeRef = useRef<HTMLIFrameElement | null>(null)
 
-  // Dispatch preview state changes to parent component
+  // Dispatch preview state changes to parent component + save preview URL locally
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('preview-state-changed', { 
-        detail: { preview } 
+      window.dispatchEvent(new CustomEvent('preview-state-changed', {
+        detail: { preview }
       }))
+    }
+    // Persist preview URL to workspace so it loads instantly on next tab switch
+    if (preview.url && project?.id && !preview.isLoading) {
+      import('@/lib/storage-manager').then(({ storageManager }) => {
+        storageManager.init().then(() => {
+          storageManager.updateWorkspace(project.id, { previewUrl: preview.url! })
+        })
+      }).catch(() => {})
     }
   }, [preview])
 
@@ -1007,7 +1015,7 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
     checkProjectFramework()
   }, [project])
 
-  // Auto-load pipilot.dev preview URL for Vite projects when switching to preview tab
+  // Auto-load preview URL from local workspace or external DB on preview tab switch
   useEffect(() => {
     if (
       activeTab === 'preview' &&
@@ -1017,22 +1025,37 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
       !preview.url &&
       !preview.isLoading
     ) {
-      // Fetch the reserved preview slug from the sites table
-      const fetchPreviewSlug = async () => {
+      const loadPreviewUrl = async () => {
         try {
+          // First check if the workspace has a locally saved preview URL
+          const { storageManager } = await import('@/lib/storage-manager')
+          await storageManager.init()
+          const workspace = await storageManager.getWorkspace(project.id)
+          if (workspace?.previewUrl) {
+            console.log('[CodePreviewPanel] Loaded preview URL from local workspace:', workspace.previewUrl)
+            setPreview(prev => ({ ...prev, url: workspace.previewUrl! }))
+            return
+          }
+
+          // Fallback: check the external sites table
           const response = await fetch(`/api/projects/${project.id}/preview-slug`)
           if (response.ok) {
             const data = await response.json()
             if (data.previewUrl) {
-              console.log('[CodePreviewPanel] Auto-loading Vite project preview URL:', data.previewUrl)
+              console.log('[CodePreviewPanel] Loaded preview URL from sites table:', data.previewUrl)
               setPreview(prev => ({ ...prev, url: data.previewUrl }))
+              // Save locally for faster access next time
+              await storageManager.updateWorkspace(project.id, {
+                previewUrl: data.previewUrl,
+                previewSlug: data.previewSlug
+              })
             }
           }
         } catch (error) {
-          console.error('[CodePreviewPanel] Error fetching preview slug:', error)
+          console.error('[CodePreviewPanel] Error loading preview URL:', error)
         }
       }
-      fetchPreviewSlug()
+      loadPreviewUrl()
     }
   }, [activeTab, isViteProject, isExpoProject, project?.id, preview.url, preview.isLoading])
 
