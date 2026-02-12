@@ -2048,7 +2048,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                             <ChainOfThoughtHeader>
                               {isStreaming && index === messages.length - 1
                                 ? "PiPilot is working"
-                                : "PiPilot worked for a moment"
+                                : "PiPilot thought for a moment"
                               }
                             </ChainOfThoughtHeader>
                             <ChainOfThoughtContent>

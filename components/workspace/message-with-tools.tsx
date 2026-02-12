@@ -607,7 +607,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
                       <ChainOfThoughtHeader>
                         {isStreaming && idx >= segments.length - 1 && !hasResponse
                           ? `PiPilot is working ${duration > 0 ? formatDuration(duration) : ''}`
-                          : 'PiPilot worked for a moment'
+                          : 'PiPilot thought for a moment'
                         }
                       </ChainOfThoughtHeader>
                       <ChainOfThoughtContent>
@@ -677,7 +677,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
               <ChainOfThoughtHeader>
                 {isStreaming
                   ? `PiPilot is working ${duration > 0 ? `${formatDuration(duration)}` : ''}`
-                  : `PiPilot worked for a moment`
+                  : `PiPilot thought for a moment`
                 }
               </ChainOfThoughtHeader>
               <ChainOfThoughtContent>
