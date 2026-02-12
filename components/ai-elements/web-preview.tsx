@@ -156,7 +156,7 @@ export const WebPreviewNavigationButton = ({
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
-          className="h-8 w-8 p-0 hover:text-foreground"
+          className="h-8 w-8 p-0 text-muted-foreground hover:text-orange-400 hover:bg-orange-500/10"
           disabled={disabled}
           onClick={onClick}
           size="sm"
@@ -217,7 +217,7 @@ export const WebPreviewUrl = ({
         <Button
           variant="ghost"
           size="sm"
-          className="h-6 w-6 p-0 mr-1"
+          className="h-6 w-6 p-0 mr-1 text-muted-foreground hover:text-orange-400 hover:bg-orange-500/10"
           onClick={onRefresh}
           disabled={refreshDisabled}
           title="Refresh Preview"
@@ -226,7 +226,7 @@ export const WebPreviewUrl = ({
         </Button>
       )}
       <Input
-        className="h-8 flex-1 text-sm pr-8"
+        className="h-8 flex-1 text-sm pr-8 focus-visible:ring-1 focus-visible:ring-orange-500/50 focus-visible:border-orange-500/50"
         onChange={onChange ?? handleChange}
         onKeyDown={handleKeyDown}
         placeholder="Enter URL..."
@@ -237,7 +237,7 @@ export const WebPreviewUrl = ({
         <Button
           variant="ghost"
           size="sm"
-          className="h-6 w-6 p-0 absolute right-1"
+          className="h-6 w-6 p-0 absolute right-1 text-muted-foreground hover:text-orange-400 hover:bg-orange-500/10"
           onClick={onOpenExternal}
           disabled={externalDisabled}
           title="Open in new tab"
@@ -272,7 +272,7 @@ export const WebPreviewDeviceSelector = ({
         <Button
           variant="outline"
           size="sm"
-          className={cn("h-8 w-8 p-0", className)}
+          className={cn("h-8 w-8 p-0 hover:text-orange-400 hover:border-orange-500/50", device && "text-orange-400 border-orange-500/50 bg-orange-500/10", className)}
         >
           {device ? device.icon : <Monitor className="h-4 w-4" />}
         </Button>
@@ -282,7 +282,7 @@ export const WebPreviewDeviceSelector = ({
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => setDevice(null)}
-          className="flex items-center gap-2"
+          className={cn("flex items-center gap-2", !device && "text-orange-400 bg-orange-500/10")}
         >
           <Monitor className="h-4 w-4" />
           <span>Responsive (Auto)</span>
@@ -293,7 +293,7 @@ export const WebPreviewDeviceSelector = ({
           <DropdownMenuItem
             key={preset.name}
             onClick={() => setDevice(preset)}
-            className="flex items-center justify-between"
+            className={cn("flex items-center justify-between", device?.name === preset.name && "text-orange-400 bg-orange-500/10")}
           >
             <div className="flex items-center gap-2">
               {preset.icon}
@@ -310,7 +310,7 @@ export const WebPreviewDeviceSelector = ({
           <DropdownMenuItem
             key={preset.name}
             onClick={() => setDevice(preset)}
-            className="flex items-center justify-between"
+            className={cn("flex items-center justify-between", device?.name === preset.name && "text-orange-400 bg-orange-500/10")}
           >
             <div className="flex items-center gap-2">
               {preset.icon}
@@ -678,13 +678,17 @@ export const WebPreviewConsole = ({
     >
       <CollapsibleTrigger asChild>
         <Button
-          className="flex w-full items-center justify-between p-4 text-left font-medium"
+          className={cn(
+            "flex w-full items-center justify-between p-4 text-left font-medium hover:bg-orange-500/10",
+            consoleOpen && "text-orange-400"
+          )}
           variant="ghost"
         >
           <span className="flex items-center gap-2">
+            <Terminal className="h-4 w-4" />
             Console
             {errorLogs.length > 0 && (
-              <span className="inline-flex items-center justify-center rounded-full bg-destructive px-2 py-0.5 text-xs font-medium text-destructive-foreground">
+              <span className="inline-flex items-center justify-center rounded-full bg-red-500/20 text-red-400 px-2 py-0.5 text-xs font-medium">
                 {errorLogs.length} error{errorLogs.length > 1 ? 's' : ''}
               </span>
             )}
@@ -705,12 +709,12 @@ export const WebPreviewConsole = ({
       >
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "terminal" | "browser")} className="w-full">
           <div className="flex items-center justify-between mb-2">
-            <TabsList className="h-8">
-              <TabsTrigger value="terminal" className="text-xs px-3 py-1 gap-1">
+            <TabsList className="h-8 bg-gray-800/50">
+              <TabsTrigger value="terminal" className="text-xs px-3 py-1 gap-1 data-[state=active]:bg-orange-600/15 data-[state=active]:text-orange-400">
                 <Terminal className="h-3 w-3" />
                 Terminal
               </TabsTrigger>
-              <TabsTrigger value="browser" className="text-xs px-3 py-1 gap-1">
+              <TabsTrigger value="browser" className="text-xs px-3 py-1 gap-1 data-[state=active]:bg-orange-600/15 data-[state=active]:text-orange-400">
                 <Globe className="h-3 w-3" />
                 Browser
                 {consoleFeedLogs.length > 0 && (
@@ -725,7 +729,7 @@ export const WebPreviewConsole = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 text-xs gap-1"
+                  className="h-7 text-xs gap-1 hover:text-orange-400 hover:bg-orange-500/10"
                   onClick={handleCopyLogs}
                 >
                   {copied ? (
@@ -745,7 +749,7 @@ export const WebPreviewConsole = ({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-7 text-xs gap-1 text-destructive hover:text-destructive border-destructive/50 hover:border-destructive hover:bg-destructive/10"
+                  className="h-7 text-xs gap-1 text-orange-400 hover:text-orange-300 border-orange-500/50 hover:border-orange-500 hover:bg-orange-500/10"
                   onClick={handleAskAiToFixTerminal}
                 >
                   <Sparkles className="h-3 w-3" />
@@ -756,7 +760,7 @@ export const WebPreviewConsole = ({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-7 text-xs gap-1 text-destructive hover:text-destructive border-destructive/50 hover:border-destructive hover:bg-destructive/10"
+                  className="h-7 text-xs gap-1 text-orange-400 hover:text-orange-300 border-orange-500/50 hover:border-orange-500 hover:bg-orange-500/10"
                   onClick={handleAskAiToFix}
                 >
                   <Sparkles className="h-3 w-3" />
@@ -767,7 +771,7 @@ export const WebPreviewConsole = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 text-xs gap-1"
+                  className="h-7 text-xs gap-1 hover:text-orange-400 hover:bg-orange-500/10"
                   onClick={onClearBrowserLogs}
                 >
                   <Trash2 className="h-3 w-3" />
