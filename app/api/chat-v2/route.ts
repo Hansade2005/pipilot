@@ -2712,6 +2712,9 @@ In Ask Mode, I'm your knowledgeable companion who can help you understand, learn
 
 Use emojis sparingly for section headers and key highlights. Keep responses clear and focused.
 
+## Task Management (manage_todos)
+For complex tasks with 3+ steps, use the \`manage_todos\` tool to create a visible todo list above the chat input. This helps users track your progress in real-time. Send the full updated list each time - mark tasks as "in_progress" when starting, "completed" when done. Only one task should be "in_progress" at a time.
+
 ## Next Step Suggestions (MANDATORY)
 At the END of every response, you MUST call the \`suggest_next_steps\` tool with 3-4 follow-up suggestions relevant to the discussion. These appear as clickable suggestion chips. Keep labels short (3-8 words) and actionable.
 ` : `
@@ -3142,6 +3145,14 @@ const { theme, setTheme } = useTheme();
 - Zero console errors, smooth performance
 - Bugs fixed thoroughly with root cause analysis
 - Production-ready code with proper error handling
+
+## Task Management (manage_todos)
+For complex, multi-step tasks (3+ steps), use the \`manage_todos\` tool to create a visible todo list above the chat input. This helps users track your progress in real-time as you work through implementation steps.
+- Send the FULL updated todo list each time (not just changes)
+- Only ONE todo should be "in_progress" at a time
+- Mark todos as "completed" immediately when finished
+- Keep titles short and actionable
+- Use it proactively for multi-step builds, refactors, and feature implementations
 
 ## Next Step Suggestions (MANDATORY)
 At the END of every response, you MUST call the \`suggest_next_steps\` tool to provide 3-4 contextual follow-up suggestions. These appear as clickable chips below your message. Make suggestions:
@@ -10199,6 +10210,41 @@ ${issues.length > 0 ? issues.map(issue => `- ${issue.suggestion}`).join('\n') : 
         }
       }),
 
+      // TODO MANAGEMENT - AI creates and manages a task list displayed in the Queue UI above the chat input
+      manage_todos: tool({
+        description: `Create and manage a structured todo/task list to track progress on multi-step tasks. The todo list is displayed in a collapsible panel above the chat input so the user can see your progress in real-time.
+
+USE THIS TOOL WHEN:
+- A task requires 3 or more distinct steps
+- The user provides multiple tasks to complete
+- Working on complex, multi-step implementations
+- You want to show the user clear progress on what you're doing
+
+RULES:
+- Send the FULL updated todo list each time (not just changes)
+- Only ONE todo should be "in_progress" at a time
+- Mark todos as "completed" immediately when done
+- Keep titles short and actionable (e.g. "Add authentication middleware")
+- Use descriptions for extra context when helpful
+- Each todo must have a unique id (use short descriptive slugs like "add-auth", "fix-nav-bug")`,
+        inputSchema: z.object({
+          todos: z.array(z.object({
+            id: z.string().describe('Unique identifier for the todo (e.g. "setup-db", "add-auth")'),
+            title: z.string().describe('Short, actionable title (e.g. "Set up database schema")'),
+            description: z.string().optional().describe('Optional extra context or details'),
+            status: z.enum(['pending', 'in_progress', 'completed']).describe('Current status of the todo')
+          })).min(1).max(15).describe('The complete, updated list of todos')
+        }),
+        execute: async ({ todos }, { toolCallId }) => {
+          // The frontend reads the tool input directly to display todos in the Queue UI
+          return {
+            success: true,
+            todos,
+            toolCallId
+          }
+        }
+      }),
+
       code_quality_analysis: tool({
         description: 'Create or update code quality analysis documentation with detailed metrics, complexity scores, maintainability analysis, and improvement recommendations in markdown format.',
         inputSchema: z.object({
@@ -10330,12 +10376,12 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
     }
 
     // Filter tools based on chat mode and UI initial prompt detection
-    const readOnlyTools = ['read_file', 'grep_search', 'list_files', 'web_search', 'web_extract', 'generate_image', 'suggest_next_steps']
+    const readOnlyTools = ['read_file', 'grep_search', 'list_files', 'web_search', 'web_extract', 'generate_image', 'suggest_next_steps', 'manage_todos']
     const uiInitialPromptTools = [
       'list_files', 'check_dev_errors', 'grep_search', 'semantic_code_navigator',
       'web_search', 'web_extract', 'remove_package',
       'client_replace_string_in_file', 'edit_file', 'delete_folder','continue_backend_implementation',
-      'delete_file', 'read_file', 'write_file', 'suggest_next_steps'
+      'delete_file', 'read_file', 'write_file', 'suggest_next_steps', 'manage_todos'
     ]
 
     let toolsToUse
