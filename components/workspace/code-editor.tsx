@@ -87,144 +87,46 @@ function InlineChat({
   }
 
   return (
-   <div 
-  className={`fixed z-50 bg-white border border-slate-200 rounded-2xl shadow-2xl ${
-    mode === 'modal' 
-      ? 'w-[95vw] sm:w-[700px] h-[90vh] sm:h-[600px] max-w-[95vw] max-h-[90vh] sm:max-h-[85vh]' 
-      : 'w-96 max-w-[90vw]'
-  }`}
-  style={{ 
-    top: position.top, 
+   <div
+  className="fixed z-50 bg-[#1e1e1e] border border-gray-700/60 rounded-2xl shadow-2xl w-96 max-w-[90vw]"
+  style={{
+    top: position.top,
     left: position.left,
-    transform: mode === 'modal' ? 'translate(-50%, -50%)' : 'translate(-50%, -100%)',
-    maxHeight: mode === 'modal' ? 'calc(100vh - 2rem)' : undefined,
-    maxWidth: mode === 'modal' ? 'calc(100vw - 2rem)' : undefined
+    transform: 'translate(-50%, -100%)',
   }}
 >
   {/* Header */}
-  <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-violet-50 to-purple-50 flex-shrink-0">
-    <div className="flex items-center gap-3">
-      <div className="w-9 h-9 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-        <Sparkles className="h-5 w-5 text-white" />
+  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700/40 bg-gray-900/80 rounded-t-2xl flex-shrink-0">
+    <div className="flex items-center gap-2">
+      <div className="w-7 h-7 bg-orange-600 rounded-lg flex items-center justify-center">
+        <Sparkles className="h-4 w-4 text-white" />
       </div>
-      <div>
-        <span className="text-base sm:text-lg font-semibold text-slate-900">
-          {mode === 'modal' ? 'AI Assistant' : 'AI Fix'}
-        </span>
-        <p className="text-xs text-slate-500 hidden sm:block">Powered by AI</p>
-      </div>
+      <span className="text-sm font-medium text-gray-200">AI Fix</span>
     </div>
-    
+
     <div className="flex items-center gap-2">
       {onModelChange && (
-        <div className="relative">
-          <Select value={selectedModel} onValueChange={onModelChange}>
-            <SelectTrigger className="appearance-none bg-white border border-slate-200 rounded-lg px-3 py-2 pr-8 text-xs sm:text-sm font-medium text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-all h-auto">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {chatModels.map((model) => (
-                <SelectItem key={model.id} value={model.id} className="text-xs sm:text-sm">
-                  {model.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Select value={selectedModel} onValueChange={onModelChange}>
+          <SelectTrigger className="appearance-none bg-gray-800 border border-gray-700/60 rounded-lg px-2 py-1 text-xs font-medium text-gray-300 hover:border-gray-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all h-auto">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {chatModels.map((model) => (
+              <SelectItem key={model.id} value={model.id} className="text-xs">
+                {model.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       )}
-      <Button 
-        variant="ghost" 
-        size="sm" 
+      <button
         onClick={onClose}
-        className="w-9 h-9 rounded-lg hover:bg-slate-100 flex items-center justify-center transition-colors text-slate-500 hover:text-slate-700 p-0"
+        className="w-7 h-7 rounded-lg hover:bg-gray-800 flex items-center justify-center transition-colors text-gray-500 hover:text-gray-300"
       >
-        <X className="h-5 w-5" />
-      </Button>
+        <X className="h-4 w-4" />
+      </button>
     </div>
   </div>
-
-  {/* Modal Conversation Area */}
-  {mode === 'modal' && (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Conversation History - Fixed height with scrolling */}
-      <ScrollArea className="flex-1 min-h-0" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-        <div className="p-4 sm:p-6 space-y-4 bg-slate-50/50">
-          {conversationHistory.map((message, index) => (
-            <div 
-              key={index} 
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}
-            >
-              <div className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 shadow-sm ${
-                message.role === 'user' 
-                  ? 'bg-gradient-to-br from-violet-500 to-purple-600 text-white' 
-                  : 'bg-white border border-slate-200 text-slate-800'
-              }`}>
-                <div className={`text-xs font-medium mb-1.5 ${
-                  message.role === 'user' ? 'text-violet-100' : 'text-slate-500'
-                }`}>
-                  {message.role === 'user' ? 'You' : 'AI Assistant'}
-                </div>
-                <div className="text-sm sm:text-base leading-relaxed whitespace-pre-wrap">
-                  {message.content}
-                </div>
-              </div>
-            </div>
-          ))}
-          
-          {/* Loading indicator - only show when not streaming */}
-          {isLoading && !streamingResponse && (
-            <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 bg-white border border-slate-200 shadow-sm">
-                <div className="text-xs font-medium text-slate-500 mb-1.5">AI Assistant</div>
-                <div className="flex items-center gap-2">
-                  <div className="flex gap-1">
-                    <span className="w-2 h-2 bg-violet-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                    <span className="w-2 h-2 bg-violet-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                    <span className="w-2 h-2 bg-violet-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
-                  </div>
-                  <span className="text-sm text-slate-600">Thinking...</span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </ScrollArea>
-
-      {/* Input Area - Fixed at bottom */}
-      <div className="border-t border-slate-200 bg-white p-4 sm:p-6 flex-shrink-0">
-        <div className="relative">
-          <Textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask me to refactor code, add features, fix issues..."
-            className="w-full resize-none border border-slate-200 rounded-xl px-4 py-3 pr-12 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all min-h-[56px] max-h-[120px] placeholder:text-slate-400 shadow-none"
-            disabled={isLoading}
-          />
-          
-          <Button
-            onClick={handleSubmit}
-            disabled={!input.trim() || isLoading}
-            size="sm"
-            className="absolute right-2 bottom-2 w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 disabled:from-slate-300 disabled:to-slate-400 disabled:cursor-not-allowed rounded-lg flex items-center justify-center transition-all shadow-lg hover:shadow-xl disabled:shadow-none p-0"
-          >
-            <Send className="h-5 w-5 text-white" />
-          </Button>
-        </div>
-        
-        <div className="flex items-center justify-between mt-3 px-1">
-          <div className="text-xs text-slate-500">
-            <span className="hidden sm:inline">Press Enter to send, Shift+Enter for new line</span>
-            <span className="sm:hidden">Tap send button to submit</span>
-          </div>
-          <div className="text-xs text-slate-400">
-            {input.length}/2000
-          </div>
-        </div>
-      </div>
-    </div>
-  )}
       {/* Inline Mode - VS Code Copilot Style */}
 {mode === 'inline' && (
   <>
@@ -1117,16 +1019,6 @@ export function CodeEditor({ file, onSave, projectFiles = [], openFiles = [], on
           >
             {fontSize}px
           </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => {
-              openInlineChat("AI Code Assistant - Ask me anything about this file or request changes", 1, 'modal')
-            }}
-            title="AI Assistant (Ctrl+Shift+I)"
-          >
-            <Sparkles className="h-4 w-4" />
-          </Button>
           {isInlineStreaming && (
             <div className="flex items-center space-x-2 px-2 py-1 bg-orange-500/10 rounded-md">
               <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
@@ -1264,14 +1156,6 @@ export function CodeEditor({ file, onSave, projectFiles = [], openFiles = [], on
               return [...new Set(exports)] // Remove duplicates
             }
             
-            // Add keyboard shortcuts for AI features
-            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyI, () => {
-              const position = editor.getPosition()
-              if (position) {
-                openInlineChat("AI Code Assistant", position.lineNumber)
-              }
-            })
-
             // Add keyboard shortcut for inline streaming (Ctrl+Shift+S)
             editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyS, () => {
               const position = editor.getPosition()
@@ -1577,11 +1461,6 @@ export function CodeEditor({ file, onSave, projectFiles = [], openFiles = [], on
               }
             })
 
-            // Add keyboard shortcut for AI Assistant (Ctrl+Shift+I)
-            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyI, () => {
-              openInlineChat("AI Code Assistant - Ask me anything about this file or request changes", 1, 'modal')
-            })
-            
             // Enable quick suggestions
             editor.updateOptions({
               quickSuggestions: {
@@ -1684,7 +1563,7 @@ export function CodeEditor({ file, onSave, projectFiles = [], openFiles = [], on
       </div>
 
       {/* Status Bar */}
-      <div className="px-4 py-2 border-t border-border bg-muted/50 text-xs text-muted-foreground flex-shrink-0">
+      <div className="px-4 py-1.5 border-t border-gray-800/60 bg-gray-950 text-xs text-gray-500 flex-shrink-0">
         <div className="flex items-center justify-between">
           <span>{file.path}</span>
           <span>
