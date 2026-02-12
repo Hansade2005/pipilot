@@ -5861,9 +5861,11 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                                   const planSteps = (input.steps || []).map((s: any, i: number) => `${i + 1}. ${s.title}: ${s.description}`).join('\n')
                                   const buildPrompt = `Build the following plan now:\n\n**${input.title}**\n${input.description}\n\nSteps:\n${planSteps}\n\nTech Stack: ${(input.techStack || []).join(', ')}\n\nBuild this complete application following the plan above. Start implementing immediately.`
                                   setInput(buildPrompt)
+                                  // Use sendButtonRef.click() like initial prompt to avoid stale closure issue
                                   setTimeout(() => {
-                                    const syntheticEvent = { preventDefault: () => {} } as React.FormEvent
-                                    handleEnhancedSubmit(syntheticEvent)
+                                    if (sendButtonRef.current) {
+                                      sendButtonRef.current.click()
+                                    }
                                   }, 150)
                                 }}
                                 onRefine={() => {
