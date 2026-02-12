@@ -2925,9 +2925,12 @@ export default function TodoApp() {
             }}
           >
             <WebPreviewNavigation className="fixed top-0 left-0 right-0 z-50 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800/60">
+              {/* Spacer to push all controls right */}
+              {!isMobile && <div className="flex-1" />}
+
               {/* Tab switching buttons + Chat Session Selector - hidden on mobile */}
               {!isMobile && (
-                <div className="flex items-center gap-0.5 ml-2">
+                <div className="flex items-center gap-0.5">
                   <WebPreviewNavigationButton
                     onClick={() => onTabChange("code")}
                     tooltip="Switch to Code View"
@@ -2960,18 +2963,15 @@ export default function TodoApp() {
                 </div>
               )}
 
-              {/* Spacer to push controls right */}
-              {!isMobile && <div className="flex-1" />}
-
               {/* For Expo: No Visual Editor/Responsive. For others: show icons only */}
               {!isExpoProject && (
                 <>
-                  {/* Device selector - hidden on mobile */}
-                  {!isMobile && <WebPreviewDeviceSelector />}
                   <VisualEditorToggle
                     isEnabled={isVisualEditorEnabled}
                     onToggle={setIsVisualEditorEnabled}
                   />
+                  {/* Device selector - hidden on mobile */}
+                  {!isMobile && <WebPreviewDeviceSelector />}
                 </>
               )}
 
