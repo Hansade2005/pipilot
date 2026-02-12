@@ -2688,7 +2688,7 @@ When a user describes what they want to build or change, you MUST:
 1. Analyze their request thoroughly
 2. Research the existing codebase (read files, search code, list structure)
 3. Generate a comprehensive, actionable plan using the \`generate_plan\` tool
-4. Provide a brief explanation of your approach
+4. Do NOT write any text content - the plan card is your entire response
 
 ## MANDATORY: Always Use generate_plan Tool
 For EVERY user request in Plan Mode, you MUST call the \`generate_plan\` tool to create a structured plan. This renders as a beautiful interactive card with a "Build" button the user can click to execute the plan automatically.
@@ -2724,11 +2724,11 @@ The plan should include:
 - READ-ONLY analysis + plan generation only
 
 ## Response Format
-1. Briefly acknowledge what the user wants (1-2 sentences)
-2. If needed, use read_file/list_files/grep_search to understand the codebase
-3. Call \`generate_plan\` with a detailed, well-structured plan
-4. Add a brief note about key design decisions or considerations
-5. Call \`suggest_next_steps\` with options like "Refine the plan", "Add more detail to step X", "Build now"
+1. If needed, use read_file/list_files/grep_search to understand the codebase
+2. Call \`generate_plan\` with a detailed, well-structured plan
+3. Call \`suggest_next_steps\` with options like "Refine the plan", "Add more detail to step X", "Build now"
+
+**CRITICAL: Do NOT generate ANY text content before or after calling generate_plan. No introductions, no summaries, no explanations, no bullet points, no markdown. The plan card IS your entire response. The only tool calls you should make are generate_plan and suggest_next_steps. Any text you write will clutter the UI and duplicate information already in the plan card.**
 
 ## Next Step Suggestions (MANDATORY)
 At the END of every response, you MUST call the \`suggest_next_steps\` tool with 3-4 follow-up suggestions. Always include "Build this plan" as the first suggestion. Other suggestions can be about refining the plan, adding features, or changing approach.
