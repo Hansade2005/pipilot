@@ -5741,8 +5741,12 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                     ) : null
                   })()}
 
-                  {/* Next Step Suggestions - Lovable-style follow-up chips */}
+                  {/* Next Step Suggestions - Only show for the LAST assistant message */}
                   {(() => {
+                    // Find the last assistant message - only show suggestions on it
+                    const lastAssistantMsg = [...messages].reverse().find(m => m.role === 'assistant')
+                    if (!lastAssistantMsg || message.id !== lastAssistantMsg.id) return null
+
                     const toolCalls = activeToolCalls.get(message.id)
                     const isMessageStreaming = (isLoading && message.id === messages[messages.length - 1]?.id) || message.id === continuingMessageId
                     const suggestions = extractNextStepSuggestions(toolCalls)
