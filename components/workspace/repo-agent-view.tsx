@@ -78,7 +78,8 @@ import {
   Trash2,
   Copy,
   RotateCcw,
-  ArrowLeft
+  ArrowLeft,
+  Square
 } from 'lucide-react'
 
 // Helper for user-friendly tool labels (past tense for completed actions)
@@ -1653,7 +1654,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
   if (currentView === 'landing') {
     return (
       <TooltipProvider>
-        <div className="flex flex-col h-screen bg-gray-900 text-white overflow-hidden">
+        <div className="flex flex-col h-screen bg-gray-950 text-white overflow-hidden">
           <div className="flex-1 flex flex-col items-center justify-center px-6">
             {/* Hero Section */}
             <div className="text-center mb-8 max-w-3xl">
@@ -1667,25 +1668,23 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
               </p>
             </div>
 
-            {/* Clean Input Box - Matching Image Design */}
+            {/* Clean Input Card - Matching chat-panel-v2 design */}
             <div className="w-full max-w-4xl">
-              <div className="bg-gray-800/60 backdrop-blur-xl rounded-xl border border-gray-700/50 shadow-2xl overflow-hidden">
+              <div className="rounded-2xl border border-gray-700/60 bg-gray-900/80 focus-within:border-gray-600 transition-colors shadow-2xl overflow-hidden">
                 {/* Header Bar with Repo/Branch Info */}
-                <div className="flex items-center gap-3 px-4 py-3 bg-gray-900/50 border-b border-gray-700/50">
+                <div className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-700/60">
                   {/* GitHub Icon + Connection */}
                   <div className="flex items-center gap-2">
                     {storedTokens.github ? (
-                      <>
-                        <div className="flex items-center gap-1.5 text-sm text-gray-400">
-                          <Github className="h-4 w-4" />
-                          <span className="text-xs">@</span>
-                          <span className="font-medium text-white">github</span>
-                        </div>
-                      </>
+                      <div className="flex items-center gap-1.5 text-sm text-gray-400">
+                        <Github className="h-4 w-4" />
+                        <span className="text-xs">@</span>
+                        <span className="font-medium text-gray-200">github</span>
+                      </div>
                     ) : (
                       <a
                         href="/workspace/account"
-                        className="flex items-center gap-2 text-sm text-yellow-400 hover:text-yellow-300"
+                        className="flex items-center gap-2 text-sm text-orange-400 hover:text-orange-300 transition-colors"
                       >
                         <Github className="h-4 w-4" />
                         <span>Connect GitHub</span>
@@ -1693,7 +1692,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                     )}
                   </div>
 
-                  <div className="h-4 w-px bg-gray-700" />
+                  <div className="h-4 w-px bg-gray-700/60" />
 
                   {/* Repository Dropdown */}
                   <Select
@@ -1701,19 +1700,19 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                     onValueChange={setSelectedRepo}
                     disabled={!storedTokens.github || isLoadingRepos}
                   >
-                    <SelectTrigger className="h-7 bg-transparent border-0 text-white text-sm font-medium hover:bg-gray-700/30 focus:ring-0 w-auto min-w-[200px]">
+                    <SelectTrigger className="h-7 bg-transparent border-0 text-gray-200 text-sm font-medium hover:bg-gray-800/60 focus:ring-0 w-auto min-w-[200px]">
                       <SelectValue placeholder="Select repository" />
                     </SelectTrigger>
-                    <SelectContent className="bg-gray-800 border-gray-700">
+                    <SelectContent className="bg-gray-900 border-gray-700/60">
                       {repositories.map((repo) => (
                         <SelectItem
                           key={repo.full_name}
                           value={repo.full_name}
-                          className="text-white hover:bg-gray-700"
+                          className="text-gray-200 hover:bg-gray-800"
                         >
                           <div className="flex items-center gap-2">
                             <span>{repo.full_name}</span>
-                            {repo.private && <Lock className="h-3 w-3 text-gray-400" />}
+                            {repo.private && <Lock className="h-3 w-3 text-gray-500" />}
                           </div>
                         </SelectItem>
                       ))}
@@ -1731,12 +1730,12 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                         onValueChange={setSelectedBranch}
                         disabled={!selectedRepo || isLoadingBranches || !storedTokens.github}
                       >
-                        <SelectTrigger className="h-7 bg-transparent border-0 text-white text-sm hover:bg-gray-700/30 focus:ring-0 w-auto min-w-[100px]">
+                        <SelectTrigger className="h-7 bg-transparent border-0 text-gray-200 text-sm hover:bg-gray-800/60 focus:ring-0 w-auto min-w-[100px]">
                           <SelectValue placeholder="Branch" />
                         </SelectTrigger>
-                        <SelectContent className="bg-gray-800 border-gray-700">
+                        <SelectContent className="bg-gray-900 border-gray-700/60">
                           {branches.map((branch) => (
-                            <SelectItem key={branch} value={branch} className="text-white hover:bg-gray-700">
+                            <SelectItem key={branch} value={branch} className="text-gray-200 hover:bg-gray-800">
                               {branch}
                             </SelectItem>
                           ))}
@@ -1748,46 +1747,35 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                   <div className="flex-1" />
 
                   {/* Refresh Icon */}
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                  <button
+                    type="button"
                     onClick={fetchUserGitHubRepos}
                     disabled={isLoadingRepos || !storedTokens.github}
-                    className="h-7 w-7 p-0 text-gray-400 hover:text-white hover:bg-gray-700/30"
+                    className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors disabled:opacity-30"
                   >
                     {isLoadingRepos ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
                       <RefreshCw className="h-3.5 w-3.5" />
                     )}
-                  </Button>
+                  </button>
 
                   {/* History Dropdown */}
                   <div className="relative">
-                    <Button
-                      variant="ghost"
-                      size="sm"
+                    <button
+                      type="button"
                       onClick={() => {
                         setShowHistoryDropdown(!showHistoryDropdown)
                         if (!showHistoryDropdown) loadConversationsList()
                       }}
-                      className="h-7 w-7 p-0 text-gray-400 hover:text-white hover:bg-gray-700/30"
+                      className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
                     >
                       <History className="h-3.5 w-3.5" />
-                    </Button>
+                    </button>
 
                     {showHistoryDropdown && (
-                      <div
-                        className="absolute top-full mt-2 right-0 w-72 rounded-xl overflow-hidden z-50"
-                        style={{
-                          background: 'rgba(17, 24, 39, 0.95)',
-                          border: '1px solid rgba(234, 88, 12, 0.2)',
-                          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6)',
-                          backdropFilter: 'blur(20px)',
-                          maxHeight: '300px'
-                        }}
-                      >
-                        <div className="p-3 border-b border-orange-500/20">
+                      <div className="absolute top-full mt-2 right-0 w-72 rounded-xl overflow-hidden z-50 bg-gray-900/95 backdrop-blur-xl border border-gray-700/60 shadow-2xl max-h-[300px]">
+                        <div className="p-3 border-b border-gray-700/60">
                           <p className="text-xs text-gray-400 font-medium">Conversation History</p>
                         </div>
                         <div className="overflow-y-auto max-h-64">
@@ -1810,16 +1798,12 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                                     setCurrentView('workspace')
                                     setShowHistoryDropdown(false)
                                   }}
-                                  className="w-full text-left p-3 transition-all border-none cursor-pointer hover:bg-orange-500/10"
-                                  style={{
-                                    background: isCurrent ? 'rgba(234, 88, 12, 0.1)' : 'transparent',
-                                    borderBottom: '1px solid rgba(234, 88, 12, 0.1)'
-                                  }}
+                                  className={`w-full text-left p-3 transition-colors cursor-pointer hover:bg-gray-800/60 border-b border-gray-800/40 ${isCurrent ? 'bg-orange-600/10' : ''}`}
                                 >
                                   <div className="flex items-start gap-2">
-                                    <Github className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                                    <Github className="w-4 h-4 text-gray-500 flex-shrink-0 mt-0.5" />
                                     <div className="flex-1 min-w-0">
-                                      <p className="text-sm text-white font-medium truncate">{title}</p>
+                                      <p className="text-sm text-gray-200 font-medium truncate">{title}</p>
                                       <p className="text-xs text-gray-400 truncate">{conv.repo} • {conv.branch}</p>
                                       <p className="text-xs text-gray-500 mt-1">
                                         {new Date(conv.lastActivity).toLocaleDateString()}
@@ -1837,48 +1821,47 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 </div>
 
                 {/* Input Area */}
-                <div className="relative p-4 flex flex-col">
-                  <Textarea
+                <div className="relative">
+                  <textarea
                     ref={textareaRef}
                     value={landingInput}
-                    onChange={(e) => setLandingInput(e.target.value)}
-                    placeholder="Describe your coding task or ask a question..."
-                    className="w-full min-h-[140px] bg-transparent border-0 text-white text-base placeholder-gray-500 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 px-4 py-4 mb-3 rounded-lg"
-                    style={{
-                      whiteSpace: 'pre-wrap',
-                      wordWrap: 'break-word',
-                      overflowWrap: 'break-word'
+                    onChange={(e) => {
+                      setLandingInput(e.target.value)
+                      const textarea = e.target as HTMLTextAreaElement
+                      textarea.style.height = 'auto'
+                      textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px'
                     }}
+                    placeholder="Describe your coding task or ask a question..."
+                    className="w-full min-h-[100px] max-h-[200px] resize-none border-0 bg-transparent text-sm text-gray-100 placeholder:text-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none px-4 pt-3 pb-2"
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                      if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault()
                         handleLandingSubmit()
                       }
                     }}
                   />
+                </div>
 
-                  {/* Bottom Controls */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-500">
-                      Press <kbd className="px-1.5 py-0.5 bg-gray-700/50 rounded text-xs border border-gray-600">Cmd</kbd>+<kbd className="px-1.5 py-0.5 bg-gray-700/50 rounded text-xs border border-gray-600">Enter</kbd> to send
-                    </span>
-
-                    {/* Send Button */}
-                    <Button
-                      onClick={handleLandingSubmit}
-                      disabled={!landingInput.trim() || !selectedRepo || isLandingLoading || !storedTokens.github}
-                      className="h-9 px-4 rounded-lg bg-orange-600 hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium"
+                {/* Bottom Action Bar */}
+                <div className="flex items-center justify-end px-3 pb-2.5">
+                  {/* Send/Loading Button */}
+                  {isLandingLoading ? (
+                    <button
+                      type="button"
+                      className="h-7 w-7 rounded-lg bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors"
                     >
-                      {isLandingLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span>Send</span>
-                          <Send className="h-4 w-4" />
-                        </div>
-                      )}
-                    </Button>
-                  </div>
+                      <Square className="w-3.5 h-3.5 text-white fill-white" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleLandingSubmit}
+                      disabled={!landingInput.trim() || !selectedRepo || !storedTokens.github}
+                      className="h-7 w-7 rounded-lg bg-orange-600 hover:bg-orange-500 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+                    >
+                      <ArrowUp className="size-4 text-white" />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
