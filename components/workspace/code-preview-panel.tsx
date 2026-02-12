@@ -2928,9 +2928,19 @@ export default function TodoApp() {
               {/* Spacer to push all controls right */}
               {!isMobile && <div className="flex-1" />}
 
-              {/* Tab switching buttons + Chat Session Selector - hidden on mobile */}
+              {/* Chat Session Selector + Tab switching buttons - hidden on mobile */}
               {!isMobile && (
                 <div className="flex items-center gap-0.5">
+                  {project && userId && onSessionChange && (
+                    <ChatSessionSelector
+                      workspaceId={project.id}
+                      userId={userId}
+                      currentSessionId={currentSessionId || null}
+                      onSessionChange={onSessionChange}
+                      onNewSession={onNewSession}
+                      compact={true}
+                    />
+                  )}
                   <WebPreviewNavigationButton
                     onClick={() => onTabChange("code")}
                     tooltip="Switch to Code View"
@@ -2950,16 +2960,6 @@ export default function TodoApp() {
                   >
                     <Database className="h-4 w-4" />
                   </WebPreviewNavigationButton>
-                  {project && userId && onSessionChange && (
-                    <ChatSessionSelector
-                      workspaceId={project.id}
-                      userId={userId}
-                      currentSessionId={currentSessionId || null}
-                      onSessionChange={onSessionChange}
-                      onNewSession={onNewSession}
-                      compact={true}
-                    />
-                  )}
                 </div>
               )}
 

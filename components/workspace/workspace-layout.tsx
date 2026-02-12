@@ -1108,8 +1108,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             {/* Main Workspace */}
             {!isLoadingProjects && clientProjects.length > 0 && selectedProject && (
               <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
-                {/* Left Panel - Chat (Resizable) - Chat comes first */}
-                <ResizablePanel defaultSize={50} minSize={25} maxSize={65}>
+                {/* Left Panel - Chat (Resizable) */}
+                <ResizablePanel defaultSize={40} minSize={20} maxSize={40}>
                   <div className="h-full flex flex-col overflow-hidden border-r border-gray-800/60">
                     <ChatPanelV2
                       key={`chat-${selectedProject.id}-${chatSessionKey}`}
@@ -1129,7 +1129,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 <ResizableHandle withHandle />
 
                 {/* Right Panel - VS Code Layout */}
-                <ResizablePanel defaultSize={50} minSize={25}>
+                <ResizablePanel defaultSize={60} minSize={30}>
                   <div className="h-full flex flex-col overflow-hidden">
                     {/* Content Area */}
                     {activeTab === "code" ? (
