@@ -3068,6 +3068,8 @@ export default function TodoApp() {
                     </div>
                   </div>
                 </div>
+              ) : isAIStreaming ? (
+                <AIRespondingView projectName={project?.name} />
               ) : preview.url ? (
                 isExpoProject ? (
                   <div className="h-full w-full flex items-center justify-center p-4">
@@ -3141,8 +3143,6 @@ export default function TodoApp() {
                     }}
                   />
                 )
-              ) : isAIStreaming ? (
-                <AIRespondingView projectName={project?.name} />
               ) : (
                 <PreviewEmptyState
                   projectName={project?.name}
