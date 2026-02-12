@@ -2925,26 +2925,9 @@ export default function TodoApp() {
             }}
           >
             <WebPreviewNavigation className="fixed top-0 left-0 right-0 z-50 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800/60">
-              {/* Chat Session Selector - hidden on mobile */}
-              {!isMobile && project && userId && onSessionChange && (
-                <div className="flex items-center gap-1 ml-2">
-                  <ChatSessionSelector
-                    workspaceId={project.id}
-                    userId={userId}
-                    currentSessionId={currentSessionId || null}
-                    onSessionChange={onSessionChange}
-                    onNewSession={onNewSession}
-                    compact={true}
-                  />
-                </div>
-              )}
-
-              {/* Spacer to push buttons right on desktop - hidden on mobile where there's no left content */}
-              {!isMobile && <div className="flex-1" />}
-
-              {/* Tab switching buttons - hidden on mobile */}
+              {/* Tab switching buttons + Chat Session Selector - hidden on mobile */}
               {!isMobile && (
-                <>
+                <div className="flex items-center gap-0.5 ml-2">
                   <WebPreviewNavigationButton
                     onClick={() => onTabChange("code")}
                     tooltip="Switch to Code View"
@@ -2964,10 +2947,21 @@ export default function TodoApp() {
                   >
                     <Database className="h-4 w-4" />
                   </WebPreviewNavigationButton>
-
-                  <div className="w-4" />
-                </>
+                  {project && userId && onSessionChange && (
+                    <ChatSessionSelector
+                      workspaceId={project.id}
+                      userId={userId}
+                      currentSessionId={currentSessionId || null}
+                      onSessionChange={onSessionChange}
+                      onNewSession={onNewSession}
+                      compact={true}
+                    />
+                  )}
+                </div>
               )}
+
+              {/* Spacer to push remaining controls right on desktop */}
+              {!isMobile && <div className="flex-1" />}
 
               {/* For Expo: No Visual Editor/Responsive. For others: show icons only */}
               {!isExpoProject && (
@@ -3010,28 +3004,6 @@ export default function TodoApp() {
                 </WebPreviewNavigationButton>
               )}
 
-              {/* Sandpack Research Preview - Vite projects only, hidden on mobile */}
-              {!isMobile && isViteProject && !isExpoProject && (
-                <>
-                  <div className="w-px h-5 bg-border mx-1" />
-                  {showSandpackPreview ? (
-                    <WebPreviewNavigationButton
-                      onClick={closeSandpackPreview}
-                      tooltip="Close Sandpack Preview"
-                    >
-                      <XIcon className="h-4 w-4 text-orange-500" />
-                    </WebPreviewNavigationButton>
-                  ) : (
-                    <WebPreviewNavigationButton
-                      onClick={openSandpackPreview}
-                      disabled={!project || sandpackLoading}
-                      tooltip="Try Sandpack Preview (Research)"
-                    >
-                      <FlaskConical className={`h-4 w-4 ${sandpackLoading ? 'animate-pulse text-orange-400' : 'text-orange-500'}`} />
-                    </WebPreviewNavigationButton>
-                  )}
-                </>
-              )}
             </WebPreviewNavigation>
 
             <div className={isExpoProject ? "flex-1 min-h-0 pt-16 relative" : "flex-1 min-h-0 relative"}>
