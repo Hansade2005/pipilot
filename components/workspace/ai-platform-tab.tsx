@@ -565,7 +565,7 @@ export function AIPplatformTab({ user }: AIPplatformTabProps) {
             <div className="border-b border-white/10 bg-gray-900/95 backdrop-blur-xl p-4">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center shadow-lg shadow-purple-500/20">
+                        <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center shadow-lg shadow-orange-500/20">
                           <Logo variant="icon" size="sm" />
 
                         </div>
@@ -609,7 +609,7 @@ export function AIPplatformTab({ user }: AIPplatformTabProps) {
                                             <div className="border-t border-white/10 my-1" />
                                             <DropdownMenuItem
                                                 onClick={() => setShowCreateTeamDialog(true)}
-                                                className="text-purple-400 hover:bg-purple-500/10 focus:bg-purple-500/10"
+                                                className="text-orange-400 hover:bg-orange-500/10 focus:bg-orange-500/10"
                                             >
                                                 <Plus className="w-4 h-4 mr-2" />
                                                 Create New Team
@@ -638,31 +638,31 @@ export function AIPplatformTab({ user }: AIPplatformTabProps) {
                         <TabsList className="grid w-full grid-cols-5 bg-transparent">
                             <TabsTrigger
                                 value="overview"
-                                className="data-[state=active]:bg-purple-600/20 data-[state=active]:text-white"
+                                className="data-[state=active]:bg-orange-600/20 data-[state=active]:text-white"
                             >
                                 Overview
                             </TabsTrigger>
                             <TabsTrigger
                                 value="api-keys"
-                                className="data-[state=active]:bg-purple-600/20 data-[state=active]:text-white"
+                                className="data-[state=active]:bg-orange-600/20 data-[state=active]:text-white"
                             >
                                 API Keys
                             </TabsTrigger>
                             <TabsTrigger
                                 value="wallet"
-                                className="data-[state=active]:bg-purple-600/20 data-[state=active]:text-white"
+                                className="data-[state=active]:bg-orange-600/20 data-[state=active]:text-white"
                             >
                                 Wallet
                             </TabsTrigger>
                             <TabsTrigger
                                 value="teams"
-                                className="data-[state=active]:bg-purple-600/20 data-[state=active]:text-white"
+                                className="data-[state=active]:bg-orange-600/20 data-[state=active]:text-white"
                             >
                                 Teams
                             </TabsTrigger>
                             <TabsTrigger
                                 value="activity"
-                                className="data-[state=active]:bg-purple-600/20 data-[state=active]:text-white"
+                                className="data-[state=active]:bg-orange-600/20 data-[state=active]:text-white"
                             >
                                 Activity
                             </TabsTrigger>
@@ -673,13 +673,13 @@ export function AIPplatformTab({ user }: AIPplatformTabProps) {
                         <TabsContent value="overview" className="space-y-6">
                             {loadingTeams ? (
                                 <div className="flex items-center justify-center py-8">
-                                    <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
+                                    <Loader2 className="w-8 h-8 animate-spin text-orange-400" />
                                 </div>
                             ) : teams.length === 0 ? (
                                 <Card className="bg-gray-800/50 border-white/10">
                                     <CardHeader>
                                         <CardTitle className="text-white flex items-center">
-                                            <Sparkles className="w-5 h-5 mr-2 text-purple-400" />
+                                            <Sparkles className="w-5 h-5 mr-2 text-orange-400" />
                                             Welcome to PiPilot AI
                                         </CardTitle>
                                         <CardDescription className="text-gray-400">
@@ -712,7 +712,7 @@ export function AIPplatformTab({ user }: AIPplatformTabProps) {
                                             <Button
                                                 onClick={createTeam}
                                                 disabled={creatingTeam || !newTeamName.trim()}
-                                                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500"
+                                                className="w-full bg-orange-600 hover:bg-orange-500"
                                             >
                                                 {creatingTeam ? (
                                                     <>
@@ -733,23 +733,23 @@ export function AIPplatformTab({ user }: AIPplatformTabProps) {
                                 <>
                                     {/* Stats Cards */}
                                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                                        <Card className="bg-gradient-to-br from-purple-900/20 to-purple-700/10 border-purple-500/20 backdrop-blur-xl">
+                                        <Card className="bg-gradient-to-br from-orange-900/20 to-orange-700/10 border-orange-500/20 backdrop-blur-xl">
                                             <CardContent className="p-6">
                                                 <div className="flex items-center justify-between">
                                                     <div>
-                                                        <p className="text-sm font-medium text-purple-200">Wallet Balance</p>
+                                                        <p className="text-sm font-medium text-orange-200">Wallet Balance</p>
                                                         <h3 className="text-3xl font-bold text-white mt-1">
                                                             {formatCurrency(animatedStats.balance)}
                                                         </h3>
                                                     </div>
-                                                    <div className="p-3 bg-purple-500/20 rounded-lg">
-                                                        <Wallet className="h-6 w-6 text-purple-400" />
+                                                    <div className="p-3 bg-orange-500/20 rounded-lg">
+                                                        <Wallet className="h-6 w-6 text-orange-400" />
                                                     </div>
                                                 </div>
                                                 <Button
                                                     onClick={() => setActiveSection("wallet")}
                                                     size="sm"
-                                                    className="mt-4 w-full bg-purple-600 hover:bg-purple-500"
+                                                    className="mt-4 w-full bg-orange-600 hover:bg-orange-500"
                                                 >
                                                     <CreditCard className="mr-2 h-4 w-4" />
                                                     Top Up
@@ -774,20 +774,20 @@ export function AIPplatformTab({ user }: AIPplatformTabProps) {
                                             </CardContent>
                                         </Card>
 
-                                        <Card className="bg-gradient-to-br from-pink-900/20 to-pink-700/10 border-pink-500/20 backdrop-blur-xl">
+                                        <Card className="bg-gradient-to-br from-orange-900/20 to-orange-700/10 border-orange-500/20 backdrop-blur-xl">
                                             <CardContent className="p-6">
                                                 <div className="flex items-center justify-between">
                                                     <div>
-                                                        <p className="text-sm font-medium text-pink-200">Total Spent</p>
+                                                        <p className="text-sm font-medium text-orange-200">Total Spent</p>
                                                         <h3 className="text-3xl font-bold text-white mt-1">
                                                             {formatCurrency(animatedStats.totalSpent)}
                                                         </h3>
                                                     </div>
-                                                    <div className="p-3 bg-pink-500/20 rounded-lg">
-                                                        <ArrowUp className="h-6 w-6 text-pink-400" />
+                                                    <div className="p-3 bg-orange-500/20 rounded-lg">
+                                                        <ArrowUp className="h-6 w-6 text-orange-400" />
                                                     </div>
                                                 </div>
-                                                <p className="text-xs text-pink-200/60 mt-2">Lifetime spending</p>
+                                                <p className="text-xs text-orange-200/60 mt-2">Lifetime spending</p>
                                             </CardContent>
                                         </Card>
 
@@ -1245,7 +1245,7 @@ export function AIPplatformTab({ user }: AIPplatformTabProps) {
                                                     <Card key={log.id} className="bg-gray-700/50 border-white/5">
                                                         <CardContent className="pt-4">
                                                             <div className="flex items-start gap-3">
-                                                                <div className="p-2 bg-purple-500/20 rounded-lg">
+                                                                <div className="p-2 bg-orange-500/20 rounded-lg">
                                                                     {getActivityIcon(log.action_type)}
                                                                 </div>
                                                                 <div className="flex-1">
@@ -1302,7 +1302,7 @@ export function AIPplatformTab({ user }: AIPplatformTabProps) {
                         <Button
                             onClick={createTeam}
                             disabled={creatingTeam || !newTeamName}
-                            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500"
+                            className="bg-orange-600 hover:bg-orange-500"
                         >
                             {creatingTeam ? (
                                 <>
