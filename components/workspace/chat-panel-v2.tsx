@@ -18,6 +18,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { Switch } from "@/components/ui/switch"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { MessageWithTools } from './message-with-tools'
+import { NextStepSuggestions, extractNextStepSuggestions } from './next-step-suggestions'
 import {
   Send, Paperclip, Mic, MicOff, X, FileText, Image as ImageIcon,
   Link as LinkIcon, Loader2, ChevronDown, ChevronUp, StopCircle, Trash2, Plus,
@@ -5709,7 +5710,8 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                     // Filter out tools with special rendering
                     const inlineToolCalls = toolCalls.filter(tc =>
                       tc.toolName !== 'request_supabase_connection' &&
-                      tc.toolName !== 'continue_backend_implementation'
+                      tc.toolName !== 'continue_backend_implementation' &&
+                      tc.toolName !== 'suggest_next_steps'
                     )
                     return (
                       <MessageWithTools
@@ -5725,15 +5727,40 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                   {/* Tool Activity Panel - Always show for summary/tracking purposes */}
                   {(() => {
                     const toolCalls = activeToolCalls.get(message.id)
-                    // Filter out tools with special rendering (like request_supabase_connection, continue_backend_implementation)
+                    // Filter out tools with special rendering (like request_supabase_connection, continue_backend_implementation, suggest_next_steps)
                     const regularToolCalls = toolCalls?.filter(tc =>
                       tc.toolName !== 'request_supabase_connection' &&
-                      tc.toolName !== 'continue_backend_implementation'
+                      tc.toolName !== 'continue_backend_implementation' &&
+                      tc.toolName !== 'suggest_next_steps'
                     )
                     return regularToolCalls && regularToolCalls.length > 0 ? (
                       <ToolActivityPanel
                         toolCalls={regularToolCalls}
                         isStreaming={(isLoading && message.id === messages[messages.length - 1]?.id) || message.id === continuingMessageId}
+                      />
+                    ) : null
+                  })()}
+
+                  {/* Next Step Suggestions - Only show for the LAST assistant message */}
+                  {(() => {
+                    // Find the last assistant message - only show suggestions on it
+                    const lastAssistantMsg = [...messages].reverse().find(m => m.role === 'assistant')
+                    if (!lastAssistantMsg || message.id !== lastAssistantMsg.id) return null
+
+                    const toolCalls = activeToolCalls.get(message.id)
+                    const isMessageStreaming = (isLoading && message.id === messages[messages.length - 1]?.id) || message.id === continuingMessageId
+                    const suggestions = extractNextStepSuggestions(toolCalls)
+                    return suggestions.length > 0 ? (
+                      <NextStepSuggestions
+                        suggestions={suggestions}
+                        isVisible={!isMessageStreaming}
+                        onSuggestionClick={(prompt) => {
+                          setInput(prompt)
+                          setTimeout(() => {
+                            const syntheticEvent = { preventDefault: () => {} } as React.FormEvent
+                            handleEnhancedSubmit(syntheticEvent)
+                          }, 100)
+                        }}
                       />
                     ) : null
                   })()}
