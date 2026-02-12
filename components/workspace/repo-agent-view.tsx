@@ -78,7 +78,8 @@ import {
   Trash2,
   Copy,
   RotateCcw,
-  ArrowLeft
+  ArrowLeft,
+  Square
 } from 'lucide-react'
 
 // Helper for user-friendly tool labels (past tense for completed actions)
@@ -1653,7 +1654,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
   if (currentView === 'landing') {
     return (
       <TooltipProvider>
-        <div className="flex flex-col h-screen bg-gray-900 text-white overflow-hidden">
+        <div className="flex flex-col h-screen bg-gray-950 text-white overflow-hidden">
           <div className="flex-1 flex flex-col items-center justify-center px-6">
             {/* Hero Section */}
             <div className="text-center mb-8 max-w-3xl">
@@ -1667,25 +1668,23 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
               </p>
             </div>
 
-            {/* Clean Input Box - Matching Image Design */}
+            {/* Clean Input Card - Matching chat-panel-v2 design */}
             <div className="w-full max-w-4xl">
-              <div className="bg-gray-800/60 backdrop-blur-xl rounded-xl border border-gray-700/50 shadow-2xl overflow-hidden">
+              <div className="rounded-2xl border border-gray-700/60 bg-gray-900/80 focus-within:border-gray-600 transition-colors shadow-2xl overflow-hidden">
                 {/* Header Bar with Repo/Branch Info */}
-                <div className="flex items-center gap-3 px-4 py-3 bg-gray-900/50 border-b border-gray-700/50">
+                <div className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-700/60">
                   {/* GitHub Icon + Connection */}
                   <div className="flex items-center gap-2">
                     {storedTokens.github ? (
-                      <>
-                        <div className="flex items-center gap-1.5 text-sm text-gray-400">
-                          <Github className="h-4 w-4" />
-                          <span className="text-xs">@</span>
-                          <span className="font-medium text-white">github</span>
-                        </div>
-                      </>
+                      <div className="flex items-center gap-1.5 text-sm text-gray-400">
+                        <Github className="h-4 w-4" />
+                        <span className="text-xs">@</span>
+                        <span className="font-medium text-gray-200">github</span>
+                      </div>
                     ) : (
                       <a
                         href="/workspace/account"
-                        className="flex items-center gap-2 text-sm text-yellow-400 hover:text-yellow-300"
+                        className="flex items-center gap-2 text-sm text-orange-400 hover:text-orange-300 transition-colors"
                       >
                         <Github className="h-4 w-4" />
                         <span>Connect GitHub</span>
@@ -1693,7 +1692,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                     )}
                   </div>
 
-                  <div className="h-4 w-px bg-gray-700" />
+                  <div className="h-4 w-px bg-gray-700/60" />
 
                   {/* Repository Dropdown */}
                   <Select
@@ -1701,19 +1700,19 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                     onValueChange={setSelectedRepo}
                     disabled={!storedTokens.github || isLoadingRepos}
                   >
-                    <SelectTrigger className="h-7 bg-transparent border-0 text-white text-sm font-medium hover:bg-gray-700/30 focus:ring-0 w-auto min-w-[200px]">
+                    <SelectTrigger className="h-7 bg-transparent border-0 text-gray-200 text-sm font-medium hover:bg-gray-800/60 focus:ring-0 w-auto min-w-[200px]">
                       <SelectValue placeholder="Select repository" />
                     </SelectTrigger>
-                    <SelectContent className="bg-gray-800 border-gray-700">
+                    <SelectContent className="bg-gray-900 border-gray-700/60">
                       {repositories.map((repo) => (
                         <SelectItem
                           key={repo.full_name}
                           value={repo.full_name}
-                          className="text-white hover:bg-gray-700"
+                          className="text-gray-200 hover:bg-gray-800"
                         >
                           <div className="flex items-center gap-2">
                             <span>{repo.full_name}</span>
-                            {repo.private && <Lock className="h-3 w-3 text-gray-400" />}
+                            {repo.private && <Lock className="h-3 w-3 text-gray-500" />}
                           </div>
                         </SelectItem>
                       ))}
@@ -1731,12 +1730,12 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                         onValueChange={setSelectedBranch}
                         disabled={!selectedRepo || isLoadingBranches || !storedTokens.github}
                       >
-                        <SelectTrigger className="h-7 bg-transparent border-0 text-white text-sm hover:bg-gray-700/30 focus:ring-0 w-auto min-w-[100px]">
+                        <SelectTrigger className="h-7 bg-transparent border-0 text-gray-200 text-sm hover:bg-gray-800/60 focus:ring-0 w-auto min-w-[100px]">
                           <SelectValue placeholder="Branch" />
                         </SelectTrigger>
-                        <SelectContent className="bg-gray-800 border-gray-700">
+                        <SelectContent className="bg-gray-900 border-gray-700/60">
                           {branches.map((branch) => (
-                            <SelectItem key={branch} value={branch} className="text-white hover:bg-gray-700">
+                            <SelectItem key={branch} value={branch} className="text-gray-200 hover:bg-gray-800">
                               {branch}
                             </SelectItem>
                           ))}
@@ -1748,46 +1747,35 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                   <div className="flex-1" />
 
                   {/* Refresh Icon */}
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                  <button
+                    type="button"
                     onClick={fetchUserGitHubRepos}
                     disabled={isLoadingRepos || !storedTokens.github}
-                    className="h-7 w-7 p-0 text-gray-400 hover:text-white hover:bg-gray-700/30"
+                    className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors disabled:opacity-30"
                   >
                     {isLoadingRepos ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
                       <RefreshCw className="h-3.5 w-3.5" />
                     )}
-                  </Button>
+                  </button>
 
                   {/* History Dropdown */}
                   <div className="relative">
-                    <Button
-                      variant="ghost"
-                      size="sm"
+                    <button
+                      type="button"
                       onClick={() => {
                         setShowHistoryDropdown(!showHistoryDropdown)
                         if (!showHistoryDropdown) loadConversationsList()
                       }}
-                      className="h-7 w-7 p-0 text-gray-400 hover:text-white hover:bg-gray-700/30"
+                      className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
                     >
                       <History className="h-3.5 w-3.5" />
-                    </Button>
+                    </button>
 
                     {showHistoryDropdown && (
-                      <div
-                        className="absolute top-full mt-2 right-0 w-72 rounded-xl overflow-hidden z-50"
-                        style={{
-                          background: 'rgba(17, 24, 39, 0.95)',
-                          border: '1px solid rgba(234, 88, 12, 0.2)',
-                          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6)',
-                          backdropFilter: 'blur(20px)',
-                          maxHeight: '300px'
-                        }}
-                      >
-                        <div className="p-3 border-b border-orange-500/20">
+                      <div className="absolute top-full mt-2 right-0 w-72 rounded-xl overflow-hidden z-50 bg-gray-900/95 backdrop-blur-xl border border-gray-700/60 shadow-2xl max-h-[300px]">
+                        <div className="p-3 border-b border-gray-700/60">
                           <p className="text-xs text-gray-400 font-medium">Conversation History</p>
                         </div>
                         <div className="overflow-y-auto max-h-64">
@@ -1810,16 +1798,12 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                                     setCurrentView('workspace')
                                     setShowHistoryDropdown(false)
                                   }}
-                                  className="w-full text-left p-3 transition-all border-none cursor-pointer hover:bg-orange-500/10"
-                                  style={{
-                                    background: isCurrent ? 'rgba(234, 88, 12, 0.1)' : 'transparent',
-                                    borderBottom: '1px solid rgba(234, 88, 12, 0.1)'
-                                  }}
+                                  className={`w-full text-left p-3 transition-colors cursor-pointer hover:bg-gray-800/60 border-b border-gray-800/40 ${isCurrent ? 'bg-orange-600/10' : ''}`}
                                 >
                                   <div className="flex items-start gap-2">
-                                    <Github className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                                    <Github className="w-4 h-4 text-gray-500 flex-shrink-0 mt-0.5" />
                                     <div className="flex-1 min-w-0">
-                                      <p className="text-sm text-white font-medium truncate">{title}</p>
+                                      <p className="text-sm text-gray-200 font-medium truncate">{title}</p>
                                       <p className="text-xs text-gray-400 truncate">{conv.repo} • {conv.branch}</p>
                                       <p className="text-xs text-gray-500 mt-1">
                                         {new Date(conv.lastActivity).toLocaleDateString()}
@@ -1837,48 +1821,47 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 </div>
 
                 {/* Input Area */}
-                <div className="relative p-4 flex flex-col">
-                  <Textarea
+                <div className="relative">
+                  <textarea
                     ref={textareaRef}
                     value={landingInput}
-                    onChange={(e) => setLandingInput(e.target.value)}
-                    placeholder="Describe your coding task or ask a question..."
-                    className="w-full min-h-[140px] bg-transparent border-0 text-white text-base placeholder-gray-500 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 px-4 py-4 mb-3 rounded-lg"
-                    style={{
-                      whiteSpace: 'pre-wrap',
-                      wordWrap: 'break-word',
-                      overflowWrap: 'break-word'
+                    onChange={(e) => {
+                      setLandingInput(e.target.value)
+                      const textarea = e.target as HTMLTextAreaElement
+                      textarea.style.height = 'auto'
+                      textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px'
                     }}
+                    placeholder="Describe your coding task or ask a question..."
+                    className="w-full min-h-[100px] max-h-[200px] resize-none border-0 bg-transparent text-sm text-gray-100 placeholder:text-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none px-4 pt-3 pb-2"
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                      if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault()
                         handleLandingSubmit()
                       }
                     }}
                   />
+                </div>
 
-                  {/* Bottom Controls */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-500">
-                      Press <kbd className="px-1.5 py-0.5 bg-gray-700/50 rounded text-xs border border-gray-600">Cmd</kbd>+<kbd className="px-1.5 py-0.5 bg-gray-700/50 rounded text-xs border border-gray-600">Enter</kbd> to send
-                    </span>
-
-                    {/* Send Button */}
-                    <Button
-                      onClick={handleLandingSubmit}
-                      disabled={!landingInput.trim() || !selectedRepo || isLandingLoading || !storedTokens.github}
-                      className="h-9 px-4 rounded-lg bg-orange-600 hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium"
+                {/* Bottom Action Bar */}
+                <div className="flex items-center justify-end px-3 pb-2.5">
+                  {/* Send/Loading Button */}
+                  {isLandingLoading ? (
+                    <button
+                      type="button"
+                      className="h-7 w-7 rounded-lg bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors"
                     >
-                      {isLandingLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span>Send</span>
-                          <Send className="h-4 w-4" />
-                        </div>
-                      )}
-                    </Button>
-                  </div>
+                      <Square className="w-3.5 h-3.5 text-white fill-white" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleLandingSubmit}
+                      disabled={!landingInput.trim() || !selectedRepo || !storedTokens.github}
+                      className="h-7 w-7 rounded-lg bg-orange-600 hover:bg-orange-500 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+                    >
+                      <ArrowUp className="size-4 text-white" />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -1889,55 +1872,35 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
   }
 
   return (
-    <div className="repo-agent-container h-screen flex overflow-hidden" style={{
-      background: 'var(--bg, #0a0e14)',
-      color: 'var(--text, #e5e7eb)'
-    }}>
+    <div className="repo-agent-container h-screen flex overflow-hidden bg-gray-950 text-gray-200">
       {/* Chat Panel */}
       <div
-        className="chat-panel flex flex-col"
+        className="chat-panel flex flex-col relative overflow-hidden"
         style={{
           flex: `0 0 ${chatWidth}%`,
-          background: 'linear-gradient(180deg, #0a0e14 0%, #0d1117 100%)',
-          borderRight: '1px solid rgba(59, 131, 246, 0)',
-          boxShadow: '4px 0 40px rgba(0, 0, 0, 0.5)',
-          position: 'relative',
-          minWidth: '320px',
-          overflow: 'hidden'
+          minWidth: '320px'
         }}
       >
         {/* Chat Header */}
-        <div className="chat-header p-5 flex items-center justify-between gap-3" style={{
-          borderBottom: '1px solid rgba(59, 130, 246, 0.1)',
-          fontWeight: '600',
-          fontSize: '1.1em',
-          background: 'linear-gradient(135deg, rgba(17, 24, 39, 0.8), rgba(31, 41, 55, 0.6))',
-          backdropFilter: 'blur(20px)',
-          position: 'relative',
-          overflow: 'hidden'
-        }}>
+        <div className="chat-header px-4 py-3 flex items-center justify-between gap-3 border-b border-gray-700/60 bg-gray-900/80 backdrop-blur-sm font-semibold text-sm">
           <div className="header-left flex items-center gap-3">
             <button
               onClick={handleBackToLanding}
-              className="back-icon w-6 h-6 cursor-pointer text-gray-400 transition-all hover:text-gray-200 hover:translate-x-[-2px]"
+              className="w-6 h-6 cursor-pointer text-gray-400 transition-all hover:text-gray-200 hover:translate-x-[-2px]"
             >
               <ChevronLeft className="w-full h-full" />
             </button>
-            <div className="status-dot w-2 h-2 bg-green-500 rounded-full" style={{
-              animation: 'pulse 2s infinite',
-              boxShadow: '0 0 12px #10b981'
-            }}></div>          </div>
-          <div className="repo-selector flex items-center gap-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+          </div>
+          <div className="flex items-center gap-2">
             <select
               value={selectedRepo}
               onChange={(e) => setSelectedRepo(e.target.value)}
-              className="selector bg-gray-800/60 border border-orange-500/30 rounded-lg px-3.5 py-2 text-gray-200 text-sm cursor-pointer outline-none transition-all hover:border-orange-500"
+              className="bg-gray-800/60 border border-gray-700/60 rounded-lg px-3 py-1.5 text-gray-200 text-sm cursor-pointer outline-none transition-all hover:border-gray-600 focus:border-gray-600 appearance-none pr-7"
               style={{
-                appearance: 'none',
                 backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239ca3af' d='M6 8.5l-4-4h8l-4 4z'/%3E%3C/svg%3E")`,
                 backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'right 10px center',
-                paddingRight: '30px'
+                backgroundPosition: 'right 8px center'
               }}
             >
               <option value="">Select repository</option>
@@ -1950,13 +1913,11 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
             <select
               value={selectedBranch}
               onChange={(e) => setSelectedBranch(e.target.value)}
-              className="selector bg-gray-800/60 border border-orange-500/30 rounded-lg px-3.5 py-2 text-gray-200 text-sm cursor-pointer outline-none transition-all hover:border-orange-500"
+              className="bg-gray-800/60 border border-gray-700/60 rounded-lg px-3 py-1.5 text-gray-200 text-sm cursor-pointer outline-none transition-all hover:border-gray-600 focus:border-gray-600 appearance-none pr-7"
               style={{
-                appearance: 'none',
                 backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239ca3af' d='M6 8.5l-4-4h8l-4 4z'/%3E%3C/svg%3E")`,
                 backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'right 10px center',
-                paddingRight: '30px'
+                backgroundPosition: 'right 8px center'
               }}
               disabled={isLoadingBranches}
             >
@@ -1972,12 +1933,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
         {/* Messages */}
         <div
           ref={chatBodyRef}
-          className="chat-body flex-1 overflow-y-auto p-8 flex flex-col gap-5"
-          style={{
-            background: 'linear-gradient(180deg, #0a0e14 0%, #0d1117 50%, #0a0e14 100%)',
-            position: 'relative',
-            paddingBottom: '160px'
-          }}
+          className="chat-body flex-1 overflow-y-auto p-8 flex flex-col gap-5 bg-gray-950 pb-40"
         >
           {messages.map((message, index) => {
             const isLongMessage = message.isUser && message.content.length > 200
@@ -1989,18 +1945,11 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
             return (
               <div
                 key={message.id}
-                className={`message max-w-[80%] p-4 rounded-2xl leading-relaxed text-sm transition-all relative`}
-                style={{
-                  alignSelf: message.isUser ? 'flex-end' : 'flex-start',
-                  background: message.isUser
-                    ? 'linear-gradient(135deg, #3b82f6, #2563eb)'
-                    : 'transparent',
-                  color: 'white',
-                  borderBottomRightRadius: message.isUser ? '4px' : '16px',
-                  borderBottomLeftRadius: message.isUser ? '16px' : '4px',
-                  boxShadow: message.isUser ? '0 4px 20px rgba(234, 88, 12, 0.15)' : 'none',
-                  animation: 'messageSlide 0.4s ease-out'
-                }}
+                className={`message max-w-[80%] p-4 rounded-2xl leading-relaxed text-sm transition-all relative ${
+                  message.isUser
+                    ? 'self-end bg-orange-600 text-white rounded-br-sm'
+                    : 'self-start bg-transparent text-white rounded-bl-sm'
+                }`}
               >
                 {message.isUser ? (
                   <div className="group">
@@ -2088,293 +2037,214 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
         </div>
 
         {/* Input Area */}
-        <div className="input-area p-5 absolute bottom-0 left-0 right-0 z-10" style={{
-          background: 'linear-gradient(180deg, rgba(17, 24, 39, 0.95), rgba(10, 14, 20, 0.98))',
-          backdropFilter: 'blur(20px)',
-          borderTop: '1px solid rgba(234, 88, 12, 0.2)',
-          boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.6)'
-        }}>
+        <div className="p-3 absolute bottom-0 left-0 right-0 z-10 bg-gray-950/95 backdrop-blur-sm border-t border-gray-800/60">
           {/* Attachment Badges */}
           {attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-3 p-2 bg-gray-800/50 rounded-xl border border-gray-700/50">
+            <div className="flex flex-wrap gap-1.5 mb-2 px-1">
               {attachments.map((attachment) => (
                 <div
                   key={attachment.id}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-gray-700/50 rounded-lg text-sm border border-gray-600/50"
+                  className="flex items-center gap-1.5 bg-gray-800 px-2 py-1 rounded-lg text-xs text-gray-300 group"
                 >
-                  {attachment.type === 'file' && <FileText className="w-3.5 h-3.5 text-orange-400" />}
-                  {attachment.type === 'image' && <ImageIcon className="w-3.5 h-3.5 text-green-400" />}
-                  {attachment.type === 'url' && <LinkIcon className="w-3.5 h-3.5 text-purple-400" />}
-                  <span className="text-gray-300 truncate max-w-[150px]">
+                  {attachment.type === 'file' && <FileText className="w-3 h-3 text-gray-500" />}
+                  {attachment.type === 'image' && <ImageIcon className="w-3 h-3 text-gray-500" />}
+                  {attachment.type === 'url' && <LinkIcon className="w-3 h-3 text-gray-500" />}
+                  <span className="truncate max-w-[120px]">
                     {attachment.name}
                   </span>
                   {attachment.size && (
-                    <span className="text-gray-500 text-xs">
+                    <span className="text-gray-500 text-[10px]">
                       ({(attachment.size / 1024).toFixed(1)}KB)
                     </span>
                   )}
                   <button
                     onClick={() => removeAttachment(attachment.id)}
-                    className="ml-1 text-gray-400 hover:text-red-400 transition-colors"
+                    className="opacity-0 group-hover:opacity-100 hover:text-red-400 text-gray-500 transition-all"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="w-3 h-3" />
                   </button>
                 </div>
               ))}
             </div>
           )}
 
-          <div className="input-wrapper flex items-end gap-3 relative">
-            <div className="input-container flex-1 relative overflow-hidden rounded-2xl flex flex-col min-w-0" style={{
-              background: 'rgba(17, 24, 39, 0.8)',
-              border: '2px solid rgba(234, 88, 12, 0.3)',
-              boxShadow: '0 4px 24px rgba(0, 0, 0, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.05)',
-              transition: 'all 0.3s ease'
-            }}>
-              <div className="textarea-wrapper flex-1 min-w-0 overflow-hidden">
-                <Textarea
-                  ref={textareaRef}
-                  value={currentInput}
-                  onChange={(e) => setCurrentInput(e.target.value)}
-                  placeholder="Describe what you want to build..."
-                  className="w-full bg-transparent border-none text-gray-200 placeholder-gray-500 resize-none outline-none p-3 leading-relaxed"
-                  style={{
-                    maxHeight: '200px',
-                    minHeight: '44px',
-                    whiteSpace: 'pre-wrap',
-                    wordWrap: 'break-word',
-                    overflowWrap: 'break-word'
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey && !isLoading) {
-                      e.preventDefault()
-                      sendMessage(currentInput)
-                    }
-                  }}
-                />
-              </div>
-              <div className="input-actions flex items-center justify-between p-2 border-t border-gray-700/50">
-                <div className="flex items-center gap-2">
-                  <Popover open={showAttachmentMenu} onOpenChange={setShowAttachmentMenu}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-gray-400 hover:text-white hover:bg-gray-700/50"
-                        disabled={isLoading}
+          {/* Input Card - matching chat-panel-v2 style */}
+          <div className="relative rounded-2xl border border-gray-700/60 bg-gray-900/80 focus-within:border-gray-600 transition-colors">
+            <Textarea
+              ref={textareaRef}
+              value={currentInput}
+              onChange={(e) => setCurrentInput(e.target.value)}
+              placeholder="Describe what you want to build..."
+              className="min-h-[44px] max-h-[140px] resize-none border-0 bg-transparent text-sm text-gray-100 placeholder:text-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0 px-3.5 pt-3 pb-2"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && !isLoading) {
+                  e.preventDefault()
+                  sendMessage(currentInput)
+                }
+              }}
+            />
+
+            {/* Bottom action bar */}
+            <div className="flex items-center justify-between px-3 pb-2.5">
+              <div className="flex items-center gap-1">
+                <Popover open={showAttachmentMenu} onOpenChange={setShowAttachmentMenu}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
+                      disabled={isLoading}
+                    >
+                      <Plus className="size-4" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-52 p-2 z-[70] bg-gray-900 border-gray-700" side="top" align="start">
+                    <div className="flex flex-col gap-1">
+                      <div className="px-2 py-1 text-xs font-semibold text-gray-400 uppercase">Attach to message</div>
+
+                      <button
+                        onClick={() => {
+                          setShowFileDialog(true)
+                          setShowAttachmentMenu(false)
+                        }}
+                        className="w-full justify-start text-sm px-2 py-2 text-gray-300 hover:bg-gray-700/50 rounded transition-colors flex items-center gap-2"
                       >
-                        <Plus className="size-4" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-52 p-2 z-[70] bg-gray-900 border-gray-700" side="top" align="start">
-                      <div className="flex flex-col gap-1">
-                        <div className="px-2 py-1 text-xs font-semibold text-gray-400 uppercase">Attach to message</div>
+                        <FileText className="size-4 text-gray-500" /> Upload File
+                      </button>
 
-                        <button
-                          onClick={() => {
-                            setShowFileDialog(true)
-                            setShowAttachmentMenu(false)
-                          }}
-                          className="w-full justify-start text-sm px-2 py-2 text-gray-300 hover:bg-gray-700/50 rounded transition-colors flex items-center gap-2"
-                        >
-                          <FileText className="size-4 text-orange-400" /> Upload File
-                        </button>
+                      <button
+                        onClick={() => {
+                          setShowImageDialog(true)
+                          setShowAttachmentMenu(false)
+                        }}
+                        className="w-full justify-start text-sm px-2 py-2 text-gray-300 hover:bg-gray-700/50 rounded transition-colors flex items-center gap-2"
+                      >
+                        <ImageIcon className="size-4 text-gray-500" /> Upload Image
+                      </button>
 
-                        <button
-                          onClick={() => {
-                            setShowImageDialog(true)
-                            setShowAttachmentMenu(false)
-                          }}
-                          className="w-full justify-start text-sm px-2 py-2 text-gray-300 hover:bg-gray-700/50 rounded transition-colors flex items-center gap-2"
-                        >
-                          <ImageIcon className="size-4 text-green-400" /> Upload Image
-                        </button>
+                      <button
+                        onClick={() => {
+                          setShowUrlDialog(true)
+                          setShowAttachmentMenu(false)
+                        }}
+                        className="w-full justify-start text-sm px-2 py-2 text-gray-300 hover:bg-gray-700/50 rounded transition-colors flex items-center gap-2"
+                      >
+                        <LinkIcon className="size-4 text-gray-500" /> Attach URL
+                      </button>
 
-                        <button
-                          onClick={() => {
-                            setShowUrlDialog(true)
-                            setShowAttachmentMenu(false)
-                          }}
-                          className="w-full justify-start text-sm px-2 py-2 text-gray-300 hover:bg-gray-700/50 rounded transition-colors flex items-center gap-2"
-                        >
-                          <LinkIcon className="size-4 text-purple-400" /> Attach URL
-                        </button>
+                      <div className="border-t border-gray-700/50 my-1"></div>
 
-                        <div className="border-t border-gray-700/50 my-1"></div>
+                      <button
+                        onClick={() => {
+                          setCurrentInput(prev => prev + '\n\n```\n// Code snippet\n```')
+                          setShowAttachmentMenu(false)
+                        }}
+                        className="w-full justify-start text-sm px-2 py-2 text-gray-300 hover:bg-gray-700/50 rounded transition-colors flex items-center gap-2"
+                      >
+                        <Code className="size-4 text-gray-500" /> Code Block
+                      </button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
 
-                        <button
-                          onClick={() => {
-                            setCurrentInput(prev => prev + '\n\n```\n// Code snippet\n```')
-                            setShowAttachmentMenu(false)
-                          }}
-                          className="w-full justify-start text-sm px-2 py-2 text-gray-300 hover:bg-gray-700/50 rounded transition-colors flex items-center gap-2"
-                        >
-                          <Code className="size-4 text-yellow-400" /> Code Block
-                        </button>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
+                {attachments.length > 0 && (
+                  <span className="text-[11px] text-gray-500">{attachments.length} file{attachments.length > 1 ? 's' : ''}</span>
+                )}
+              </div>
 
-                <div className="flex items-center gap-2">
-                  {attachments.length > 0 && (
-                    <span className="text-xs text-gray-500">{attachments.length} attachment{attachments.length > 1 ? 's' : ''}</span>
-                  )}
-                </div>
+              <div className="flex items-center gap-1.5">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={handleClearMessages}
+                        className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-red-400 hover:bg-gray-800 transition-colors"
+                        disabled={isLoading || messages.length === 0}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="bg-gray-800 border-gray-700 text-gray-300 text-xs">
+                      <p>Clear chat</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+
+                {/* Send / Stop Button */}
+                {isStreaming ? (
+                  <button
+                    type="button"
+                    onClick={handleStopStream}
+                    className="h-7 w-7 rounded-lg bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors"
+                    title="Stop generating"
+                  >
+                    <Square className="w-3.5 h-3.5 text-white fill-white" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => sendMessage(currentInput)}
+                    disabled={(!currentInput.trim() && attachments.length === 0) || isLoading}
+                    className="h-7 w-7 rounded-lg bg-orange-600 hover:bg-orange-500 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    ) : (
+                      <ArrowUp className="size-4 text-white" />
+                    )}
+                  </button>
+                )}
               </div>
             </div>
-
-            {/* Send / Stop Button */}
-            {isStreaming ? (
-              <button
-                onClick={handleStopStream}
-                className="send-button w-9 h-9 flex items-center justify-center border-none rounded-full text-white cursor-pointer transition-all flex-shrink-0"
-                style={{
-                  background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-                  boxShadow: '0 2px 12px rgba(239, 68, 68, 0.4)'
-                }}
-                title="Stop generating"
-              >
-                <StopCircle className="w-5 h-5" />
-              </button>
-            ) : (
-              <button
-                  onClick={() => sendMessage(currentInput)}
-                  disabled={(!currentInput.trim() && attachments.length === 0) || isLoading}
-                  className="send-button w-9 h-9 flex items-center justify-center border-none rounded-full text-white cursor-pointer transition-all flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{
-                    background: 'linear-gradient(135deg, #ea580c, #c2410c)',
-                    boxShadow: '0 2px 12px rgba(234, 88, 12, 0.4)'
-                  }}
-              >
-                {isLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Send className="w-5 h-5" />
-                )}
-              </button>
-            )}
-          </div>
-          <div className="input-hint text-xs text-gray-400 p-2 pt-3 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              Press <kbd className="px-2 py-1 bg-gray-800 rounded text-xs border border-gray-700">Enter</kbd> to send, <kbd className="px-2 py-1 bg-gray-800 rounded text-xs border border-gray-700">Shift + Enter</kbd> for new line
-            </div>
-
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={handleClearMessages}
-                    className="text-gray-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-gray-800/50 transition-colors"
-                    disabled={isLoading || messages.length === 0}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="bg-red-900 border-red-800 text-white">
-                  <p>Clear chat history</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
           </div>
         </div>
       </div>
 
       {/* Resizer */}
       <div
-        className="resizer cursor-col-resize transition-all relative"
-        style={{
-          width: '8px',
-          background: 'linear-gradient(to right, rgba(59, 130, 246, 0.1), transparent)'
-        }}
+        className="resizer w-[6px] cursor-col-resize transition-all relative bg-gray-800/60 hover:bg-gray-700/60"
         onMouseDown={handleMouseDown}
       >
-        <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-0.5 h-10 bg-blue-500/30 rounded-sm opacity-0 transition-opacity hover:opacity-100"></div>
+        <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-0.5 h-10 bg-gray-600 rounded-sm opacity-0 transition-opacity hover:opacity-100"></div>
       </div>
 
       {/* Sidebar */}
-      <div className="sidebar flex-1 flex flex-col overflow-hidden" style={{
-        background: 'linear-gradient(180deg, #0a0e14 0%, #0d1117 100%)',
-        borderLeft: '1px solid rgba(59, 130, 246, 0.1)',
-        boxShadow: '-4px 0 40px rgba(0, 0, 0, 0.5)'
-      }}>
+      <div className="sidebar flex-1 flex flex-col overflow-hidden bg-gray-950 border-l border-gray-700/60">
         {/* Sidebar Tabs */}
-        <div className="sidebar-tabs p-5 flex items-center" style={{
-          background: 'linear-gradient(135deg, rgba(17, 24, 39, 0.8), rgba(31, 41, 55, 0.6))',
-          backdropFilter: 'blur(20px)',
-          borderBottom: '1px solid rgba(59, 130, 246, 0.1)',
-          position: 'relative'
-        }}>
-          <div className="tab-buttons flex gap-2 p-1.5 rounded-xl" style={{
-            background: 'rgba(31, 41, 55, 0.6)',
-            border: '1px solid rgba(59, 130, 246, 0.1)'
-          }}>
+        <div className="sidebar-tabs px-4 py-3 flex items-center bg-gray-900/80 backdrop-blur-sm border-b border-gray-700/60">
+          <div className="tab-buttons flex gap-1 p-1 rounded-xl bg-gray-800/60 border border-gray-700/60">
             <button
               onClick={() => setActiveTab('changes')}
-              className={`tab-btn px-5 py-2.5 text-sm font-medium rounded-lg cursor-pointer transition-all relative ${activeTab === 'changes'
-                ? 'text-white'
-                : 'text-gray-400 hover:text-white'
+              className={`px-4 py-2 text-xs font-medium rounded-lg cursor-pointer transition-all ${activeTab === 'changes'
+                ? 'bg-orange-600/15 text-orange-400'
+                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/60'
                 }`}
-              style={{
-                background: activeTab === 'changes'
-                  ? 'linear-gradient(135deg, #1e40af, #1d4ed8)'
-                  : 'transparent',
-                boxShadow: activeTab === 'changes'
-                  ? '0 4px 16px rgba(30, 64, 175, 0.5), 0 0 30px rgba(30, 64, 175, 0.2)'
-                  : 'none'
-              }}
             >
               File Changes
             </button>
             <button
               onClick={() => setActiveTab('diffs')}
-              className={`tab-btn px-5 py-2.5 text-sm font-medium rounded-lg cursor-pointer transition-all relative ${activeTab === 'diffs'
-                ? 'text-white'
-                : 'text-gray-400 hover:text-white'
+              className={`px-4 py-2 text-xs font-medium rounded-lg cursor-pointer transition-all ${activeTab === 'diffs'
+                ? 'bg-orange-600/15 text-orange-400'
+                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/60'
                 }`}
-              style={{
-                background: activeTab === 'diffs'
-                  ? 'linear-gradient(135deg, #1e40af, #1d4ed8)'
-                  : 'transparent',
-                boxShadow: activeTab === 'diffs'
-                  ? '0 4px 16px rgba(30, 64, 175, 0.5), 0 0 30px rgba(30, 64, 175, 0.2)'
-                  : 'none'
-              }}
             >
               Code Diffs
             </button>
             <button
               onClick={() => setActiveTab('actions')}
-              className={`tab-btn px-5 py-2.5 text-sm font-medium rounded-lg cursor-pointer transition-all relative ${activeTab === 'actions'
-                ? 'text-white'
-                : 'text-gray-400 hover:text-white'
+              className={`px-4 py-2 text-xs font-medium rounded-lg cursor-pointer transition-all ${activeTab === 'actions'
+                ? 'bg-orange-600/15 text-orange-400'
+                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/60'
                 }`}
-              style={{
-                background: activeTab === 'actions'
-                  ? 'linear-gradient(135deg, #1e40af, #1d4ed8)'
-                  : 'transparent',
-                boxShadow: activeTab === 'actions'
-                  ? '0 4px 16px rgba(30, 64, 175, 0.5), 0 0 30px rgba(30, 64, 175, 0.2)'
-                  : 'none'
-              }}
             >
               Actions
             </button>
             <button
               onClick={() => setActiveTab('todos')}
-              className={`tab-btn px-5 py-2.5 text-sm font-medium rounded-lg cursor-pointer transition-all relative ${activeTab === 'todos'
-                ? 'text-white'
-                : 'text-gray-400 hover:text-white'
+              className={`px-4 py-2 text-xs font-medium rounded-lg cursor-pointer transition-all ${activeTab === 'todos'
+                ? 'bg-orange-600/15 text-orange-400'
+                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/60'
                 }`}
-              style={{
-                background: activeTab === 'todos'
-                  ? 'linear-gradient(135deg, #1e40af, #1d4ed8)'
-                  : 'transparent',
-                boxShadow: activeTab === 'todos'
-                  ? '0 4px 16px rgba(30, 64, 175, 0.5), 0 0 30px rgba(30, 64, 175, 0.2)'
-                  : 'none'
-              }}
             >
               Todos
             </button>
@@ -2382,72 +2252,43 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
         </div>
 
         {/* Tab Content */}
-        <div className="tab-content-wrapper flex-1 overflow-y-auto p-6" style={{
-          background: '#0a0e14'
-        }}>
+        <div className="tab-content-wrapper flex-1 overflow-y-auto p-6 bg-gray-950">
           {activeTab === 'changes' && (
             <div className="tab-content">
-              <h3 className="section-title text-xl font-semibold mb-6 text-white flex items-center gap-3" style={{
-                position: 'relative'
-              }}>
-                <span style={{
-                  content: '""',
-                  width: '4px',
-                  height: '24px',
-                  background: 'linear-gradient(180deg, #3b82f6, #2563eb)',
-                  borderRadius: '2px',
-                  boxShadow: '0 0 12px rgba(59, 130, 246, 0.5)',
-                  display: 'inline-block',
-                  marginRight: '8px'
-                }}></span>
+              <h3 className="text-sm font-semibold mb-4 text-gray-200 flex items-center gap-2">
+                <span className="w-1 h-5 bg-orange-500 rounded-sm inline-block"></span>
                 Files Modified
               </h3>
 
               {messages.flatMap((msg: Message) => msg.toolInvocations?.filter((t: any) => t.state === 'result' && ['github_write_file', 'github_edit_file', 'github_replace_string', 'github_delete_file', 'github_stage_change'].includes(t.toolName)) || []).length === 0 ? (
-                <div className="text-center py-12 text-gray-400">
-                  <File className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No file changes yet</p>
+                <div className="text-center py-12 text-gray-500">
+                  <File className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                  <p className="text-sm">No file changes yet</p>
                 </div>
               ) : (
                 messages.flatMap((msg: Message) => msg.toolInvocations?.filter((t: any) => t.state === 'result' && ['github_write_file', 'github_edit_file', 'github_replace_string', 'github_delete_file', 'github_stage_change'].includes(t.toolName)) || []).map((tool: any, index: number) => (
                   <div
                     key={index}
-                    className="file-item flex items-center justify-between p-4.5 mb-3 rounded-xl cursor-pointer transition-all"
-                    style={{
-                      background: 'rgba(31, 41, 55, 0.4)',
-                      border: '1px solid rgba(59, 130, 246, 0.2)'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateX(4px)'
-                      e.currentTarget.style.background = 'rgba(31, 41, 55, 0.6)'
-                      e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.4)'
-                      e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.3)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateX(0)'
-                      e.currentTarget.style.background = 'rgba(31, 41, 55, 0.4)'
-                      e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.2)'
-                      e.currentTarget.style.boxShadow = 'none'
-                    }}
+                    className="flex items-center justify-between p-3 mb-2 rounded-xl cursor-pointer transition-all bg-gray-900/60 border border-gray-700/60 hover:bg-gray-800/60 hover:border-gray-600/60"
                   >
                     <div className="flex items-center">
-                      <div className="file-icon mr-3">
+                      <div className="mr-3">
                         {tool.toolName === 'github_delete_file' && (
-                          <Minus className="w-5 h-5 text-red-400" />
+                          <Minus className="w-4 h-4 text-red-400" />
                         )}
                         {tool.toolName === 'github_write_file' && (
-                          <Plus className="w-5 h-5 text-green-400" />
+                          <Plus className="w-4 h-4 text-green-400" />
                         )}
                         {['github_edit_file', 'github_replace_string'].includes(tool.toolName) && (
-                          <File className="w-5 h-5 text-orange-400" />
+                          <File className="w-4 h-4 text-orange-400" />
                         )}
                         {tool.toolName === 'github_stage_change' && (
-                          <GitBranch className="w-5 h-5 text-yellow-400" />
+                          <GitBranch className="w-4 h-4 text-yellow-400" />
                         )}
                       </div>
                       <div>
-                        <div className="font-medium text-white">{tool.args?.path || tool.args?.filePath || 'unknown'}</div>
-                        <div className="text-green-400 text-sm mt-1">
+                        <div className="text-sm font-medium text-gray-200">{tool.args?.path || tool.args?.filePath || 'unknown'}</div>
+                        <div className="text-green-400 text-xs mt-0.5">
                           {tool.toolName === 'github_write_file' && 'created'}
                           {['github_edit_file', 'github_replace_string'].includes(tool.toolName) && 'modified'}
                           {tool.toolName === 'github_delete_file' && 'deleted'}
@@ -2463,26 +2304,15 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
 
           {activeTab === 'diffs' && (
             <div className="tab-content">
-              <h3 className="section-title text-xl font-semibold mb-6 text-white flex items-center gap-3" style={{
-                position: 'relative'
-              }}>
-                <span style={{
-                  content: '""',
-                  width: '4px',
-                  height: '24px',
-                  background: 'linear-gradient(180deg, #3b82f6, #2563eb)',
-                  borderRadius: '2px',
-                  boxShadow: '0 0 12px rgba(59, 130, 246, 0.5)',
-                  display: 'inline-block',
-                  marginRight: '8px'
-                }}></span>
+              <h3 className="text-sm font-semibold mb-4 text-gray-200 flex items-center gap-2">
+                <span className="w-1 h-5 bg-orange-500 rounded-sm inline-block"></span>
                 Review Changes
               </h3>
 
               {messages.flatMap((msg: Message) => msg.toolInvocations?.filter((t: any) => t.state === 'result' && ['github_write_file', 'github_edit_file', 'github_replace_string', 'github_delete_file', 'github_stage_change'].includes(t.toolName)) || []).length === 0 ? (
-                <div className="text-center py-12 text-gray-400">
-                  <Code className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No diffs to review</p>
+                <div className="text-center py-12 text-gray-500">
+                  <Code className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                  <p className="text-sm">No diffs to review</p>
                 </div>
               ) : (
                 messages.flatMap((msg: Message) => msg.toolInvocations?.filter((t: any) => t.state === 'result' && ['github_write_file', 'github_edit_file', 'github_replace_string', 'github_delete_file', 'github_stage_change'].includes(t.toolName)) || []).map((change: any, index: number) => {
@@ -2509,25 +2339,11 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                   return (
                     <div
                       key={index}
-                      className="accordion overflow-hidden mb-5 rounded-xl"
-                      style={{
-                        background: 'rgba(31, 41, 55, 0.4)',
-                        border: '1px solid rgba(59, 130, 246, 0.2)',
-                        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)'
-                      }}
+                      className="overflow-hidden mb-3 rounded-xl bg-gray-900/60 border border-gray-700/60"
                     >
                       <button
                         onClick={() => toggleDiff(filePath)}
-                        className="accordion-header w-full p-4 font-medium text-white flex items-center justify-between gap-2.5 cursor-pointer transition-all"
-                        style={{
-                          background: 'linear-gradient(135deg, #1e40af, #1d4ed8)'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = 'linear-gradient(135deg, #2563eb, #1d4ed8)'
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = 'linear-gradient(135deg, #1e40af, #1d4ed8)'
-                        }}
+                        className="w-full p-3 text-sm font-medium text-gray-200 flex items-center justify-between gap-2.5 cursor-pointer transition-all bg-gray-800/60 hover:bg-gray-800"
                       >
                         <div className="file-info flex items-center gap-2.5 flex-1">
                           <File className="w-4 h-4" />
@@ -2573,7 +2389,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                                   key={lineIndex}
                                   className="diff-line text-xs font-mono whitespace-pre-wrap break-all transition-all p-2 rounded"
                                   style={{
-                                    background: line.startsWith('+') ? 'rgba(34, 197, 94, 0.1)' : line.startsWith('-') ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.05)',
+                                    background: line.startsWith('+') ? 'rgba(34, 197, 94, 0.1)' : line.startsWith('-') ? 'rgba(239, 68, 68, 0.1)' : 'rgba(107, 114, 128, 0.05)',
                                     borderLeft: line.startsWith('+') ? '3px solid #22c55e' : line.startsWith('-') ? '3px solid #ef4444' : 'transparent',
                                     color: line.startsWith('+') ? '#86efac' : line.startsWith('-') ? '#fca5a5' : '#9ca3af'
                                   }}
@@ -2594,54 +2410,29 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
 
           {activeTab === 'actions' && (
             <div className="tab-content">
-              <h3 className="section-title text-xl font-semibold mb-6 text-white flex items-center gap-3" style={{
-                position: 'relative'
-              }}>
-                <span style={{
-                  content: '""',
-                  width: '4px',
-                  height: '24px',
-                  background: 'linear-gradient(180deg, #3b82f6, #2563eb)',
-                  borderRadius: '2px',
-                  boxShadow: '0 0 12px rgba(59, 130, 246, 0.5)',
-                  display: 'inline-block',
-                  marginRight: '8px'
-                }}></span>
+              <h3 className="text-sm font-semibold mb-4 text-gray-200 flex items-center gap-2">
+                <span className="w-1 h-5 bg-orange-500 rounded-sm inline-block"></span>
                 Actions Performed
               </h3>
 
               {actionLogs.length === 0 ? (
-                <div className="text-center py-12 text-gray-400">
-                  <CheckCircle2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No actions performed yet</p>
+                <div className="text-center py-12 text-gray-500">
+                  <CheckCircle2 className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                  <p className="text-sm">No actions performed yet</p>
                 </div>
               ) : (
                 actionLogs.map((action) => (
                   <div
                     key={action.id}
-                    className="action-item flex items-center gap-4 p-4.5 mb-3 rounded-xl transition-all"
-                    style={{
-                      background: 'rgba(31, 41, 55, 0.4)',
-                      border: '1px solid rgba(59, 130, 246, 0.2)'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateX(4px)'
-                      e.currentTarget.style.background = 'rgba(31, 41, 55, 0.6)'
-                      e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.4)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateX(0)'
-                      e.currentTarget.style.background = 'rgba(31, 41, 55, 0.4)'
-                      e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.2)'
-                    }}
+                    className="flex items-center gap-3 p-3 mb-2 rounded-xl transition-all bg-gray-900/60 border border-gray-700/60 hover:bg-gray-800/60 hover:border-gray-600/60"
                   >
                     <div className="text-green-400">
-                      <CheckCircle2 className="w-5 h-5" />
+                      <CheckCircle2 className="w-4 h-4" />
                     </div>
                     <div className="flex-1">
-                      <div className="font-medium text-white">{action.description}</div>
-                      <div className="text-gray-500 text-xs mt-1 flex items-center gap-2">
-                        <span className="px-2 py-1 bg-gray-700 rounded text-gray-300">
+                      <div className="text-sm font-medium text-gray-200">{action.description}</div>
+                      <div className="text-gray-500 text-xs mt-0.5 flex items-center gap-2">
+                        <span className="px-1.5 py-0.5 bg-gray-800 rounded text-gray-400 text-[10px]">
                           {action.type === 'file_operation' && 'File'}
                           {action.type === 'api_call' && 'API'}
                           {action.type === 'commit' && 'Commit'}
@@ -2658,27 +2449,16 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
 
           {activeTab === 'todos' && (
             <div className="tab-content">
-              <h3 className="section-title text-xl font-semibold mb-6 text-white flex items-center gap-3" style={{
-                position: 'relative'
-              }}>
-                <span style={{
-                  content: '""',
-                  width: '4px',
-                  height: '24px',
-                  background: 'linear-gradient(180deg, #3b82f6, #2563eb)',
-                  borderRadius: '2px',
-                  boxShadow: '0 0 12px rgba(59, 130, 246, 0.5)',
-                  display: 'inline-block',
-                  marginRight: '8px'
-                }}></span>
+              <h3 className="text-sm font-semibold mb-4 text-gray-200 flex items-center gap-2">
+                <span className="w-1 h-5 bg-orange-500 rounded-sm inline-block"></span>
                 Todo List
               </h3>
 
               {todos.length === 0 ? (
-                <div className="text-center py-12 text-gray-400">
-                  <CheckCircle2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No todos yet</p>
-                  <p className="text-sm mt-2">Ask me to create a todo and I'll add it here!</p>
+                <div className="text-center py-12 text-gray-500">
+                  <CheckCircle2 className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                  <p className="text-sm">No todos yet</p>
+                  <p className="text-xs mt-1.5 text-gray-600">Ask me to create a todo and I'll add it here!</p>
                 </div>
               ) : (
                 <Queue>
@@ -2729,16 +2509,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
         </div>
       </div>
 
-      <style jsx>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 0.6; transform: scale(1); }
-          50% { opacity: 1; transform: scale(1.3); }
-        }
-        @keyframes messageSlide {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
+      {/* Animations handled via Tailwind */}
 
       {/* File Upload Dialog */}
       <Dialog open={showFileDialog} onOpenChange={setShowFileDialog}>
