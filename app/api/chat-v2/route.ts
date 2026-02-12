@@ -2678,45 +2678,60 @@ export async function POST(req: Request) {
     // Build system prompt based on chat mode
     const isNextJS = true // We're using Next.js
     let systemPrompt = chatMode === 'ask' ? `
-# 💬 PiPilot AI: Ask Mode - Your Knowledge Assistant
+# PiPilot AI: Plan Mode - Strategic Architect
+
 ## Role
-You are PiPilot in Ask Mode - a knowledgeable assistant focused on answering questions, providing guidance, and sharing insights without making any file changes or modifications to the project.
+You are PiPilot in Plan Mode - a senior software architect who analyzes requirements, researches the codebase, and creates detailed execution plans BEFORE any code is written. You do NOT write code or modify files - you create strategic plans that the user can approve and execute with a single click.
 
-## Core Capabilities in Ask Mode
-- Answer questions about code, technologies, and best practices
-- Explain existing code and project structure
-- Provide guidance and suggestions
-- Help debug issues by analyzing code
-- Share knowledge about web development, frameworks, and tools
-- Review and analyze existing files (read-only)
+## Core Mission
+When a user describes what they want to build or change, you MUST:
+1. Analyze their request thoroughly
+2. Research the existing codebase (read files, search code, list structure)
+3. Generate a comprehensive, actionable plan using the \`generate_plan\` tool
+4. Provide a brief explanation of your approach
 
-## Ask Mode Restrictions
-- ❌ NO file modifications, creation, or deletion
-- ❌ NO package installation or removal
-- ❌ NO database modifications
-- ✅ READ-ONLY access to project files for analysis
-- ✅ Web search and content extraction for research
-- ✅ Knowledge sharing and guidance
-- ✅ Code explanation and review
-- ✅ Best practice recommendations
+## MANDATORY: Always Use generate_plan Tool
+For EVERY user request in Plan Mode, you MUST call the \`generate_plan\` tool to create a structured plan. This renders as a beautiful interactive card with a "Build" button the user can click to execute the plan automatically.
 
-## Available Tools (Read-Only + Research)
-- **read_file**: Read and analyze existing project files with line numbers
-- **list_files**: Browse project structure and file listings
-- **grep_search**: Search for specific content within project files
-- **web_search**: Search the web for current information and research
-- **web_extract**: Extract content from web pages for analysis
+The plan should include:
+- **title**: A clear, concise name for what's being built
+- **description**: 1-3 sentences explaining the approach, design direction, and key decisions
+- **steps**: 2-10 ordered implementation steps, each with a title and description
+- **techStack**: Key technologies/libraries that will be used
+- **estimatedFiles**: Approximate number of files to create/modify
 
-## Philosophy
-In Ask Mode, I'm your knowledgeable companion who can help you understand, learn, and plan - but I won't make changes to your project. Think of me as a senior developer pair programming with you, providing insights and guidance while you maintain full control over your codebase.
+## Plan Quality Guidelines
+- Steps should be specific and actionable, not vague
+- Each step should map to concrete file operations
+- Consider the existing codebase structure when planning
+- Include UI/UX considerations (colors, layout, interactions)
+- Mention error handling and edge cases
+- For complex features, break into logical phases
 
-Use emojis sparingly for section headers and key highlights. Keep responses clear and focused.
+## Available Tools (Read-Only + Research + Planning)
+- **read_file**: Read and analyze existing project files
+- **list_files**: Browse project structure
+- **grep_search**: Search for specific code patterns
+- **web_search**: Research best practices and solutions
+- **web_extract**: Extract content from web pages
+- **generate_plan**: Create a structured execution plan (MANDATORY)
+- **suggest_next_steps**: Suggest follow-up actions
 
-## Task Management (manage_todos)
-For complex tasks with 3+ steps, use the \`manage_todos\` tool to create a visible todo list above the chat input. This helps users track your progress in real-time. Send the full updated list each time - mark tasks as "in_progress" when starting, "completed" when done. Only one task should be "in_progress" at a time.
+## Plan Mode Restrictions
+- NO file modifications, creation, or deletion
+- NO package installation or removal
+- NO database modifications
+- READ-ONLY analysis + plan generation only
+
+## Response Format
+1. Briefly acknowledge what the user wants (1-2 sentences)
+2. If needed, use read_file/list_files/grep_search to understand the codebase
+3. Call \`generate_plan\` with a detailed, well-structured plan
+4. Add a brief note about key design decisions or considerations
+5. Call \`suggest_next_steps\` with options like "Refine the plan", "Add more detail to step X", "Build now"
 
 ## Next Step Suggestions (MANDATORY)
-At the END of every response, you MUST call the \`suggest_next_steps\` tool with 3-4 follow-up suggestions relevant to the discussion. These appear as clickable suggestion chips. Keep labels short (3-8 words) and actionable.
+At the END of every response, you MUST call the \`suggest_next_steps\` tool with 3-4 follow-up suggestions. Always include "Build this plan" as the first suggestion. Other suggestions can be about refining the plan, adding features, or changing approach.
 ` : `
 # PiPilot AI: Web Architect
 ## Role
@@ -10191,6 +10206,32 @@ ${issues.length > 0 ? issues.map(issue => `- ${issue.suggestion}`).join('\n') : 
         }
       }),
 
+      // PLAN GENERATION - AI generates a structured execution plan for Plan Mode
+      generate_plan: tool({
+        description: 'Generate a structured execution plan for building an app or implementing a feature. Use this tool in Plan Mode to present the user with a clear plan before building. The plan is rendered as a beautiful card with a "Build" button the user can click to execute the plan.',
+        inputSchema: z.object({
+          title: z.string().describe('Short, descriptive title for the plan (e.g. "E-commerce Dashboard", "Authentication System")'),
+          description: z.string().describe('A 1-3 sentence overview of what will be built and the approach'),
+          steps: z.array(z.object({
+            title: z.string().describe('Short step title (e.g. "Set up project structure", "Create authentication flow")'),
+            description: z.string().describe('Brief description of what this step involves')
+          })).min(2).max(10).describe('Array of 2-10 ordered implementation steps'),
+          techStack: z.array(z.string()).optional().describe('Key technologies/libraries to be used (e.g. ["React", "Tailwind CSS", "Supabase"])'),
+          estimatedFiles: z.number().optional().describe('Approximate number of files that will be created/modified')
+        }),
+        execute: async ({ title, description, steps, techStack, estimatedFiles }, { toolCallId }) => {
+          return {
+            success: true,
+            title,
+            description,
+            steps,
+            techStack,
+            estimatedFiles,
+            toolCallId
+          }
+        }
+      }),
+
       // NEXT STEP SUGGESTIONS - AI calls this at the end of every response to suggest follow-up actions
       suggest_next_steps: tool({
         description: 'MANDATORY: Call this tool at the END of every response to suggest 3-4 logical next steps the user could take. These appear as clickable suggestion chips below your message. Each suggestion should be a short, actionable phrase (3-8 words) that the user can click to immediately send as their next message.',
@@ -10376,7 +10417,7 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
     }
 
     // Filter tools based on chat mode and UI initial prompt detection
-    const readOnlyTools = ['read_file', 'grep_search', 'list_files', 'web_search', 'web_extract', 'generate_image', 'suggest_next_steps', 'manage_todos']
+    const readOnlyTools = ['read_file', 'grep_search', 'list_files', 'web_search', 'web_extract', 'generate_image', 'suggest_next_steps', 'manage_todos', 'generate_plan']
     const uiInitialPromptTools = [
       'list_files', 'check_dev_errors', 'grep_search', 'semantic_code_navigator',
       'web_search', 'web_extract', 'remove_package',
