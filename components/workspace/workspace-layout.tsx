@@ -436,13 +436,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     const handleAiStreamComplete = (event: CustomEvent) => {
       const { shouldSwitchToPreview, shouldCreatePreview } = event.detail
 
-      if (shouldSwitchToPreview) {
-        // Switch to preview tab
+      if (shouldSwitchToPreview && !isMobile) {
+        // Switch to preview tab (desktop only - no auto-switch on mobile)
         setActiveTab('preview')
-        // Also switch mobile tab to preview on mobile devices
-        if (isMobile) {
-          setMobileTab('preview')
-        }
       }
 
       if (shouldCreatePreview) {
@@ -457,14 +453,12 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
     // Auto-switch to preview tab when AI starts streaming so the user
     // sees the AI responding view (rocket + witty messages) immediately.
+    // Only on desktop - no auto-switch on mobile.
     const handleAiStreamingState = (event: CustomEvent) => {
       const { isStreaming } = event.detail
       setIsAIStreaming(isStreaming)
-      if (isStreaming) {
+      if (isStreaming && !isMobile) {
         setActiveTab('preview')
-        if (isMobile) {
-          setMobileTab('preview')
-        }
       }
     }
 
