@@ -2960,20 +2960,20 @@ export default function TodoApp() {
                 </div>
               )}
 
+              {/* Spacer to push controls right */}
+              {!isMobile && <div className="flex-1" />}
+
               {/* For Expo: No Visual Editor/Responsive. For others: show icons only */}
               {!isExpoProject && (
                 <>
+                  {/* Device selector - hidden on mobile */}
+                  {!isMobile && <WebPreviewDeviceSelector />}
                   <VisualEditorToggle
                     isEnabled={isVisualEditorEnabled}
                     onToggle={setIsVisualEditorEnabled}
                   />
-                  {/* Device selector - hidden on mobile */}
-                  {!isMobile && <WebPreviewDeviceSelector />}
                 </>
               )}
-
-              {/* Spacer to push URL bar and play/stop controls right */}
-              {!isMobile && <div className="flex-1" />}
 
               <WebPreviewUrl
                 onRefresh={refreshPreview}
