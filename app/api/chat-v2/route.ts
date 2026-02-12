@@ -2711,6 +2711,9 @@ You are PiPilot in Ask Mode - a knowledgeable assistant focused on answering que
 In Ask Mode, I'm your knowledgeable companion who can help you understand, learn, and plan - but I won't make changes to your project. Think of me as a senior developer pair programming with you, providing insights and guidance while you maintain full control over your codebase.
 
 Use emojis sparingly for section headers and key highlights. Keep responses clear and focused.
+
+## Next Step Suggestions (MANDATORY)
+At the END of every response, you MUST call the \`suggest_next_steps\` tool with 3-4 follow-up suggestions relevant to the discussion. These appear as clickable suggestion chips. Keep labels short (3-8 words) and actionable.
 ` : `
 # PiPilot AI: Web Architect
 ## Role
@@ -3139,6 +3142,15 @@ const { theme, setTheme } = useTheme();
 - Zero console errors, smooth performance
 - Bugs fixed thoroughly with root cause analysis
 - Production-ready code with proper error handling
+
+## Next Step Suggestions (MANDATORY)
+At the END of every response, you MUST call the \`suggest_next_steps\` tool to provide 3-4 contextual follow-up suggestions. These appear as clickable chips below your message. Make suggestions:
+- **Relevant** to what was just built, discussed, or fixed
+- **Actionable** - each should be a clear next task (e.g. "Add dark mode toggle", "Implement search", "Add loading states")
+- **Progressive** - suggest logical next features or improvements that build on the current work
+- **Varied** - mix between UI enhancements, functionality additions, and optimizations
+- Keep labels short (3-8 words). The prompt can be more detailed.
+- ALWAYS call this tool as your FINAL action in every response, even for simple answers.
 
 `
 
@@ -10168,6 +10180,25 @@ ${issues.length > 0 ? issues.map(issue => `- ${issue.suggestion}`).join('\n') : 
         }
       }),
 
+      // NEXT STEP SUGGESTIONS - AI calls this at the end of every response to suggest follow-up actions
+      suggest_next_steps: tool({
+        description: 'MANDATORY: Call this tool at the END of every response to suggest 3-4 logical next steps the user could take. These appear as clickable suggestion chips below your message. Each suggestion should be a short, actionable phrase (3-8 words) that the user can click to immediately send as their next message.',
+        inputSchema: z.object({
+          suggestions: z.array(z.object({
+            label: z.string().describe('Short display text for the chip (3-8 words, e.g. "Add dark mode", "Add search functionality")'),
+            prompt: z.string().describe('The full prompt to send when clicked (can be more detailed than the label)')
+          })).min(2).max(5).describe('Array of 2-5 next step suggestions relevant to what was just built or discussed')
+        }),
+        execute: async ({ suggestions }, { toolCallId }) => {
+          // No server-side work needed - the frontend reads the tool input directly
+          return {
+            success: true,
+            suggestions,
+            toolCallId
+          }
+        }
+      }),
+
       code_quality_analysis: tool({
         description: 'Create or update code quality analysis documentation with detailed metrics, complexity scores, maintainability analysis, and improvement recommendations in markdown format.',
         inputSchema: z.object({
@@ -10299,12 +10330,12 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
     }
 
     // Filter tools based on chat mode and UI initial prompt detection
-    const readOnlyTools = ['read_file', 'grep_search', 'list_files', 'web_search', 'web_extract', 'generate_image']
+    const readOnlyTools = ['read_file', 'grep_search', 'list_files', 'web_search', 'web_extract', 'generate_image', 'suggest_next_steps']
     const uiInitialPromptTools = [
       'list_files', 'check_dev_errors', 'grep_search', 'semantic_code_navigator',
       'web_search', 'web_extract', 'remove_package',
       'client_replace_string_in_file', 'edit_file', 'delete_folder','continue_backend_implementation',
-      'delete_file', 'read_file', 'write_file'
+      'delete_file', 'read_file', 'write_file', 'suggest_next_steps'
     ]
 
     let toolsToUse
