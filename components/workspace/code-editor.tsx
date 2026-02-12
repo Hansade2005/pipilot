@@ -5,8 +5,7 @@ import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { Editor } from "@monaco-editor/react"
 import { Button } from "@/components/ui/button"
-import { FileText, Save, Settings, Maximize2, Sparkles, Send, X } from "lucide-react"
-import { useTheme } from "next-themes"
+import { FileText, Save, Sparkles, Send, X } from "lucide-react"
 import { useAutoCloudBackup } from "@/hooks/use-auto-cloud-backup"
 import type { File } from "@/lib/storage-manager"
 import { Textarea } from "@/components/ui/textarea"
@@ -233,28 +232,70 @@ function InlineChat({
   )
 }
 
+export interface EditorSettings {
+  fontSize: number
+  fontFamily: string
+  theme: 'vs-dark' | 'vs' | 'hc-black' | 'hc-light'
+  minimap: boolean
+  wordWrap: 'on' | 'off' | 'wordWrapColumn' | 'bounded'
+  lineNumbers: 'on' | 'off' | 'relative' | 'interval'
+  tabSize: number
+  insertSpaces: boolean
+  cursorBlinking: 'blink' | 'smooth' | 'phase' | 'expand' | 'solid'
+  cursorStyle: 'line' | 'block' | 'underline' | 'line-thin' | 'block-outline' | 'underline-thin'
+  renderWhitespace: 'none' | 'boundary' | 'selection' | 'trailing' | 'all'
+  bracketPairColorization: boolean
+  indentGuides: boolean
+  smoothScrolling: boolean
+  scrollBeyondLastLine: boolean
+  stickyScroll: boolean
+  linkedEditing: boolean
+  formatOnPaste: boolean
+  formatOnType: boolean
+}
+
+export const defaultEditorSettings: EditorSettings = {
+  fontSize: 14,
+  fontFamily: 'JetBrains Mono, Fira Code, monospace',
+  theme: 'vs-dark',
+  minimap: true,
+  wordWrap: 'on',
+  lineNumbers: 'on',
+  tabSize: 2,
+  insertSpaces: true,
+  cursorBlinking: 'smooth',
+  cursorStyle: 'line',
+  renderWhitespace: 'selection',
+  bracketPairColorization: true,
+  indentGuides: true,
+  smoothScrolling: true,
+  scrollBeyondLastLine: false,
+  stickyScroll: false,
+  linkedEditing: false,
+  formatOnPaste: false,
+  formatOnType: false,
+}
+
 interface CodeEditorProps {
   file: File | null
   onSave?: (file: File, content: string) => void
-  projectFiles?: File[] // Add project files for import resolution
-  // Multi-tab support
+  projectFiles?: File[]
   openFiles?: File[]
   onCloseFile?: (file: File) => void
   onSelectFile?: (file: File) => void
+  editorSettings?: EditorSettings
 }
 
-export function CodeEditor({ file, onSave, projectFiles = [], openFiles = [], onCloseFile, onSelectFile }: CodeEditorProps) {
-  const { theme } = useTheme()
+export function CodeEditor({ file, onSave, projectFiles = [], openFiles = [], onCloseFile, onSelectFile, editorSettings }: CodeEditorProps) {
+  const settings = editorSettings || defaultEditorSettings
   const { triggerAutoBackup } = useAutoCloudBackup({
-    debounceMs: 1000, // Shorter debounce for code editor saves
-    silent: true // Don't show notifications for every save
+    debounceMs: 1000,
+    silent: true
   })
   const editorRef = useRef<any>(null)
   const [content, setContent] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
-  const [showMinimap, setShowMinimap] = useState(true)
-  const [fontSize, setFontSize] = useState(14)
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   // Inline chat state
@@ -1005,20 +1046,6 @@ export function CodeEditor({ file, onSave, projectFiles = [], openFiles = [], on
           {hasChanges && <div className="w-2 h-2 bg-orange-500 rounded-full" />}
         </div>
         <div className="flex items-center space-x-2">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => setShowMinimap(!showMinimap)}
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => setFontSize(fontSize === 14 ? 16 : 14)}
-          >
-            {fontSize}px
-          </Button>
           {isInlineStreaming && (
             <div className="flex items-center space-x-2 px-2 py-1 bg-orange-500/10 rounded-md">
               <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
@@ -1062,7 +1089,7 @@ export function CodeEditor({ file, onSave, projectFiles = [], openFiles = [], on
           language={getLanguage(file.name)}
           value={content}
           onChange={handleContentChange}
-          theme="vs-dark"
+          theme={settings.theme}
           onMount={(editor, monaco) => {
             editorRef.current = editor
             
@@ -1485,27 +1512,34 @@ export function CodeEditor({ file, onSave, projectFiles = [], openFiles = [], on
             })
           }}
           options={{
-            minimap: { enabled: showMinimap },
-            fontSize,
-            fontFamily: 'JetBrains Mono, Fira Code, monospace',
-            lineNumbers: 'on',
+            minimap: { enabled: settings.minimap },
+            fontSize: settings.fontSize,
+            fontFamily: settings.fontFamily,
+            lineNumbers: settings.lineNumbers,
+            tabSize: settings.tabSize,
+            insertSpaces: settings.insertSpaces,
             rulers: [80, 120],
-            wordWrap: 'on',
+            wordWrap: settings.wordWrap,
             automaticLayout: true,
-            scrollBeyondLastLine: false,
+            scrollBeyondLastLine: settings.scrollBeyondLastLine,
             scrollbar: {
               vertical: 'visible',
               horizontal: 'visible',
               alwaysConsumeMouseWheel: false,
             },
-            smoothScrolling: true,
-            cursorBlinking: 'smooth',
-            renderWhitespace: 'selection',
-            bracketPairColorization: { enabled: true },
+            smoothScrolling: settings.smoothScrolling,
+            cursorBlinking: settings.cursorBlinking,
+            cursorStyle: settings.cursorStyle,
+            renderWhitespace: settings.renderWhitespace,
+            bracketPairColorization: { enabled: settings.bracketPairColorization },
             guides: {
-              bracketPairs: true,
-              indentation: true,
+              bracketPairs: settings.bracketPairColorization,
+              indentation: settings.indentGuides,
             },
+            stickyScroll: { enabled: settings.stickyScroll },
+            linkedEditing: settings.linkedEditing,
+            formatOnPaste: settings.formatOnPaste,
+            formatOnType: settings.formatOnType,
             // Ensure proper layout within container
             overviewRulerLanes: 0,
             hideCursorInOverviewRuler: true,
