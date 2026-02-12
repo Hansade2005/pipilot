@@ -423,9 +423,11 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       const { shouldSwitchToPreview, shouldCreatePreview } = event.detail
       console.log('[WorkspaceLayout] AI stream complete event received:', { shouldSwitchToPreview, shouldCreatePreview })
 
-      if (shouldSwitchToPreview && !isMobile) {
-        // Switch to preview tab (desktop only - no auto-switch on mobile)
+      if (shouldSwitchToPreview) {
         setActiveTab('preview')
+        if (isMobile) {
+          setMobileTab('preview')
+        }
       }
 
       if (shouldCreatePreview) {
