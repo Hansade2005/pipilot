@@ -19,7 +19,7 @@ import { CodeEditor } from "./code-editor"
 import { DatabaseTab } from "./database-tab"
 import { AIPplatformTab } from "./ai-platform-tab"
 import { CloudTab } from "./cloud-tab"
-import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, Square, Monitor, Smartphone, Database, Cloud } from "lucide-react"
+import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, Square, Monitor, Smartphone, Database, Cloud, Search, Folder } from "lucide-react"
 import { storageManager } from "@/lib/storage-manager"
 import { useToast } from '@/hooks/use-toast'
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -79,6 +79,10 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [aiMode, setAiMode] = useState<AIMode>('agent')
   const [projectFiles, setProjectFiles] = useState<File[]>([])
 
+  // VS Code-like code view state
+  const [codeViewPanel, setCodeViewPanel] = useState<'files' | 'search' | null>('files')
+  const [openFiles, setOpenFiles] = useState<File[]>([])
+
   // Initialize auto cloud backup when user is available
   const { triggerBackup, getSyncStatus } = useCloudSync(user?.id || null)
   
@@ -91,6 +95,30 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
   // GitHub push functionality
   const { pushToGitHub, checkGitHubConnection, isPushing } = useGitHubPush()
+
+  // VS Code tab management helpers
+  const handleOpenFile = (file: File) => {
+    setSelectedFile(file)
+    setOpenFiles(prev => {
+      if (prev.some(f => f.path === file.path)) return prev
+      return [...prev, file]
+    })
+  }
+
+  const handleCloseFile = (file: File) => {
+    setOpenFiles(prev => {
+      const next = prev.filter(f => f.path !== file.path)
+      // If we closed the active file, select the last remaining tab
+      if (selectedFile?.path === file.path) {
+        setSelectedFile(next.length > 0 ? next[next.length - 1] : null)
+      }
+      return next
+    })
+  }
+
+  const handleSelectOpenFile = (file: File) => {
+    setSelectedFile(file)
+  }
 
   // Visual Editor save handler - applies style changes to source files
   const handleVisualEditorSave = async (changes: { 
@@ -1139,94 +1167,121 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
                 <ResizableHandle withHandle />
 
-                {/* Right Panel - Code/Preview Area */}
+                {/* Right Panel - VS Code Layout */}
                 <ResizablePanel defaultSize={60} minSize={30}>
                   <div className="h-full flex flex-col">
-                    {/* Tab Switcher with Preview Controls - Hidden when in preview mode */}
-                    {activeTab !== "preview" && (
-                      <div className="border-b border-border bg-card p-2 flex-shrink-0">
-                        <div className="flex items-center justify-between">
-                          <div className="flex space-x-1">
-                            <Button
-                              variant={activeTab === "code" ? "secondary" : "ghost"}
-                              size="sm"
-                              onClick={() => setActiveTab("code")}
-                              title="Code Editor"
-                            >
-                              <Code className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setActiveTab("preview")}
-                              title="Live Preview"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant={activeTab === "cloud" ? "secondary" : "ghost"}
-                              size="sm"
-                              onClick={() => setActiveTab("cloud")}
-                              title="Cloud Services"
-                            >
-                              <Cloud className="h-4 w-4" />
-                            </Button>
-                          </div>
-
-
-                        </div>
-                      </div>
-                    )}
-
                     {/* Content Area */}
                     {activeTab === "code" ? (
-                      /* Code Tab: File Explorer + Code Editor */
-                      <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
-                        {/* File Explorer Panel */}
-                        <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
-                          <div className="h-full flex flex-col border-r border-border">
-                            <FileExplorer
-                              key={fileExplorerKey}
-                              project={selectedProject}
-                              onFileSelect={setSelectedFile}
-                              selectedFile={selectedFile}
-                            />
+                      /* VS Code-like Layout: Activity Bar + Sidebar + Editor */
+                      <div className="flex-1 flex min-h-0">
+                        {/* Activity Bar - VS Code icon strip */}
+                        <div className="w-12 bg-gray-950 border-r border-gray-800/60 flex flex-col items-center py-1 flex-shrink-0">
+                          <button
+                            onClick={() => setCodeViewPanel(codeViewPanel === 'files' ? null : 'files')}
+                            className={`w-10 h-10 flex items-center justify-center rounded-lg mb-0.5 transition-colors relative ${
+                              codeViewPanel === 'files'
+                                ? 'text-white bg-gray-800/60'
+                                : 'text-gray-500 hover:text-gray-300'
+                            }`}
+                            title="Explorer"
+                          >
+                            <Folder className="size-5" />
+                            {codeViewPanel === 'files' && (
+                              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-orange-500 rounded-r" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => setCodeViewPanel(codeViewPanel === 'search' ? null : 'search')}
+                            className={`w-10 h-10 flex items-center justify-center rounded-lg mb-0.5 transition-colors relative ${
+                              codeViewPanel === 'search'
+                                ? 'text-white bg-gray-800/60'
+                                : 'text-gray-500 hover:text-gray-300'
+                            }`}
+                            title="Search"
+                          >
+                            <Search className="size-5" />
+                            {codeViewPanel === 'search' && (
+                              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-orange-500 rounded-r" />
+                            )}
+                          </button>
+
+                          <div className="flex-1" />
+
+                          {/* Bottom activity bar icons */}
+                          <button
+                            onClick={() => setActiveTab("preview")}
+                            className="w-10 h-10 flex items-center justify-center rounded-lg mb-0.5 transition-colors text-gray-500 hover:text-gray-300"
+                            title="Live Preview"
+                          >
+                            <Eye className="size-5" />
+                          </button>
+                          <button
+                            onClick={() => setActiveTab("cloud")}
+                            className="w-10 h-10 flex items-center justify-center rounded-lg mb-0.5 transition-colors text-gray-500 hover:text-gray-300"
+                            title="Cloud Services"
+                          >
+                            <Cloud className="size-5" />
+                          </button>
+                        </div>
+
+                        {/* Sidebar Panel (File Explorer or Search) */}
+                        {codeViewPanel && (
+                          <div className="w-64 bg-gray-950 border-r border-gray-800/60 flex flex-col min-h-0 flex-shrink-0">
+                            {codeViewPanel === 'files' && (
+                              <FileExplorer
+                                key={fileExplorerKey}
+                                project={selectedProject}
+                                onFileSelect={(file) => {
+                                  if (file) handleOpenFile(file)
+                                }}
+                                selectedFile={selectedFile}
+                              />
+                            )}
+                            {codeViewPanel === 'search' && (
+                              <div className="flex flex-col h-full">
+                                <div className="px-4 py-3 border-b border-gray-800/60">
+                                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Search</h3>
+                                </div>
+                                <div className="p-3">
+                                  <input
+                                    type="text"
+                                    placeholder="Search files..."
+                                    className="w-full px-3 py-1.5 bg-gray-900/80 border border-gray-700/60 rounded-lg text-sm text-gray-200 placeholder:text-gray-500 focus:outline-none focus:border-gray-600"
+                                  />
+                                </div>
+                                <div className="flex-1 flex items-center justify-center text-gray-600 text-xs">
+                                  Type to search across files
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </ResizablePanel>
+                        )}
 
-                        <ResizableHandle withHandle />
+                        {/* Editor Area - fills remaining space */}
+                        <div className="flex-1 min-w-0 flex flex-col">
+                          <CodeEditor
+                            file={selectedFile}
+                            projectFiles={projectFiles}
+                            openFiles={openFiles}
+                            onCloseFile={handleCloseFile}
+                            onSelectFile={handleSelectOpenFile}
+                            onSave={(file, content) => {
+                              console.log("File saved:", file.name, content.length, "characters")
 
-                        {/* Code Editor Panel */}
-                        <ResizablePanel defaultSize={75} minSize={40}>
-                          <div className="h-full flex flex-col">
-                            <CodeEditor
-                              file={selectedFile}
-                              projectFiles={projectFiles}
-                              onSave={(file, content) => {
-                                // Update the file content in state if needed
-                                console.log("File saved:", file.name, content.length, "characters")
+                              if (selectedProject) {
+                                storageManager.getFiles(selectedProject.id).then(files => {
+                                  setProjectFiles(files || [])
+                                }).catch(error => {
+                                  console.error("Error refreshing project files:", error)
+                                })
+                              }
 
-                                // Refresh project files to update Monaco's extra libraries
-                                if (selectedProject) {
-                                  storageManager.getFiles(selectedProject.id).then(files => {
-                                    setProjectFiles(files || [])
-                                    console.log("Refreshed project files after save:", files?.length || 0, "files")
-                                  }).catch(error => {
-                                    console.error("Error refreshing project files:", error)
-                                  })
-                                }
-
-                                // Trigger instant cloud backup after file save
-                                triggerInstantBackup(`Saved file: ${file.name}`)
-
-                                // Force file explorer refresh to show updated content
-                                setFileExplorerKey(prev => prev + 1)
-                                console.log("File saved successfully, triggering file explorer refresh")
-                              }}
-                            />
-                          </div>
-                        </ResizablePanel>
-                      </ResizablePanelGroup>
+                              triggerInstantBackup(`Saved file: ${file.name}`)
+                              setFileExplorerKey(prev => prev + 1)
+                            }}
+                          />
+                        </div>
+                      </div>
                     ) : activeTab === "preview" ? (
                       /* Preview Tab: Full-width Preview */
                       <CodePreviewPanel 
@@ -1242,7 +1297,20 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       />
                     ) : activeTab === "cloud" ? (
                       /* Cloud Tab */
-                      <CloudTab user={user} selectedProject={selectedProject} /> 
+                      <div className="flex-1 flex flex-col min-h-0">
+                        <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-800/60 bg-gray-950 flex-shrink-0">
+                          <button
+                            onClick={() => setActiveTab("code")}
+                            className="h-7 px-2 flex items-center gap-1.5 rounded-lg text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
+                          >
+                            <Code className="size-3.5" />
+                            <span>Back to Code</span>
+                          </button>
+                        </div>
+                        <div className="flex-1 min-h-0">
+                          <CloudTab user={user} selectedProject={selectedProject} />
+                        </div>
+                      </div>
                     ) : (
                       /* Database Tab - fallback */
                       <DatabaseTab workspaceId={selectedProject?.id || ""} />
@@ -1276,7 +1344,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             )}
 
             {/* Status Bar */}
-            <div className="h-8 border-t border-border bg-muted/50 flex items-center justify-between px-4 text-xs">
+            <div className="h-7 border-t border-gray-800/60 bg-gray-950 flex items-center justify-between px-4 text-xs text-gray-500">
               <div className="flex items-center space-x-4">
                 {/* GitHub Status */}
                 <div className="flex items-center space-x-1">
@@ -1287,7 +1355,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                         return <span className="text-green-600 dark:text-green-400">Connected</span>
                       }
                       if (gitHubConnected) {
-                        return <span className="text-blue-600 dark:text-blue-400">Account Connected</span>
+                        return <span className="text-orange-400">Account Connected</span>
                       }
                       return <span className="text-muted-foreground">Not Connected</span>
                     })()}
