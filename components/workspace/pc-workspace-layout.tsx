@@ -15,7 +15,7 @@ import { ChatPanelV2 } from "./chat-panel-v2"
 import { CodePreviewPanel } from "./code-preview-panel"
 import { ProjectHeader } from "./project-header"
 import { FileExplorer } from "./file-explorer"
-import { CodeEditor } from "./code-editor"
+import { CodeEditor, defaultEditorSettings, type EditorSettings } from "./code-editor"
 import { DatabaseTab } from "./database-tab"
 import { AIPplatformTab } from "./ai-platform-tab"
 import { CloudTab } from "./cloud-tab"
@@ -80,9 +80,10 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [projectFiles, setProjectFiles] = useState<File[]>([])
 
   // VS Code-like code view state
-  const [codeViewPanel, setCodeViewPanel] = useState<'files' | 'search' | 'chat' | null>('files')
+  const [codeViewPanel, setCodeViewPanel] = useState<'files' | 'search' | 'chat' | 'settings' | null>('files')
   const [openFiles, setOpenFiles] = useState<File[]>([])
   const [searchQuery, setSearchQuery] = useState('')
+  const [editorSettings, setEditorSettings] = useState<EditorSettings>(defaultEditorSettings)
 
   // Code chat state
   const [codeChatMessages, setCodeChatMessages] = useState<Array<{role: 'user' | 'assistant', content: string}>>([])
@@ -1298,9 +1299,23 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                           >
                             <Cloud className="size-5" />
                           </button>
+                          <button
+                            onClick={() => setCodeViewPanel(codeViewPanel === 'settings' ? null : 'settings')}
+                            className={`w-10 h-10 flex items-center justify-center rounded-lg mb-0.5 transition-colors relative ${
+                              codeViewPanel === 'settings'
+                                ? 'text-white bg-gray-800/60'
+                                : 'text-gray-500 hover:text-gray-300'
+                            }`}
+                            title="Settings"
+                          >
+                            <Settings className="size-5" />
+                            {codeViewPanel === 'settings' && (
+                              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-orange-500 rounded-r" />
+                            )}
+                          </button>
                         </div>
 
-                        {/* Sidebar Panel (File Explorer, Search, or Chat) */}
+                        {/* Sidebar Panel (File Explorer, Search, Chat, or Settings) */}
                         {codeViewPanel && (
                           <div className="w-64 bg-gray-950 border-r border-gray-800/60 flex flex-col min-h-0 flex-shrink-0">
                             {codeViewPanel === 'files' && (
@@ -1435,6 +1450,196 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                                 </div>
                               </div>
                             )}
+                            {codeViewPanel === 'settings' && (
+                              <div className="flex flex-col h-full">
+                                <div className="px-4 py-3 border-b border-gray-800/60">
+                                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Editor Settings</h3>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-3 space-y-4">
+
+                                  {/* Theme */}
+                                  <div>
+                                    <label className="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Theme</label>
+                                    <select
+                                      value={editorSettings.theme}
+                                      onChange={(e) => setEditorSettings(prev => ({ ...prev, theme: e.target.value as EditorSettings['theme'] }))}
+                                      className="mt-1 w-full px-2.5 py-1.5 bg-gray-900/80 border border-gray-700/60 rounded-lg text-xs text-gray-200 focus:outline-none focus:border-gray-600"
+                                    >
+                                      <option value="vs-dark">Dark (Default)</option>
+                                      <option value="vs">Light</option>
+                                      <option value="hc-black">High Contrast Dark</option>
+                                      <option value="hc-light">High Contrast Light</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Font Size */}
+                                  <div>
+                                    <label className="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Font Size</label>
+                                    <div className="mt-1 flex items-center gap-2">
+                                      <input
+                                        type="range"
+                                        min="10"
+                                        max="24"
+                                        value={editorSettings.fontSize}
+                                        onChange={(e) => setEditorSettings(prev => ({ ...prev, fontSize: Number(e.target.value) }))}
+                                        className="flex-1 accent-orange-500 h-1"
+                                      />
+                                      <span className="text-xs text-gray-300 w-8 text-right">{editorSettings.fontSize}px</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Font Family */}
+                                  <div>
+                                    <label className="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Font Family</label>
+                                    <select
+                                      value={editorSettings.fontFamily}
+                                      onChange={(e) => setEditorSettings(prev => ({ ...prev, fontFamily: e.target.value }))}
+                                      className="mt-1 w-full px-2.5 py-1.5 bg-gray-900/80 border border-gray-700/60 rounded-lg text-xs text-gray-200 focus:outline-none focus:border-gray-600"
+                                    >
+                                      <option value="JetBrains Mono, Fira Code, monospace">JetBrains Mono</option>
+                                      <option value="Fira Code, monospace">Fira Code</option>
+                                      <option value="Cascadia Code, monospace">Cascadia Code</option>
+                                      <option value="Source Code Pro, monospace">Source Code Pro</option>
+                                      <option value="Consolas, monospace">Consolas</option>
+                                      <option value="Monaco, monospace">Monaco</option>
+                                      <option value="monospace">System Mono</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Tab Size */}
+                                  <div>
+                                    <label className="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Tab Size</label>
+                                    <select
+                                      value={editorSettings.tabSize}
+                                      onChange={(e) => setEditorSettings(prev => ({ ...prev, tabSize: Number(e.target.value) }))}
+                                      className="mt-1 w-full px-2.5 py-1.5 bg-gray-900/80 border border-gray-700/60 rounded-lg text-xs text-gray-200 focus:outline-none focus:border-gray-600"
+                                    >
+                                      <option value={2}>2 spaces</option>
+                                      <option value={4}>4 spaces</option>
+                                      <option value={8}>8 spaces</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Word Wrap */}
+                                  <div>
+                                    <label className="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Word Wrap</label>
+                                    <select
+                                      value={editorSettings.wordWrap}
+                                      onChange={(e) => setEditorSettings(prev => ({ ...prev, wordWrap: e.target.value as EditorSettings['wordWrap'] }))}
+                                      className="mt-1 w-full px-2.5 py-1.5 bg-gray-900/80 border border-gray-700/60 rounded-lg text-xs text-gray-200 focus:outline-none focus:border-gray-600"
+                                    >
+                                      <option value="on">On</option>
+                                      <option value="off">Off</option>
+                                      <option value="wordWrapColumn">Word Wrap Column</option>
+                                      <option value="bounded">Bounded</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Line Numbers */}
+                                  <div>
+                                    <label className="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Line Numbers</label>
+                                    <select
+                                      value={editorSettings.lineNumbers}
+                                      onChange={(e) => setEditorSettings(prev => ({ ...prev, lineNumbers: e.target.value as EditorSettings['lineNumbers'] }))}
+                                      className="mt-1 w-full px-2.5 py-1.5 bg-gray-900/80 border border-gray-700/60 rounded-lg text-xs text-gray-200 focus:outline-none focus:border-gray-600"
+                                    >
+                                      <option value="on">On</option>
+                                      <option value="off">Off</option>
+                                      <option value="relative">Relative</option>
+                                      <option value="interval">Interval</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Cursor Style */}
+                                  <div>
+                                    <label className="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Cursor Style</label>
+                                    <select
+                                      value={editorSettings.cursorStyle}
+                                      onChange={(e) => setEditorSettings(prev => ({ ...prev, cursorStyle: e.target.value as EditorSettings['cursorStyle'] }))}
+                                      className="mt-1 w-full px-2.5 py-1.5 bg-gray-900/80 border border-gray-700/60 rounded-lg text-xs text-gray-200 focus:outline-none focus:border-gray-600"
+                                    >
+                                      <option value="line">Line</option>
+                                      <option value="block">Block</option>
+                                      <option value="underline">Underline</option>
+                                      <option value="line-thin">Line Thin</option>
+                                      <option value="block-outline">Block Outline</option>
+                                      <option value="underline-thin">Underline Thin</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Cursor Blinking */}
+                                  <div>
+                                    <label className="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Cursor Blinking</label>
+                                    <select
+                                      value={editorSettings.cursorBlinking}
+                                      onChange={(e) => setEditorSettings(prev => ({ ...prev, cursorBlinking: e.target.value as EditorSettings['cursorBlinking'] }))}
+                                      className="mt-1 w-full px-2.5 py-1.5 bg-gray-900/80 border border-gray-700/60 rounded-lg text-xs text-gray-200 focus:outline-none focus:border-gray-600"
+                                    >
+                                      <option value="blink">Blink</option>
+                                      <option value="smooth">Smooth</option>
+                                      <option value="phase">Phase</option>
+                                      <option value="expand">Expand</option>
+                                      <option value="solid">Solid</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Render Whitespace */}
+                                  <div>
+                                    <label className="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Render Whitespace</label>
+                                    <select
+                                      value={editorSettings.renderWhitespace}
+                                      onChange={(e) => setEditorSettings(prev => ({ ...prev, renderWhitespace: e.target.value as EditorSettings['renderWhitespace'] }))}
+                                      className="mt-1 w-full px-2.5 py-1.5 bg-gray-900/80 border border-gray-700/60 rounded-lg text-xs text-gray-200 focus:outline-none focus:border-gray-600"
+                                    >
+                                      <option value="none">None</option>
+                                      <option value="boundary">Boundary</option>
+                                      <option value="selection">Selection</option>
+                                      <option value="trailing">Trailing</option>
+                                      <option value="all">All</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Toggle Settings */}
+                                  <div className="space-y-2 pt-1">
+                                    <label className="text-[11px] text-gray-400 font-medium uppercase tracking-wider block">Features</label>
+                                    {([
+                                      ['minimap', 'Minimap'],
+                                      ['bracketPairColorization', 'Bracket Pair Colors'],
+                                      ['indentGuides', 'Indent Guides'],
+                                      ['smoothScrolling', 'Smooth Scrolling'],
+                                      ['scrollBeyondLastLine', 'Scroll Beyond Last Line'],
+                                      ['stickyScroll', 'Sticky Scroll'],
+                                      ['linkedEditing', 'Linked Editing'],
+                                      ['formatOnPaste', 'Format On Paste'],
+                                      ['formatOnType', 'Format On Type'],
+                                      ['insertSpaces', 'Insert Spaces'],
+                                    ] as const).map(([key, label]) => (
+                                      <label key={key} className="flex items-center justify-between cursor-pointer group">
+                                        <span className="text-xs text-gray-300 group-hover:text-gray-100 transition-colors">{label}</span>
+                                        <button
+                                          onClick={() => setEditorSettings(prev => ({ ...prev, [key]: !prev[key] }))}
+                                          className={`relative w-8 h-[18px] rounded-full transition-colors flex-shrink-0 ${
+                                            editorSettings[key] ? 'bg-orange-600' : 'bg-gray-700'
+                                          }`}
+                                        >
+                                          <div className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white transition-transform ${
+                                            editorSettings[key] ? 'translate-x-[16px]' : 'translate-x-[2px]'
+                                          }`} />
+                                        </button>
+                                      </label>
+                                    ))}
+                                  </div>
+
+                                  {/* Reset */}
+                                  <button
+                                    onClick={() => setEditorSettings(defaultEditorSettings)}
+                                    className="w-full mt-2 px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800/60 border border-gray-700/60 rounded-lg transition-colors"
+                                  >
+                                    Reset to Defaults
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -1446,6 +1651,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                             openFiles={openFiles}
                             onCloseFile={handleCloseFile}
                             onSelectFile={handleSelectOpenFile}
+                            editorSettings={editorSettings}
                             onSave={(file, content) => {
                               console.log("File saved:", file.name, content.length, "characters")
 
