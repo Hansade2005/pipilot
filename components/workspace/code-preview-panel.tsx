@@ -170,16 +170,16 @@ const FEATURE_CARDS = [
     title: "AI Chat Commands",
     description: "Type / for slash commands, @ to reference files.",
     color: "from-blue-500/20 to-blue-600/10",
-    accent: "text-blue-500",
-    accentBg: "bg-blue-500",
+    accent: "text-orange-500",
+    accentBg: "bg-orange-500",
   },
   {
     icon: MousePointerClick,
     title: "Visual Click-to-Edit",
     description: "Click any element in the preview to edit it live.",
-    color: "from-purple-500/20 to-purple-600/10",
-    accent: "text-purple-500",
-    accentBg: "bg-purple-500",
+    color: "from-orange-500/20 to-orange-600/10",
+    accent: "text-orange-500",
+    accentBg: "bg-orange-500",
   },
   {
     icon: RotateCcw,
@@ -209,9 +209,9 @@ const FEATURE_CARDS = [
     icon: Share2,
     title: "Project Actions",
     description: "Clone projects, publish & sell templates.",
-    color: "from-pink-500/20 to-pink-600/10",
-    accent: "text-pink-500",
-    accentBg: "bg-pink-500",
+    color: "from-orange-500/20 to-orange-600/10",
+    accent: "text-orange-500",
+    accentBg: "bg-orange-500",
   },
   {
     icon: Palette,
@@ -241,20 +241,20 @@ function ChatCommandsDemo() {
   return (
     <div className="space-y-2">
       {/* Fake input */}
-      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background/80 border border-border">
-        <span className="text-xs text-blue-500 font-mono">{typedText}</span>
-        <span className="w-0.5 h-3.5 bg-blue-500 animate-pulse" />
+      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background/80 border border-gray-700/40">
+        <span className="text-xs text-orange-500 font-mono">{typedText}</span>
+        <span className="w-0.5 h-3.5 bg-orange-500 animate-pulse" />
       </div>
       {/* Dropdown */}
-      <div className="rounded-lg bg-background/80 border border-border overflow-hidden">
+      <div className="rounded-lg bg-background/80 border border-gray-700/40 overflow-hidden">
         {commands.map((c, i) => (
           <div
             key={c.cmd}
             className={`flex items-center justify-between px-3 py-1.5 text-xs transition-all duration-300 ${
-              i === (step > 0 ? step - 1 : 0) ? 'bg-blue-500/15' : ''
+              i === (step > 0 ? step - 1 : 0) ? 'bg-orange-500/15' : ''
             }`}
           >
-            <span className="font-mono font-medium text-blue-400">{c.cmd}</span>
+            <span className="font-mono font-medium text-orange-400">{c.cmd}</span>
             <span className="text-muted-foreground">{c.desc}</span>
           </div>
         ))}
@@ -278,7 +278,7 @@ function VisualEditorDemo() {
   ]
   const selected = step
   return (
-    <div className="relative h-[120px] rounded-lg bg-background/80 border border-border overflow-hidden">
+    <div className="relative h-[120px] rounded-lg bg-background/80 border border-gray-700/40 overflow-hidden">
       {/* Fake UI elements */}
       <div className="absolute top-3 left-3 right-[52%] h-7 rounded bg-muted/60 flex items-center px-2">
         <span className="text-[9px] text-muted-foreground">Header</span>
@@ -297,7 +297,7 @@ function VisualEditorDemo() {
         <div
           key={i}
           className={`absolute rounded transition-all duration-500 ${
-            selected === i ? 'ring-2 ring-purple-500 ring-offset-1 ring-offset-transparent' : ''
+            selected === i ? 'ring-2 ring-orange-500 ring-offset-1 ring-offset-transparent' : ''
           }`}
           style={{
             top: i < 2 ? '12px' : '44px',
@@ -313,21 +313,21 @@ function VisualEditorDemo() {
         className="absolute w-4 h-4 transition-all duration-700 ease-in-out z-10"
         style={{ left: cursorPos[step].left, top: cursorPos[step].top }}
       >
-        <MousePointerClick className="h-4 w-4 text-purple-500 drop-shadow-md" />
+        <MousePointerClick className="h-4 w-4 text-orange-500 drop-shadow-md" />
       </div>
       {/* Style panel slides in on select */}
       <div
-        className={`absolute right-0 top-0 bottom-0 w-[72px] bg-background/95 border-l border-border transition-transform duration-500 flex flex-col gap-1 p-1.5 ${
+        className={`absolute right-0 top-0 bottom-0 w-[72px] bg-background/95 border-l border-gray-700/40 transition-transform duration-500 flex flex-col gap-1 p-1.5 ${
           step >= 2 ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
-        <span className="text-[8px] font-medium text-purple-400 px-1">Styles</span>
-        <div className="h-2.5 w-full rounded bg-purple-500/20" />
-        <div className="h-2.5 w-3/4 rounded bg-purple-500/15" />
-        <div className="h-2.5 w-full rounded bg-purple-500/10" />
+        <span className="text-[8px] font-medium text-orange-400 px-1">Styles</span>
+        <div className="h-2.5 w-full rounded bg-orange-500/20" />
+        <div className="h-2.5 w-3/4 rounded bg-orange-500/15" />
+        <div className="h-2.5 w-full rounded bg-orange-500/10" />
         <div className="flex gap-1 mt-1">
-          <div className="w-3 h-3 rounded-full bg-purple-400" />
-          <div className="w-3 h-3 rounded-full bg-pink-400" />
+          <div className="w-3 h-3 rounded-full bg-orange-400" />
+          <div className="w-3 h-3 rounded-full bg-orange-400" />
           <div className="w-3 h-3 rounded-full bg-blue-400" />
         </div>
       </div>
@@ -356,17 +356,17 @@ function MessageActionsDemo() {
         <div className="w-5 h-5 rounded-full bg-muted flex-shrink-0 flex items-center justify-center">
           <Zap className="h-3 w-3 text-muted-foreground" />
         </div>
-        <div className="flex-1 px-2.5 py-1.5 rounded-lg bg-muted/50 border border-border/50">
+        <div className="flex-1 px-2.5 py-1.5 rounded-lg bg-muted/50 border border-gray-700/40/50">
           <div className="h-2 w-3/4 rounded bg-muted-foreground/15 mb-1" />
           <div className="h-2 w-1/2 rounded bg-muted-foreground/10" />
         </div>
       </div>
       {/* User message with action bar */}
       <div className="relative flex gap-2 items-start">
-        <div className="w-5 h-5 rounded-full bg-blue-500/20 flex-shrink-0 flex items-center justify-center">
-          <span className="text-[8px] font-bold text-blue-400">U</span>
+        <div className="w-5 h-5 rounded-full bg-orange-500/20 flex-shrink-0 flex items-center justify-center">
+          <span className="text-[8px] font-bold text-orange-400">U</span>
         </div>
-        <div className="flex-1 px-2.5 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20">
+        <div className="flex-1 px-2.5 py-1.5 rounded-lg bg-orange-500/10 border border-blue-500/20">
           <div className="h-2 w-full rounded bg-blue-400/15 mb-1" />
           <div className="h-2 w-2/3 rounded bg-blue-400/10" />
         </div>
@@ -508,12 +508,12 @@ function ProjectActionsDemo() {
     return () => clearInterval(t)
   }, [])
   return (
-    <div className="relative rounded-lg bg-background/80 border border-border overflow-hidden h-[110px]">
+    <div className="relative rounded-lg bg-background/80 border border-gray-700/40 overflow-hidden h-[110px]">
       {/* Fake project card */}
       <div className="p-3">
         <div className="flex items-center gap-2 mb-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-pink-500/30 to-purple-500/30 flex items-center justify-center">
-            <Code className="h-4 w-4 text-pink-400" />
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500/30 to-orange-600/30 flex items-center justify-center">
+            <Code className="h-4 w-4 text-orange-400" />
           </div>
           <div>
             <div className="h-2.5 w-20 rounded bg-foreground/15" />
@@ -528,7 +528,7 @@ function ProjectActionsDemo() {
         hovered ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2'
       }`}>
         {[
-          { label: "Clone", color: "bg-blue-500/80" },
+          { label: "Clone", color: "bg-orange-500/80" },
           { label: "Publish", color: "bg-green-500/80" },
           { label: "Delete", color: "bg-red-500/80" },
         ].map((btn, i) => (
@@ -549,7 +549,7 @@ function ProjectActionsDemo() {
 function ThemeTypographyDemo() {
   const [step, setStep] = useState(0)
   const themes = [
-    { bg: "bg-slate-900", fg: "text-white", accent: "bg-blue-500", name: "Dark" },
+    { bg: "bg-slate-900", fg: "text-white", accent: "bg-orange-500", name: "Dark" },
     { bg: "bg-white", fg: "text-slate-900", accent: "bg-violet-500", name: "Light" },
     { bg: "bg-emerald-950", fg: "text-emerald-100", accent: "bg-emerald-500", name: "Forest" },
     { bg: "bg-orange-50", fg: "text-orange-900", accent: "bg-orange-500", name: "Warm" },
@@ -563,7 +563,7 @@ function ThemeTypographyDemo() {
   return (
     <div className="space-y-2">
       {/* Mini preview switching themes */}
-      <div className={`rounded-lg p-3 transition-all duration-700 ${theme.bg} border border-border/30`}>
+      <div className={`rounded-lg p-3 transition-all duration-700 ${theme.bg} border border-gray-700/40/30`}>
         <div className={`text-sm font-bold ${theme.fg} ${fonts[step]} transition-all duration-500 mb-1`}>
           Hello World
         </div>
@@ -583,7 +583,7 @@ function ThemeTypographyDemo() {
       <div className="flex items-center justify-between">
         {themes.map((t, i) => (
           <div key={i} className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md transition-all duration-300 ${
-            i === step ? 'bg-muted ring-1 ring-primary/40' : ''
+            i === step ? 'bg-muted ring-1 ring-orange-500/40' : ''
           }`}>
             <div className={`w-3 h-3 rounded-full ${t.accent} transition-transform duration-300 ${i === step ? 'scale-125' : ''}`} />
             <span className="text-[8px] text-muted-foreground">{t.name}</span>
@@ -751,7 +751,7 @@ function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
   const DemoComponent = CARD_DEMOS[activeCard]
 
   return (
-    <div className="h-full flex flex-col items-center justify-center p-4 sm:p-6 bg-gradient-to-b from-background to-muted/20 overflow-y-auto">
+    <div className="h-full flex flex-col items-center justify-center p-4 sm:p-6 bg-gradient-to-b from-gray-950 to-gray-900/50 overflow-y-auto">
       <div className="w-full max-w-lg">
         {/* Card row: dots | card | nav buttons */}
         <div className="flex items-center gap-3 mb-6">
@@ -763,7 +763,7 @@ function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
                 onClick={() => setActiveCard(i)}
                 className={`rounded-full transition-all duration-300 ${
                   i === activeCard
-                    ? 'w-2 h-5 bg-primary'
+                    ? 'w-2 h-5 bg-orange-500'
                     : 'w-2 h-2 bg-muted-foreground/25 hover:bg-muted-foreground/50'
                 }`}
               />
@@ -773,7 +773,7 @@ function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
           {/* Center: feature card */}
           <div className="flex-1 min-w-0">
             <div
-              className={`rounded-2xl border border-border bg-gradient-to-br ${card.color} shadow-lg overflow-hidden transition-all duration-500`}
+              className={`rounded-2xl border border-gray-700/40 bg-gradient-to-br ${card.color} shadow-lg overflow-hidden transition-all duration-500`}
             >
               {/* Card header */}
               <div className="px-5 pt-4 pb-2 flex items-start gap-3">
@@ -799,13 +799,13 @@ function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
           <div className="hidden sm:flex flex-col items-center gap-1.5">
             <button
               onClick={goPrev}
-              className="w-8 h-8 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center transition-colors shadow-sm"
+              className="w-8 h-8 rounded-full border border-gray-700/60 bg-gray-900 hover:bg-gray-800 flex items-center justify-center transition-colors shadow-sm"
             >
               <ChevronUp className="h-4 w-4 text-muted-foreground" />
             </button>
             <button
               onClick={() => setIsPlaying(!isPlaying)}
-              className="w-8 h-8 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center transition-colors shadow-sm"
+              className="w-8 h-8 rounded-full border border-gray-700/60 bg-gray-900 hover:bg-gray-800 flex items-center justify-center transition-colors shadow-sm"
             >
               {isPlaying ? (
                 <Pause className="h-3.5 w-3.5 text-muted-foreground" />
@@ -815,7 +815,7 @@ function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
             </button>
             <button
               onClick={goNext}
-              className="w-8 h-8 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center transition-colors shadow-sm"
+              className="w-8 h-8 rounded-full border border-gray-700/60 bg-gray-900 hover:bg-gray-800 flex items-center justify-center transition-colors shadow-sm"
             >
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </button>
@@ -824,7 +824,7 @@ function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
 
         {/* Mobile: horizontal dots + nav */}
         <div className="flex sm:hidden items-center justify-center gap-3 mb-5">
-          <button onClick={goPrev} className="w-7 h-7 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center">
+          <button onClick={goPrev} className="w-7 h-7 rounded-full border border-gray-700/60 bg-gray-900 hover:bg-gray-800 flex items-center justify-center">
             <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
           </button>
           <div className="flex items-center gap-1.5">
@@ -833,15 +833,15 @@ function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
                 key={i}
                 onClick={() => setActiveCard(i)}
                 className={`rounded-full transition-all duration-300 ${
-                  i === activeCard ? 'w-5 h-1.5 bg-primary' : 'w-1.5 h-1.5 bg-muted-foreground/25'
+                  i === activeCard ? 'w-5 h-1.5 bg-orange-500' : 'w-1.5 h-1.5 bg-muted-foreground/25'
                 }`}
               />
             ))}
           </div>
-          <button onClick={() => setIsPlaying(!isPlaying)} className="w-7 h-7 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center">
+          <button onClick={() => setIsPlaying(!isPlaying)} className="w-7 h-7 rounded-full border border-gray-700/60 bg-gray-900 hover:bg-gray-800 flex items-center justify-center">
             {isPlaying ? <Pause className="h-3 w-3 text-muted-foreground" /> : <Play className="h-3 w-3 text-muted-foreground ml-0.5" />}
           </button>
-          <button onClick={goNext} className="w-7 h-7 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center">
+          <button onClick={goNext} className="w-7 h-7 rounded-full border border-gray-700/60 bg-gray-900 hover:bg-gray-800 flex items-center justify-center">
             <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
           </button>
         </div>
