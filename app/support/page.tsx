@@ -42,6 +42,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { Response } from "@/components/ai-elements/response"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 // Storage key for chat persistence
 const STORAGE_KEY = 'pipilot_support_chat'
@@ -258,6 +259,7 @@ const quickHelp = [
 ]
 
 export default function SupportPage() {
+  usePageTitle('Support')
   const [searchQuery, setSearchQuery] = useState("")
   const [chatOpen, setChatOpen] = useState(false)
   const [chatMinimized, setChatMinimized] = useState(false)

@@ -23,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Navigation } from '@/components/navigation';
 import { Footer } from '@/components/footer';
 import type { Table } from '@/lib/supabase';
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface DatabaseData {
   id: number;
@@ -36,6 +37,7 @@ interface TableWithCount extends Table {
 }
 
 export default function DatabasePage() {
+  usePageTitle('Project Database')
   const params = useParams();
   const [workspace, setWorkspace] = useState<any>(null);
   const [database, setDatabase] = useState<DatabaseData | null>(null);

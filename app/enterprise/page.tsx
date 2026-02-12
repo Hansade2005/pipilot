@@ -19,8 +19,10 @@ import { Footer } from "@/components/footer"
 import Link from "next/link"
 import { enterpriseService } from "@/lib/supabase/enterprise"
 import { toast } from "sonner"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function EnterprisePage() {
+  usePageTitle('Enterprise')
   const enterpriseFeatures = [
     {
       icon: Shield,

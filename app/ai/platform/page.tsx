@@ -21,6 +21,7 @@ import { toast } from "sonner"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
 import Link from "next/link"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface Team {
     id: string
@@ -45,6 +46,7 @@ interface TeamStats {
 }
 
 export default function AIPlatformDashboard() {
+  usePageTitle('AI Platform')
     const supabase = createClient()
     const [teams, setTeams] = useState<Team[]>([])
     const [currentTeam, setCurrentTeam] = useState<Team | null>(null)

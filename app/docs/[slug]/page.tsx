@@ -10,6 +10,7 @@ import { Footer } from "@/components/footer"
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface DocSection {
   title: string
@@ -19,6 +20,7 @@ interface DocSection {
 }
 
 export default function DocPage() {
+  usePageTitle('Documentation')
   const params = useParams()
   const router = useRouter()
   const [docData, setDocData] = useState<DocSection | null>(null)

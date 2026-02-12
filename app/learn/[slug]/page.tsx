@@ -16,6 +16,7 @@ import {
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { useEffect, useState } from "react"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface Course {
   id: string
@@ -68,6 +69,7 @@ interface UserProgress {
 }
 
 export default function CoursePage() {
+  usePageTitle('Learn')
   const params = useParams()
   const router = useRouter()
   const slug = params.slug as string

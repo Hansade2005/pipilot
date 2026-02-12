@@ -1,5 +1,11 @@
 import { Suspense } from "react"
 import ResetPasswordForm from "./reset-password-form"
+import type { Metadata } from 'next'
+
+
+export const metadata: Metadata = {
+  title: 'Reset Password | PiPilot',
+}
 
 export default function ResetPasswordPage() {
   return (

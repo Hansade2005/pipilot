@@ -5,12 +5,14 @@ import React, { Suspense } from "react"
 export const dynamic = 'force-dynamic'
 import { Loader2 } from "lucide-react"
 import PcDeploymentClient from "@/components/workspace/pc-deployment-client"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 function DeploymentPageContent() {
   return <PcDeploymentClient />
 }
 
 export default function DeploymentPage() {
+  usePageTitle('Deployment')
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Enhanced Gradient Background */}

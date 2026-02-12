@@ -12,8 +12,10 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { Github, ArrowLeft } from "lucide-react"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function LoginPage() {
+  usePageTitle('Log In')
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)

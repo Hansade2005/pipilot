@@ -11,8 +11,10 @@ import { Database, Loader2, ArrowLeft, ArrowRight, Sparkles, Check, Globe, Zap }
 import { toast } from "sonner"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function NewDatabasePage() {
+  usePageTitle('New Database')
     const router = useRouter()
     const [step, setStep] = useState(1)
     const [creating, setCreating] = useState(false)

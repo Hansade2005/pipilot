@@ -2,6 +2,12 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { PcWorkspaceLayout } from "@/components/workspace/pc-workspace-layout"
 import { storageManager } from "@/lib/storage-manager"
+import type { Metadata } from 'next'
+
+
+export const metadata: Metadata = {
+  title: 'Workspace | PiPilot',
+}
 
 export default async function WorkspacePage({
   searchParams,

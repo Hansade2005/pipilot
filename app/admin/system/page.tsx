@@ -28,8 +28,10 @@ import {
   TrendingUp,
   LineChart
 } from "lucide-react"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function AdminSystemPage() {
+  usePageTitle('System Settings')
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [systemHealth, setSystemHealth] = useState<any>(null)

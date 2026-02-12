@@ -13,8 +13,10 @@ import { AuthModal } from "@/components/auth-modal"
 import { TemplateManager } from "@/lib/template-manager"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function ShowcasePage() {
+  usePageTitle('Showcase')
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [showAuthModal, setShowAuthModal] = useState(false)

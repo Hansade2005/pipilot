@@ -32,6 +32,7 @@ import { storageManager, type Workspace as Project, type Deployment, type Enviro
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 // Extended project interface for display
 interface ProjectDisplay extends Project {
@@ -42,6 +43,7 @@ interface ProjectDisplay extends Project {
 }
 
 export default function ManagementPage() {
+  usePageTitle('Project Management')
   const { toast } = useToast()
   const router = useRouter()
   const [activeTab, setActiveTab] = useState("overview")

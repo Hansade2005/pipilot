@@ -10,6 +10,7 @@ import { Footer } from "@/components/footer"
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface BlogPost {
   id: string
@@ -41,6 +42,7 @@ interface Category {
 }
 
 export default function BlogPostPage() {
+  usePageTitle('Blog Post')
   const params = useParams()
   const router = useRouter()
   const [postData, setPostData] = useState<BlogPost | null>(null)

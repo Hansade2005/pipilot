@@ -27,8 +27,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useAgentCloud, MODELS } from "../layout"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function NewSessionPage() {
+  usePageTitle('New Agent')
   const router = useRouter()
   const {
     repos,

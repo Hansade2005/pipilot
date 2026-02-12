@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/components/ui/use-toast"
 import { Globe, ExternalLink, Settings, ArrowLeft } from "lucide-react"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function SitePage() {
+  usePageTitle('Site Details')
   const params = useParams()
   const router = useRouter()
   const siteId = params.siteId as string

@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { RefreshCw, Database, MessageSquare, ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface Message {
   id: string
@@ -21,6 +22,7 @@ interface Message {
 }
 
 export default function DevToolsPage() {
+  usePageTitle('Developer Tools')
   const [sessions, setSessions] = useState<any[]>([])
   const [messages, setMessages] = useState<{ [sessionId: string]: Message[] }>({})
   const [loading, setLoading] = useState(false)

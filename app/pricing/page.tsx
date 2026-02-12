@@ -15,8 +15,10 @@ import { convertUsdToCad, formatPrice } from "@/lib/currency-converter"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { PaymentProviderSelector } from "@/components/pricing/payment-provider-selector"
 import { CreditTopUpSelector } from "@/components/billing/credit-topup-selector"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function PricingPage() {
+  usePageTitle('Pricing')
   const [isAnnual, setIsAnnual] = useState(false)
   const [openFAQ, setOpenFAQ] = useState<number | null>(null)
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null)

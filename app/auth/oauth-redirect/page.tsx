@@ -4,8 +4,10 @@ import React, { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/use-toast'
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function OAuthRedirectPage() {
+  usePageTitle('Signing In')
   const router = useRouter()
   const { toast } = useToast()
 

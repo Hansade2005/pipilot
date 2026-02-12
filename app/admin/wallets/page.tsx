@@ -26,6 +26,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface TeamWallet {
     id: string
@@ -77,6 +78,7 @@ interface WalletStats {
 }
 
 export default function AdminWalletsPage() {
+  usePageTitle('Wallet Management')
     const [wallets, setWallets] = useState<TeamWallet[]>([])
     const [loading, setLoading] = useState(true)
     const [stats, setStats] = useState<WalletStats>({ totalUsers: 0, totalBalance: 0, averageBalance: 0, activeWallets: 0 })

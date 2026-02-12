@@ -7,12 +7,14 @@ import { Loader2 } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import DeploymentClient from "@/components/workspace/deployment-client"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 function DeploymentPageContent() {
   return <DeploymentClient />
 }
 
 export default function DeploymentPage() {
+  usePageTitle('Deployment')
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Enhanced Gradient Background */}

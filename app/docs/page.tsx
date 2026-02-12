@@ -49,6 +49,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 // Storage key for chat persistence
 const STORAGE_KEY = 'pipilot_docs_chat'
@@ -111,6 +112,7 @@ function prepareMessagesForAI(messages: ChatMessage[], currentMessage: ChatMessa
 }
 
 export default function DocsPage() {
+  usePageTitle('Documentation')
   const [searchQuery, setSearchQuery] = useState("")
   const [docsData, setDocsData] = useState<DocsData | null>(null)
   const [filteredSections, setFilteredSections] = useState<DocSection[]>([])

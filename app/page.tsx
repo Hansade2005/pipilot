@@ -50,8 +50,10 @@ import { TemplateManager } from "@/lib/template-manager"
 import { toast } from "sonner"
 import { storageManager } from "@/lib/storage-manager"
 import { TemplatesView } from "@/components/workspace/templates-view"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function LandingPage() {
+  usePageTitle('Home')
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [userProfile, setUserProfile] = useState<{ full_name?: string } | null>(null)

@@ -4,8 +4,10 @@ import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { Logo } from "@/components/ui/logo"
 import { Heart } from "lucide-react"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function TermsPage() {
+  usePageTitle('Terms of Service')
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Enhanced Gradient Background */}

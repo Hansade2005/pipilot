@@ -10,6 +10,7 @@ import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface BlogPost {
   id: string
@@ -55,6 +56,7 @@ interface BlogPost {
 }
 
 export default function BlogPage() {
+  usePageTitle('Community')
   const [allBlogPosts, setAllBlogPosts] = useState<BlogPost[]>([])
   const [filteredPosts, setFilteredPosts] = useState<BlogPost[]>([])
   const [loading, setLoading] = useState(true)

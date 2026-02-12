@@ -25,8 +25,10 @@ import {
   Target,
   Heart,
 } from "lucide-react"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function AboutPage() {
+  usePageTitle('About')
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Enhanced Gradient Background */}

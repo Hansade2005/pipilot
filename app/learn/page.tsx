@@ -18,6 +18,7 @@ import {
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { useEffect, useState } from "react"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface BlogPost {
   id: string
@@ -142,6 +143,7 @@ interface UserProgress {
 }
 
 export default function LearnPage() {
+  usePageTitle('Learn')
   const [courses, setCourses] = useState<Course[]>([])
   const [filteredCourses, setFilteredCourses] = useState<Course[]>([])
   const [coursesData, setCoursesData] = useState<any>(null)

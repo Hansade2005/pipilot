@@ -17,8 +17,10 @@ import {
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { useAgentCloud, DEFAULT_MCPS, ConnectorConfig } from "../layout"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function SettingsPage() {
+  usePageTitle('Agent Cloud Settings')
   const router = useRouter()
   const { connectors, setConnectors, storedTokens } = useAgentCloud()
 

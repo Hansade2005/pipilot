@@ -16,6 +16,7 @@ import { toast } from "sonner"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from "next/navigation"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface Team {
     id: string
@@ -41,6 +42,7 @@ interface ApiKey {
 }
 
 export default function ApiKeysPage() {
+  usePageTitle('API Keys')
     const supabase = createClient()
     const router = useRouter()
     const [currentTeam, setCurrentTeam] = useState<Team | null>(null)

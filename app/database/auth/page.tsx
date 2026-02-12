@@ -6,8 +6,10 @@ import { Card, CardContent } from "@/components/ui/card"
 import { RecordViewer } from "@/components/workspace/database-tab/record-viewer"
 import { toast } from "sonner"
 import type { TableWithCount, RecordData } from "@/components/workspace/database-tab/types"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function AuthPage() {
+  usePageTitle('Database Auth')
     const [database, setDatabase] = useState<any>(null)
     const [usersTable, setUsersTable] = useState<TableWithCount | null>(null)
     const [records, setRecords] = useState<RecordData[]>([])

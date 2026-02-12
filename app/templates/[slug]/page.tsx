@@ -24,8 +24,10 @@ import {
   Loader2
 } from "lucide-react"
 import { toast } from "sonner"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function TemplatePage() {
+  usePageTitle('Template')
   const params = useParams()
   const router = useRouter()
   const slug = params.slug as string

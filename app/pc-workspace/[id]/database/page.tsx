@@ -21,6 +21,7 @@ import { ApiDocsGenerator } from '@/components/database/api-docs-generator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { Table } from '@/lib/supabase';
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface DatabaseData {
   id: number;
@@ -34,6 +35,7 @@ interface TableWithCount extends Table {
 }
 
 export default function DatabasePage() {
+  usePageTitle('Project Database')
   const params = useParams();
   const [workspace, setWorkspace] = useState<any>(null);
   const [database, setDatabase] = useState<DatabaseData | null>(null);

@@ -32,6 +32,7 @@ import {
   Lightbulb,
   Rocket
 } from "lucide-react"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 // Custom SVG Icons (same as in account page)
 const GitHubIcon = ({ className }: { className?: string }) => (
@@ -199,6 +200,7 @@ const useCases = [
 ]
 
 export default function IntegrationsPage() {
+  usePageTitle('Integrations')
   const [activeTab, setActiveTab] = useState("features")
 
   return (

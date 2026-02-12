@@ -68,6 +68,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { SupabaseConnectionManager } from "@/components/supabase-connection-manager"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 // MCP Server config type
 interface MCPServerConfig {
@@ -94,6 +95,7 @@ interface ProjectDetails extends Project {
 }
 
 export default function ProjectPage() {
+  usePageTitle('Project')
   const { slug } = useParams()
   const router = useRouter()
   const { toast } = useToast()
