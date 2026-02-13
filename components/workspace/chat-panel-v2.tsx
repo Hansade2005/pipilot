@@ -26,7 +26,7 @@ import {
   Search, Globe, Eye, FolderOpen, Settings, Edit3, CheckCircle2, XCircle,
   Square, Database, CornerDownLeft, Table, Key, Code, Server, BarChart3,
   CreditCard, Coins, GitBranch, ChevronRight, ChevronLeft, Wrench,
-  ToggleLeft, ToggleRight, Sparkles, FileUp, Hash, ExternalLink
+  ToggleLeft, ToggleRight, Sparkles, FileUp, Hash, ExternalLink, Monitor
 } from 'lucide-react'
 import { ModelSelector } from '@/components/ui/model-selector'
 import { cn, filterUnwantedFiles } from '@/lib/utils'
@@ -529,6 +529,8 @@ const ToolActivityPanel = ({
       case 'web_search':
       case 'web_extract':
         return <Globe className="w-3.5 h-3.5" />
+      case 'browse_web':
+        return <Monitor className="w-3.5 h-3.5" />
       case 'check_dev_errors':
         return <Settings className="w-3.5 h-3.5" />
       case 'generate_report':
@@ -596,6 +598,8 @@ const ToolActivityPanel = ({
         return `Search web for "${args?.query || 'query'}"`
       case 'web_extract':
         return 'Extracting web content'
+      case 'browse_web':
+        return 'Running browser test'
       case 'check_dev_errors':
         return 'Checking for errors'
       case 'generate_report':
@@ -849,6 +853,8 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
       case 'web_search':
       case 'web_extract':
         return <Globe className="w-3.5 h-3.5" />
+      case 'browse_web':
+        return <Monitor className="w-3.5 h-3.5" />
       case 'check_dev_errors':
         return <Settings className="w-3.5 h-3.5" />
       case 'generate_report':
@@ -916,6 +922,8 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
         return `Search web for "${args?.query || 'query'}"`
       case 'web_extract':
         return 'Extracting web content'
+      case 'browse_web':
+        return 'Running browser test'
       case 'check_dev_errors':
         return 'Checking for errors'
       case 'generate_report':
