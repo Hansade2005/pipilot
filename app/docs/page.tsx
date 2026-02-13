@@ -689,9 +689,7 @@ export default function DocsPage() {
         {/* Left: Logo + Brand */}
         <div className="flex items-center gap-3 mr-6">
           <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
-              <span className="text-white font-bold text-sm">P</span>
-            </div>
+            <img src="/logo.png" alt="PiPilot" className="w-7 h-7 rounded-lg shadow-lg shadow-orange-500/20" />
             <span className="text-white font-semibold text-sm hidden sm:inline">PiPilot</span>
           </Link>
         </div>
