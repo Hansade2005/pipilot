@@ -329,18 +329,24 @@ export function ActivityChatPanel({
           }))
       }
 
-      // Build messages history
-      const chatHistory = messages.slice(-8).map(m => ({
-        role: m.role,
-        content: m.content,
-      }))
+      // Build messages history - filter out assistant messages with empty content
+      // to prevent "Assistant message must have either content or tool_calls" API error
+      const chatHistory = messages.slice(-8)
+        .map(m => ({
+          role: m.role,
+          content: m.content,
+        }))
+        .filter(m => {
+          if (m.role === 'assistant' && (!m.content || m.content.trim() === '')) return false
+          return true
+        })
 
       chatHistory.push({
         role: 'user',
         content: userMessage.content,
       })
 
-      const response = await fetch('/api/activity-chat', {
+      const response = await fetch('/api/activity-chat-v2', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
