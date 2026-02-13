@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { Task, TaskTrigger, TaskContent, TaskItem } from '@/components/ai-elements/task'
 import { ChainOfThought, ChainOfThoughtHeader, ChainOfThoughtContent, ChainOfThoughtStep } from '@/components/ai-elements/chain-of-thought'
 import { Response } from '@/components/ai-elements/response'
-import { FileText, Edit3, X, Package, PackageMinus, Loader2, CheckCircle2, XCircle, BrainIcon, FileCode,FolderOpen,Search, FileImage, FileJson, FileType, Settings, Package as PackageIcon, File, Globe, Eye, Zap, Database, Table, Code, Key, BarChart3 } from 'lucide-react'
+import { FileText, Edit3, X, Package, PackageMinus, Loader2, CheckCircle2, XCircle, BrainIcon, FileCode,FolderOpen,Search, FileImage, FileJson, FileType, Settings, Package as PackageIcon, File, Globe, Eye, Zap, Database, Table, Code, Key, BarChart3, Monitor } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SupabaseConnectionCard } from './supabase-connection-card'
 import { ContinueBackendCard } from './continue-backend-card'
@@ -175,6 +175,7 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
       case 'semantic_code_navigator': return <Search className="w-3.5 h-3.5" />
       case 'web_search':
       case 'web_extract': return <Globe className="w-3.5 h-3.5" />
+      case 'browse_web': return <Monitor className="w-3.5 h-3.5" />
       case 'check_dev_errors': return <Settings className="w-3.5 h-3.5" />
       case 'generate_report': return <BarChart3 className="w-3.5 h-3.5" />
       default: return <Zap className="w-3.5 h-3.5" />
@@ -200,6 +201,7 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
       case 'semantic_code_navigator': return `Search codebase for "${args?.query || 'query'}"`
       case 'web_search': return `Searching: ${args?.query || 'query'}`
       case 'web_extract': return 'Extracting web content'
+      case 'browse_web': return 'Running browser test'
       case 'check_dev_errors': return 'Checking for errors'
       case 'generate_report': return 'Generating report'
       default: return tool
@@ -472,6 +474,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
       case 'web_search':
       case 'web_extract':
       case 'vscode-websearchforcopilot_webSearch': return Globe
+      case 'browse_web': return Monitor
       case 'check_dev_errors': return Settings
       default: return FileText
     }
@@ -500,6 +503,8 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
         return `Search web for "${args?.query || 'query'}"`
       case 'web_extract':
         return 'Extracting web content'
+      case 'browse_web':
+        return 'Running browser test'
       case 'check_dev_errors':
         return 'Checking for errors'
       default:
