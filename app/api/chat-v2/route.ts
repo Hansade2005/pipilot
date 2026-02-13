@@ -5778,6 +5778,135 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
         }
       }),
 
+      browse_web: tool({
+        description: `Browser Automation Tool - Navigate to any URL, take screenshots, click elements, fill forms, read console logs, and test web applications using Playwright in a secure sandbox with Chromium browser.
+
+Use this tool to:
+- Test the user's app by navigating to its preview URL and interacting with it
+- Visit any website to gather visual information or verify behavior
+- Take screenshots of web pages for analysis
+- Fill out forms and click buttons to test user flows
+- Read browser console logs and detect runtime errors
+- Verify responsive layouts at different viewport sizes
+
+IMPORTANT SCRIPT RULES:
+- You receive 'page', 'browser', and 'context' variables already initialized
+- The browser viewport is 1280x720 by default
+- Save ALL screenshots to '/home/user/' directory (e.g., page.screenshot({ path: '/home/user/screenshot.png' }))
+- Console logs, page errors, and network errors are automatically captured
+- Do NOT import chromium or launch browser - it's already done for you
+- Do NOT close the browser - it's handled automatically
+- Use 'await' for all Playwright operations
+- For testing the user's app, first use check_dev_errors to get the preview URL, then use this tool to navigate to it
+
+Example script for taking a screenshot:
+  await page.goto('https://example.com');
+  await page.screenshot({ path: '/home/user/homepage.png', fullPage: true });
+
+Example script for form testing:
+  await page.goto('https://example.com/login');
+  await page.fill('input[name="email"]', 'test@example.com');
+  await page.fill('input[name="password"]', 'password123');
+  await page.click('button[type="submit"]');
+  await page.waitForNavigation();
+  await page.screenshot({ path: '/home/user/after_login.png' });
+
+Example script for responsive testing:
+  await page.goto('https://example.com');
+  await page.screenshot({ path: '/home/user/desktop.png' });
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.screenshot({ path: '/home/user/mobile.png' });
+
+Present results using this markdown structure:
+## Browser Test Results
+
+### Screenshots
+| Screenshot | Description |
+|-----------|-------------|
+| ![Screenshot](url) | Description of what was captured |
+
+### Console Output
+- List any console logs, errors, or warnings detected
+
+### Page Info
+- **URL:** final page URL
+- **Title:** page title
+- **Errors:** any runtime errors detected`,
+        inputSchema: z.object({
+          script: z.string().describe('Playwright script body to execute. You have access to page, browser, and context variables. Save screenshots to /home/user/ directory. Do NOT import chromium or launch/close browser.'),
+          timeoutSeconds: z.number().optional().describe('Execution timeout in seconds (default: 60, max: 120)')
+        }),
+        execute: async ({ script, timeoutSeconds = 60 }, { abortSignal, toolCallId }) => {
+          const toolStartTime = Date.now();
+          const timeStatus = getTimeStatus();
+
+          if (abortSignal?.aborted) {
+            return { success: false, error: 'Tool execution was aborted', toolCallId, executionTimeMs: 0 };
+          }
+
+          if (timeStatus.isApproachingTimeout) {
+            return { success: false, error: timeStatus.warningMessage, toolCallId, executionTimeMs: 0 };
+          }
+
+          try {
+            // Call the browse_web API route
+            const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/browse_web`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                script,
+                timeoutSeconds: Math.min(timeoutSeconds, 120)
+              })
+            });
+
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+
+            const executionTime = Date.now() - toolStartTime;
+            toolExecutionTimes['browse_web'] = (toolExecutionTimes['browse_web'] || 0) + executionTime;
+
+            return {
+              success: result.success,
+              screenshots: result.screenshots || {},
+              browserData: result.browserData || {},
+              stdout: result.stdout || '',
+              stderr: result.stderr || '',
+              exitCode: result.exitCode,
+              uploadResults: result.uploadResults || [],
+              // Formatted data for AI presentation
+              screenshotUrls: Object.entries(result.screenshots || {}).map(([name, url]) => ({
+                name,
+                url,
+                markdown: `![${name}](${url})`
+              })),
+              consoleLogs: result.browserData?.consoleLogs || [],
+              pageErrors: result.browserData?.pageErrors || [],
+              networkErrors: result.browserData?.networkErrors || [],
+              currentUrl: result.browserData?.currentUrl || '',
+              pageTitle: result.browserData?.title || '',
+              toolCallId,
+              executionTimeMs: executionTime,
+              timeWarning: timeStatus.warningMessage
+            };
+          } catch (error) {
+            const executionTime = Date.now() - toolStartTime;
+            toolExecutionTimes['browse_web'] = (toolExecutionTimes['browse_web'] || 0) + executionTime;
+            return {
+              success: false,
+              error: `Browser automation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              toolCallId,
+              executionTimeMs: executionTime,
+              timeWarning: timeStatus.warningMessage
+            };
+          }
+        }
+      }),
+
       list_files: tool({
         description: 'List all files and directories in the project with their structure and metadata.',
         inputSchema: z.object({
