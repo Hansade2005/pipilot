@@ -1231,6 +1231,15 @@ export function ChatPanelV2({
   // MCP server toggles (per-session runtime toggles)
   const [mcpServerToggles, setMcpServerToggles] = useState<Record<string, boolean>>({})
   const [loadedMcpServers, setLoadedMcpServers] = useState<MCPServerConfig[]>([])
+  // MCP inline add/remove
+  const [mcpSubmenuView, setMcpSubmenuView] = useState<'list' | 'add'>('list')
+  const [newMcpName, setNewMcpName] = useState('')
+  const [newMcpUrl, setNewMcpUrl] = useState('')
+  const [newMcpHeaderKey, setNewMcpHeaderKey] = useState('')
+  const [newMcpHeaderValue, setNewMcpHeaderValue] = useState('')
+  const [newMcpHeaders, setNewMcpHeaders] = useState<Record<string, string>>({})
+  const [newMcpScope, setNewMcpScope] = useState<'project' | 'global'>('project')
+  const [mcpDeleteConfirm, setMcpDeleteConfirm] = useState<string | null>(null)
 
   // Tool category toggles
   const [toolCategoryToggles, setToolCategoryToggles] = useState<Record<string, boolean>>(() => {
@@ -1457,6 +1466,102 @@ export function ChatPanelV2({
     setMcpServerToggles(toggles)
   }, [project?.id])
 
+  // Reload MCP servers from localStorage (used after add/remove)
+  const reloadMcpServers = useCallback(() => {
+    if (typeof window === 'undefined') return
+    const servers: MCPServerConfig[] = []
+    try {
+      const globalStored = localStorage.getItem('pipilot-mcp-servers-global')
+      if (globalStored) servers.push(...JSON.parse(globalStored))
+    } catch {}
+    if (project?.id) {
+      try {
+        const stored = localStorage.getItem(`pipilot-mcp-servers-${project.id}`)
+        if (stored) servers.push(...JSON.parse(stored))
+      } catch {}
+    }
+    setLoadedMcpServers(servers)
+    const toggles: Record<string, boolean> = {}
+    servers.forEach(s => { toggles[s.id || s.name] = s.enabled !== false })
+    setMcpServerToggles(toggles)
+  }, [project?.id])
+
+  // Add a new MCP server inline
+  const handleAddMcpServer = useCallback(() => {
+    if (!newMcpName.trim() || !newMcpUrl.trim()) return
+    if (!newMcpUrl.startsWith('http://') && !newMcpUrl.startsWith('https://')) return
+
+    // Capture any pending header input
+    const finalHeaders = { ...newMcpHeaders }
+    if (newMcpHeaderKey.trim() && newMcpHeaderValue.trim()) {
+      finalHeaders[newMcpHeaderKey.trim()] = newMcpHeaderValue.trim()
+    }
+
+    const server: MCPServerConfig = {
+      id: crypto.randomUUID(),
+      name: newMcpName.trim(),
+      transport: 'http',
+      url: newMcpUrl.trim(),
+      headers: Object.keys(finalHeaders).length > 0 ? finalHeaders : undefined,
+      enabled: true,
+    }
+
+    const storageKey = newMcpScope === 'global'
+      ? 'pipilot-mcp-servers-global'
+      : `pipilot-mcp-servers-${project?.id}`
+
+    if (!storageKey || (newMcpScope === 'project' && !project?.id)) return
+
+    try {
+      const existing = JSON.parse(localStorage.getItem(storageKey) || '[]')
+      existing.push(server)
+      localStorage.setItem(storageKey, JSON.stringify(existing))
+    } catch {}
+
+    // Reset form
+    setNewMcpName('')
+    setNewMcpUrl('')
+    setNewMcpHeaderKey('')
+    setNewMcpHeaderValue('')
+    setNewMcpHeaders({})
+    setNewMcpScope('project')
+    setMcpSubmenuView('list')
+    reloadMcpServers()
+  }, [newMcpName, newMcpUrl, newMcpHeaders, newMcpHeaderKey, newMcpHeaderValue, newMcpScope, project?.id, reloadMcpServers])
+
+  // Remove an MCP server
+  const handleRemoveMcpServer = useCallback((serverId: string) => {
+    if (typeof window === 'undefined') return
+
+    // Try removing from project-specific storage
+    if (project?.id) {
+      try {
+        const key = `pipilot-mcp-servers-${project.id}`
+        const servers: MCPServerConfig[] = JSON.parse(localStorage.getItem(key) || '[]')
+        const filtered = servers.filter(s => s.id !== serverId)
+        if (filtered.length !== servers.length) {
+          localStorage.setItem(key, JSON.stringify(filtered))
+          reloadMcpServers()
+          setMcpDeleteConfirm(null)
+          return
+        }
+      } catch {}
+    }
+
+    // Try removing from global storage
+    try {
+      const key = 'pipilot-mcp-servers-global'
+      const servers: MCPServerConfig[] = JSON.parse(localStorage.getItem(key) || '[]')
+      const filtered = servers.filter(s => s.id !== serverId)
+      if (filtered.length !== servers.length) {
+        localStorage.setItem(key, JSON.stringify(filtered))
+      }
+    } catch {}
+
+    reloadMcpServers()
+    setMcpDeleteConfirm(null)
+  }, [project?.id, reloadMcpServers])
+
   // Persist feature toggles
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -1487,6 +1592,8 @@ export function ChatPanelV2({
         setShowCommandMenu(false)
         setCommandMenuSubmenu('none')
         setToolDetailCategory(null)
+        setMcpSubmenuView('list')
+        setMcpDeleteConfirm(null)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -6668,58 +6775,242 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                       <div className="py-1.5">
                         <button
                           className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors border-b border-gray-700/50"
-                          onClick={() => setCommandMenuSubmenu('none')}
+                          onClick={() => {
+                            if (mcpSubmenuView === 'add') {
+                              setMcpSubmenuView('list')
+                            } else {
+                              setCommandMenuSubmenu('none')
+                            }
+                          }}
                         >
                           <ChevronLeft className="size-4" />
-                          <span className="font-medium">MCP Servers</span>
+                          <span className="font-medium">{mcpSubmenuView === 'add' ? 'Add MCP Server' : 'MCP Servers'}</span>
+                          {mcpSubmenuView === 'list' && (
+                            <span className="text-[11px] text-gray-500 ml-auto">{loadedMcpServers.length} server{loadedMcpServers.length !== 1 ? 's' : ''}</span>
+                          )}
                         </button>
-                        {loadedMcpServers.length === 0 ? (
-                          <div className="px-4 py-4 text-sm text-gray-500 text-center">
-                            No MCP servers configured
-                          </div>
+
+                        {mcpSubmenuView === 'list' ? (
+                          <>
+                            {loadedMcpServers.length === 0 ? (
+                              <div className="px-4 py-6 text-center">
+                                <Server className="size-8 text-gray-600 mx-auto mb-2" />
+                                <div className="text-sm text-gray-500">No MCP servers configured</div>
+                                <div className="text-[11px] text-gray-600 mt-1">Add a server to extend AI capabilities</div>
+                              </div>
+                            ) : (
+                              <div className="max-h-[240px] overflow-y-auto">
+                                {loadedMcpServers.map((server) => {
+                                  const key = server.id || server.name
+                                  const isOn = mcpServerToggles[key] !== false
+                                  return (
+                                    <div key={key} className="flex items-center hover:bg-gray-800 transition-colors group">
+                                      <button
+                                        className="flex-1 flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 min-w-0"
+                                        onClick={() => setMcpServerToggles(prev => ({ ...prev, [key]: !isOn }))}
+                                      >
+                                        <Server className={`size-4 flex-shrink-0 ${isOn ? 'text-green-400' : 'text-gray-500'}`} />
+                                        <div className="text-left min-w-0 flex-1">
+                                          <div className="flex items-center gap-2">
+                                            <span className={`truncate ${isOn ? 'text-gray-200' : 'text-gray-500'}`}>{server.name}</span>
+                                            {server.transport === 'stdio' && (
+                                              <span className="text-[10px] px-1 py-0.5 bg-yellow-900/30 text-yellow-500 rounded flex-shrink-0">local</span>
+                                            )}
+                                          </div>
+                                          {server.url && (
+                                            <div className="text-[10px] text-gray-600 truncate">{server.url}</div>
+                                          )}
+                                        </div>
+                                      </button>
+                                      <div className="flex items-center gap-1 pr-2">
+                                        {mcpDeleteConfirm === key ? (
+                                          <div className="flex items-center gap-1">
+                                            <button
+                                              className="p-1 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors"
+                                              onClick={() => handleRemoveMcpServer(server.id)}
+                                              title="Confirm remove"
+                                            >
+                                              <Check className="size-3.5" />
+                                            </button>
+                                            <button
+                                              className="p-1 text-gray-500 hover:text-gray-300 hover:bg-gray-700 rounded transition-colors"
+                                              onClick={() => setMcpDeleteConfirm(null)}
+                                              title="Cancel"
+                                            >
+                                              <X className="size-3.5" />
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          <button
+                                            className="p-1 text-gray-600 hover:text-red-400 hover:bg-red-500/10 rounded opacity-0 group-hover:opacity-100 transition-all"
+                                            onClick={() => setMcpDeleteConfirm(key)}
+                                            title="Remove server"
+                                          >
+                                            <Trash2 className="size-3.5" />
+                                          </button>
+                                        )}
+                                        <Switch
+                                          checked={isOn}
+                                          onCheckedChange={(checked) => setMcpServerToggles(prev => ({ ...prev, [key]: checked }))}
+                                          className="h-4 w-7 flex-shrink-0"
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )}
+                            <div className="border-t border-gray-700/50 mt-1 flex">
+                              <button
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-orange-400 hover:bg-gray-800 transition-colors"
+                                onClick={() => {
+                                  setMcpSubmenuView('add')
+                                  setMcpDeleteConfirm(null)
+                                }}
+                              >
+                                <Plus className="size-4" />
+                                <span>Add server</span>
+                              </button>
+                              <div className="w-px bg-gray-700/50" />
+                              <button
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-gray-400 hover:text-gray-300 hover:bg-gray-800 transition-colors"
+                                onClick={() => {
+                                  setShowCommandMenu(false)
+                                  if (project?.slug) {
+                                    window.open(`/workspace/projects/${project.slug}?tab=mcp`, '_blank')
+                                  }
+                                }}
+                              >
+                                <ExternalLink className="size-4" />
+                                <span>Full settings</span>
+                              </button>
+                            </div>
+                          </>
                         ) : (
-                          <div className="max-h-[240px] overflow-y-auto">
-                            {loadedMcpServers.map((server) => {
-                              const key = server.id || server.name
-                              const isOn = mcpServerToggles[key] !== false
-                              return (
+                          /* Add MCP Server Form */
+                          <div className="px-4 py-3 space-y-3">
+                            <div>
+                              <label className="text-[11px] text-gray-500 mb-1 block">Server name</label>
+                              <input
+                                type="text"
+                                value={newMcpName}
+                                onChange={(e) => setNewMcpName(e.target.value)}
+                                placeholder="e.g. my-mcp-server"
+                                className="w-full h-8 px-2.5 text-sm bg-gray-800 border border-gray-700/60 rounded-lg text-gray-100 placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[11px] text-gray-500 mb-1 block">Server URL</label>
+                              <input
+                                type="url"
+                                value={newMcpUrl}
+                                onChange={(e) => setNewMcpUrl(e.target.value)}
+                                placeholder="https://mcp.example.com/sse"
+                                className="w-full h-8 px-2.5 text-sm bg-gray-800 border border-gray-700/60 rounded-lg text-gray-100 placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
+                              />
+                            </div>
+
+                            {/* Headers */}
+                            <div>
+                              <label className="text-[11px] text-gray-500 mb-1 block">Headers (optional)</label>
+                              {Object.entries(newMcpHeaders).length > 0 && (
+                                <div className="space-y-1 mb-2">
+                                  {Object.entries(newMcpHeaders).map(([hk, hv]) => (
+                                    <div key={hk} className="flex items-center gap-1.5 text-[11px]">
+                                      <span className="text-gray-400 font-mono truncate">{hk}</span>
+                                      <span className="text-gray-600">:</span>
+                                      <span className="text-gray-500 font-mono truncate flex-1">{'*'.repeat(Math.min(hv.length, 12))}</span>
+                                      <button
+                                        className="p-0.5 text-gray-600 hover:text-red-400 transition-colors"
+                                        onClick={() => setNewMcpHeaders(prev => {
+                                          const next = { ...prev }
+                                          delete next[hk]
+                                          return next
+                                        })}
+                                      >
+                                        <X className="size-3" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              <div className="flex gap-1.5">
+                                <input
+                                  type="text"
+                                  value={newMcpHeaderKey}
+                                  onChange={(e) => setNewMcpHeaderKey(e.target.value)}
+                                  placeholder="Key"
+                                  className="flex-1 h-7 px-2 text-[12px] bg-gray-800 border border-gray-700/60 rounded-md text-gray-100 placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50"
+                                />
+                                <input
+                                  type="text"
+                                  value={newMcpHeaderValue}
+                                  onChange={(e) => setNewMcpHeaderValue(e.target.value)}
+                                  placeholder="Value"
+                                  className="flex-1 h-7 px-2 text-[12px] bg-gray-800 border border-gray-700/60 rounded-md text-gray-100 placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50"
+                                />
                                 <button
-                                  key={key}
-                                  className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
-                                  onClick={() => setMcpServerToggles(prev => ({ ...prev, [key]: !isOn }))}
+                                  className="h-7 w-7 flex items-center justify-center rounded-md bg-gray-800 border border-gray-700/60 text-gray-400 hover:text-orange-400 hover:border-orange-500/50 transition-colors disabled:opacity-30"
+                                  disabled={!newMcpHeaderKey.trim() || !newMcpHeaderValue.trim()}
+                                  onClick={() => {
+                                    if (newMcpHeaderKey.trim() && newMcpHeaderValue.trim()) {
+                                      setNewMcpHeaders(prev => ({ ...prev, [newMcpHeaderKey.trim()]: newMcpHeaderValue.trim() }))
+                                      setNewMcpHeaderKey('')
+                                      setNewMcpHeaderValue('')
+                                    }
+                                  }}
                                 >
-                                  <div className="flex items-center gap-3 min-w-0">
-                                    <Server className={`size-4 flex-shrink-0 ${isOn ? 'text-green-400' : 'text-gray-500'}`} />
-                                    <span className="truncate">{server.name}</span>
-                                    {server.transport === 'stdio' && (
-                                      <span className="text-[10px] px-1 py-0.5 bg-yellow-900/30 text-yellow-500 rounded flex-shrink-0">local</span>
-                                    )}
-                                  </div>
-                                  <Switch
-                                    checked={isOn}
-                                    onCheckedChange={(checked) => setMcpServerToggles(prev => ({ ...prev, [key]: checked }))}
-                                    className="h-4 w-7 flex-shrink-0"
-                                    onClick={(e) => e.stopPropagation()}
-                                  />
+                                  <Plus className="size-3.5" />
                                 </button>
-                              )
-                            })}
+                              </div>
+                            </div>
+
+                            {/* Scope selector */}
+                            <div>
+                              <label className="text-[11px] text-gray-500 mb-1.5 block">Scope</label>
+                              <div className="flex gap-2">
+                                <button
+                                  className={`flex-1 text-[12px] py-1.5 rounded-md border transition-colors ${newMcpScope === 'project' ? 'border-orange-500/50 bg-orange-600/15 text-orange-400' : 'border-gray-700/60 text-gray-500 hover:text-gray-300'}`}
+                                  onClick={() => setNewMcpScope('project')}
+                                >
+                                  This project
+                                </button>
+                                <button
+                                  className={`flex-1 text-[12px] py-1.5 rounded-md border transition-colors ${newMcpScope === 'global' ? 'border-orange-500/50 bg-orange-600/15 text-orange-400' : 'border-gray-700/60 text-gray-500 hover:text-gray-300'}`}
+                                  onClick={() => setNewMcpScope('global')}
+                                >
+                                  All projects
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex gap-2 pt-1">
+                              <button
+                                className="flex-1 h-8 text-sm rounded-lg bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700 transition-colors"
+                                onClick={() => {
+                                  setMcpSubmenuView('list')
+                                  setNewMcpName('')
+                                  setNewMcpUrl('')
+                                  setNewMcpHeaderKey('')
+                                  setNewMcpHeaderValue('')
+                                  setNewMcpHeaders({})
+                                  setNewMcpScope('project')
+                                }}
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                className="flex-1 h-8 text-sm rounded-lg bg-orange-600 hover:bg-orange-500 text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                disabled={!newMcpName.trim() || !newMcpUrl.trim() || (!newMcpUrl.startsWith('http://') && !newMcpUrl.startsWith('https://'))}
+                                onClick={handleAddMcpServer}
+                              >
+                                Add server
+                              </button>
+                            </div>
                           </div>
                         )}
-                        <div className="border-t border-gray-700/50 mt-1">
-                          <button
-                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-blue-400 hover:bg-gray-800 transition-colors"
-                            onClick={() => {
-                              setShowCommandMenu(false)
-                              if (project?.slug) {
-                                window.open(`/workspace/projects/${project.slug}?tab=mcp`, '_blank')
-                              }
-                            }}
-                          >
-                            <ExternalLink className="size-4" />
-                            <span>Manage servers</span>
-                          </button>
-                        </div>
                       </div>
                     )}
 
