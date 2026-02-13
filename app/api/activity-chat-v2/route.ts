@@ -223,6 +223,8 @@ export async function POST(req: NextRequest) {
       clientFileTree = [],
       fileContexts = [],
       codebaseContext,
+      openFiles = [],
+      currentFile = null,
     } = body
 
     if (!messages || !Array.isArray(messages)) {
@@ -312,9 +314,21 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Build editor state context (currently open files)
+    let editorStateStr = ''
+    if (currentFile || (openFiles && openFiles.length > 0)) {
+      editorStateStr = '\n\n# Editor State'
+      if (currentFile) {
+        editorStateStr += `\nCurrently focused file: \`${currentFile}\``
+      }
+      if (openFiles && openFiles.length > 0) {
+        editorStateStr += `\nOpen files in editor tabs: ${openFiles.map((f: string) => `\`${f}\``).join(', ')}`
+      }
+    }
+
     const systemPrompt = `You are PiPilot Code Assistant - an AI coding assistant embedded in the code editor sidebar. You help users understand, write, and modify code in their projects.
 
-${projectContext}${fileContextStr}${codebaseStr}
+${projectContext}${fileContextStr}${codebaseStr}${editorStateStr}
 
 ## Your Capabilities
 - Read, write, edit, and delete project files using tools
@@ -322,6 +336,7 @@ ${projectContext}${fileContextStr}${codebaseStr}
 - List files and directories
 - Explain code, find bugs, suggest improvements
 - Generate new code and modify existing code
+- You know which files the user currently has open in their editor
 
 ## Guidelines
 - Be concise and direct in your responses
@@ -330,6 +345,7 @@ ${projectContext}${fileContextStr}${codebaseStr}
 - Provide code in markdown code blocks with language tags
 - Focus on the user's specific question or task
 - When creating or editing files, the changes are applied to the project in real-time
+- If the user asks about "the current file" or "this file", refer to the currently focused file from the Editor State section
 - IMPORTANT: Always provide a text response along with any tool calls. Never respond with only tool calls and no text.`
 
     // Build tools

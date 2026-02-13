@@ -95,7 +95,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [chatPanelVisible, setChatPanelVisible] = useState(true)
 
   // Resizable sidebar width for activity panels
-  const [sidebarWidth, setSidebarWidth] = useState(256)
+  const [sidebarWidth, setSidebarWidth] = useState(360)
   const sidebarResizing = useRef(false)
   const sidebarRef = useRef<HTMLDivElement>(null)
 
@@ -1343,6 +1343,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                                 projectId={selectedProject?.id || null}
                                 projectFiles={projectFiles}
                                 selectedFile={selectedFile}
+                                openFiles={openFiles}
                                 selectedModel={selectedModel}
                                 onOpenFile={(filePath) => {
                                   const file = projectFiles.find(f => f.path === filePath)
