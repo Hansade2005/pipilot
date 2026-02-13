@@ -1027,7 +1027,7 @@ export function CodeEditor({ file, onSave, projectFiles = [], openFiles = [], on
                   <button
                     onClick={(e) => { e.stopPropagation(); onCloseFile(f) }}
                     className={`size-4 flex items-center justify-center rounded-sm transition-colors ${
-                      isActive ? 'hover:bg-gray-700/60 text-gray-400' : 'opacity-0 group-hover:opacity-100 hover:bg-gray-700/60 text-gray-500'
+                      isActive ? 'hover:bg-gray-700/60 text-gray-400' : 'md:opacity-0 md:group-hover:opacity-100 hover:bg-gray-700/60 text-gray-500'
                     }`}
                   >
                     <X className="size-3" />

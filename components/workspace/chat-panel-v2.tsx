@@ -287,7 +287,7 @@ const ExpandableUserMessage = ({
               </p>
             </div>
           </div>
-          <div className="flex items-center justify-end gap-0.5 mt-1 sm:opacity-0 sm:hover:opacity-100 transition-opacity">
+          <div className="flex items-center justify-end gap-0.5 mt-1 md:opacity-0 md:hover:opacity-100 transition-opacity">
             <Action tooltip="Retry message" onClick={handleIconClick}>
               <RotateCcw className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
             </Action>
@@ -390,7 +390,7 @@ const ExpandableUserMessage = ({
           )}
         </div>
       </div>
-      <div className="flex items-center justify-end gap-0.5 mt-1 opacity-0 hover:opacity-100 transition-opacity">
+      <div className="flex items-center justify-end gap-0.5 mt-1 md:opacity-0 md:hover:opacity-100 transition-opacity">
         <Action tooltip="Retry message" onClick={handleIconClick}>
           <RotateCcw className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
         </Action>
@@ -6238,7 +6238,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 <div key={file.id} className="flex items-center gap-1.5 bg-gray-800 px-2 py-1 rounded-lg text-xs text-gray-300 group">
                   <FileText className="size-3 text-gray-500" />
                   <span className="truncate max-w-[120px]">{file.name}</span>
-                  <button className="opacity-0 group-hover:opacity-100 hover:text-red-400 text-gray-500 transition-all" onClick={() => setAttachedFiles((prev: AttachedFile[]) => prev.filter((f: AttachedFile) => f.id !== file.id))}>
+                  <button className="md:opacity-0 md:group-hover:opacity-100 hover:text-red-400 text-gray-500 transition-all" onClick={() => setAttachedFiles((prev: AttachedFile[]) => prev.filter((f: AttachedFile) => f.id !== file.id))}>
                     <X className="size-3" />
                   </button>
                 </div>
@@ -6255,7 +6255,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                       </button>
                     </>
                   ) : (
-                    <button className="opacity-0 group-hover:opacity-100 hover:text-red-400 text-gray-500 transition-all" onClick={() => setAttachedImages((prev: AttachedImage[]) => prev.filter((i: AttachedImage) => i.id !== img.id))}>
+                    <button className="md:opacity-0 md:group-hover:opacity-100 hover:text-red-400 text-gray-500 transition-all" onClick={() => setAttachedImages((prev: AttachedImage[]) => prev.filter((i: AttachedImage) => i.id !== img.id))}>
                       <X className="size-3" />
                     </button>
                   )}
@@ -6265,7 +6265,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 <div key={file.id} className="flex items-center gap-1.5 bg-gray-800 px-2 py-1 rounded-lg text-xs text-gray-300 group">
                   <FileText className="size-3 text-gray-500" />
                   <span className="truncate max-w-[120px]">{file.name}</span>
-                  <button className="opacity-0 group-hover:opacity-100 hover:text-red-400 text-gray-500 transition-all" onClick={() => setAttachedUploadedFiles((prev: AttachedUploadedFile[]) => prev.filter((f: AttachedUploadedFile) => f.id !== file.id))}>
+                  <button className="md:opacity-0 md:group-hover:opacity-100 hover:text-red-400 text-gray-500 transition-all" onClick={() => setAttachedUploadedFiles((prev: AttachedUploadedFile[]) => prev.filter((f: AttachedUploadedFile) => f.id !== file.id))}>
                     <X className="size-3" />
                   </button>
                 </div>
@@ -6275,7 +6275,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                   <LinkIcon className="size-3 text-gray-500" />
                   <span className="truncate max-w-[120px]">{url.title || url.url}</span>
                   {url.isProcessing && <Loader2 className="size-3 animate-spin text-gray-400" />}
-                  <button className="opacity-0 group-hover:opacity-100 hover:text-red-400 text-gray-500 transition-all" onClick={() => setAttachedUrls((prev: AttachedUrl[]) => prev.filter((u: AttachedUrl) => u.id !== url.id))}>
+                  <button className="md:opacity-0 md:group-hover:opacity-100 hover:text-red-400 text-gray-500 transition-all" onClick={() => setAttachedUrls((prev: AttachedUrl[]) => prev.filter((u: AttachedUrl) => u.id !== url.id))}>
                     <X className="size-3" />
                   </button>
                 </div>
@@ -6842,7 +6842,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                                           </div>
                                         ) : (
                                           <button
-                                            className="p-1 text-gray-600 hover:text-red-400 hover:bg-red-500/10 rounded opacity-0 group-hover:opacity-100 transition-all"
+                                            className="p-1 text-gray-600 hover:text-red-400 hover:bg-red-500/10 rounded md:opacity-0 md:group-hover:opacity-100 transition-all"
                                             onClick={() => setMcpDeleteConfirm(key)}
                                             title="Remove server"
                                           >

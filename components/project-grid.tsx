@@ -686,7 +686,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
                       {project.category}
                     </Badge>
                   </div>
-                  <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
+                  <div className="absolute bottom-3 right-3 md:opacity-0 md:group-hover:opacity-100 transition-all duration-300 transform md:translate-y-2 md:group-hover:translate-y-0">
                     <div className="p-2 bg-orange-600 rounded-full shadow-lg">
                       <ExternalLink className="w-4 h-4 text-white" />
                     </div>
@@ -706,7 +706,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
                       </svg>
                       {timeAgo(project.createdAt)}
                     </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                       <span className="text-xs text-orange-400 font-medium">Open →</span>
                     </div>
                   </div>
