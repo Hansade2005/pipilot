@@ -418,7 +418,7 @@ ${projectContext}${fileContextStr}${codebaseStr}
       temperature: 0.5,
       messages: sanitizedMessages,
       tools: Object.keys(tools).length > 0 ? tools : undefined,
-      ...(Object.keys(tools).length > 0 ? { stopWhen: stepCountIs(5) } : {}),
+      ...(Object.keys(tools).length > 0 ? { stopWhen: stepCountIs(30) } : {}),
     })
 
     // Stream using newline-delimited JSON

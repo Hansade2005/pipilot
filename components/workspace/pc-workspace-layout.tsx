@@ -19,7 +19,7 @@ import { CodeEditor, defaultEditorSettings, type EditorSettings } from "./code-e
 import { DatabaseTab } from "./database-tab"
 import { AIPplatformTab } from "./ai-platform-tab"
 import { CloudTab } from "./cloud-tab"
-import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, Square, Monitor, Smartphone, Database, Cloud, Search, Folder } from "lucide-react"
+import { Github, Globe, Rocket, Settings, PanelLeft, PanelLeftClose, PanelLeftOpen, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, Square, Monitor, Smartphone, Database, Cloud, Search, Folder } from "lucide-react"
 import { storageManager } from "@/lib/storage-manager"
 import { useToast } from '@/hooks/use-toast'
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -78,6 +78,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_CHAT_MODEL)
   const [aiMode, setAiMode] = useState<AIMode>('agent')
   const [projectFiles, setProjectFiles] = useState<File[]>([])
+
+  // Chat panel toggle (desktop)
+  const [chatPanelVisible, setChatPanelVisible] = useState(true)
 
   // VS Code-like code view state
   const [codeViewPanel, setCodeViewPanel] = useState<'files' | 'search' | 'chat' | 'settings' | null>('files')
@@ -1217,24 +1220,28 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
             {/* Main Workspace */}
             {!isLoadingProjects && clientProjects.length > 0 && (
-              <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
-                {/* Left Panel - Chat (Resizable) */}
-                <ResizablePanel defaultSize={40} minSize={20} maxSize={40}>
-                  <div className="h-full flex flex-col border-r border-border">
-                    <ChatPanelV2
-                      project={selectedProject}
-                      selectedModel={selectedModel}
-                      aiMode={aiMode}
-                      initialPrompt={initialChatPrompt}
-                      initialChatMode={initialChatMode}
-                    />
-                  </div>
-                </ResizablePanel>
+              <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0" key={chatPanelVisible ? 'with-chat' : 'without-chat'}>
+                {/* Left Panel - Chat (Resizable) - toggleable */}
+                {chatPanelVisible && (
+                  <>
+                    <ResizablePanel defaultSize={40} minSize={20} maxSize={40}>
+                      <div className="h-full flex flex-col border-r border-border">
+                        <ChatPanelV2
+                          project={selectedProject}
+                          selectedModel={selectedModel}
+                          aiMode={aiMode}
+                          initialPrompt={initialChatPrompt}
+                          initialChatMode={initialChatMode}
+                        />
+                      </div>
+                    </ResizablePanel>
 
-                <ResizableHandle withHandle />
+                    <ResizableHandle withHandle />
+                  </>
+                )}
 
                 {/* Right Panel - VS Code Layout */}
-                <ResizablePanel defaultSize={60} minSize={30}>
+                <ResizablePanel defaultSize={chatPanelVisible ? 60 : 100} minSize={30}>
                   <div className="h-full flex flex-col">
                     {/* Content Area */}
                     {activeTab === "code" ? (
@@ -1242,6 +1249,21 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       <div className="flex-1 flex min-h-0">
                         {/* Activity Bar - VS Code icon strip */}
                         <div className="w-12 bg-gray-950 border-r border-gray-800/60 flex flex-col items-center py-1 flex-shrink-0">
+                          {/* Toggle Chat Panel */}
+                          <button
+                            onClick={() => setChatPanelVisible(v => !v)}
+                            className={`w-10 h-10 flex items-center justify-center rounded-lg mb-1 transition-colors relative ${
+                              chatPanelVisible
+                                ? 'text-orange-400 bg-orange-600/15'
+                                : 'text-gray-500 hover:text-orange-400 hover:bg-orange-500/10'
+                            }`}
+                            title={chatPanelVisible ? "Hide Chat Panel" : "Show Chat Panel"}
+                          >
+                            {chatPanelVisible ? <PanelLeftClose className="size-5" /> : <PanelLeftOpen className="size-5" />}
+                          </button>
+
+                          <div className="w-6 border-t border-gray-800/60 mb-1" />
+
                           <button
                             onClick={() => setCodeViewPanel(codeViewPanel === 'files' ? null : 'files')}
                             className={`w-10 h-10 flex items-center justify-center rounded-lg mb-0.5 transition-colors relative ${
