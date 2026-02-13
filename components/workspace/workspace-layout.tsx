@@ -25,6 +25,8 @@ import { DatabaseTab } from "./database-tab"
 import { AIPplatformTab } from "./ai-platform-tab"
 import { CloudTab } from "./cloud-tab"
 import { AuditTab } from "./audit-tab"
+import { ActivitySearchPanel } from "./activity-search-panel"
+import { ActivityChatPanel } from "./activity-chat-panel"
 import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, DatabaseBackup, Square, Monitor, Smartphone, Database, Cloud, Shield, Search, Folder } from "lucide-react"
 import { storageManager } from "@/lib/storage-manager"
 import { useToast } from '@/hooks/use-toast'
@@ -1262,126 +1264,25 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                               />
                             )}
                             {codeViewPanel === 'search' && (
-                              <div className="flex flex-col h-full">
-                                <div className="px-4 py-3 border-b border-gray-800/60">
-                                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Search</h3>
-                                </div>
-                                <div className="p-3">
-                                  <input
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Search files..."
-                                    className="w-full px-3 py-1.5 bg-gray-900/80 border border-gray-700/60 rounded-lg text-sm text-gray-200 placeholder:text-gray-500 focus:outline-none focus:border-gray-600"
-                                  />
-                                </div>
-                                <div className="flex-1 overflow-y-auto">
-                                  {searchQuery.trim() ? (
-                                    (() => {
-                                      const results = projectFiles.filter(f =>
-                                        f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                        f.path.toLowerCase().includes(searchQuery.toLowerCase())
-                                      )
-                                      return results.length > 0 ? (
-                                        results.map(f => (
-                                          <button
-                                            key={f.path}
-                                            onClick={() => { handleOpenFile(f); setCodeViewPanel('files') }}
-                                            className="w-full px-4 py-2 text-left text-xs hover:bg-gray-800/60 transition-colors flex items-center gap-2"
-                                          >
-                                            <FileText className="size-3.5 text-gray-500 flex-shrink-0" />
-                                            <div className="min-w-0">
-                                              <div className="text-gray-200 truncate">{f.name}</div>
-                                              <div className="text-gray-500 truncate text-[10px]">{f.path}</div>
-                                            </div>
-                                          </button>
-                                        ))
-                                      ) : (
-                                        <div className="flex items-center justify-center h-20 text-gray-600 text-xs">
-                                          No files found
-                                        </div>
-                                      )
-                                    })()
-                                  ) : (
-                                    <div className="flex items-center justify-center h-20 text-gray-600 text-xs">
-                                      Type to search across files
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
+                              <ActivitySearchPanel
+                                projectId={selectedProject?.id || null}
+                                onOpenFile={(filePath, lineNumber) => {
+                                  const file = projectFiles.find(f => f.path === filePath)
+                                  if (file) handleOpenFile(file)
+                                }}
+                              />
                             )}
                             {codeViewPanel === 'chat' && (
-                              <div className="flex flex-col h-full">
-                                <div className="px-4 py-3 border-b border-gray-800/60 flex items-center justify-between">
-                                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Chat</h3>
-                                  {codeChatMessages.length > 0 && (
-                                    <button
-                                      onClick={() => setCodeChatMessages([])}
-                                      className="text-gray-500 hover:text-gray-300 transition-colors"
-                                      title="Clear chat"
-                                    >
-                                      <RotateCcw className="size-3.5" />
-                                    </button>
-                                  )}
-                                </div>
-
-                                {/* Messages */}
-                                <div ref={codeChatScrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">
-                                  {codeChatMessages.length === 0 && (
-                                    <div className="text-center py-8">
-                                      <MessageSquare className="size-8 text-gray-600 mx-auto mb-3" />
-                                      <p className="text-xs text-gray-500">Ask questions about your code</p>
-                                      {selectedFile && (
-                                        <p className="text-[10px] text-gray-600 mt-1">Context: {selectedFile.name}</p>
-                                      )}
-                                    </div>
-                                  )}
-                                  {codeChatMessages.map((msg, i) => (
-                                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                      <div className={`max-w-[90%] rounded-xl px-3 py-2 text-xs ${
-                                        msg.role === 'user'
-                                          ? 'bg-orange-600 text-white'
-                                          : 'bg-gray-800/60 text-gray-200 border border-gray-700/40'
-                                      }`}>
-                                        <div className="whitespace-pre-wrap break-words">{msg.content}</div>
-                                      </div>
-                                    </div>
-                                  ))}
-                                  {isCodeChatLoading && codeChatMessages[codeChatMessages.length - 1]?.content === '' && (
-                                    <div className="flex justify-start">
-                                      <div className="bg-gray-800/60 rounded-xl px-3 py-2 border border-gray-700/40">
-                                        <div className="flex gap-1">
-                                          <span className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                          <span className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                          <span className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Input */}
-                                <div className="p-3 border-t border-gray-800/60">
-                                  <div className="flex gap-2">
-                                    <input
-                                      type="text"
-                                      value={codeChatInput}
-                                      onChange={(e) => setCodeChatInput(e.target.value)}
-                                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCodeChatSend() } }}
-                                      placeholder="Ask about your code..."
-                                      className="flex-1 min-w-0 px-3 py-1.5 bg-gray-900/80 border border-gray-700/60 rounded-lg text-sm text-gray-200 placeholder:text-gray-500 focus:outline-none focus:border-gray-600"
-                                      disabled={isCodeChatLoading}
-                                    />
-                                    <button
-                                      onClick={handleCodeChatSend}
-                                      disabled={!codeChatInput.trim() || isCodeChatLoading}
-                                      className="h-8 w-8 rounded-lg bg-orange-600 hover:bg-orange-500 disabled:opacity-40 disabled:hover:bg-orange-600 flex items-center justify-center flex-shrink-0 transition-colors"
-                                    >
-                                      <ArrowUp className="size-4 text-white" />
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
+                              <ActivityChatPanel
+                                projectId={selectedProject?.id || null}
+                                projectFiles={projectFiles}
+                                selectedFile={selectedFile}
+                                selectedModel={selectedModel}
+                                onOpenFile={(filePath) => {
+                                  const file = projectFiles.find(f => f.path === filePath)
+                                  if (file) handleOpenFile(file)
+                                }}
+                              />
                             )}
                             {codeViewPanel === 'settings' && (
                               <div className="flex flex-col h-full">
