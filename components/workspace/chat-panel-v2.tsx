@@ -470,6 +470,9 @@ const ToolActivityPanel = ({
     if (['web_search', 'web_extract'].includes(toolName)) {
       return '🌐 Web Operations'
     }
+    if (['browse_web'].includes(toolName)) {
+      return '🖥️ Browser Testing'
+    }
     if (['manage_api_keys', 'supabase_fetch_api_keys'].includes(toolName)) {
       return '🔑 API Management'
     }
