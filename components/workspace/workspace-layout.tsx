@@ -97,6 +97,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   // Resizable sidebar width for activity panels
   const [sidebarWidth, setSidebarWidth] = useState(256)
   const sidebarResizing = useRef(false)
+  const sidebarRef = useRef<HTMLDivElement>(null)
 
   // VS Code-like code view state
   const [codeViewPanel, setCodeViewPanel] = useState<'files' | 'search' | 'chat' | 'settings' | null>('files')
@@ -137,7 +138,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   // GitHub push functionality
   const { pushToGitHub, checkGitHubConnection, isPushing } = useGitHubPush()
 
-  // Sidebar resize handlers
+  // Sidebar resize handlers — update DOM directly during drag to avoid
+  // cascading React re-renders (which cause "Maximum update depth exceeded"
+  // crashes via react-resizable-panels' ResizeObserver). State is synced once on mouseup.
   const handleSidebarResizeStart = (e: React.MouseEvent) => {
     e.preventDefault()
     sidebarResizing.current = true
@@ -147,15 +150,20 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     const handleMouseMove = (e: MouseEvent) => {
       if (!sidebarResizing.current) return
       const newWidth = Math.max(200, Math.min(600, startWidth + (e.clientX - startX)))
-      setSidebarWidth(newWidth)
+      if (sidebarRef.current) {
+        sidebarRef.current.style.width = `${newWidth}px`
+      }
     }
 
-    const handleMouseUp = () => {
+    const handleMouseUp = (e: MouseEvent) => {
       sidebarResizing.current = false
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
+      // Commit final width to React state (single re-render)
+      const finalWidth = Math.max(200, Math.min(600, startWidth + (e.clientX - startX)))
+      setSidebarWidth(finalWidth)
     }
 
     document.body.style.cursor = 'col-resize'
@@ -1305,7 +1313,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
                         {/* Sidebar Panel (File Explorer, Search, Chat, or Settings) - Resizable */}
                         {codeViewPanel && (
-                          <div className="relative bg-gray-950 border-r border-gray-800/60 flex flex-col min-h-0 flex-shrink-0" style={{ width: sidebarWidth }}>
+                          <div ref={sidebarRef} className="relative bg-gray-950 border-r border-gray-800/60 flex flex-col min-h-0 flex-shrink-0" style={{ width: sidebarWidth }}>
                             {/* Drag handle for resizing */}
                             <div
                               onMouseDown={handleSidebarResizeStart}
