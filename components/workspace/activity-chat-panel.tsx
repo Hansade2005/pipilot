@@ -20,6 +20,20 @@ import {
   File as FileIcon,
   Folder,
   Image,
+  Edit3,
+  Eye,
+  FolderOpen,
+  Search,
+  CheckCircle2,
+  XCircle,
+  Zap,
+  PackageMinus,
+  Table,
+  Key,
+  BarChart3,
+  Monitor,
+  Globe,
+  Settings,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Response } from "@/components/ai-elements/response"
@@ -49,6 +63,7 @@ interface ToolCall {
   args: any
   result?: any
   status: 'pending' | 'done' | 'error'
+  textPosition?: number // Character position in text when tool was called
 }
 
 interface AtMentionOption {
@@ -63,6 +78,7 @@ interface ActivityChatPanelProps {
   projectId: string | null
   projectFiles: ProjectFile[]
   selectedFile: ProjectFile | null
+  openFiles?: ProjectFile[]
   selectedModel: string
   onOpenFile?: (filePath: string, lineNumber?: number) => void
 }
@@ -79,10 +95,166 @@ function getFileIcon(name: string) {
   return <FileIcon className="size-3 text-gray-500" />
 }
 
+// ──────────────────────────────────────────────────────────
+// Inline Tool Pill Component (matching chat-panel-v2 style)
+// ──────────────────────────────────────────────────────────
+const InlineToolPill = ({ toolName, input, status = 'pending', onOpenFile }: {
+  toolName: string
+  input?: any
+  status?: 'pending' | 'done' | 'error'
+  onOpenFile?: (filePath: string) => void
+}) => {
+  const getToolIcon = (tool: string) => {
+    switch (tool) {
+      case 'write_file': return <FileText className="w-3 h-3" />
+      case 'edit_file': return <Edit3 className="w-3 h-3" />
+      case 'read_file': return <Eye className="w-3 h-3" />
+      case 'list_files': return <FolderOpen className="w-3 h-3" />
+      case 'delete_file': return <X className="w-3 h-3" />
+      case 'grep_search': return <Search className="w-3 h-3" />
+      default: return <Zap className="w-3 h-3" />
+    }
+  }
+
+  const getToolLabel = (tool: string, args?: any) => {
+    switch (tool) {
+      case 'write_file': return `Creating ${args?.path ? args.path.split('/').pop() : 'file'}`
+      case 'edit_file': return `Editing ${args?.filePath ? args.filePath.split('/').pop() : 'file'}`
+      case 'read_file': return `Reading ${args?.path ? args.path.split('/').pop() : 'file'}`
+      case 'list_files': return 'Listing files'
+      case 'delete_file': return `Deleting ${args?.path ? args.path.split('/').pop() : 'file'}`
+      case 'grep_search': return `Searching "${args?.pattern || 'pattern'}"`
+      default: return tool
+    }
+  }
+
+  const getStatusColor = (s: string) => {
+    switch (s) {
+      case 'pending': return 'bg-blue-500/10 border-blue-500/20 text-blue-400'
+      case 'done': return 'bg-green-500/10 border-green-500/20 text-green-400'
+      case 'error': return 'bg-red-500/10 border-red-500/20 text-red-400'
+      default: return 'bg-gray-500/10 border-gray-700/30 text-gray-400'
+    }
+  }
+
+  const getStatusIcon = (s: string) => {
+    switch (s) {
+      case 'pending': return <Loader2 className="w-3 h-3 animate-spin" />
+      case 'done': return <CheckCircle2 className="w-3 h-3" />
+      case 'error': return <XCircle className="w-3 h-3" />
+      default: return null
+    }
+  }
+
+  // Get the file path for clickable link
+  const filePath = input?.path || input?.filePath || null
+
+  return (
+    <div className={cn(
+      "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-medium border transition-colors",
+      getStatusColor(status)
+    )}>
+      {getToolIcon(toolName)}
+      <span className="max-w-[160px] truncate">{getToolLabel(toolName, input)}</span>
+      {filePath && onOpenFile && (
+        <button
+          onClick={() => onOpenFile(filePath)}
+          className="text-blue-400 hover:text-blue-300 hover:underline truncate max-w-[100px] ml-0.5"
+        >
+          {filePath.split('/').pop()}
+        </button>
+      )}
+      {getStatusIcon(status)}
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────
+// Interleaved Content - renders text + tool pills at positions
+// ──────────────────────────────────────────────────────────
+const InterleavedContent = ({
+  content,
+  toolCalls,
+  isStreaming = false,
+  onOpenFile,
+  children,
+}: {
+  content: string
+  toolCalls: ToolCall[]
+  isStreaming?: boolean
+  onOpenFile?: (filePath: string) => void
+  children: (text: string) => React.ReactNode
+}) => {
+  const toolsWithPositions = toolCalls.filter(tc => typeof tc.textPosition === 'number')
+
+  if (toolsWithPositions.length === 0) {
+    return <>{children(content)}</>
+  }
+
+  const sortedTools = [...toolsWithPositions].sort((a, b) => (a.textPosition || 0) - (b.textPosition || 0))
+
+  const segments: Array<{ type: 'text' | 'tool', content?: string, tool?: ToolCall }> = []
+  let lastPosition = 0
+
+  for (const tool of sortedTools) {
+    const position = tool.textPosition || 0
+    if (position > lastPosition) {
+      const textSegment = content.slice(lastPosition, position)
+      if (textSegment) {
+        segments.push({ type: 'text', content: textSegment })
+      }
+    }
+    segments.push({ type: 'tool', tool })
+    lastPosition = position
+  }
+
+  if (lastPosition < content.length) {
+    segments.push({ type: 'text', content: content.slice(lastPosition) })
+  }
+
+  return (
+    <div className="interleaved-content space-y-1.5">
+      {segments.map((segment, index) => {
+        if (segment.type === 'text' && segment.content) {
+          return <div key={`text-${index}`}>{children(segment.content)}</div>
+        }
+        if (segment.type === 'tool' && segment.tool) {
+          return (
+            <div key={`tool-${segment.tool.id}`} className="my-1.5">
+              <InlineToolPill
+                toolName={segment.tool.name}
+                input={segment.tool.args}
+                status={segment.tool.status}
+                onOpenFile={onOpenFile}
+              />
+            </div>
+          )
+        }
+        return null
+      })}
+      {isStreaming && sortedTools.length > 0 && sortedTools[sortedTools.length - 1].status === 'pending' && (
+        <div className="flex items-center gap-1.5 text-gray-500 text-[10px] mt-1">
+          <Loader2 className="w-2.5 h-2.5 animate-spin" />
+          <span>Executing...</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────
+// Client-side tool execution list (matching chat-panel-v2)
+// ──────────────────────────────────────────────────────────
+const CLIENT_SIDE_TOOLS = [
+  'write_file', 'edit_file', 'delete_file',
+  'read_file', 'list_files', 'grep_search',
+]
+
 export function ActivityChatPanel({
   projectId,
   projectFiles,
   selectedFile,
+  openFiles,
   selectedModel,
   onOpenFile,
 }: ActivityChatPanelProps) {
@@ -277,6 +449,58 @@ export function ActivityChatPanel({
     setAttachedContexts(prev => prev.filter((_, i) => i !== index))
   }
 
+  // ──────────────────────────────────────────────────────────
+  // Client-side tool execution (matching chat-panel-v2 pattern)
+  // ──────────────────────────────────────────────────────────
+  const executeClientSideTool = useCallback(async (toolName: string, toolCallId: string, args: any) => {
+    if (!projectId) return
+
+    try {
+      const { handleClientFileOperation } = await import('@/lib/client-file-tools')
+
+      const addToolResult = (result: any) => {
+        console.log('[ActivityChat][ClientTool] Tool completed:', toolName, result.errorText ? 'FAILED' : 'OK')
+
+        const newStatus = result.errorText ? 'error' : 'done'
+
+        // Update tool status in messages
+        setMessages(prev => prev.map(m => {
+          if (m.toolCalls) {
+            return {
+              ...m,
+              toolCalls: m.toolCalls.map(tc =>
+                tc.id === toolCallId ? { ...tc, status: newStatus as 'pending' | 'done' | 'error', result: result.output || result } : tc
+              )
+            }
+          }
+          return m
+        }))
+      }
+
+      // Execute without awaiting addToolResult (per AI SDK pattern - prevents deadlocks)
+      handleClientFileOperation(
+        { toolName, toolCallId, args },
+        projectId,
+        addToolResult
+      ).catch(error => {
+        console.error('[ActivityChat][ClientTool] Execution error:', error)
+        setMessages(prev => prev.map(m => {
+          if (m.toolCalls) {
+            return {
+              ...m,
+              toolCalls: m.toolCalls.map(tc =>
+                tc.id === toolCallId ? { ...tc, status: 'error' as const } : tc
+              )
+            }
+          }
+          return m
+        }))
+      })
+    } catch (error) {
+      console.error('[ActivityChat][ClientTool] Import error:', error)
+    }
+  }, [projectId])
+
   // Send message
   const handleSend = useCallback(async () => {
     if ((!input.trim() && attachedContexts.length === 0) || isLoading) return
@@ -346,6 +570,10 @@ export function ActivityChatPanel({
         content: userMessage.content,
       })
 
+      // Build open files context
+      const openFilePaths = openFiles?.map(f => f.path) || []
+      const currentFilePath = selectedFile?.path || null
+
       const response = await fetch('/api/activity-chat-v2', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -357,6 +585,8 @@ export function ActivityChatPanel({
           clientFileTree: projectFiles.map(f => f.path),
           fileContexts: userMessage.fileContexts || [],
           codebaseContext: userMessage.fileContexts?.some(c => c.type === 'codebase'),
+          openFiles: openFilePaths,
+          currentFile: currentFilePath,
         }),
         signal: abortController.signal,
       })
@@ -394,19 +624,27 @@ export function ActivityChatPanel({
                   : m
               ))
             } else if (data.type === 'tool-call') {
+              // Track text position for inline tool pill rendering
               const toolCall: ToolCall = {
                 id: data.toolCallId,
                 name: data.toolName,
                 args: data.args,
                 status: 'pending',
+                textPosition: accumulatedText.length,
               }
               currentToolCalls = [...currentToolCalls, toolCall]
               setMessages(prev => prev.map(m =>
                 m.id === assistantId
-                  ? { ...m, toolCalls: currentToolCalls }
+                  ? { ...m, toolCalls: [...currentToolCalls] }
                   : m
               ))
+
+              // Execute client-side tool (write to IndexedDB)
+              if (CLIENT_SIDE_TOOLS.includes(data.toolName)) {
+                executeClientSideTool(data.toolName, data.toolCallId, data.args)
+              }
             } else if (data.type === 'tool-result') {
+              // Update tool status from server result
               currentToolCalls = currentToolCalls.map(tc =>
                 tc.id === data.toolCallId
                   ? { ...tc, result: data.result, status: data.result?.success ? 'done' : 'error' }
@@ -414,7 +652,7 @@ export function ActivityChatPanel({
               )
               setMessages(prev => prev.map(m =>
                 m.id === assistantId
-                  ? { ...m, toolCalls: currentToolCalls }
+                  ? { ...m, toolCalls: [...currentToolCalls] }
                   : m
               ))
 
@@ -447,7 +685,7 @@ export function ActivityChatPanel({
       setIsLoading(false)
       abortRef.current = null
     }
-  }, [input, attachedContexts, isLoading, messages, projectId, projectFiles, selectedModel])
+  }, [input, attachedContexts, isLoading, messages, projectId, projectFiles, selectedModel, openFiles, selectedFile, executeClientSideTool])
 
   // Stop streaming
   const handleStop = () => {
@@ -578,50 +816,39 @@ export function ActivityChatPanel({
               ) : (
                 /* Assistant Message */
                 <div className="w-full min-w-0">
-                  {/* Tool Calls */}
-                  {msg.toolCalls && msg.toolCalls.length > 0 && (
-                    <div className="mb-2 space-y-1">
-                      {msg.toolCalls.map((tc) => (
-                        <div key={tc.id} className="flex items-center gap-1.5 text-[10px] text-gray-500 px-1">
-                          {tc.status === 'pending' ? (
-                            <Loader2 className="size-3 animate-spin text-orange-400" />
-                          ) : tc.status === 'done' ? (
-                            <Check className="size-3 text-green-400" />
-                          ) : (
-                            <X className="size-3 text-red-400" />
-                          )}
-                          <Wrench className="size-3 text-gray-600" />
-                          <span className="text-gray-400 font-mono">{tc.name}</span>
-                          {tc.name === 'write_file' && tc.args?.path && (
-                            <button
-                              onClick={() => onOpenFile?.(tc.args.path)}
-                              className="text-blue-400 hover:text-blue-300 hover:underline truncate max-w-[120px]"
-                            >
-                              {tc.args.path}
-                            </button>
-                          )}
-                          {tc.name === 'read_file' && tc.args?.path && (
-                            <span className="text-gray-500 truncate max-w-[120px]">{tc.args.path}</span>
-                          )}
-                          {tc.name === 'edit_file' && tc.args?.filePath && (
-                            <button
-                              onClick={() => onOpenFile?.(tc.args.filePath)}
-                              className="text-blue-400 hover:text-blue-300 hover:underline truncate max-w-[120px]"
-                            >
-                              {tc.args.filePath}
-                            </button>
-                          )}
+                  {/* Interleaved content + tool pills (matching chat-panel-v2 pattern) */}
+                  {msg.content ? (
+                    <InterleavedContent
+                      content={msg.content}
+                      toolCalls={msg.toolCalls || []}
+                      isStreaming={msg.isStreaming}
+                      onOpenFile={onOpenFile}
+                    >
+                      {(text) => (
+                        <div className="text-xs text-gray-200 leading-relaxed overflow-hidden min-w-0" style={{ overflowWrap: 'anywhere' }}>
+                          <Response className="text-xs [&>pre]:text-[10px] [&>pre]:rounded-lg [&>pre]:bg-gray-900/80 [&>pre]:border [&>pre]:border-gray-800/60 [&>p]:text-xs [&>p]:mb-2 [&>h1]:text-sm [&>h2]:text-xs [&>h3]:text-xs [&>ul]:text-xs [&>ol]:text-xs [&>li]:text-xs [&>blockquote]:text-xs">
+                            {text}
+                          </Response>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                  {/* Message Content */}
-                  {msg.content && (
-                    <div className="text-xs text-gray-200 leading-relaxed overflow-hidden min-w-0" style={{ overflowWrap: 'anywhere' }}>
-                      <Response className="text-xs [&>pre]:text-[10px] [&>pre]:rounded-lg [&>pre]:bg-gray-900/80 [&>pre]:border [&>pre]:border-gray-800/60 [&>p]:text-xs [&>p]:mb-2 [&>h1]:text-sm [&>h2]:text-xs [&>h3]:text-xs [&>ul]:text-xs [&>ol]:text-xs [&>li]:text-xs [&>blockquote]:text-xs">
-                        {msg.content}
-                      </Response>
-                    </div>
+                      )}
+                    </InterleavedContent>
+                  ) : (
+                    <>
+                      {/* Show tool pills even without text content */}
+                      {msg.toolCalls && msg.toolCalls.length > 0 && (
+                        <div className="space-y-1.5 mb-2">
+                          {msg.toolCalls.map((tc) => (
+                            <InlineToolPill
+                              key={tc.id}
+                              toolName={tc.name}
+                              input={tc.args}
+                              status={tc.status}
+                              onOpenFile={onOpenFile}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
                   {/* Loading dots */}
                   {msg.isStreaming && !msg.content && (!msg.toolCalls || msg.toolCalls.length === 0) && (
