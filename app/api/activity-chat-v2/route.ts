@@ -11,6 +11,132 @@ const activitySessionStorage = new Map<string, {
   files: Map<string, any>
 }>()
 
+// Helper: Normalize file path by stripping leading ./ and / and collapsing double slashes
+function normalizeFilePath(filePath: string): string {
+  let normalized = filePath
+  while (normalized.startsWith('./')) normalized = normalized.slice(2)
+  while (normalized.startsWith('/')) normalized = normalized.slice(1)
+  normalized = normalized.replace(/\/+/g, '/')
+  if (normalized.endsWith('/') && normalized.length > 1) normalized = normalized.slice(0, -1)
+  return normalized
+}
+
+// Helper: Find file in sessionFiles with fuzzy path matching
+function findFileInSession(sessionFiles: Map<string, any>, inputPath: string): { file: any, resolvedPath: string } | null {
+  // 1. Exact match
+  const exactMatch = sessionFiles.get(inputPath)
+  if (exactMatch) return { file: exactMatch, resolvedPath: inputPath }
+
+  // 2. Normalized path
+  const normalized = normalizeFilePath(inputPath)
+  const normalizedMatch = sessionFiles.get(normalized)
+  if (normalizedMatch) return { file: normalizedMatch, resolvedPath: normalized }
+
+  // 3. Compare normalized stored paths
+  for (const [storedPath, fileData] of sessionFiles.entries()) {
+    if (normalizeFilePath(storedPath) === normalized) {
+      return { file: fileData, resolvedPath: storedPath }
+    }
+  }
+
+  // 4. Basename match (only if unique)
+  const basename = inputPath.split('/').pop() || inputPath
+  const basenameMatches: { path: string, file: any }[] = []
+  for (const [storedPath, fileData] of sessionFiles.entries()) {
+    const storedBasename = storedPath.split('/').pop() || storedPath
+    if (storedBasename === basename && !fileData.isDirectory) {
+      basenameMatches.push({ path: storedPath, file: fileData })
+    }
+  }
+  if (basenameMatches.length === 1) {
+    return { file: basenameMatches[0].file, resolvedPath: basenameMatches[0].path }
+  }
+
+  // 5. endsWith match
+  const endsWithMatches: { path: string, file: any }[] = []
+  for (const [storedPath, fileData] of sessionFiles.entries()) {
+    if ((storedPath.endsWith('/' + normalized) || storedPath === normalized) && !fileData.isDirectory) {
+      endsWithMatches.push({ path: storedPath, file: fileData })
+    }
+  }
+  if (endsWithMatches.length === 1) {
+    return { file: endsWithMatches[0].file, resolvedPath: endsWithMatches[0].path }
+  }
+
+  return null
+}
+
+// Helper: Get similar file paths for suggestions
+function getSimilarPaths(sessionFiles: Map<string, any>, inputPath: string): string[] {
+  const normalized = normalizeFilePath(inputPath)
+  const basename = inputPath.split('/').pop() || inputPath
+  const suggestions: string[] = []
+  for (const [storedPath] of sessionFiles.entries()) {
+    const storedBasename = storedPath.split('/').pop() || storedPath
+    if (storedBasename === basename || storedPath.includes(normalized) || normalized.includes(storedBasename)) {
+      suggestions.push(storedPath)
+    }
+  }
+  return suggestions.slice(0, 3)
+}
+
+// Helper: Parse search/replace block (robust line-by-line parser matching main chat-v2 route)
+function parseSearchReplaceBlock(blockText: string) {
+  const SEARCH_START = "<<<<<<< SEARCH"
+  const DIVIDER = "======="
+  const REPLACE_END = ">>>>>>> REPLACE"
+  const lines = blockText.split('\n')
+  const searchLines: string[] = []
+  const replaceLines: string[] = []
+  let mode: 'none' | 'search' | 'replace' = 'none'
+
+  for (const line of lines) {
+    if (line.trim() === SEARCH_START) {
+      mode = 'search'
+    } else if (line.trim() === DIVIDER && mode === 'search') {
+      mode = 'replace'
+    } else if (line.trim() === REPLACE_END && mode === 'replace') {
+      break
+    } else if (mode === 'search') {
+      searchLines.push(line)
+    } else if (mode === 'replace') {
+      replaceLines.push(line)
+    }
+  }
+
+  const hasSearchContent = searchLines.some(line => line.trim() !== '')
+  const hasReplaceContent = replaceLines.some(line => line.trim() !== '')
+  if (!hasSearchContent && !hasReplaceContent) return null
+
+  return {
+    search: searchLines.join('\n'),
+    replace: replaceLines.join('\n'),
+  }
+}
+
+// Helper: Whitespace-flexible match when exact match fails
+function tryWhitespaceFlexibleMatch(content: string, searchText: string): { index: number, matchedText: string } | null {
+  const searchLines = searchText.split('\n')
+  const contentLines = content.split('\n')
+
+  for (let i = 0; i <= contentLines.length - searchLines.length; i++) {
+    let matches = true
+    for (let j = 0; j < searchLines.length; j++) {
+      if (searchLines[j].trim() !== contentLines[i + j].trim()) {
+        matches = false
+        break
+      }
+    }
+    if (matches) {
+      const matchedLines = contentLines.slice(i, i + searchLines.length)
+      const matchedText = matchedLines.join('\n')
+      const index = content.indexOf(matchedText)
+      return { index: index >= 0 ? index : 0, matchedText }
+    }
+  }
+  return null
+}
+
 function getActivityModel(modelId?: string) {
   try {
     const selectedModelId = modelId || DEFAULT_CHAT_MODEL
@@ -58,30 +184,35 @@ function constructToolResult(toolName: string, input: any, projectId: string) {
       if (!path || content === undefined) {
         return { success: false, error: 'Invalid path or content' }
       }
-      const existing = sessionFiles.get(path)
-      if (existing) {
-        existing.content = String(content)
-        existing.size = content.length
-        return { success: true, message: `File ${path} updated successfully.`, path, content, action: 'updated' }
+      const found = findFileInSession(sessionFiles, path)
+      if (found) {
+        found.file.content = String(content)
+        found.file.size = content.length
+        return { success: true, message: `File ${found.resolvedPath} updated successfully.`, path: found.resolvedPath, content, action: 'updated' }
       }
-      sessionFiles.set(path, {
+      const normalizedPath = normalizeFilePath(path)
+      sessionFiles.set(normalizedPath, {
         workspaceId: projectId,
-        name: path.split('/').pop() || path,
-        path,
+        name: normalizedPath.split('/').pop() || normalizedPath,
+        path: normalizedPath,
         content: String(content),
-        fileType: path.split('.').pop() || 'text',
-        type: path.split('.').pop() || 'text',
+        fileType: normalizedPath.split('.').pop() || 'text',
+        type: normalizedPath.split('.').pop() || 'text',
         size: content.length,
         isDirectory: false,
       })
-      return { success: true, message: `File ${path} created successfully.`, path, content, action: 'created' }
+      return { success: true, message: `File ${normalizedPath} created successfully.`, path: normalizedPath, content, action: 'created' }
     }
 
     case 'read_file': {
       const { path, startLine, endLine, lineRange } = input
-      const file = sessionFiles.get(path)
-      if (!file) return { success: false, error: `File not found: ${path}` }
+      const found = findFileInSession(sessionFiles, path)
+      if (!found) {
+        const suggestions = getSimilarPaths(sessionFiles, path)
+        return { success: false, error: `File not found: ${path}.${suggestions.length ? ` Did you mean: ${suggestions.join(', ')}?` : ' Use list_files to see available files.'}` }
+      }
 
+      const file = found.file
       let content = file.content || ''
       let actualStart = startLine
       let actualEnd = endLine
@@ -104,46 +235,130 @@ function constructToolResult(toolName: string, input: any, projectId: string) {
       const totalLines = (file.content || '').split('\n').length
       if (!actualStart && totalLines > 200) {
         content = (file.content || '').split('\n').slice(0, 200).join('\n')
-        return { success: true, path, content, totalLines, truncated: true, message: `Showing first 200 of ${totalLines} lines. Use lineRange for specific sections.` }
+        return { success: true, path: found.resolvedPath, content, totalLines, truncated: true, message: `Showing first 200 of ${totalLines} lines. Use lineRange for specific sections.` }
       }
 
-      return { success: true, path, content, totalLines }
+      return { success: true, path: found.resolvedPath, content, totalLines }
     }
 
     case 'edit_file': {
       const { filePath, searchReplaceBlock, replaceAll = false } = input
-      const file = sessionFiles.get(filePath)
-      if (!file) return { success: false, error: `File not found: ${filePath}` }
-
-      const searchMatch = searchReplaceBlock.match(/<<<<<<< SEARCH\n([\s\S]*?)\n=======\n([\s\S]*?)\n>>>>>>> REPLACE/)
-      if (!searchMatch) {
-        return { success: false, error: 'Invalid search/replace block format' }
+      const found = findFileInSession(sessionFiles, filePath)
+      if (!found) {
+        const suggestions = getSimilarPaths(sessionFiles, filePath)
+        return { success: false, error: `File not found: ${filePath}.${suggestions.length ? ` Did you mean: ${suggestions.join(', ')}?` : ' Use list_files to see available files.'}` }
       }
 
-      const [, searchStr, replaceStr] = searchMatch
+      const file = found.file
+      const resolvedPath = found.resolvedPath
+
+      // Use robust line-by-line parser instead of brittle regex
+      const parsedBlock = parseSearchReplaceBlock(searchReplaceBlock)
+      if (!parsedBlock) {
+        return { success: false, error: 'Invalid search/replace block format. Use: <<<<<<< SEARCH\\n[find]\\n=======\\n[replace]\\n>>>>>>> REPLACE' }
+      }
+
+      const { search: searchStr, replace: replaceStr } = parsedBlock
       const content = file.content || ''
 
-      if (!content.includes(searchStr)) {
-        return { success: false, error: `Search string not found in ${filePath}`, searchStr: searchStr.substring(0, 100) }
+      // Try exact match first
+      if (content.includes(searchStr)) {
+        const newContent = replaceAll
+          ? content.split(searchStr).join(replaceStr)
+          : content.replace(searchStr, replaceStr)
+        file.content = newContent
+        file.size = newContent.length
+        return { success: true, message: `File ${resolvedPath} edited successfully.`, filePath: resolvedPath, action: 'edited' }
       }
 
-      const newContent = replaceAll
-        ? content.split(searchStr).join(replaceStr)
-        : content.replace(searchStr, replaceStr)
+      // Fallback: whitespace-flexible matching
+      const flexMatch = tryWhitespaceFlexibleMatch(content, searchStr)
+      if (flexMatch) {
+        const newContent = content.replace(flexMatch.matchedText, replaceStr)
+        file.content = newContent
+        file.size = newContent.length
+        console.log(`[Activity Chat V2] edit_file: Used whitespace-flexible matching for ${resolvedPath}`)
+        return { success: true, message: `File ${resolvedPath} edited successfully (whitespace-flexible match).`, filePath: resolvedPath, action: 'edited' }
+      }
+
+      return { success: false, error: `Search string not found in ${resolvedPath} (tried exact and whitespace-flexible matching).`, searchStr: searchStr.substring(0, 100) }
+    }
+
+    case 'client_replace_string_in_file': {
+      const { filePath, oldString, newString, replaceAll = false, caseInsensitive = false } = input
+      const found = findFileInSession(sessionFiles, filePath)
+      if (!found) {
+        const suggestions = getSimilarPaths(sessionFiles, filePath)
+        return { success: false, error: `File not found: ${filePath}.${suggestions.length ? ` Did you mean: ${suggestions.join(', ')}?` : ' Use list_files to see available files.'}` }
+      }
+
+      const file = found.file
+      const resolvedPath = found.resolvedPath
+      const content = file.content || ''
+
+      const searchText = caseInsensitive ? oldString.toLowerCase() : oldString
+      const contentToSearch = caseInsensitive ? content.toLowerCase() : content
+
+      if (!contentToSearch.includes(searchText)) {
+        return { success: false, error: `String not found in ${resolvedPath}`, oldString: oldString.substring(0, 100) }
+      }
+
+      let newContent: string
+      if (replaceAll) {
+        if (caseInsensitive) {
+          let result = ''
+          let lastIndex = 0
+          let searchIndex = 0
+          while ((searchIndex = contentToSearch.indexOf(searchText, lastIndex)) !== -1) {
+            result += content.substring(lastIndex, searchIndex) + newString
+            lastIndex = searchIndex + oldString.length
+          }
+          result += content.substring(lastIndex)
+          newContent = result
+        } else {
+          newContent = content.split(oldString).join(newString)
+        }
+      } else {
+        if (caseInsensitive) {
+          const idx = contentToSearch.indexOf(searchText)
+          newContent = content.substring(0, idx) + newString + content.substring(idx + oldString.length)
+        } else {
+          newContent = content.replace(oldString, newString)
+        }
+      }
 
       file.content = newContent
       file.size = newContent.length
-
-      return { success: true, message: `File ${filePath} edited successfully.`, filePath, action: 'edited' }
+      return { success: true, message: `File ${resolvedPath} modified successfully.`, filePath: resolvedPath, action: 'modified' }
     }
 
     case 'delete_file': {
       const { path } = input
-      if (!sessionFiles.has(path)) {
-        return { success: false, error: `File not found: ${path}` }
+      const found = findFileInSession(sessionFiles, path)
+      if (!found) {
+        const suggestions = getSimilarPaths(sessionFiles, path)
+        return { success: false, error: `File not found: ${path}.${suggestions.length ? ` Did you mean: ${suggestions.join(', ')}?` : ''}` }
       }
-      sessionFiles.delete(path)
-      return { success: true, message: `File ${path} deleted.`, path }
+      sessionFiles.delete(found.resolvedPath)
+      return { success: true, message: `File ${found.resolvedPath} deleted.`, path: found.resolvedPath }
+    }
+
+    case 'delete_folder': {
+      const { path } = input
+      const normalizedPath = (path.endsWith('/') ? path : path + '/')
+      const filesToDelete: string[] = []
+      for (const filePath of sessionFiles.keys()) {
+        if (filePath.startsWith(normalizedPath)) {
+          filesToDelete.push(filePath)
+        }
+      }
+      if (filesToDelete.length === 0) {
+        return { success: false, error: `Folder not found or empty: ${path}` }
+      }
+      for (const fp of filesToDelete) {
+        sessionFiles.delete(fp)
+      }
+      return { success: true, message: `Folder ${path} deleted (${filesToDelete.length} files removed).`, path, filesDeleted: filesToDelete.length }
     }
 
     case 'list_files': {
@@ -375,7 +590,7 @@ ${projectContext}${fileContextStr}${codebaseStr}${editorStateStr}
       }),
 
       edit_file: tool({
-        description: 'Edit a file using search/replace blocks.',
+        description: 'Edit a file using search/replace blocks. IMPORTANT: If this tool fails more than 2 times on the same file, switch to using client_replace_string_in_file or write_file instead.',
         parameters: z.object({
           filePath: z.string().describe('File path relative to project root'),
           searchReplaceBlock: z.string().describe('Search/replace in format: <<<<<<< SEARCH\\n[find]\\n=======\\n[replace]\\n>>>>>>> REPLACE'),
@@ -386,6 +601,20 @@ ${projectContext}${fileContextStr}${codebaseStr}${editorStateStr}
         },
       }),
 
+      client_replace_string_in_file: tool({
+        description: 'Replace exact strings in a file. More reliable than edit_file for simple replacements. Use this when edit_file fails.',
+        parameters: z.object({
+          filePath: z.string().describe('File path relative to project root'),
+          oldString: z.string().describe('Exact string to find (must match exactly including whitespace)'),
+          newString: z.string().describe('String to replace with'),
+          replaceAll: z.boolean().optional().describe('Replace all occurrences (default: false)'),
+          caseInsensitive: z.boolean().optional().describe('Case-insensitive matching (default: false)'),
+        }),
+        execute: async ({ filePath, oldString, newString, replaceAll, caseInsensitive }) => {
+          return constructToolResult('client_replace_string_in_file', { filePath, oldString, newString, replaceAll, caseInsensitive }, projectId)
+        },
+      }),
+
       delete_file: tool({
         description: 'Delete a file from the project.',
         parameters: z.object({
@@ -393,6 +622,16 @@ ${projectContext}${fileContextStr}${codebaseStr}${editorStateStr}
         }),
         execute: async ({ path }) => {
           return constructToolResult('delete_file', { path }, projectId)
+        },
+      }),
+
+      delete_folder: tool({
+        description: 'Delete a folder and all its contents from the project.',
+        parameters: z.object({
+          path: z.string().describe('Folder path to delete'),
+        }),
+        execute: async ({ path }) => {
+          return constructToolResult('delete_folder', { path }, projectId)
         },
       }),
 

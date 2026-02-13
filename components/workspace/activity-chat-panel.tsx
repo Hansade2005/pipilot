@@ -108,9 +108,11 @@ const InlineToolPill = ({ toolName, input, status = 'pending', onOpenFile }: {
     switch (tool) {
       case 'write_file': return <FileText className="w-3 h-3" />
       case 'edit_file': return <Edit3 className="w-3 h-3" />
+      case 'client_replace_string_in_file': return <Edit3 className="w-3 h-3" />
       case 'read_file': return <Eye className="w-3 h-3" />
       case 'list_files': return <FolderOpen className="w-3 h-3" />
       case 'delete_file': return <X className="w-3 h-3" />
+      case 'delete_folder': return <X className="w-3 h-3" />
       case 'grep_search': return <Search className="w-3 h-3" />
       default: return <Zap className="w-3 h-3" />
     }
@@ -120,9 +122,11 @@ const InlineToolPill = ({ toolName, input, status = 'pending', onOpenFile }: {
     switch (tool) {
       case 'write_file': return `Creating ${args?.path ? args.path.split('/').pop() : 'file'}`
       case 'edit_file': return `Editing ${args?.filePath ? args.filePath.split('/').pop() : 'file'}`
+      case 'client_replace_string_in_file': return `Replacing in ${args?.filePath ? args.filePath.split('/').pop() : 'file'}`
       case 'read_file': return `Reading ${args?.path ? args.path.split('/').pop() : 'file'}`
       case 'list_files': return 'Listing files'
       case 'delete_file': return `Deleting ${args?.path ? args.path.split('/').pop() : 'file'}`
+      case 'delete_folder': return `Deleting folder ${args?.path ? args.path.split('/').pop() : 'folder'}`
       case 'grep_search': return `Searching "${args?.pattern || 'pattern'}"`
       default: return tool
     }
@@ -243,11 +247,12 @@ const InterleavedContent = ({
 }
 
 // ──────────────────────────────────────────────────────────
-// Client-side tool execution list (matching chat-panel-v2)
+// Client-side tool execution list - ONLY tools that have handlers in client-file-tools.ts
+// list_files and grep_search are server-only (no client handler exists)
 // ──────────────────────────────────────────────────────────
 const CLIENT_SIDE_TOOLS = [
-  'write_file', 'edit_file', 'delete_file',
-  'read_file', 'list_files', 'grep_search',
+  'write_file', 'edit_file', 'client_replace_string_in_file',
+  'delete_file', 'delete_folder', 'read_file',
 ]
 
 export function ActivityChatPanel({
@@ -657,7 +662,7 @@ export function ActivityChatPanel({
               ))
 
               // If file was written/edited, trigger refresh
-              if (data.toolName === 'write_file' || data.toolName === 'edit_file' || data.toolName === 'delete_file') {
+              if (['write_file', 'edit_file', 'client_replace_string_in_file', 'delete_file', 'delete_folder'].includes(data.toolName)) {
                 window.dispatchEvent(new CustomEvent('files-changed', {
                   detail: { projectId, forceRefresh: true }
                 }))
