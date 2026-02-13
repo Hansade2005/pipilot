@@ -267,7 +267,7 @@ function BranchItem({
       </div>
 
       {!isEditing && (
-        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-0.5 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
           <Button
             variant="ghost"
             size="sm"
@@ -481,7 +481,7 @@ export function BranchFromMessageButton({
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 px-2 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+            className="h-6 px-2 text-[10px] md:opacity-0 md:group-hover:opacity-100 transition-opacity"
             onClick={() => onBranch(messageId)}
           >
             <GitBranch className="h-3 w-3 mr-1" />

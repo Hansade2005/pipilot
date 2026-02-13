@@ -1971,7 +1971,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                     )}
 
                     {/* User Action Buttons */}
-                    <div className="flex justify-end mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex justify-end mt-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                       <Actions>
                         <Action tooltip="Retry message" onClick={() => handleRetryMessage(message.id, message.content)}>
                           <ArrowUp className="w-4 h-4" />
@@ -2016,7 +2016,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                     </div>
 
                     {/* Assistant Action Buttons */}
-                    <div className="flex justify-end mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex justify-end mt-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                       <Actions>
                         <Action tooltip="Copy message" onClick={() => handleCopyMessage(message.content)}>
                           <Copy className="w-4 h-4" />
@@ -2056,7 +2056,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                   )}
                   <button
                     onClick={() => removeAttachment(attachment.id)}
-                    className="opacity-0 group-hover:opacity-100 hover:text-red-400 text-gray-500 transition-all"
+                    className="md:opacity-0 md:group-hover:opacity-100 hover:text-red-400 text-gray-500 transition-all"
                   >
                     <X className="w-3 h-3" />
                   </button>

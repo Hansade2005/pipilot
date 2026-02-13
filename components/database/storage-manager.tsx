@@ -407,7 +407,7 @@ export default function StorageManager({ databaseId }: StorageManagerProps) {
                       }}
                     />
                     {isPreviewable(file.mime_type) && (
-                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center md:opacity-0 md:group-hover:opacity-100">
                         <Eye className="h-8 w-8 text-white" />
                       </div>
                     )}
@@ -418,7 +418,7 @@ export default function StorageManager({ databaseId }: StorageManagerProps) {
                       <FileText className="h-12 w-12" />
                       <span className="text-xs">PDF Document</span>
                     </div>
-                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center md:opacity-0 md:group-hover:opacity-100">
                       <Eye className="h-8 w-8 text-white" />
                     </div>
                   </>

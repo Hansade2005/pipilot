@@ -242,7 +242,7 @@ export function TeamActivityFeed({ workspaceId, organizationId }: TeamActivityFe
                       </div>
                     </div>
 
-                    <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <ChevronRight className="h-4 w-4 text-muted-foreground md:opacity-0 md:group-hover:opacity-100 transition-opacity" />
                   </div>
                 ))}
               </div>

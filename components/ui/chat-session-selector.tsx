@@ -323,7 +323,7 @@ export function ChatSessionSelector({
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:opacity-100"
+                          className="h-6 w-6 p-0 md:opacity-0 md:group-hover:opacity-100 hover:opacity-100"
                           onClick={(e) => startEditing(session, e)}
                         >
                           <Pencil className="h-3 w-3" />
@@ -331,7 +331,7 @@ export function ChatSessionSelector({
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:opacity-100 hover:text-destructive"
+                          className="h-6 w-6 p-0 md:opacity-0 md:group-hover:opacity-100 hover:opacity-100 hover:text-destructive"
                           onClick={(e) => handleDeleteSession(session.id, e)}
                         >
                           <Trash2 className="h-3 w-3" />
