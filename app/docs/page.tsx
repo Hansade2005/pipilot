@@ -3,8 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { Response } from "@/components/ai-elements/response"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -42,6 +41,8 @@ import {
   GitBranch,
   HeadphonesIcon,
   ListTree,
+  Globe,
+  Sparkles,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -121,7 +122,7 @@ const sectionGroups: SectionGroup[] = [
   },
   {
     label: "Platform Features",
-    items: ["Slash Commands System", "Conversation Branching", "AI Memory System", "Multi-Chat Session Support", "Codebase Search & Replace"]
+    items: ["Slash Commands System", "Conversation Branching", "AI Memory System", "Multi-Chat Session Support", "Browser Testing", "Codebase Search & Replace"]
   },
   {
     label: "Support",
@@ -145,6 +146,7 @@ const sectionIcons: Record<string, any> = {
   'AI Memory System': Brain,
   'Multi-Chat Session Support': Layers,
   'Codebase Search & Replace': Search,
+  'Browser Testing': Globe,
   'AI Support System': HeadphonesIcon,
 }
 
@@ -189,6 +191,7 @@ export default function DocsPage() {
   const [docsData, setDocsData] = useState<DocsData | null>(null)
   const [selectedSection, setSelectedSection] = useState<DocSection | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [mobileTocOpen, setMobileTocOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchResults, setSearchResults] = useState<DocSection[]>([])
   const [activeTocId, setActiveTocId] = useState<string>("")
@@ -315,14 +318,23 @@ export default function DocsPage() {
     }
   }
 
-  // Copy page URL
+  // Copy page content as markdown
   const handleCopyPage = () => {
     if (!selectedSection) return
-    const slug = selectedSection.title.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-')
-    navigator.clipboard.writeText(`${window.location.origin}/docs/${slug}`)
+    const markdownContent = `# ${selectedSection.title}\n\n${selectedSection.overview}\n\n${selectedSection.content}`
+    navigator.clipboard.writeText(markdownContent)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
-    toast.success("Link copied to clipboard")
+    toast.success("Page content copied as Markdown")
+  }
+
+  // Ask assistant about this page
+  const handleAskAssistant = () => {
+    if (!selectedSection) return
+    setChatOpen(true)
+    setChatMinimized(false)
+    setChatInput(`Tell me more about "${selectedSection.title}"`)
+    setTimeout(() => chatInputRef.current?.focus(), 200)
   }
 
   // Navigate sections
@@ -599,10 +611,10 @@ export default function DocsPage() {
   // ==================== RENDER ====================
 
   const SidebarNav = ({ isMobile = false }: { isMobile?: boolean }) => (
-    <div className={`flex flex-col h-full ${isMobile ? '' : ''}`}>
+    <div className={`flex flex-col h-full overflow-hidden ${isMobile ? '' : ''}`}>
       {/* Sidebar search (desktop only) */}
       {!isMobile && (
-        <div className="px-4 pt-4 pb-2">
+        <div className="px-4 pt-4 pb-2 flex-shrink-0">
           <button
             onClick={() => setSearchOpen(true)}
             className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-500 bg-gray-900/60 border border-gray-800 rounded-lg hover:border-gray-700 hover:text-gray-400 transition-colors"
@@ -616,7 +628,7 @@ export default function DocsPage() {
         </div>
       )}
 
-      <ScrollArea className="flex-1 px-3 pb-6">
+      <div className="flex-1 overflow-y-auto min-h-0 px-3 pb-6">
         <nav className="space-y-6 py-3">
           {sectionGroups.map((group) => {
             // Check if any item in this group exists in our data
@@ -662,7 +674,7 @@ export default function DocsPage() {
             )
           })}
         </nav>
-      </ScrollArea>
+      </div>
     </div>
   )
 
@@ -716,24 +728,63 @@ export default function DocsPage() {
       <div className="flex-1 flex overflow-hidden min-h-0">
 
         {/* LEFT SIDEBAR (Desktop) */}
-        <aside className="hidden lg:flex flex-col w-64 xl:w-72 border-r border-gray-800/60 bg-[#030305] flex-shrink-0">
+        <aside className="hidden lg:flex flex-col w-64 xl:w-72 border-r border-gray-800/60 bg-[#030305] flex-shrink-0 overflow-hidden">
           <SidebarNav />
         </aside>
 
         {/* Mobile Sidebar */}
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-          <SheetTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden fixed top-16 left-3 z-50 h-8 w-8 bg-gray-900/80 text-gray-400 hover:text-orange-400 hover:bg-gray-800 border border-gray-800 rounded-lg"
-            >
-              <Menu className="h-4 w-4" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-72 p-0 bg-[#030305] border-gray-800">
-            <div className="pt-4">
+          <SheetContent side="left" className="w-[280px] p-0 bg-[#030305] border-gray-800">
+            <div className="flex flex-col h-full">
+              <div className="px-4 pt-5 pb-3 border-b border-gray-800/60 flex-shrink-0">
+                <div className="flex items-center gap-2.5 mb-3">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center">
+                    <span className="text-white font-bold text-sm">P</span>
+                  </div>
+                  <span className="text-white font-semibold text-sm">Documentation</span>
+                </div>
+                <button
+                  onClick={() => { setSidebarOpen(false); setSearchOpen(true) }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-500 bg-gray-900/60 border border-gray-800 rounded-lg hover:border-gray-700 hover:text-gray-400 transition-colors"
+                >
+                  <Search className="h-3.5 w-3.5" />
+                  <span className="flex-1 text-left">Search docs...</span>
+                </button>
+              </div>
               <SidebarNav isMobile />
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Mobile TOC Sheet */}
+        <Sheet open={mobileTocOpen} onOpenChange={setMobileTocOpen}>
+          <SheetContent side="right" className="w-[280px] p-0 bg-[#030305] border-gray-800">
+            <div className="flex flex-col h-full">
+              <div className="px-4 pt-5 pb-3 border-b border-gray-800/60 flex-shrink-0">
+                <div className="flex items-center gap-2">
+                  <ListTree className="h-4 w-4 text-orange-400" />
+                  <h4 className="text-sm font-semibold text-white">On this page</h4>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto px-4 py-4">
+                <nav className="space-y-1">
+                  {tocHeadings.map((heading) => (
+                    <button
+                      key={heading.id}
+                      onClick={() => { scrollToHeading(heading.id); setMobileTocOpen(false) }}
+                      className={`block w-full text-left text-sm leading-snug py-2 px-3 rounded-lg transition-colors duration-150 ${
+                        heading.level === 3 ? 'pl-6' : ''
+                      } ${
+                        activeTocId === heading.id
+                          ? 'text-orange-400 font-medium bg-orange-500/10'
+                          : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'
+                      }`}
+                    >
+                      {heading.text}
+                    </button>
+                  ))}
+                </nav>
+              </div>
             </div>
           </SheetContent>
         </Sheet>
@@ -744,7 +795,7 @@ export default function DocsPage() {
           className="flex-1 overflow-y-auto overflow-x-hidden min-w-0 scroll-smooth"
         >
           {selectedSection ? (
-            <div className="max-w-3xl mx-auto px-6 lg:px-10 py-8 lg:py-10">
+            <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-10 py-6 lg:py-10 pb-24 lg:pb-10">
               {/* Breadcrumb */}
               {currentGroup && (
                 <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-4">
@@ -754,22 +805,33 @@ export default function DocsPage() {
 
               {/* Page Title + Actions */}
               <div className="flex items-start justify-between gap-4 mb-2">
-                <h1 className="text-3xl lg:text-4xl font-bold text-white tracking-tight">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white tracking-tight">
                   {selectedSection.title}
                 </h1>
-                <button
-                  onClick={handleCopyPage}
-                  className="flex-shrink-0 mt-1.5 flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-500 hover:text-gray-300 bg-gray-900/50 border border-gray-800 rounded-lg hover:border-gray-700 transition-colors"
-                >
-                  {copied ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
-                  <span>{copied ? 'Copied' : 'Copy link'}</span>
-                </button>
+                <div className="flex items-center gap-2 flex-shrink-0 mt-1.5">
+                  <button
+                    onClick={handleCopyPage}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-500 hover:text-gray-300 bg-gray-900/50 border border-gray-800 rounded-lg hover:border-gray-700 transition-colors"
+                  >
+                    {copied ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+                    <span>{copied ? 'Copied!' : 'Copy page'}</span>
+                  </button>
+                </div>
               </div>
 
               {/* Overview */}
-              <p className="text-gray-400 text-base lg:text-lg leading-relaxed mb-8">
+              <p className="text-gray-400 text-base lg:text-lg leading-relaxed mb-4">
                 {selectedSection.overview}
               </p>
+
+              {/* Ask Assistant link */}
+              <button
+                onClick={handleAskAssistant}
+                className="inline-flex items-center gap-2 px-3 py-1.5 mb-8 text-xs text-orange-400 hover:text-orange-300 bg-orange-500/10 hover:bg-orange-500/15 border border-orange-500/20 hover:border-orange-500/30 rounded-lg transition-all"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>Ask AI about this page</span>
+              </button>
 
               {/* Markdown Content */}
               <article className="prose prose-lg prose-invert max-w-none
@@ -888,6 +950,45 @@ export default function DocsPage() {
         )}
       </div>
 
+      {/* ===== MOBILE BOTTOM NAVIGATION ===== */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#030305]/95 backdrop-blur-xl border-t border-gray-800/60" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+        <div className="flex items-center justify-around px-2 py-2">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className={`flex flex-col items-center gap-1 px-4 py-1.5 rounded-lg transition-colors ${
+              sidebarOpen ? 'text-orange-400' : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            <Menu className="h-5 w-5" />
+            <span className="text-[10px] font-medium">Sections</span>
+          </button>
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="flex flex-col items-center gap-1 px-4 py-1.5 rounded-lg text-gray-500 hover:text-gray-300 transition-colors"
+          >
+            <Search className="h-5 w-5" />
+            <span className="text-[10px] font-medium">Search</span>
+          </button>
+          <button
+            onClick={() => setMobileTocOpen(true)}
+            className={`flex flex-col items-center gap-1 px-4 py-1.5 rounded-lg transition-colors ${
+              mobileTocOpen ? 'text-orange-400' : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            <ListTree className="h-5 w-5" />
+            <span className="text-[10px] font-medium">On page</span>
+          </button>
+          <button
+            onClick={() => { setChatOpen(true); setChatMinimized(false) }}
+            className="flex flex-col items-center gap-1 px-4 py-1.5 rounded-lg text-gray-500 hover:text-gray-300 transition-colors relative"
+          >
+            <MessageSquare className="h-5 w-5" />
+            <span className="text-[10px] font-medium">Ask AI</span>
+            <span className="absolute top-0.5 right-3 w-2 h-2 bg-green-500 rounded-full" />
+          </button>
+        </div>
+      </div>
+
       {/* ===== SEARCH COMMAND PALETTE ===== */}
       {searchOpen && (
         <div
@@ -965,7 +1066,7 @@ export default function DocsPage() {
       {!chatOpen && (
         <button
           onClick={() => { setChatOpen(true); setChatMinimized(false) }}
-          className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full shadow-2xl shadow-orange-500/20 flex items-center justify-center hover:scale-110 transition-all duration-300 group"
+          className="hidden lg:flex fixed bottom-6 right-6 z-50 w-14 h-14 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full shadow-2xl shadow-orange-500/20 items-center justify-center hover:scale-110 transition-all duration-300 group"
           aria-label="Open AI Chat"
         >
           <MessageSquare className="h-6 w-6 text-white" />
@@ -978,7 +1079,7 @@ export default function DocsPage() {
 
       {chatOpen && (
         <div className={`fixed z-50 transition-all duration-300 ${
-          chatMinimized ? 'bottom-6 right-6 w-72' : 'bottom-6 right-6 w-[400px] max-w-[calc(100vw-48px)]'
+          chatMinimized ? 'bottom-16 lg:bottom-6 right-4 lg:right-6 w-72' : 'bottom-16 lg:bottom-6 right-2 lg:right-6 w-[calc(100vw-16px)] sm:w-[400px] max-w-[calc(100vw-16px)]'
         }`}>
           <div className={`bg-gray-900 border border-gray-700/60 rounded-2xl shadow-2xl overflow-hidden flex flex-col ${
             chatMinimized ? 'h-auto' : 'h-[600px] max-h-[calc(100vh-100px)]'
