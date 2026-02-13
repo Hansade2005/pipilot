@@ -1268,6 +1268,7 @@ export function ChatPanelV2({
     web_tools: [
       { name: 'web_search', label: 'Web Search' },
       { name: 'web_extract', label: 'Web Extract' },
+      { name: 'browse_web', label: 'Browse Web' },
     ],
     dev_tools: [
       { name: 'check_dev_errors', label: 'Check Dev Errors' },
