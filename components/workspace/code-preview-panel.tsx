@@ -19,7 +19,7 @@ import {
   Package,
   Trash2,
   Copy,
-  Database,
+  Cloud,
   Edit3,
   Wand2,
   Rocket,
@@ -53,7 +53,6 @@ import {
   WebPreviewDeviceSelector,
   DEVICE_PRESETS
 } from "@/components/ai-elements/web-preview";
-import { DatabaseTab } from "./database-tab";
 import {
   VisualEditorWrapper,
   VisualEditorToggle,
@@ -123,8 +122,8 @@ async function compressProjectFiles(
 
 interface CodePreviewPanelProps {
   project: Project | null;
-  activeTab: "code" | "preview" | "database";
-  onTabChange: (tab: "code" | "preview" | "database") => void;
+  activeTab: "code" | "preview" | "cloud" | "audit";
+  onTabChange: (tab: "code" | "preview" | "cloud" | "audit") => void;
   previewViewMode?: "desktop" | "mobile";
   syncedUrl?: string;
   onUrlChange?: (url: string) => void;
@@ -2927,10 +2926,10 @@ export default function TodoApp() {
                     <Eye className="h-4 w-4" />
                   </WebPreviewNavigationButton>
                   <WebPreviewNavigationButton
-                    onClick={() => onTabChange("database")}
-                    tooltip="Switch to Database View"
+                    onClick={() => onTabChange("cloud")}
+                    tooltip="Switch to Cloud"
                   >
-                    <Database className="h-4 w-4" />
+                    <Cloud className="h-4 w-4" />
                   </WebPreviewNavigationButton>
                 </div>
               )}
@@ -3163,8 +3162,6 @@ export default function TodoApp() {
             />
           </WebPreview>
         </VisualEditorWrapper>
-        ) : activeTab === "database" ? (
-          <DatabaseTab workspaceId={project?.id || ""} />
         ) : null}
       </div>
 
