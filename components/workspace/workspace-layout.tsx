@@ -37,6 +37,7 @@ import { useRealtimeSync } from '@/hooks/use-realtime-sync'
 import { useSubscriptionCache } from '@/hooks/use-subscription-cache'
 import { restoreBackupFromCloud, isCloudSyncEnabled } from '@/lib/cloud-sync'
 import { generateFileUpdate, type StyleChange } from '@/lib/visual-editor'
+
 import { ChatSessionSelector } from "@/components/ui/chat-session-selector"
 import { AiModeSelector, type AIMode } from "@/components/ui/ai-mode-selector"
 import { DEFAULT_CHAT_MODEL } from "@/lib/ai-models"
@@ -54,6 +55,11 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
+// Module-level flag: resets on full page refresh (module reloads), but persists
+// across in-session re-renders and client-side navigations. This ensures we only
+// auto-restore once per page load — not while the user is actively working.
+let hasAutoRestoredThisSession = false
 
 interface WorkspaceLayoutProps {
   user: User
@@ -602,6 +608,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   }, [selectedProject, isMobile, toast])
 
   // Auto-restore from cloud and load projects from IndexedDB on client-side
+  // Only runs on fresh page load/refresh (hasAutoRestoredThisSession resets on reload)
   useEffect(() => {
     const loadClientProjects = async () => {
       try {
@@ -609,13 +616,12 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
         await storageManager.init()
 
-        // Check if we're in a specific project workspace (has projectId in URL)
-        const projectId = searchParams.get('projectId')
         const isDeletingProject = searchParams.get('deleting') === 'true'
         const isNewProject = searchParams.get('newProject') !== null
 
-        // Only auto-restore when in a project workspace and not during deletion or creation
-        if (projectId && !isDeletingProject && !justCreatedProject && !isNewProject) {
+        // Auto-restore on any page refresh/navigation, but NOT during active session
+        // hasAutoRestoredThisSession is module-level: resets on page refresh, persists in-session
+        if (!hasAutoRestoredThisSession && !isDeletingProject && !justCreatedProject && !isNewProject) {
           const cloudSyncEnabled = await isCloudSyncEnabled(user.id)
 
           if (cloudSyncEnabled) {
@@ -640,6 +646,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               setIsAutoRestoring(false)
             }
           }
+
+          // Mark as restored for this session — prevents re-restore on in-session navigation
+          hasAutoRestoredThisSession = true
         }
 
         const workspaces = await storageManager.getWorkspaces(user.id)
