@@ -2459,10 +2459,11 @@ export function ChatPanelV2({
     const messageToRetry = messages.find(msg => msg.id === messageId)
     if (!messageToRetry) return
 
-    // Clear all messages that came after this message (including AI responses)
+    // Clear the retried message and all messages after it (including AI responses)
+    // This removes the user message from UI to avoid duplication when it's re-sent
     const messageIndex = messages.findIndex(msg => msg.id === messageId)
     if (messageIndex !== -1) {
-      setMessages(prev => prev.slice(0, messageIndex + 1))
+      setMessages(prev => prev.slice(0, messageIndex))
     }
 
     // Set the content as input and submit fresh
