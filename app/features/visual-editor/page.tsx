@@ -39,6 +39,7 @@ import {
   Lightbulb,
   Rocket
 } from "lucide-react"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 const features = [
   {
@@ -147,6 +148,7 @@ const useCases = [
 ]
 
 export default function VisualEditorPage() {
+  usePageTitle('Visual Editor')
   const [activeTab, setActiveTab] = useState("features")
 
   return (

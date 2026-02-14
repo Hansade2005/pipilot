@@ -19,7 +19,7 @@ import {
   Package,
   Trash2,
   Copy,
-  Database,
+  Cloud,
   Edit3,
   Wand2,
   Rocket,
@@ -53,12 +53,10 @@ import {
   WebPreviewDeviceSelector,
   DEVICE_PRESETS
 } from "@/components/ai-elements/web-preview";
-import { DatabaseTab } from "./database-tab";
 import {
   VisualEditorWrapper,
   VisualEditorToggle,
 } from "./visual-editor-wrapper";
-import { ModelSelector } from "@/components/ui/model-selector";
 import { ChatSessionSelector } from "@/components/ui/chat-session-selector";
 import type { StyleChange, Theme } from "@/lib/visual-editor";
 import dynamic from "next/dynamic";
@@ -124,8 +122,8 @@ async function compressProjectFiles(
 
 interface CodePreviewPanelProps {
   project: Project | null;
-  activeTab: "code" | "preview" | "database";
-  onTabChange: (tab: "code" | "preview" | "database") => void;
+  activeTab: "code" | "preview" | "cloud" | "audit";
+  onTabChange: (tab: "code" | "preview" | "cloud" | "audit") => void;
   previewViewMode?: "desktop" | "mobile";
   syncedUrl?: string;
   onUrlChange?: (url: string) => void;
@@ -171,16 +169,16 @@ const FEATURE_CARDS = [
     title: "AI Chat Commands",
     description: "Type / for slash commands, @ to reference files.",
     color: "from-blue-500/20 to-blue-600/10",
-    accent: "text-blue-500",
-    accentBg: "bg-blue-500",
+    accent: "text-orange-500",
+    accentBg: "bg-orange-500",
   },
   {
     icon: MousePointerClick,
     title: "Visual Click-to-Edit",
     description: "Click any element in the preview to edit it live.",
-    color: "from-purple-500/20 to-purple-600/10",
-    accent: "text-purple-500",
-    accentBg: "bg-purple-500",
+    color: "from-orange-500/20 to-orange-600/10",
+    accent: "text-orange-500",
+    accentBg: "bg-orange-500",
   },
   {
     icon: RotateCcw,
@@ -210,9 +208,9 @@ const FEATURE_CARDS = [
     icon: Share2,
     title: "Project Actions",
     description: "Clone projects, publish & sell templates.",
-    color: "from-pink-500/20 to-pink-600/10",
-    accent: "text-pink-500",
-    accentBg: "bg-pink-500",
+    color: "from-orange-500/20 to-orange-600/10",
+    accent: "text-orange-500",
+    accentBg: "bg-orange-500",
   },
   {
     icon: Palette,
@@ -242,20 +240,20 @@ function ChatCommandsDemo() {
   return (
     <div className="space-y-2">
       {/* Fake input */}
-      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background/80 border border-border">
-        <span className="text-xs text-blue-500 font-mono">{typedText}</span>
-        <span className="w-0.5 h-3.5 bg-blue-500 animate-pulse" />
+      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background/80 border border-gray-700/40">
+        <span className="text-xs text-orange-500 font-mono">{typedText}</span>
+        <span className="w-0.5 h-3.5 bg-orange-500 animate-pulse" />
       </div>
       {/* Dropdown */}
-      <div className="rounded-lg bg-background/80 border border-border overflow-hidden">
+      <div className="rounded-lg bg-background/80 border border-gray-700/40 overflow-hidden">
         {commands.map((c, i) => (
           <div
             key={c.cmd}
             className={`flex items-center justify-between px-3 py-1.5 text-xs transition-all duration-300 ${
-              i === (step > 0 ? step - 1 : 0) ? 'bg-blue-500/15' : ''
+              i === (step > 0 ? step - 1 : 0) ? 'bg-orange-500/15' : ''
             }`}
           >
-            <span className="font-mono font-medium text-blue-400">{c.cmd}</span>
+            <span className="font-mono font-medium text-orange-400">{c.cmd}</span>
             <span className="text-muted-foreground">{c.desc}</span>
           </div>
         ))}
@@ -279,7 +277,7 @@ function VisualEditorDemo() {
   ]
   const selected = step
   return (
-    <div className="relative h-[120px] rounded-lg bg-background/80 border border-border overflow-hidden">
+    <div className="relative h-[120px] rounded-lg bg-background/80 border border-gray-700/40 overflow-hidden">
       {/* Fake UI elements */}
       <div className="absolute top-3 left-3 right-[52%] h-7 rounded bg-muted/60 flex items-center px-2">
         <span className="text-[9px] text-muted-foreground">Header</span>
@@ -298,7 +296,7 @@ function VisualEditorDemo() {
         <div
           key={i}
           className={`absolute rounded transition-all duration-500 ${
-            selected === i ? 'ring-2 ring-purple-500 ring-offset-1 ring-offset-transparent' : ''
+            selected === i ? 'ring-2 ring-orange-500 ring-offset-1 ring-offset-transparent' : ''
           }`}
           style={{
             top: i < 2 ? '12px' : '44px',
@@ -314,21 +312,21 @@ function VisualEditorDemo() {
         className="absolute w-4 h-4 transition-all duration-700 ease-in-out z-10"
         style={{ left: cursorPos[step].left, top: cursorPos[step].top }}
       >
-        <MousePointerClick className="h-4 w-4 text-purple-500 drop-shadow-md" />
+        <MousePointerClick className="h-4 w-4 text-orange-500 drop-shadow-md" />
       </div>
       {/* Style panel slides in on select */}
       <div
-        className={`absolute right-0 top-0 bottom-0 w-[72px] bg-background/95 border-l border-border transition-transform duration-500 flex flex-col gap-1 p-1.5 ${
+        className={`absolute right-0 top-0 bottom-0 w-[72px] bg-background/95 border-l border-gray-700/40 transition-transform duration-500 flex flex-col gap-1 p-1.5 ${
           step >= 2 ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
-        <span className="text-[8px] font-medium text-purple-400 px-1">Styles</span>
-        <div className="h-2.5 w-full rounded bg-purple-500/20" />
-        <div className="h-2.5 w-3/4 rounded bg-purple-500/15" />
-        <div className="h-2.5 w-full rounded bg-purple-500/10" />
+        <span className="text-[8px] font-medium text-orange-400 px-1">Styles</span>
+        <div className="h-2.5 w-full rounded bg-orange-500/20" />
+        <div className="h-2.5 w-3/4 rounded bg-orange-500/15" />
+        <div className="h-2.5 w-full rounded bg-orange-500/10" />
         <div className="flex gap-1 mt-1">
-          <div className="w-3 h-3 rounded-full bg-purple-400" />
-          <div className="w-3 h-3 rounded-full bg-pink-400" />
+          <div className="w-3 h-3 rounded-full bg-orange-400" />
+          <div className="w-3 h-3 rounded-full bg-orange-400" />
           <div className="w-3 h-3 rounded-full bg-blue-400" />
         </div>
       </div>
@@ -357,17 +355,17 @@ function MessageActionsDemo() {
         <div className="w-5 h-5 rounded-full bg-muted flex-shrink-0 flex items-center justify-center">
           <Zap className="h-3 w-3 text-muted-foreground" />
         </div>
-        <div className="flex-1 px-2.5 py-1.5 rounded-lg bg-muted/50 border border-border/50">
+        <div className="flex-1 px-2.5 py-1.5 rounded-lg bg-muted/50 border border-gray-700/40/50">
           <div className="h-2 w-3/4 rounded bg-muted-foreground/15 mb-1" />
           <div className="h-2 w-1/2 rounded bg-muted-foreground/10" />
         </div>
       </div>
       {/* User message with action bar */}
       <div className="relative flex gap-2 items-start">
-        <div className="w-5 h-5 rounded-full bg-blue-500/20 flex-shrink-0 flex items-center justify-center">
-          <span className="text-[8px] font-bold text-blue-400">U</span>
+        <div className="w-5 h-5 rounded-full bg-orange-500/20 flex-shrink-0 flex items-center justify-center">
+          <span className="text-[8px] font-bold text-orange-400">U</span>
         </div>
-        <div className="flex-1 px-2.5 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20">
+        <div className="flex-1 px-2.5 py-1.5 rounded-lg bg-orange-500/10 border border-blue-500/20">
           <div className="h-2 w-full rounded bg-blue-400/15 mb-1" />
           <div className="h-2 w-2/3 rounded bg-blue-400/10" />
         </div>
@@ -509,12 +507,12 @@ function ProjectActionsDemo() {
     return () => clearInterval(t)
   }, [])
   return (
-    <div className="relative rounded-lg bg-background/80 border border-border overflow-hidden h-[110px]">
+    <div className="relative rounded-lg bg-background/80 border border-gray-700/40 overflow-hidden h-[110px]">
       {/* Fake project card */}
       <div className="p-3">
         <div className="flex items-center gap-2 mb-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-pink-500/30 to-purple-500/30 flex items-center justify-center">
-            <Code className="h-4 w-4 text-pink-400" />
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500/30 to-orange-600/30 flex items-center justify-center">
+            <Code className="h-4 w-4 text-orange-400" />
           </div>
           <div>
             <div className="h-2.5 w-20 rounded bg-foreground/15" />
@@ -529,7 +527,7 @@ function ProjectActionsDemo() {
         hovered ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2'
       }`}>
         {[
-          { label: "Clone", color: "bg-blue-500/80" },
+          { label: "Clone", color: "bg-orange-500/80" },
           { label: "Publish", color: "bg-green-500/80" },
           { label: "Delete", color: "bg-red-500/80" },
         ].map((btn, i) => (
@@ -550,7 +548,7 @@ function ProjectActionsDemo() {
 function ThemeTypographyDemo() {
   const [step, setStep] = useState(0)
   const themes = [
-    { bg: "bg-slate-900", fg: "text-white", accent: "bg-blue-500", name: "Dark" },
+    { bg: "bg-slate-900", fg: "text-white", accent: "bg-orange-500", name: "Dark" },
     { bg: "bg-white", fg: "text-slate-900", accent: "bg-violet-500", name: "Light" },
     { bg: "bg-emerald-950", fg: "text-emerald-100", accent: "bg-emerald-500", name: "Forest" },
     { bg: "bg-orange-50", fg: "text-orange-900", accent: "bg-orange-500", name: "Warm" },
@@ -564,7 +562,7 @@ function ThemeTypographyDemo() {
   return (
     <div className="space-y-2">
       {/* Mini preview switching themes */}
-      <div className={`rounded-lg p-3 transition-all duration-700 ${theme.bg} border border-border/30`}>
+      <div className={`rounded-lg p-3 transition-all duration-700 ${theme.bg} border border-gray-700/40/30`}>
         <div className={`text-sm font-bold ${theme.fg} ${fonts[step]} transition-all duration-500 mb-1`}>
           Hello World
         </div>
@@ -584,7 +582,7 @@ function ThemeTypographyDemo() {
       <div className="flex items-center justify-between">
         {themes.map((t, i) => (
           <div key={i} className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md transition-all duration-300 ${
-            i === step ? 'bg-muted ring-1 ring-primary/40' : ''
+            i === step ? 'bg-muted ring-1 ring-orange-500/40' : ''
           }`}>
             <div className={`w-3 h-3 rounded-full ${t.accent} transition-transform duration-300 ${i === step ? 'scale-125' : ''}`} />
             <span className="text-[8px] text-muted-foreground">{t.name}</span>
@@ -752,7 +750,7 @@ function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
   const DemoComponent = CARD_DEMOS[activeCard]
 
   return (
-    <div className="h-full flex flex-col items-center justify-center p-4 sm:p-6 bg-gradient-to-b from-background to-muted/20 overflow-y-auto">
+    <div className="h-full flex flex-col items-center justify-center p-4 sm:p-6 bg-gradient-to-b from-gray-950 to-gray-900/50 overflow-y-auto">
       <div className="w-full max-w-lg">
         {/* Card row: dots | card | nav buttons */}
         <div className="flex items-center gap-3 mb-6">
@@ -764,7 +762,7 @@ function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
                 onClick={() => setActiveCard(i)}
                 className={`rounded-full transition-all duration-300 ${
                   i === activeCard
-                    ? 'w-2 h-5 bg-primary'
+                    ? 'w-2 h-5 bg-orange-500'
                     : 'w-2 h-2 bg-muted-foreground/25 hover:bg-muted-foreground/50'
                 }`}
               />
@@ -774,7 +772,7 @@ function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
           {/* Center: feature card */}
           <div className="flex-1 min-w-0">
             <div
-              className={`rounded-2xl border border-border bg-gradient-to-br ${card.color} shadow-lg overflow-hidden transition-all duration-500`}
+              className={`rounded-2xl border border-gray-700/40 bg-gradient-to-br ${card.color} shadow-lg overflow-hidden transition-all duration-500`}
             >
               {/* Card header */}
               <div className="px-5 pt-4 pb-2 flex items-start gap-3">
@@ -800,13 +798,13 @@ function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
           <div className="hidden sm:flex flex-col items-center gap-1.5">
             <button
               onClick={goPrev}
-              className="w-8 h-8 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center transition-colors shadow-sm"
+              className="w-8 h-8 rounded-full border border-gray-700/60 bg-gray-900 hover:bg-gray-800 flex items-center justify-center transition-colors shadow-sm"
             >
               <ChevronUp className="h-4 w-4 text-muted-foreground" />
             </button>
             <button
               onClick={() => setIsPlaying(!isPlaying)}
-              className="w-8 h-8 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center transition-colors shadow-sm"
+              className="w-8 h-8 rounded-full border border-gray-700/60 bg-gray-900 hover:bg-gray-800 flex items-center justify-center transition-colors shadow-sm"
             >
               {isPlaying ? (
                 <Pause className="h-3.5 w-3.5 text-muted-foreground" />
@@ -816,7 +814,7 @@ function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
             </button>
             <button
               onClick={goNext}
-              className="w-8 h-8 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center transition-colors shadow-sm"
+              className="w-8 h-8 rounded-full border border-gray-700/60 bg-gray-900 hover:bg-gray-800 flex items-center justify-center transition-colors shadow-sm"
             >
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </button>
@@ -825,7 +823,7 @@ function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
 
         {/* Mobile: horizontal dots + nav */}
         <div className="flex sm:hidden items-center justify-center gap-3 mb-5">
-          <button onClick={goPrev} className="w-7 h-7 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center">
+          <button onClick={goPrev} className="w-7 h-7 rounded-full border border-gray-700/60 bg-gray-900 hover:bg-gray-800 flex items-center justify-center">
             <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
           </button>
           <div className="flex items-center gap-1.5">
@@ -834,15 +832,15 @@ function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
                 key={i}
                 onClick={() => setActiveCard(i)}
                 className={`rounded-full transition-all duration-300 ${
-                  i === activeCard ? 'w-5 h-1.5 bg-primary' : 'w-1.5 h-1.5 bg-muted-foreground/25'
+                  i === activeCard ? 'w-5 h-1.5 bg-orange-500' : 'w-1.5 h-1.5 bg-muted-foreground/25'
                 }`}
               />
             ))}
           </div>
-          <button onClick={() => setIsPlaying(!isPlaying)} className="w-7 h-7 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center">
+          <button onClick={() => setIsPlaying(!isPlaying)} className="w-7 h-7 rounded-full border border-gray-700/60 bg-gray-900 hover:bg-gray-800 flex items-center justify-center">
             {isPlaying ? <Pause className="h-3 w-3 text-muted-foreground" /> : <Play className="h-3 w-3 text-muted-foreground ml-0.5" />}
           </button>
-          <button onClick={goNext} className="w-7 h-7 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center">
+          <button onClick={goNext} className="w-7 h-7 rounded-full border border-gray-700/60 bg-gray-900 hover:bg-gray-800 flex items-center justify-center">
             <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
           </button>
         </div>
@@ -918,12 +916,20 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
   const [isVisualEditorEnabled, setIsVisualEditorEnabled] = useState(false)
   const previewIframeRef = useRef<HTMLIFrameElement | null>(null)
 
-  // Dispatch preview state changes to parent component
+  // Dispatch preview state changes to parent component + save preview URL locally
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('preview-state-changed', { 
-        detail: { preview } 
+      window.dispatchEvent(new CustomEvent('preview-state-changed', {
+        detail: { preview }
       }))
+    }
+    // Persist preview URL to workspace so it loads instantly on next tab switch
+    if (preview.url && project?.id && !preview.isLoading) {
+      import('@/lib/storage-manager').then(({ storageManager }) => {
+        storageManager.init().then(() => {
+          storageManager.updateWorkspace(project.id, { previewUrl: preview.url! })
+        })
+      }).catch(() => {})
     }
   }, [preview])
 
@@ -1008,34 +1014,23 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
     checkProjectFramework()
   }, [project])
 
-  // Auto-load pipilot.dev preview URL for Vite projects when switching to preview tab
+  // Auto-load preview URL from project slug on preview tab switch
+  // Projects already have a slug field - use it to construct the preview URL directly
   useEffect(() => {
     if (
       activeTab === 'preview' &&
       isViteProject &&
       !isExpoProject &&
       project?.id &&
+      project?.slug &&
       !preview.url &&
       !preview.isLoading
     ) {
-      // Fetch the reserved preview slug from the sites table
-      const fetchPreviewSlug = async () => {
-        try {
-          const response = await fetch(`/api/projects/${project.id}/preview-slug`)
-          if (response.ok) {
-            const data = await response.json()
-            if (data.previewUrl) {
-              console.log('[CodePreviewPanel] Auto-loading Vite project preview URL:', data.previewUrl)
-              setPreview(prev => ({ ...prev, url: data.previewUrl }))
-            }
-          }
-        } catch (error) {
-          console.error('[CodePreviewPanel] Error fetching preview slug:', error)
-        }
-      }
-      fetchPreviewSlug()
+      const previewUrl = `https://${project.slug}.pipilot.dev/`
+      console.log('[CodePreviewPanel] Constructed preview URL from project slug:', previewUrl)
+      setPreview(prev => ({ ...prev, url: previewUrl }))
     }
-  }, [activeTab, isViteProject, isExpoProject, project?.id, preview.url, preview.isLoading])
+  }, [activeTab, isViteProject, isExpoProject, project?.id, project?.slug, preview.url, preview.isLoading])
 
   // Track if files have changed since last preview was created
   const filesChangedSincePreviewRef = useRef(false)
@@ -1070,12 +1065,14 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
     // When AI streaming ends and files have changed, refresh the preview
     if (!isAIStreaming && filesChangedSincePreviewRef.current && preview.url && !preview.isLoading) {
       console.log('[CodePreviewPanel] AI streaming ended, files changed - auto-refreshing preview')
-      // Use a small delay to ensure all file operations are complete
+      // Use a longer delay (1500ms) to ensure all file writes to IndexedDB are
+      // fully committed before we fetch them. Users reported that auto-refreshed
+      // previews showed stale file states from before the stream.
       const timeoutId = setTimeout(() => {
         if (filesChangedSincePreviewRef.current) {
           refreshPreviewWithLatestFiles()
         }
-      }, 500)
+      }, 1500)
       return () => clearTimeout(timeoutId)
     }
   }, [isAIStreaming])
@@ -1120,8 +1117,7 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
 
       // Handle legacy console messages
       if (event.data?.type === 'console') {
-        addConsoleLog(event.data.message, 'browser')
-        // Also add to browserLogs for the Browser tab (legacy format)
+        // Only add to browserLogs for the Browser tab (legacy format)
         const level = event.data.level || 'log'
         setBrowserLogs(prev => [...prev, JSON.stringify({
           method: level,
@@ -1134,40 +1130,6 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
       // Handle BROWSER_CONSOLE_LOG from console bridge (both formats)
       if (event.data?.type === 'BROWSER_CONSOLE_LOG' && event.data?.payload) {
         const { method, data, timestamp, id } = event.data.payload
-
-        // Helper to format a single arg (handles both wrapped and direct formats)
-        const formatArg = (arg: any): string => {
-          // Handle wrapped format: { type: 'string', value: ... }
-          if (arg && typeof arg === 'object' && 'type' in arg && 'value' in arg) {
-            if (arg.type === 'string') return String(arg.value)
-            if (arg.type === 'error') return `${arg.value?.name || 'Error'}: ${arg.value?.message || 'Unknown'}`
-            if (arg.type === 'object' || arg.type === 'array') {
-              try { return JSON.stringify(arg.value) } catch { return '[Object]' }
-            }
-            return String(arg.value ?? '')
-          }
-
-          // Handle direct format from console bridge
-          if (arg && typeof arg === 'object' && arg.__isError) {
-            // Error object from console bridge
-            return `${arg.name || 'Error'}: ${arg.message || 'Unknown error'}${arg.stack ? '\n' + arg.stack : ''}`
-          }
-
-          // Handle plain objects and arrays
-          if (arg && typeof arg === 'object') {
-            try { return JSON.stringify(arg, null, 2) } catch { return '[Object]' }
-          }
-
-          // Handle primitives
-          return String(arg ?? '')
-        }
-
-        // Extract a simple message for the unified console log
-        const simpleMessage = Array.isArray(data)
-          ? data.map(formatArg).join(' ')
-          : formatArg(data)
-
-        addConsoleLog(simpleMessage, 'browser')
 
         // Add to browserLogs for the Browser tab (console-feed format)
         // Normalize the data to console-feed format
@@ -1501,9 +1463,12 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
 
       const authUserId = user.id
       const authUsername = user.user_metadata?.full_name || user.email?.split('@')[0] || 'anonymous'
-      // Fetch files from IndexedDB client-side
+      // Fetch latest files from IndexedDB client-side
+      // Re-init storage manager to ensure we get the freshest data after streaming
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
+      // Small yield to allow any pending IndexedDB transactions to flush
+      await new Promise(resolve => setTimeout(resolve, 200))
       const files = await storageManager.getFiles(project.id)
       
       if (!files || files.length === 0) {
@@ -1828,8 +1793,10 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
       console.log('[CodePreviewPanel] Syncing latest files to preview sandbox:', preview.sandboxId)
 
       // Fetch latest files from IndexedDB
+      // Re-init and yield to ensure all pending writes are flushed
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
+      await new Promise(resolve => setTimeout(resolve, 200))
       const files = await storageManager.getFiles(project.id)
 
       if (!files || files.length === 0) {
@@ -2870,11 +2837,11 @@ export default function TodoApp() {
 
   if (!project) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-muted/20">
+      <div className="flex-1 flex items-center justify-center bg-gray-950">
         <div className="text-center">
-          <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Project Selected</h3>
-          <p className="text-muted-foreground">Select a project from the sidebar to start building</p>
+          <FileText className="h-12 w-12 text-gray-600 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-300 mb-2">No Project Selected</h3>
+          <p className="text-gray-500">Select a project from the sidebar to start building</p>
         </div>
       </div>
     )
@@ -2884,7 +2851,7 @@ export default function TodoApp() {
     <div className="flex flex-col h-full">
       {/* Tabs - Hidden on mobile and when in preview tab on desktop */}
       {!isMobile && activeTab !== "preview" && (
-        <div className="border-b border-border bg-card">
+        <div className="border-b border-gray-800/60 bg-gray-900/80">
           <div className="flex items-center justify-between px-4 py-2">
             <div className="flex space-x-1">
               {/* Desktop tabs would go here if needed */}
@@ -2928,18 +2895,14 @@ export default function TodoApp() {
               setPreview(prev => ({ ...prev, url }))
             }}
           >
-            <WebPreviewNavigation className="fixed top-0 left-0 right-0 z-50 bg-card border-b border-border">
-              {/* Model Selector and Chat Session Selector */}
-              {project && selectedModel && onModelChange && (
-                <div className="flex items-center gap-1 ml-2">
-                  <ModelSelector
-                    selectedModel={selectedModel}
-                    onModelChange={onModelChange}
-                    userPlan={userPlan}
-                    subscriptionStatus={subscriptionStatus}
-                    compact={true}
-                  />
-                  {userId && onSessionChange && (
+            <WebPreviewNavigation className="fixed top-0 left-0 right-0 z-50 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800/60">
+              {/* Spacer to push all controls right */}
+              {!isMobile && <div className="flex-1" />}
+
+              {/* Chat Session Selector + Tab switching buttons - hidden on mobile */}
+              {!isMobile && (
+                <div className="flex items-center gap-0.5">
+                  {project && userId && onSessionChange && (
                     <ChatSessionSelector
                       workspaceId={project.id}
                       userId={userId}
@@ -2949,33 +2912,27 @@ export default function TodoApp() {
                       compact={true}
                     />
                   )}
+                  <WebPreviewNavigationButton
+                    onClick={() => onTabChange("code")}
+                    tooltip="Switch to Code View"
+                  >
+                    <Code className="h-4 w-4" />
+                  </WebPreviewNavigationButton>
+                  <WebPreviewNavigationButton
+                    onClick={() => onTabChange("preview")}
+                    disabled={true}
+                    tooltip="Current: Preview View"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </WebPreviewNavigationButton>
+                  <WebPreviewNavigationButton
+                    onClick={() => onTabChange("cloud")}
+                    tooltip="Switch to Cloud"
+                  >
+                    <Cloud className="h-4 w-4" />
+                  </WebPreviewNavigationButton>
                 </div>
               )}
-
-              <div className="flex-1" />
-
-              {/* Tab switching buttons */}
-              <WebPreviewNavigationButton
-                onClick={() => onTabChange("code")}
-                tooltip="Switch to Code View"
-              >
-                <Code className="h-4 w-4" />
-              </WebPreviewNavigationButton>
-              <WebPreviewNavigationButton
-                onClick={() => onTabChange("preview")}
-                disabled={true}
-                tooltip="Current: Preview View"
-              >
-                <Eye className="h-4 w-4" />
-              </WebPreviewNavigationButton>
-              <WebPreviewNavigationButton
-                onClick={() => onTabChange("database")}
-                tooltip="Switch to Database View"
-              >
-                <Database className="h-4 w-4" />
-              </WebPreviewNavigationButton>
-
-              <div className="w-4" />
 
               {/* For Expo: No Visual Editor/Responsive. For others: show icons only */}
               {!isExpoProject && (
@@ -2984,12 +2941,11 @@ export default function TodoApp() {
                     isEnabled={isVisualEditorEnabled}
                     onToggle={setIsVisualEditorEnabled}
                   />
-                  <WebPreviewDeviceSelector />
+                  {/* Device selector - hidden on mobile */}
+                  {!isMobile && <WebPreviewDeviceSelector />}
                 </>
               )}
 
-              <div className="w-4" />
-              
               <WebPreviewUrl
                 onRefresh={refreshPreview}
                 onOpenExternal={() => {
@@ -3017,28 +2973,6 @@ export default function TodoApp() {
                 </WebPreviewNavigationButton>
               )}
 
-              {/* Sandpack Research Preview - Vite projects only */}
-              {isViteProject && !isExpoProject && (
-                <>
-                  <div className="w-px h-5 bg-border mx-1" />
-                  {showSandpackPreview ? (
-                    <WebPreviewNavigationButton
-                      onClick={closeSandpackPreview}
-                      tooltip="Close Sandpack Preview"
-                    >
-                      <XIcon className="h-4 w-4 text-orange-500" />
-                    </WebPreviewNavigationButton>
-                  ) : (
-                    <WebPreviewNavigationButton
-                      onClick={openSandpackPreview}
-                      disabled={!project || sandpackLoading}
-                      tooltip="Try Sandpack Preview (Research)"
-                    >
-                      <FlaskConical className={`h-4 w-4 ${sandpackLoading ? 'animate-pulse text-orange-400' : 'text-orange-500'}`} />
-                    </WebPreviewNavigationButton>
-                  )}
-                </>
-              )}
             </WebPreviewNavigation>
 
             <div className={isExpoProject ? "flex-1 min-h-0 pt-16 relative" : "flex-1 min-h-0 relative"}>
@@ -3105,6 +3039,8 @@ export default function TodoApp() {
                     </div>
                   </div>
                 </div>
+              ) : isAIStreaming ? (
+                <AIRespondingView projectName={project?.name} />
               ) : preview.url ? (
                 isExpoProject ? (
                   <div className="h-full w-full flex items-center justify-center p-4">
@@ -3178,8 +3114,6 @@ export default function TodoApp() {
                     }}
                   />
                 )
-              ) : isAIStreaming ? (
-                <AIRespondingView projectName={project?.name} />
               ) : (
                 <PreviewEmptyState
                   projectName={project?.name}
@@ -3228,8 +3162,6 @@ export default function TodoApp() {
             />
           </WebPreview>
         </VisualEditorWrapper>
-        ) : activeTab === "database" ? (
-          <DatabaseTab workspaceId={project?.id || ""} />
         ) : null}
       </div>
 

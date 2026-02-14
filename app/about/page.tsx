@@ -25,8 +25,10 @@ import {
   Target,
   Heart,
 } from "lucide-react"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function AboutPage() {
+  usePageTitle('About')
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Enhanced Gradient Background */}
@@ -54,6 +56,11 @@ export default function AboutPage() {
               PiPilot is revolutionizing how developers and businesses create web applications
               through the power of artificial intelligence and cutting-edge technology.
             </p>
+            <div className="mt-6 flex items-center justify-center">
+              <a href="https://e2b.dev/startups" target="_blank" rel="noopener noreferrer" className="opacity-80 hover:opacity-100 transition-opacity">
+                <img src="/e2b-badge.svg" alt="Sponsored by E2B for Startups" className="h-8 md:h-10 w-auto rounded" />
+              </a>
+            </div>
           </div>
 
           {/* About PiPilot Section */}

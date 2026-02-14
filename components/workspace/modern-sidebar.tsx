@@ -156,7 +156,7 @@ export function ModernSidebar({
     <>
       <div className="flex flex-col flex-1 w-full">
         {/* Header with Logo and Close Button */}
-        <div className={`flex items-center w-full h-14 px-3 border-b border-gray-800 ${shouldExpand ? 'justify-between' : 'justify-center'}`}>
+        <div className={`flex items-center w-full h-14 px-3 border-b border-gray-800/60 ${shouldExpand ? 'justify-between' : 'justify-center'}`}>
           <div className="flex items-center cursor-pointer" onClick={() => window.location.href = '/'}>
             <div className="w-10 h-10 bg-gradient-to-br rounded-lg flex-shrink-0 flex items-center justify-center">
               <img src="https://pipilot.dev/logo.png" alt="Logo" className="w-8 h-8 object-contain" />
@@ -198,11 +198,11 @@ export function ModernSidebar({
                 <AccordionTrigger className="py-2 px-2 hover:no-underline hover:bg-gray-800 rounded-md transition-colors">
                   <div className="flex items-center justify-between w-full">
                     <div className="flex items-center gap-2">
-                      <Coins className="h-4 w-4 text-green-400" />
+                      <Coins className="h-4 w-4 text-orange-400" />
                       <span className="text-sm text-gray-400">Credits</span>
                     </div>
                     {!loadingCredits && creditBalance !== null && (
-                      <span className="text-xs font-bold text-green-400 mr-2">
+                      <span className="text-xs font-bold text-orange-400 mr-2">
                         {creditBalance.toFixed(2)}
                       </span>
                     )}
@@ -214,12 +214,12 @@ export function ModernSidebar({
                       <>
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-gray-400">~{estimatedMessages} messages</span>
-                          <span className="text-green-400 capitalize">{currentPlan}</span>
+                          <span className="text-orange-400 capitalize">{currentPlan}</span>
                         </div>
                         
                         <div className="flex items-center gap-2">
                           {creditBalance > 10 ? (
-                            <div className="flex items-center gap-1 text-green-400">
+                            <div className="flex items-center gap-1 text-orange-400">
                               <TrendingUp className="h-3 w-3" />
                               <span className="text-xs">Good balance</span>
                             </div>
@@ -238,7 +238,7 @@ export function ModernSidebar({
 
                         <Button
                           size="sm"
-                          className="w-full h-8 text-xs bg-green-600 hover:bg-green-700"
+                          className="w-full h-8 text-xs bg-orange-600 hover:bg-orange-500"
                           onClick={() => handleNavigation('/pricing')}
                         >
                           <CreditCard className="h-3 w-3 mr-1" />
@@ -314,7 +314,7 @@ export function ModernSidebar({
                         onClick={() => handleProjectSelect(project)}
                         className={`w-full flex items-start gap-2 p-2 rounded-md transition-colors ${
                           selectedProject?.id === project.id
-                            ? 'bg-blue-600/20 text-blue-400'
+                            ? 'bg-orange-600/20 text-orange-400'
                             : 'text-gray-400 hover:text-white hover:bg-gray-800'
                         }`}
                       >
@@ -339,7 +339,7 @@ export function ModernSidebar({
             >
               <Folder size={18} />
               {projects.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-orange-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
                   {projects.length > 9 ? '9+' : projects.length}
                 </span>
               )}
@@ -349,7 +349,7 @@ export function ModernSidebar({
       </div>
 
       {/* Bottom Navigation */}
-      <div className="flex flex-col space-y-1 px-2 pb-3 border-t border-gray-800 pt-3">
+      <div className="flex flex-col space-y-1 px-2 pb-3 border-t border-gray-800/60 pt-3">
         {/* Database */}
         <button
           onClick={() => handleNavigation('/database')}
@@ -389,7 +389,7 @@ export function ModernSidebar({
             <button 
               className={`flex items-center w-full h-10 px-2 ${shouldExpand ? 'justify-start' : 'justify-center'} hover:bg-gray-800 rounded-md transition-colors`}
             >
-              <div className="w-8 h-8 bg-pink-600 rounded-full flex items-center justify-center flex-shrink-0">
+              <div className="w-8 h-8 bg-orange-600 rounded-full flex items-center justify-center flex-shrink-0">
                 <span className="text-white text-xs font-bold">
                   {user.email?.charAt(0).toUpperCase() || 'A'}
                 </span>
@@ -437,7 +437,7 @@ export function ModernSidebar({
         {/* Mobile Sidebar - only renders when open */}
         {isMobileOpen && (
           <aside
-            className="lg:hidden fixed inset-y-0 left-0 z-[70] w-64 bg-black flex flex-col border-r border-gray-800"
+            className="lg:hidden fixed inset-y-0 left-0 z-[70] w-64 bg-gray-950 flex flex-col border-r border-gray-800/60"
             role="dialog"
             aria-modal="true"
           >
@@ -476,7 +476,7 @@ export function ModernSidebar({
                       onClick={() => handleProjectSelect(project)}
                       className="w-full flex items-start gap-3 p-3 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors text-left"
                     >
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex-shrink-0 flex items-center justify-center">
+                      <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-amber-600 rounded-lg flex-shrink-0 flex items-center justify-center">
                         <Folder className="h-6 w-6 text-white" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -526,7 +526,7 @@ export function ModernSidebar({
   return (
     <>
       <aside
-        className={`hidden lg:flex bg-black flex-col border-r border-gray-800 transition-all duration-300 relative ${
+        className={`hidden lg:flex bg-gray-950 flex-col border-r border-gray-800/60 transition-all duration-300 relative ${
           shouldExpand ? 'w-64' : 'w-14'
         }`}
         onMouseEnter={() => setIsHovered(true)}
@@ -566,7 +566,7 @@ export function ModernSidebar({
                     onClick={() => handleProjectSelect(project)}
                     className="w-full flex items-start gap-3 p-3 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors text-left"
                   >
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex-shrink-0 flex items-center justify-center">
+                    <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-amber-600 rounded-lg flex-shrink-0 flex items-center justify-center">
                       <Folder className="h-6 w-6 text-white" />
                     </div>
                     <div className="flex-1 min-w-0">

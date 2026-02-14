@@ -4,6 +4,54 @@ import { storageManager } from "@/lib/storage-manager"
 // Initialize Supabase client
 const supabase = createClient()
 
+// Maximum number of projects to sync to cloud backup
+export const MAX_BACKUP_PROJECTS = 4
+
+/**
+ * Select the N most recently active workspaces and filter all related data
+ * (files, chatSessions, messages, deployments, envVars) to only include
+ * data belonging to those workspaces.
+ */
+function filterDataToTopProjects(data: any, maxProjects: number = MAX_BACKUP_PROJECTS): any {
+  const workspaces: any[] = Array.isArray(data.workspaces) ? data.workspaces : []
+
+  // Sort by lastActivity descending, pick top N
+  const sortedWorkspaces = [...workspaces].sort((a, b) => {
+    const dateA = new Date(a.lastActivity || a.updatedAt || a.createdAt || 0).getTime()
+    const dateB = new Date(b.lastActivity || b.updatedAt || b.createdAt || 0).getTime()
+    return dateB - dateA
+  })
+  const topWorkspaces = sortedWorkspaces.slice(0, maxProjects)
+  const topWorkspaceIds = new Set(topWorkspaces.map(w => w.id))
+
+  // Also collect chatSession IDs that belong to these workspaces
+  const allChatSessions: any[] = Array.isArray(data.chatSessions) ? data.chatSessions : []
+  const filteredChatSessions = allChatSessions.filter(
+    (cs: any) => cs.workspaceId && topWorkspaceIds.has(cs.workspaceId)
+  )
+  const filteredChatSessionIds = new Set(filteredChatSessions.map((cs: any) => cs.id))
+
+  // Filter messages to only those belonging to filtered chat sessions
+  const allMessages: any[] = Array.isArray(data.messages) ? data.messages : []
+  const filteredMessages = allMessages.filter(
+    (m: any) => filteredChatSessionIds.has(m.chatSessionId)
+  )
+
+  // Filter workspace-scoped tables
+  const filterByWorkspace = (arr: any[]) =>
+    Array.isArray(arr) ? arr.filter((item: any) => topWorkspaceIds.has(item.workspaceId)) : []
+
+  return {
+    ...data,
+    workspaces: topWorkspaces,
+    files: filterByWorkspace(data.files),
+    chatSessions: filteredChatSessions,
+    messages: filteredMessages,
+    deployments: filterByWorkspace(data.deployments),
+    environmentVariables: filterByWorkspace(data.environmentVariables),
+  }
+}
+
 /**
  * Upload current IndexedDB data to Supabase Storage as a backup
  */
@@ -13,11 +61,11 @@ export async function uploadBackupToCloud(userId: string): Promise<boolean> {
     await storageManager.init()
 
     // Export all data from IndexedDB
-    const data = await storageManager.exportData()
+    const fullData = await storageManager.exportData()
 
     // PROTECTION AGAINST EMPTY DATA OVERWRITING CLOUD BACKUP
     // Check if local data appears to be cleared (all arrays empty or nearly empty)
-    const isLocalDataEmpty = Object.values(data).every((tableData: any) =>
+    const isLocalDataEmpty = Object.values(fullData).every((tableData: any) =>
       Array.isArray(tableData) && tableData.length === 0
     )
 
@@ -43,6 +91,9 @@ export async function uploadBackupToCloud(userId: string): Promise<boolean> {
         }
       }
     }
+
+    // Filter to only the top N most recently active projects
+    const data = filterDataToTopProjects(fullData, MAX_BACKUP_PROJECTS)
 
     // Create backup filename with timestamp
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
@@ -118,6 +169,11 @@ export async function uploadBackupToCloud(userId: string): Promise<boolean> {
         onConflict: 'user_id'
       })
 
+    // Notify other hooks/devices that a backup just completed
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('pipilot-backup-completed'))
+    }
+
     return true
   } catch (error) {
     console.error("Error uploading backup to cloud:", error)
@@ -176,7 +232,15 @@ export async function smartBackupToCloud(userId: string): Promise<boolean> {
     return false
   }
 }/**
- * Download the latest backup from Supabase and restore it to IndexedDB
+ * Download the latest backup from Supabase and merge it with local IndexedDB data.
+ *
+ * Merge strategy:
+ * - For each workspace (project) in the cloud backup, overwrite the local version
+ *   of that workspace and all its related data (files, chatSessions, messages,
+ *   deployments, environmentVariables).
+ * - Local-only workspaces (not present in the cloud backup) are left untouched.
+ * - Non-workspace-scoped tables (e.g. tokens, templates) are imported from cloud
+ *   only if they don't already exist locally.
  */
 export async function restoreBackupFromCloud(userId: string): Promise<boolean> {
   try {
@@ -199,13 +263,37 @@ export async function restoreBackupFromCloud(userId: string): Promise<boolean> {
     // Handle new storage-based backups
     if (data.storage_url) {
       try {
-        const response = await fetch(data.storage_url)
-        if (!response.ok) {
-          throw new Error(`Failed to download backup: ${response.status} ${response.statusText}`)
+        // Extract filename from storage URL
+        const filename = data.storage_url.split('/').pop()
+        if (!filename) {
+          throw new Error('Invalid storage URL: could not extract filename')
         }
 
-        const jsonString = await response.text()
-        backupData = JSON.parse(jsonString)
+        // Use Supabase storage client to download (works regardless of bucket privacy)
+        const { data: fileData, error: dlError } = await supabase.storage
+          .from('backups')
+          .download(filename)
+
+        if (dlError || !fileData) {
+          // Fallback: try a signed URL
+          const { data: signedData, error: signError } = await supabase.storage
+            .from('backups')
+            .createSignedUrl(filename, 60)
+
+          if (signError || !signedData?.signedUrl) {
+            throw new Error(`Failed to download backup: ${dlError?.message || signError?.message || 'unknown error'}`)
+          }
+
+          const response = await fetch(signedData.signedUrl)
+          if (!response.ok) {
+            throw new Error(`Failed to download backup: ${response.status} ${response.statusText}`)
+          }
+          const jsonString = await response.text()
+          backupData = JSON.parse(jsonString)
+        } else {
+          const jsonString = await fileData.text()
+          backupData = JSON.parse(jsonString)
+        }
       } catch (downloadError) {
         throw downloadError
       }
@@ -221,18 +309,123 @@ export async function restoreBackupFromCloud(userId: string): Promise<boolean> {
     // Initialize storage manager
     await storageManager.init()
 
-    // Clear existing data
+    // Export current local data for merging
+    const localData = await storageManager.exportData()
+
+    // Build set of workspace IDs from cloud backup
+    const cloudWorkspaces: any[] = Array.isArray(backupData.workspaces) ? backupData.workspaces : []
+    const cloudWorkspaceIds = new Set(cloudWorkspaces.map((w: any) => w.id))
+
+    // Build set of cloud chat session IDs (scoped to cloud workspaces)
+    const cloudChatSessions: any[] = Array.isArray(backupData.chatSessions) ? backupData.chatSessions : []
+    const cloudChatSessionIds = new Set(cloudChatSessions.map((cs: any) => cs.id))
+
+    // --- Merge workspace-scoped tables ---
+    // Strategy: keep local items that DON'T belong to any cloud workspace,
+    //           then add ALL cloud items for those workspaces.
+
+    const localWorkspaces: any[] = Array.isArray(localData.workspaces) ? localData.workspaces : []
+    const localFiles: any[] = Array.isArray(localData.files) ? localData.files : []
+    const localChatSessions: any[] = Array.isArray(localData.chatSessions) ? localData.chatSessions : []
+    const localMessages: any[] = Array.isArray(localData.messages) ? localData.messages : []
+    const localDeployments: any[] = Array.isArray(localData.deployments) ? localData.deployments : []
+    const localEnvVars: any[] = Array.isArray(localData.environmentVariables) ? localData.environmentVariables : []
+
+    // Collect local chatSession IDs that belong to cloud workspaces (these will be replaced)
+    const localChatSessionIdsToReplace = new Set(
+      localChatSessions
+        .filter((cs: any) => cs.workspaceId && cloudWorkspaceIds.has(cs.workspaceId))
+        .map((cs: any) => cs.id)
+    )
+
+    // Workspaces: keep local-only, replace cloud ones
+    const mergedWorkspaces = [
+      ...localWorkspaces.filter((w: any) => !cloudWorkspaceIds.has(w.id)),
+      ...cloudWorkspaces
+    ]
+
+    // Files: keep local files from non-cloud workspaces, use cloud files for cloud workspaces
+    const cloudFiles: any[] = Array.isArray(backupData.files) ? backupData.files : []
+    const mergedFiles = [
+      ...localFiles.filter((f: any) => !cloudWorkspaceIds.has(f.workspaceId)),
+      ...cloudFiles
+    ]
+
+    // ChatSessions: keep local sessions from non-cloud workspaces, use cloud sessions
+    const mergedChatSessions = [
+      ...localChatSessions.filter((cs: any) => !cs.workspaceId || !cloudWorkspaceIds.has(cs.workspaceId)),
+      ...cloudChatSessions
+    ]
+
+    // Messages: keep local messages not belonging to replaced sessions, add cloud messages
+    const cloudMessages: any[] = Array.isArray(backupData.messages) ? backupData.messages : []
+    const mergedMessages = [
+      ...localMessages.filter((m: any) => !localChatSessionIdsToReplace.has(m.chatSessionId) && !cloudChatSessionIds.has(m.chatSessionId)),
+      ...cloudMessages
+    ]
+
+    // Deployments: keep local deployments from non-cloud workspaces
+    const cloudDeployments: any[] = Array.isArray(backupData.deployments) ? backupData.deployments : []
+    const mergedDeployments = [
+      ...localDeployments.filter((d: any) => !cloudWorkspaceIds.has(d.workspaceId)),
+      ...cloudDeployments
+    ]
+
+    // Environment variables: keep local ones from non-cloud workspaces
+    const cloudEnvVars: any[] = Array.isArray(backupData.environmentVariables) ? backupData.environmentVariables : []
+    const mergedEnvVars = [
+      ...localEnvVars.filter((ev: any) => !cloudWorkspaceIds.has(ev.workspaceId)),
+      ...cloudEnvVars
+    ]
+
+    // --- Clear and re-import all data ---
     await storageManager.clearAll()
 
-    // Import backup data to IndexedDB
-    for (const [tableName, tableData] of Object.entries(backupData)) {
-      if (Array.isArray(tableData) && tableData.length > 0) {
+    // Import merged workspace-scoped tables
+    const tablesToImport: Record<string, any[]> = {
+      workspaces: mergedWorkspaces,
+      files: mergedFiles,
+      chatSessions: mergedChatSessions,
+      messages: mergedMessages,
+      deployments: mergedDeployments,
+      environmentVariables: mergedEnvVars,
+    }
+
+    for (const [tableName, tableData] of Object.entries(tablesToImport)) {
+      if (tableData.length > 0) {
         try {
-          if (typeof storageManager.importTable === 'function') {
-            await storageManager.importTable(tableName, tableData)
-          }
+          await storageManager.importTable(tableName, tableData)
         } catch (importError) {
-          // Skip tables that fail to import
+          console.error(`Error importing merged ${tableName}:`, importError)
+        }
+      }
+    }
+
+    // Import non-workspace-scoped tables from cloud (tokens, templates, etc.)
+    // Only import items that don't conflict with existing local data
+    const workspaceScopedTables = new Set([
+      'workspaces', 'files', 'chatSessions', 'messages', 'deployments', 'environmentVariables'
+    ])
+
+    for (const [tableName, tableData] of Object.entries(backupData)) {
+      if (workspaceScopedTables.has(tableName)) continue
+      if (!Array.isArray(tableData) || tableData.length === 0) continue
+
+      // For non-workspace tables, merge by ID (cloud items fill gaps)
+      const localTableData: any[] = Array.isArray((localData as any)[tableName])
+        ? (localData as any)[tableName]
+        : []
+      const localIds = new Set(localTableData.map((item: any) => item.id))
+      const mergedTable = [
+        ...localTableData,
+        ...(tableData as any[]).filter((item: any) => !localIds.has(item.id))
+      ]
+
+      if (mergedTable.length > 0) {
+        try {
+          await storageManager.importTable(tableName, mergedTable)
+        } catch (importError) {
+          console.error(`Error importing ${tableName}:`, importError)
         }
       }
     }

@@ -1,37 +1,27 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import {
   ArrowUp,
-  Plus,
-  Image as ImageIcon,
-  Zap,
-  Mic,
-  MicOff,
   Square,
   Sparkles,
   Link as LinkIcon,
-  X,CornerDownLeftIcon,
+  X,
   Github,
   Gitlab,
-  RefreshCw
+  RefreshCw,
+  ChevronDown,
+  Check,
+  Layers
 } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { filterUnwantedFiles } from "@/lib/utils"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Suggestions, Suggestion } from "@/components/ai-elements/suggestion"
+import { getRandomSuggestions } from "@/lib/project-suggestions"
 
 // Load JSZip from CDN (same as file explorer)
 if (typeof window !== 'undefined' && !window.JSZip) {
@@ -142,7 +132,8 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
 
   // Template selection state
   const [selectedTemplate, setSelectedTemplate] = useState<'vite-react' | 'nextjs' | 'expo' | 'html'>('vite-react')
-  const [hasUserSelectedTemplate, setHasUserSelectedTemplate] = useState(false)
+  const [showTemplateDropdown, setShowTemplateDropdown] = useState(false)
+  const templateDropdownRef = useRef<HTMLDivElement>(null)
 
   // URL attachment state
   const [attachedUrl, setAttachedUrl] = useState("")
@@ -160,6 +151,9 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   const [showGitlabPopover, setShowGitlabPopover] = useState(false)
   const [gitlabInput, setGitlabInput] = useState("")
   const [isImportingGitlab, setIsImportingGitlab] = useState(false)
+
+  // Plan mode state - true for Plan mode (default), false for Agent mode
+  const [isPlanMode, setIsPlanMode] = useState(true)
 
   // Fetch user on mount
   useEffect(() => {
@@ -196,39 +190,25 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   const isWebSpeechSupported = typeof window !== 'undefined' && 
     ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)
 
-  // Fetch prompt suggestions on component mount
+  // Load suggestions from static data on mount
   useEffect(() => {
-    fetchPromptSuggestions()
+    setSuggestions(getRandomSuggestions(15))
   }, [])
 
-  const fetchPromptSuggestions = async () => {
-    try {
-      const response = await fetch('/api/prompt-suggestions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ count: 15 }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success && data.suggestions) {
-          setSuggestions(data.suggestions)
-        }
+  // Close template dropdown on outside click
+  useEffect(() => {
+    if (!showTemplateDropdown) return
+    const handleClick = (e: MouseEvent) => {
+      if (templateDropdownRef.current && !templateDropdownRef.current.contains(e.target as Node)) {
+        setShowTemplateDropdown(false)
       }
-    } catch (error) {
-      console.error('Failed to fetch prompt suggestions:', error)
-      // Fallback suggestions
-      setSuggestions([
-        { display: "Landing page", prompt: "Create a modern landing page for my startup" },
-        { display: "Portfolio site", prompt: "Build a portfolio website to showcase my work" },
-        { display: "Restaurant menu", prompt: "Design a restaurant website with menu" },
-        { display: "E-commerce store", prompt: "Make an e-commerce store for clothing" },
-        { display: "Blog with dark mode", prompt: "Create a blog website with dark mode" },
-        { display: "Business website", prompt: "Build a business website with contact forms" }
-      ])
     }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showTemplateDropdown])
+
+  const refreshSuggestions = () => {
+    setSuggestions(getRandomSuggestions(15))
   }
 
   // Prompt enhancement using Pixtral AI
@@ -835,39 +815,6 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     }
   }
 
-  // Smart template selection based on prompt content
-  const detectFrameworkFromPrompt = (promptText: string): 'vite-react' | 'nextjs' | 'expo' | 'html' | null => {
-    const lowerPrompt = promptText.toLowerCase()
-
-    // Framework detection patterns - ONLY match explicit framework mentions
-    const frameworkPatterns = [
-      // Next.js - only when explicitly mentioned
-      { regex: /\bnext\.?js\b/i, template: 'nextjs' as const },
-      { regex: /\bnextjs\b/i, template: 'nextjs' as const },
-
-      // Expo/React Native - only when explicitly mentioned
-      { regex: /\bexpo\b/i, template: 'expo' as const },
-      { regex: /\breact\s+native\b/i, template: 'expo' as const },
-      { regex: /\bmobile\s+app\b/i, template: 'expo' as const },
-
-      // HTML - only when explicitly mentioned
-      { regex: /\bhtml\b/i, template: 'html' as const },
-      { regex: /\bvanilla\s+js\b/i, template: 'html' as const },
-    ]
-
-    // Check patterns - only return if explicit framework is mentioned
-    for (const { regex, template } of frameworkPatterns) {
-      if (regex.test(lowerPrompt)) {
-        console.log(`🎯 Framework explicitly detected: "${template}" from pattern: ${regex}`)
-        return template
-      }
-    }
-
-    // No explicit framework mentioned - return null to not auto-select
-    console.log('🎯 No explicit framework mentioned, no auto-selection')
-    return null
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -897,25 +844,6 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         return
       }
 
-      // Smart template selection based on prompt (excluding GitHub/GitLab imports)
-      // Only auto-detect if user hasn't manually selected a template
-      let detectedTemplate = selectedTemplate
-      if (!hasUserSelectedTemplate) {
-        const frameworkDetection = detectFrameworkFromPrompt(prompt)
-        if (frameworkDetection !== null) {
-          detectedTemplate = frameworkDetection
-          console.log(`🎯 Smart template selection: Explicitly detected "${detectedTemplate}" from prompt, auto-selecting`)
-          setSelectedTemplate(detectedTemplate)
-          toast.info(`🎯 Auto-selected ${detectedTemplate === 'nextjs' ? 'Next.js' : detectedTemplate === 'expo' ? 'Expo' : detectedTemplate === 'html' ? 'HTML' : 'Vite React'} template based on your prompt`)
-        } else {
-          console.log('🎯 No explicit framework detected, using current selection')
-          detectedTemplate = selectedTemplate
-        }
-      } else {
-        console.log(`👤 User manually selected template: "${selectedTemplate}", skipping auto-detection`)
-        detectedTemplate = selectedTemplate
-      }
-
       console.log('🚀 ChatInput: Generating project details with Pixtral for prompt:', prompt)
       
       // Generate project name and description using Pixtral
@@ -927,7 +855,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         body: JSON.stringify({
           prompt: prompt,
           userId: user.id,
-          template: detectedTemplate, // Use detected template instead of selectedTemplate
+          template: selectedTemplate,
         }),
       })
 
@@ -1009,15 +937,15 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
             throw githubError
           }
         } else {
-          // Apply template files based on detected framework
+          // Apply template files based on selected framework
           const { TemplateService } = await import('@/lib/template-service')
-          if (detectedTemplate === 'nextjs') {
+          if (selectedTemplate === 'nextjs') {
             console.log('🎯 Applying Next.js template')
             await TemplateService.applyNextJSTemplate(workspace.id)
-          } else if (detectedTemplate === 'expo') {
+          } else if (selectedTemplate === 'expo') {
             console.log('🎯 Applying Expo template')
             await TemplateService.applyExpoTemplate(workspace.id)
-          } else if (detectedTemplate === 'html') {
+          } else if (selectedTemplate === 'html') {
             console.log('🎯 Applying HTML template')
             await TemplateService.applyHtmlTemplate(workspace.id)
           } else {
@@ -1102,7 +1030,10 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         // This ensures the complete prompt is sent to the chat panel
         if (typeof window !== 'undefined') {
           sessionStorage.setItem(`initial-prompt-${workspace.id}`, fullPrompt)
-          
+
+          // Store plan mode preference so workspace chat panel picks it up
+          sessionStorage.setItem(`initial-chat-mode-${workspace.id}`, isPlanMode ? 'plan' : 'agent')
+
           // CRITICAL FIX: Clear any cached project/file state to prevent contamination
           // This ensures the workspace loads with a clean slate
           sessionStorage.removeItem('lastSelectedProject')
@@ -1173,18 +1104,18 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     <div className="w-full max-w-4xl mx-auto">
       {/* Main Chat Input */}
       <div className="relative">
-        <div className="bg-gray-800/80 chat-input-container border border-gray-600/50 rounded-3xl p-4 shadow-2xl">
+        <div className="rounded-2xl border border-gray-700/60 bg-gray-900/80 focus-within:border-gray-600 transition-colors shadow-2xl">
           {/* Loading Overlay */}
           {isGenerating && (
-            <div className="absolute inset-0 bg-gray-800/96 backdrop-blur-sm rounded-3xl flex items-center justify-center z-20 border border-gray-600/50">
+            <div className="absolute inset-0 bg-gray-900/96 backdrop-blur-sm rounded-2xl flex items-center justify-center z-20 border border-gray-700/60">
               <div className="flex items-center gap-3 text-white">
-                <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                <span className="text-lg font-medium">PiPilot is working...</span>
+                <div className="w-4 h-4 border-2 border-orange-400 border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-sm font-medium text-gray-300">PiPilot is working...</span>
               </div>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit}>
             {/* Input Field - Auto-expanding textarea */}
             <div className="relative">
               <textarea
@@ -1196,7 +1127,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                   // Auto-resize textarea
                   const textarea = e.target as HTMLTextAreaElement
                   textarea.style.height = 'auto'
-                  textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px'
+                  textarea.style.height = Math.min(textarea.scrollHeight, 140) + 'px'
                 }}
                 onKeyDown={(e: any) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
@@ -1204,21 +1135,21 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                     handleSubmit(e)
                   }
                 }}
-                className="w-full bg-transparent outline-none text-lg text-white placeholder-gray-400 py-3 px-4 resize-none overflow-y-auto min-h-[60px] max-h-[200px]"
+                className="w-full min-h-[100px] max-h-[200px] resize-none border-0 bg-transparent text-gray-100 placeholder:text-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none px-3.5 pt-3 pb-2 text-sm"
                 disabled={isGenerating}
-                rows={1}
+                rows={4}
               />
             </div>
 
             {/* URL Attachment Pills */}
             {attachedUrl && (
-              <div className="flex items-center gap-2 px-4">
-                <div className="flex items-center gap-1 bg-blue-900/20 border border-blue-700/30 px-3 py-1.5 rounded-full text-sm text-blue-300">
+              <div className="flex items-center gap-2 px-3.5 pb-1">
+                <div className="flex items-center gap-1 bg-orange-900/20 border border-orange-700/30 px-2.5 py-1 rounded-full text-xs text-orange-300">
                   <LinkIcon className="w-3 h-3" />
                   <span className="truncate max-w-[200px]">{attachedUrl}</span>
                   <button
                     onClick={handleRemoveUrl}
-                    className="ml-1 text-blue-400 hover:text-blue-200 transition-colors"
+                    className="ml-1 text-orange-400 hover:text-orange-200 transition-colors"
                     title="Remove URL"
                   >
                     <X className="w-3 h-3" />
@@ -1229,8 +1160,8 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
 
             {/* GitHub Repository Attachment Pills */}
             {githubRepoUrl && (
-              <div className="flex items-center gap-2 px-4">
-                <div className="flex items-center gap-1 bg-gray-900/20 border border-gray-700/30 px-3 py-1.5 rounded-full text-sm text-gray-300">
+              <div className="flex items-center gap-2 px-3.5 pb-1">
+                <div className="flex items-center gap-1 bg-gray-800/50 border border-gray-700/30 px-2.5 py-1 rounded-full text-xs text-gray-300">
                   <Github className="w-3 h-3" />
                   <span className="truncate max-w-[200px]">{githubRepoUrl}</span>
                   <button
@@ -1246,8 +1177,8 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
 
             {/* GitLab Repository Attachment Pills */}
             {gitlabRepoUrl && (
-              <div className="flex items-center gap-2 px-4">
-                <div className="flex items-center gap-1 bg-orange-900/20 border border-orange-700/30 px-3 py-1.5 rounded-full text-sm text-orange-300">
+              <div className="flex items-center gap-2 px-3.5 pb-1">
+                <div className="flex items-center gap-1 bg-orange-900/20 border border-orange-700/30 px-2.5 py-1 rounded-full text-xs text-orange-300">
                   <Gitlab className="w-3 h-3" />
                   <span className="truncate max-w-[200px]">{gitlabRepoUrl}</span>
                   <button
@@ -1262,16 +1193,16 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
             )}
 
             {/* Bottom Bar with Buttons */}
-            <div className="flex items-center justify-between pt-2 border-t border-gray-700/50">
+            <div className="flex items-center justify-between px-2 pb-2">
               {/* Left Side - URL Attachment, Mic and Template Selector */}
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center gap-1">
                 {/* URL Attachment Popover */}
                 <Popover open={showUrlPopover} onOpenChange={setShowUrlPopover}>
                   <PopoverTrigger asChild>
-                    <button 
+                    <button
                       type="button"
                       disabled={isGenerating}
-                      className="w-8 h-8 rounded-full flex items-center justify-center transition-all bg-gray-700/50 hover:bg-gray-600/50 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="h-8 w-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                       title="Attach website URL"
                     >
                       <LinkIcon className="w-4 h-4" />
@@ -1291,13 +1222,13 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                           placeholder="https://example.com"
                           value={urlInput}
                           onChange={(e) => setUrlInput(e.target.value)}
-                          className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
                           autoFocus
                         />
                         <button
                           onClick={handleUrlAttachment}
                           disabled={!urlInput.trim()}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                          className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                         >
                           Attach
                         </button>
@@ -1306,79 +1237,100 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                   </PopoverContent>
                 </Popover>
 
-                <button 
+                {/* Voice Button - Waveform icon */}
+                <button
                   type="button"
                   onClick={handleMicrophoneClick}
                   disabled={isTranscribing || isGenerating}
-                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                    isRecording 
-                      ? 'bg-red-600 hover:bg-red-500 text-white animate-pulse' 
+                  className={`h-8 w-8 flex items-center justify-center rounded-lg transition-colors ${
+                    isRecording
+                      ? 'text-red-400 animate-pulse'
                       : isTranscribing
-                      ? 'bg-gray-600/50 cursor-wait'
-                      : 'bg-gray-700/50 hover:bg-gray-600/50 text-gray-400 hover:text-white'
-                  }`}
+                      ? 'opacity-30 cursor-wait'
+                      : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
+                  } disabled:opacity-30 disabled:cursor-not-allowed`}
                   title={isRecording ? "Stop recording" : isTranscribing ? "Transcribing..." : "Start voice input"}
                 >
                   {isTranscribing ? (
                     <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
                   ) : isRecording ? (
-                    <MicOff className="w-4 h-4" />
+                    <svg width="16" height="16" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect x="0" y="7.5" height="6" fill="currentColor" width="1" rx="0.5" ry="0.5" />
+                      <rect x="4" y="5.5" height="10" fill="currentColor" width="1" rx="0.5" ry="0.5" />
+                      <rect x="8" y="2.5" height="16" fill="currentColor" width="1" rx="0.5" ry="0.5" />
+                      <rect x="12" y="5.5" height="10" fill="currentColor" width="1" rx="0.5" ry="0.5" />
+                      <rect x="16" y="2.5" height="16" fill="currentColor" width="1" rx="0.5" ry="0.5" />
+                      <rect x="20" y="7.5" height="6" fill="currentColor" width="1" rx="0.5" ry="0.5" />
+                    </svg>
                   ) : (
-                    <Mic className="w-4 h-4" />
+                    <svg width="16" height="16" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect x="0" y="7.5" height="6" fill="currentColor" fillOpacity="0.5" width="1" rx="0.5" ry="0.5" />
+                      <rect x="4" y="5.5" height="10" fill="currentColor" fillOpacity="0.5" width="1" rx="0.5" ry="0.5" />
+                      <rect x="8" y="2.5" height="16" fill="currentColor" fillOpacity="0.5" width="1" rx="0.5" ry="0.5" />
+                      <rect x="12" y="5.5" height="10" fill="currentColor" fillOpacity="0.5" width="1" rx="0.5" ry="0.5" />
+                      <rect x="16" y="2.5" height="16" fill="currentColor" fillOpacity="0.5" width="1" rx="0.5" ry="0.5" />
+                      <rect x="20" y="7.5" height="6" fill="currentColor" fillOpacity="0.5" width="1" rx="0.5" ry="0.5" />
+                    </svg>
                   )}
                 </button>
 
-                {/* Template Selector */}
-                <Select
-                  value={selectedTemplate}
-                  onValueChange={(value: 'vite-react' | 'nextjs' | 'expo' | 'html') => {
-                    setSelectedTemplate(value)
-                    setHasUserSelectedTemplate(true)
-                  }}
-                  disabled={isGenerating}
-                >
-                  <SelectTrigger className="w-[100px] h-8 bg-gray-700/50 border-gray-600/50 text-gray-300 text-sm">
-                    <SelectValue placeholder="Template" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700">
-                    <SelectItem value="vite-react" className="text-gray-300 focus:bg-gray-700 focus:text-white">
-                      <div className="flex items-center gap-2">
-                        <Zap className="w-3 h-3 text-purple-400" />
-                        <span>Vite</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="nextjs" className="text-gray-300 focus:bg-gray-700 focus:text-white">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">▲</span>
-                        <span>Next.js</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="expo" className="text-gray-300 focus:bg-gray-700 focus:text-white">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">📱</span>
-                        <span>Expo</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="html" className="text-gray-300 focus:bg-gray-700 focus:text-white">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">🌐</span>
-                        <span>HTML</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                {/* Template Selector - clean text + chevron like model selector */}
+                <div className="relative" ref={templateDropdownRef}>
+                  <button
+                    type="button"
+                    className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-200 transition-colors disabled:opacity-30"
+                    onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
+                    disabled={isGenerating}
+                  >
+                    <span className="font-medium">
+                      {{ 'vite-react': 'Vite', 'nextjs': 'Next.js', 'expo': 'Expo', 'html': 'HTML' }[selectedTemplate]}
+                    </span>
+                    <ChevronDown className={`size-3 transition-transform ${showTemplateDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {showTemplateDropdown && (
+                    <div className="absolute bottom-8 left-0 w-[180px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[100] overflow-hidden py-1">
+                      {([
+                        { id: 'vite-react' as const, name: 'Vite', desc: 'Frontend sites' },
+                        { id: 'nextjs' as const, name: 'Next.js', desc: 'Fullstack apps with SSR' },
+                        { id: 'expo' as const, name: 'Expo', desc: 'IOS and Android apps' },
+                        { id: 'html' as const, name: 'HTML', desc: 'Static html websites' },
+                      ]).map((tpl) => {
+                        const isSelected = tpl.id === selectedTemplate
+                        return (
+                          <button
+                            key={tpl.id}
+                            type="button"
+                            className={`w-full flex items-center justify-between px-4 py-2.5 text-left transition-colors hover:bg-gray-800 cursor-pointer ${isSelected ? 'bg-gray-800/50' : ''}`}
+                            onClick={() => {
+                              setSelectedTemplate(tpl.id)
+                              setShowTemplateDropdown(false)
+                            }}
+                          >
+                            <div className="min-w-0">
+                              <div className={`text-sm font-medium ${isSelected ? 'text-white' : 'text-gray-200'}`}>{tpl.name}</div>
+                              <div className="text-[11px] text-gray-500">{tpl.desc}</div>
+                            </div>
+                            {isSelected && <Check className="size-4 text-orange-400 ml-2 flex-shrink-0" />}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Right Side - Enhance and Send Buttons */}
-              <div className="flex items-center space-x-3">
-                <button 
+              {/* Right Side - Enhance, Plan Toggle, and Send Buttons */}
+              <div className="flex items-center gap-2">
+                {/* Prompt Enhancement */}
+                <button
                   type="button"
                   onClick={handlePromptEnhancement}
                   disabled={!prompt.trim() || isEnhancing || isGenerating}
-                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                  className={`h-8 w-8 flex items-center justify-center rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
                     isEnhancing
-                      ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
-                      : 'bg-gray-700/50 hover:bg-gradient-to-r hover:from-purple-600/80 hover:to-blue-600/80 text-gray-400 hover:text-white'
+                      ? 'bg-orange-600 text-white'
+                      : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
                   }`}
                   title="Enhance prompt with AI"
                 >
@@ -1388,18 +1340,45 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                     <Sparkles className="w-4 h-4" />
                   )}
                 </button>
-                <button 
-  type="submit" 
-  disabled={!prompt.trim() && !githubRepoUrl.trim() && !gitlabRepoUrl.trim() || isGenerating}
-  className="w-8 h-8 rounded-md bg-gray-700/50 hover:bg-gray-600/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-gray-400 hover:text-white transition-colors"
->
-  {isGenerating ? (
-    <Square className="w-4 h-4" />
-  ) : (
-    <CornerDownLeftIcon className="w-4 h-4" />
-  )}
-</button>
 
+                {/* Plan Mode Toggle */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => setIsPlanMode(!isPlanMode)}
+                      disabled={isGenerating}
+                      className={`text-sm font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+                        isPlanMode
+                          ? 'text-orange-400'
+                          : 'text-gray-400 hover:text-gray-200'
+                      }`}
+                    >
+                      Plan
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{isPlanMode ? 'Plan mode ON - AI creates a plan before building' : 'Plan mode OFF - AI builds immediately'}</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                {/* Send/Stop Button */}
+                {isGenerating ? (
+                  <button
+                    type="button"
+                    className="h-7 w-7 rounded-lg bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors"
+                  >
+                    <Square className="w-3.5 h-3.5 text-white fill-white" />
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={!prompt.trim() && !githubRepoUrl.trim() && !gitlabRepoUrl.trim()}
+                    className="h-7 w-7 rounded-lg bg-orange-600 hover:bg-orange-500 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+                  >
+                    <ArrowUp className="size-4 text-white" />
+                  </button>
+                )}
               </div>
             </div>
           </form>
@@ -1435,13 +1414,13 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                   placeholder="https://github.com/owner/repo"
                   value={githubInput}
                   onChange={(e) => setGithubInput(e.target.value)}
-                  className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
                   autoFocus
                 />
                 <button
                   onClick={handleGithubAttachment}
                   disabled={!githubInput.trim()}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                 >
                   Import
                 </button>
@@ -1515,7 +1494,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
             ))}
             <Suggestion
               suggestion="Refresh Suggestions"
-              onClick={() => fetchPromptSuggestions()}
+              onClick={() => refreshSuggestions()}
               disabled={isGenerating}
               title="Generate new prompt suggestions"
             >

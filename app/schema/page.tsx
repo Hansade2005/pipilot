@@ -5,8 +5,10 @@ import { SchemaVisualizer } from "@/components/schema-visualizer"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Database, Eye, GitBranch } from "lucide-react"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function SchemaVisualizerPage() {
+  usePageTitle('Schema')
   return (
     <div className="flex flex-col min-h-screen">
       <Navigation />

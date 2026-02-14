@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { Task, TaskTrigger, TaskContent, TaskItem } from '@/components/ai-elements/task'
 import { ChainOfThought, ChainOfThoughtHeader, ChainOfThoughtContent, ChainOfThoughtStep } from '@/components/ai-elements/chain-of-thought'
 import { Response } from '@/components/ai-elements/response'
-import { FileText, Edit3, X, Package, PackageMinus, Loader2, CheckCircle2, XCircle, BrainIcon, FileCode,FolderOpen,Search, FileImage, FileJson, FileType, Settings, Package as PackageIcon, File, Globe, Eye, Zap, Database, Table, Code, Key, BarChart3 } from 'lucide-react'
+import { FileText, Edit3, X, Package, PackageMinus, Loader2, CheckCircle2, XCircle, BrainIcon, FileCode,FolderOpen,Search, FileImage, FileJson, FileType, Settings, Package as PackageIcon, File, Globe, Eye, Zap, Database, Table, Code, Key, BarChart3, Monitor } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SupabaseConnectionCard } from './supabase-connection-card'
 import { ContinueBackendCard } from './continue-backend-card'
@@ -175,6 +175,7 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
       case 'semantic_code_navigator': return <Search className="w-3.5 h-3.5" />
       case 'web_search':
       case 'web_extract': return <Globe className="w-3.5 h-3.5" />
+      case 'browse_web': return <Monitor className="w-3.5 h-3.5" />
       case 'check_dev_errors': return <Settings className="w-3.5 h-3.5" />
       case 'generate_report': return <BarChart3 className="w-3.5 h-3.5" />
       default: return <Zap className="w-3.5 h-3.5" />
@@ -200,6 +201,7 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
       case 'semantic_code_navigator': return `Search codebase for "${args?.query || 'query'}"`
       case 'web_search': return `Searching: ${args?.query || 'query'}`
       case 'web_extract': return 'Extracting web content'
+      case 'browse_web': return 'Running browser test'
       case 'check_dev_errors': return 'Checking for errors'
       case 'generate_report': return 'Generating report'
       default: return tool
@@ -335,7 +337,10 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
   // Support both 'reasoning' and 'reasoningText' for compatibility with different providers
   const reasoningContent = (message as any).reasoning || (message as any).reasoningText || ''
   const responseContent = (message as any).content || ''
-  
+  // Get reasoning blocks for inline position tracking (new format)
+  const reasoningBlocks: { content: string, textPosition: number }[] = (message as any).reasoningBlocks || []
+  const hasInlineReasoningBlocks = reasoningBlocks.length > 0
+
   const hasReasoning = reasoningContent.trim().length > 0
   const hasResponse = responseContent.trim().length > 0
 
@@ -469,6 +474,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
       case 'web_search':
       case 'web_extract':
       case 'vscode-websearchforcopilot_webSearch': return Globe
+      case 'browse_web': return Monitor
       case 'check_dev_errors': return Settings
       default: return FileText
     }
@@ -497,6 +503,8 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
         return `Search web for "${args?.query || 'query'}"`
       case 'web_extract':
         return 'Extracting web content'
+      case 'browse_web':
+        return 'Running browser test'
       case 'check_dev_errors':
         return 'Checking for errors'
       default:
@@ -514,132 +522,207 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
   // OLD renderToolInvocation function removed - now using ChainOfThought steps
   
 
+  // Content wrapper classes - no prose, let Streamdown/Shiki handle code blocks natively
+  const reasoningWrapperClasses = 'mt-2 text-sm text-gray-300 leading-relaxed overflow-hidden break-words [overflow-wrap:anywhere]'
+  const textWrapperClasses = 'text-sm text-gray-200 leading-relaxed overflow-hidden break-words [overflow-wrap:anywhere]'
+
+  // Response className overrides for links, strong text, and code styling
+  const reasoningResponseClasses = cn(
+    '[&>pre]:bg-gray-900/80 [&>pre]:border [&>pre]:border-gray-800/60',
+    '[&_a]:text-blue-400 [&_a]:break-all',
+    '[&_strong]:text-gray-100',
+    '[&>p]:text-gray-300 [&>ul]:text-gray-300 [&>ol]:text-gray-300',
+  )
+  const textResponseClasses = cn(
+    '[&>pre]:bg-gray-900/80 [&>pre]:border [&>pre]:border-gray-800/60',
+    '[&_a]:text-blue-400 [&_a]:break-all',
+    '[&_strong]:text-gray-100',
+  )
+
+  // Filter text-stream tool calls (used by both old and new rendering)
+  const textStreamToolCalls = inlineToolCalls?.filter(tc => {
+    if (tc.status === 'failed') return false
+    const textPos = tc.textPosition ?? 0
+    const reasoningPos = tc.reasoningPosition ?? 0
+    return textPos > 0 || (textPos === 0 && reasoningPos === 0)
+  }) || []
+
   return (
     <div className="space-y-3">
-      {/* OLD PILL SYSTEM - DISABLED IN FAVOR OF NEW INLINE PILL SYSTEM IN CHAT-PANEL-V2 */}
-      {/* {hasTools && (
-        <div className="space-y-2">
-          {toolInvocations?.map((toolInvocation: any) => renderToolInvocation(toolInvocation))}
-        </div>
-      )} */}
+      {hasInlineReasoningBlocks ? (
+        /* NEW: Inline reasoning blocks interleaved with text content at correct positions */
+        (() => {
+          const sortedBlocks = [...reasoningBlocks].sort((a, b) => a.textPosition - b.textPosition)
 
-      {/* Render reasoning and tools if present */}
-      {(hasReasoning || hasTools) && (
-        <ChainOfThought defaultOpen={false}>
-          <ChainOfThoughtHeader>
-            {isStreaming 
-              ? `PiPilot is working ${duration > 0 ? `${formatDuration(duration)}` : ''}` 
-              : `PiPilot worked for a moment`
+          // Build interleaved segments: reasoning blocks split the text at their textPosition
+          const segments: Array<{
+            type: 'text' | 'reasoning'
+            content: string
+            startPos: number
+            endPos: number
+          }> = []
+          let lastTextPos = 0
+
+          for (const block of sortedBlocks) {
+            // Add text segment before this reasoning block (if any text exists)
+            if (block.textPosition > lastTextPos) {
+              const textSlice = responseContent.slice(lastTextPos, block.textPosition)
+              if (textSlice.trim()) {
+                segments.push({ type: 'text', content: textSlice, startPos: lastTextPos, endPos: block.textPosition })
+              }
             }
-          </ChainOfThoughtHeader>
-          <ChainOfThoughtContent>
-            {/* Reasoning step - with inline tool pills if available */}
-            {hasReasoning && (
-              <ChainOfThoughtStep
-                icon={BrainIcon}
-                label="Thinking Process"
-                status={isStreaming && !hasResponse ? "active" : "complete"}
-              >
-                <div className={cn(
-                  'prose prose-sm dark:prose-invert max-w-none mt-2',
-                  'prose-pre:bg-muted prose-pre:text-foreground prose-pre:overflow-x-auto',
-                  'prose-code:text-foreground prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded',
-                  'prose-p:text-muted-foreground prose-p:break-words',
-                  'prose-headings:text-foreground',
-                  'prose-strong:text-foreground',
-                  'prose-ul:text-muted-foreground',
-                  'prose-ol:text-muted-foreground',
-                  'prose-a:break-all',
-                  'overflow-hidden break-words [overflow-wrap:anywhere]'
-                )}>
-                  {inlineToolCalls && inlineToolCalls.length > 0 ? (
-                    <InterleavedContent
-                      content={reasoningContent}
-                      toolCalls={inlineToolCalls}
-                      isStreaming={isStreaming}
-                      positionKey="reasoningPosition"
-                    >
-                      {(text) => <Response>{text}</Response>}
-                    </InterleavedContent>
-                  ) : (
-                    <Response>
-                      {reasoningContent}
-                    </Response>
-                  )}
-                </div>
-              </ChainOfThoughtStep>
-            )}
+            // Add the reasoning block
+            if (block.content.trim()) {
+              segments.push({ type: 'reasoning', content: block.content, startPos: block.textPosition, endPos: block.textPosition })
+            }
+            lastTextPos = block.textPosition
+          }
 
-            {/* Tool execution steps */}
-           {/* {hasTools && toolInvocations?.map((tool: any) => {
-              const ToolIcon = getToolIcon(tool.toolName)
-              return (
-                <ChainOfThoughtStep
-                  key={tool.toolCallId}
-                  icon={ToolIcon}
-                  label={getToolLabel(tool.toolName, tool.args)}
-                  status={getToolStatus(tool)}
+          // Add remaining text after the last reasoning block
+          if (lastTextPos < responseContent.length) {
+            const remainingText = responseContent.slice(lastTextPos)
+            if (remainingText.trim()) {
+              segments.push({ type: 'text', content: remainingText, startPos: lastTextPos, endPos: responseContent.length })
+            }
+          }
+
+          return (
+            <>
+              {segments.map((segment, idx) => {
+                if (segment.type === 'reasoning') {
+                  // Get tool calls that occurred during this reasoning block
+                  const reasoningToolCalls = inlineToolCalls?.filter(tc => {
+                    if (tc.status === 'failed') return false
+                    const reasoningPos = tc.reasoningPosition ?? 0
+                    const textPos = tc.textPosition ?? 0
+                    // Tool was called during reasoning at this text position
+                    return reasoningPos > 0 && textPos === segment.startPos
+                  }) || []
+
+                  return (
+                    <ChainOfThought key={`reasoning-${idx}`} defaultOpen={false}>
+                      <ChainOfThoughtHeader>
+                        {isStreaming && idx >= segments.length - 1 && !hasResponse
+                          ? `PiPilot is working ${duration > 0 ? formatDuration(duration) : ''}`
+                          : 'PiPilot thought for a moment'
+                        }
+                      </ChainOfThoughtHeader>
+                      <ChainOfThoughtContent>
+                        <ChainOfThoughtStep
+                          icon={BrainIcon}
+                          label="Thinking Process"
+                          status={isStreaming && !hasResponse ? 'active' : 'complete'}
+                        >
+                          <div className={reasoningWrapperClasses}>
+                            {reasoningToolCalls.length > 0 ? (
+                              <InterleavedContent
+                                content={segment.content}
+                                toolCalls={reasoningToolCalls}
+                                isStreaming={isStreaming}
+                                positionKey="reasoningPosition"
+                              >
+                                {(text) => <Response className={reasoningResponseClasses}>{text}</Response>}
+                              </InterleavedContent>
+                            ) : (
+                              <Response className={reasoningResponseClasses}>{segment.content}</Response>
+                            )}
+                          </div>
+                        </ChainOfThoughtStep>
+                      </ChainOfThoughtContent>
+                    </ChainOfThought>
+                  )
+                }
+
+                if (segment.type === 'text') {
+                  // Get tool calls within this text segment's position range
+                  const segmentToolCalls = textStreamToolCalls.filter(tc => {
+                    const pos = tc.textPosition ?? 0
+                    return pos >= segment.startPos && pos < segment.endPos
+                  }).map(tc => ({
+                    ...tc,
+                    // Adjust position relative to this segment's start
+                    textPosition: (tc.textPosition ?? 0) - segment.startPos
+                  }))
+
+                  return (
+                    <div key={`text-${idx}`} className={textWrapperClasses}>
+                      {segmentToolCalls.length > 0 ? (
+                        <InterleavedContent
+                          content={segment.content}
+                          toolCalls={segmentToolCalls}
+                          isStreaming={isStreaming}
+                        >
+                          {(text) => <Response className={textResponseClasses}>{text}</Response>}
+                        </InterleavedContent>
+                      ) : (
+                        <Response className={textResponseClasses}>{segment.content}</Response>
+                      )}
+                    </div>
+                  )
+                }
+
+                return null
+              })}
+            </>
+          )
+        })()
+      ) : (
+        /* OLD: Reasoning at top in ChainOfThought (backwards compat for older messages without blocks) */
+        <>
+          {(hasReasoning || hasTools) && (
+            <ChainOfThought defaultOpen={false}>
+              <ChainOfThoughtHeader>
+                {isStreaming
+                  ? `PiPilot is working ${duration > 0 ? `${formatDuration(duration)}` : ''}`
+                  : `PiPilot thought for a moment`
+                }
+              </ChainOfThoughtHeader>
+              <ChainOfThoughtContent>
+                {hasReasoning && (
+                  <ChainOfThoughtStep
+                    icon={BrainIcon}
+                    label="Thinking Process"
+                    status={isStreaming && !hasResponse ? "active" : "complete"}
+                  >
+                    <div className={reasoningWrapperClasses}>
+                      {inlineToolCalls && inlineToolCalls.length > 0 ? (
+                        <InterleavedContent
+                          content={reasoningContent}
+                          toolCalls={inlineToolCalls}
+                          isStreaming={isStreaming}
+                          positionKey="reasoningPosition"
+                        >
+                          {(text) => <Response className={reasoningResponseClasses}>{text}</Response>}
+                        </InterleavedContent>
+                      ) : (
+                        <Response className={reasoningResponseClasses}>{reasoningContent}</Response>
+                      )}
+                    </div>
+                  </ChainOfThoughtStep>
+                )}
+              </ChainOfThoughtContent>
+            </ChainOfThought>
+          )}
+
+          {hasResponse && (
+            <div className={textWrapperClasses}>
+              {textStreamToolCalls.length > 0 ? (
+                <InterleavedContent
+                  content={responseContent}
+                  toolCalls={textStreamToolCalls}
+                  isStreaming={isStreaming}
                 >
-                  {/* Show error message if tool failed */}
-                 {/* {tool.state === 'result' && tool.result?.error && (
-                    <div className="text-sm text-red-500 mt-2">
-                      Error: {tool.result.error}
-                    </div>
-                  )}
-                  {/* Show success message if available */}
-                  {/* {tool.state === 'result' && !tool.result?.error && tool.result?.message && (
-                    <div className="text-sm text-green-600 mt-2">
-                      {tool.result.message}
-                    </div>
-                  )}
-                </ChainOfThoughtContent></ChainOfThought>
-              )
-            })}*/}
-
-          </ChainOfThoughtContent>
-        </ChainOfThought>
+                  {(text) => <Response className={textResponseClasses}>{text}</Response>}
+                </InterleavedContent>
+              ) : (
+                <Response className={textResponseClasses}>{responseContent}</Response>
+              )}
+            </div>
+          )}
+        </>
       )}
 
-      {/* Render text content if present - with inline tool pills if available */}
-      {hasResponse && (
-        <div className={cn(
-          'prose prose-sm dark:prose-invert max-w-none',
-          'prose-pre:bg-muted prose-pre:text-foreground prose-pre:overflow-x-auto',
-          'prose-code:text-foreground prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded',
-          'prose-a:break-all',
-          'overflow-hidden break-words [overflow-wrap:anywhere]'
-        )}>
-          {(() => {
-            // Filter out tools that were called during reasoning (not during text streaming)
-            // Tools called during reasoning have reasoningPosition > 0 and textPosition = 0
-            const textStreamToolCalls = inlineToolCalls?.filter(tc => {
-              // Filter out failed tools (consistent with ToolPanel activity display)
-              if (tc.status === 'failed') return false
-              const textPos = tc.textPosition ?? 0
-              const reasoningPos = tc.reasoningPosition ?? 0
-              // Show tool in text content only if:
-              // 1. It was called during text streaming (textPosition > 0), OR
-              // 2. It was called before any content (both positions are 0)
-              // Don't show if called during reasoning (textPosition = 0 but reasoningPosition > 0)
-              return textPos > 0 || (textPos === 0 && reasoningPos === 0)
-            })
-
-            return textStreamToolCalls && textStreamToolCalls.length > 0 ? (
-              <InterleavedContent
-                content={responseContent}
-                toolCalls={textStreamToolCalls}
-                isStreaming={isStreaming}
-              >
-                {(text) => <Response>{text}</Response>}
-              </InterleavedContent>
-            ) : (
-              <Response>
-                {responseContent}
-              </Response>
-            )
-          })()}
-        </div>
-      )}
+      {/* generate_plan rendering is handled by chat-panel-v2.tsx to avoid duplication */}
 
       {/* Special rendering for request_supabase_connection tool */}
       {hasTools && toolInvocations?.some((tool: any) =>
@@ -697,9 +780,12 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
 
       {/* Show loading indicator if streaming and no content yet */}
       {isStreaming && !hasReasoning && !hasResponse && !hasTools && (
-        <div className="flex items-center justify-start gap-2 text-muted-foreground text-sm bg-transparent h-fit">
-          <Loader2 className="size-4 animate-spin" />
-          <span>Thinking...</span>
+        <div className="flex items-center justify-start gap-2.5 text-gray-400 text-sm bg-transparent h-fit py-1">
+          <div className="flex gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
         </div>
       )}
     </div>

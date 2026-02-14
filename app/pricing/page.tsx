@@ -15,8 +15,10 @@ import { convertUsdToCad, formatPrice } from "@/lib/currency-converter"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { PaymentProviderSelector } from "@/components/pricing/payment-provider-selector"
 import { CreditTopUpSelector } from "@/components/billing/credit-topup-selector"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function PricingPage() {
+  usePageTitle('Pricing')
   const [isAnnual, setIsAnnual] = useState(false)
   const [openFAQ, setOpenFAQ] = useState<number | null>(null)
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
@@ -298,6 +300,13 @@ export default function PricingPage() {
             {/* Currency Indicator */}
             <div className="mt-4 flex items-center justify-center gap-2 text-sm text-white/60">
               <span>💵 Prices in CAD • 1 USD = ${exchangeRate.toFixed(2)} CAD</span>
+            </div>
+
+            {/* E2B Sponsor Badge */}
+            <div className="mt-6 flex items-center justify-center">
+              <a href="https://e2b.dev/startups" target="_blank" rel="noopener noreferrer" className="opacity-80 hover:opacity-100 transition-opacity">
+                <img src="/e2b-badge.svg" alt="Sponsored by E2B for Startups" className="h-8 md:h-10 w-auto rounded" />
+              </a>
             </div>
           </div>
 

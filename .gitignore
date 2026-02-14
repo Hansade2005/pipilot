@@ -17,13 +17,15 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files
-#.env*
-
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
 
 # vercel
 .vercel
 .vscode/mcp.json
-.env
 
 
 # typescript
@@ -37,3 +39,13 @@ gha-creds-*.json
 /lib/mcp
 /pipilotnpm/
 /pitchdeck/
+
+# Investor/business docs (keep out of repo)
+END_OF_YEAR_REPORT_2025.md
+INVESTOR_DECK_ENHANCEMENTS_2026.md
+INVESTOR_DUE_DILIGENCE_QA.md
+INVESTOR_PITCH_SCRIPT_2026.md
+LICENSE.txt
+PIPILOT_PLATFORM_DOCUMENTATION.md
+PITCH_DECK_QUICK_REFERENCE.md
+PITCH_DECK_READY_TO_PRESENT.md

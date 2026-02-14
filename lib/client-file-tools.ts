@@ -75,8 +75,13 @@ export async function handleClientFileOperation(
   await storageManager.init();
 
   try {
-    // Step 2: Match tool names
-    switch (toolCall.toolName) {
+    // Step 2: Normalize prefixed tool names (server uses pipilotdb_ prefix but cases use unprefixed names)
+    const normalizedToolName = toolCall.toolName.startsWith('pipilotdb_')
+      ? toolCall.toolName.replace('pipilotdb_', '')
+      : toolCall.toolName;
+
+    // Step 3: Match tool names
+    switch (normalizedToolName) {
       case 'write_file': {
         const { path, content } = toolCall.args;
         console.log(`[ClientFileTool] write_file: ${path}`);
@@ -974,12 +979,12 @@ export async function handleClientFileOperation(
 
       case 'create_database': {
         const { name = 'main' } = toolCall.args;
-        console.log(`[ClientFileTool] create_database: ${name}`);
+        console.log(`[ClientFileTool] create_database (original: ${toolCall.toolName}): ${name}`);
 
         // Validate inputs
         if (name && typeof name !== 'string') {
           addToolResult({
-            tool: 'create_database',
+            tool: toolCall.toolName,
             toolCallId: toolCall.toolCallId,
             state: 'output-error',
             errorText: 'Invalid database name provided'
@@ -1007,7 +1012,7 @@ export async function handleClientFileOperation(
           if (!response.ok) {
             console.error('[ClientFileTool] Database creation failed:', result);
             addToolResult({
-              tool: 'create_database',
+              tool: toolCall.toolName,
               toolCallId: toolCall.toolCallId,
               state: 'output-error',
               errorText: `Failed to create database: ${result.error || 'Unknown error'}`
@@ -1028,7 +1033,7 @@ export async function handleClientFileOperation(
           }
 
           addToolResult({
-            tool: 'create_database',
+            tool: toolCall.toolName,
             toolCallId: toolCall.toolCallId,
             state: 'output',
             result: {
@@ -1055,9 +1060,9 @@ export async function handleClientFileOperation(
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           console.error(`[ClientFileTool] create_database error:`, error);
-          
+
           addToolResult({
-            tool: 'create_database',
+            tool: toolCall.toolName,
             toolCallId: toolCall.toolCallId,
             state: 'output-error',
             errorText: `Database creation failed: ${errorMessage}`

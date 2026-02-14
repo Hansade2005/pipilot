@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client';
 import { storageManager } from '@/lib/storage-manager';
 import { getDeploymentTokens } from '@/lib/cloud-sync';
 import { useSearchParams } from 'next/navigation';
+import { usePageTitle } from '@/hooks/use-page-title'
 
 // Vercel-style Footer Component
 function VercelFooter() {
@@ -326,6 +327,7 @@ function HostingManagementContent() {
 }
 
 export default function HostingManagementPage() {
+  usePageTitle('Hosting Management')
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-black">

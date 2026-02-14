@@ -71,6 +71,7 @@ import {
   CheckSquare,
   Square
 } from "lucide-react"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface AdminNotification {
   id: string
@@ -107,6 +108,7 @@ interface User {
 }
 
 export default function AdminNotificationsPage() {
+  usePageTitle('Admin Notifications')
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [notifications, setNotifications] = useState<AdminNotification[]>([])

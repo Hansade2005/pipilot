@@ -36,8 +36,10 @@ import { ProjectGridPC } from "@/components/project-grid-pc"
 import { createClient } from "@/lib/supabase/client"
 import { TemplateManager } from "@/lib/template-manager"
 import { toast } from "sonner"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function LandingPage() {
+  usePageTitle('Home')
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [showAuthModal, setShowAuthModal] = useState(false)

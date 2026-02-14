@@ -5,8 +5,7 @@ import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { Editor } from "@monaco-editor/react"
 import { Button } from "@/components/ui/button"
-import { FileText, Save, Settings, Maximize2, Sparkles, Send, X } from "lucide-react"
-import { useTheme } from "next-themes"
+import { FileText, Save, Sparkles, Send, X, ChevronRight, Folder } from "lucide-react"
 import { useAutoCloudBackup } from "@/hooks/use-auto-cloud-backup"
 import type { File } from "@/lib/storage-manager"
 import { Textarea } from "@/components/ui/textarea"
@@ -87,144 +86,46 @@ function InlineChat({
   }
 
   return (
-   <div 
-  className={`fixed z-50 bg-white border border-slate-200 rounded-2xl shadow-2xl ${
-    mode === 'modal' 
-      ? 'w-[95vw] sm:w-[700px] h-[90vh] sm:h-[600px] max-w-[95vw] max-h-[90vh] sm:max-h-[85vh]' 
-      : 'w-96 max-w-[90vw]'
-  }`}
-  style={{ 
-    top: position.top, 
+   <div
+  className="fixed z-50 bg-[#1e1e1e] border border-gray-700/60 rounded-2xl shadow-2xl w-96 max-w-[90vw]"
+  style={{
+    top: position.top,
     left: position.left,
-    transform: mode === 'modal' ? 'translate(-50%, -50%)' : 'translate(-50%, -100%)',
-    maxHeight: mode === 'modal' ? 'calc(100vh - 2rem)' : undefined,
-    maxWidth: mode === 'modal' ? 'calc(100vw - 2rem)' : undefined
+    transform: 'translate(-50%, -100%)',
   }}
 >
   {/* Header */}
-  <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-violet-50 to-purple-50 flex-shrink-0">
-    <div className="flex items-center gap-3">
-      <div className="w-9 h-9 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-        <Sparkles className="h-5 w-5 text-white" />
+  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700/40 bg-gray-900/80 rounded-t-2xl flex-shrink-0">
+    <div className="flex items-center gap-2">
+      <div className="w-7 h-7 bg-orange-600 rounded-lg flex items-center justify-center">
+        <Sparkles className="h-4 w-4 text-white" />
       </div>
-      <div>
-        <span className="text-base sm:text-lg font-semibold text-slate-900">
-          {mode === 'modal' ? 'AI Assistant' : 'AI Fix'}
-        </span>
-        <p className="text-xs text-slate-500 hidden sm:block">Powered by AI</p>
-      </div>
+      <span className="text-sm font-medium text-gray-200">AI Fix</span>
     </div>
-    
+
     <div className="flex items-center gap-2">
       {onModelChange && (
-        <div className="relative">
-          <Select value={selectedModel} onValueChange={onModelChange}>
-            <SelectTrigger className="appearance-none bg-white border border-slate-200 rounded-lg px-3 py-2 pr-8 text-xs sm:text-sm font-medium text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-all h-auto">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {chatModels.map((model) => (
-                <SelectItem key={model.id} value={model.id} className="text-xs sm:text-sm">
-                  {model.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Select value={selectedModel} onValueChange={onModelChange}>
+          <SelectTrigger className="appearance-none bg-gray-800 border border-gray-700/60 rounded-lg px-2 py-1 text-xs font-medium text-gray-300 hover:border-gray-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all h-auto">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {chatModels.map((model) => (
+              <SelectItem key={model.id} value={model.id} className="text-xs">
+                {model.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       )}
-      <Button 
-        variant="ghost" 
-        size="sm" 
+      <button
         onClick={onClose}
-        className="w-9 h-9 rounded-lg hover:bg-slate-100 flex items-center justify-center transition-colors text-slate-500 hover:text-slate-700 p-0"
+        className="w-7 h-7 rounded-lg hover:bg-gray-800 flex items-center justify-center transition-colors text-gray-500 hover:text-gray-300"
       >
-        <X className="h-5 w-5" />
-      </Button>
+        <X className="h-4 w-4" />
+      </button>
     </div>
   </div>
-
-  {/* Modal Conversation Area */}
-  {mode === 'modal' && (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Conversation History - Fixed height with scrolling */}
-      <ScrollArea className="flex-1 min-h-0" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-        <div className="p-4 sm:p-6 space-y-4 bg-slate-50/50">
-          {conversationHistory.map((message, index) => (
-            <div 
-              key={index} 
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}
-            >
-              <div className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 shadow-sm ${
-                message.role === 'user' 
-                  ? 'bg-gradient-to-br from-violet-500 to-purple-600 text-white' 
-                  : 'bg-white border border-slate-200 text-slate-800'
-              }`}>
-                <div className={`text-xs font-medium mb-1.5 ${
-                  message.role === 'user' ? 'text-violet-100' : 'text-slate-500'
-                }`}>
-                  {message.role === 'user' ? 'You' : 'AI Assistant'}
-                </div>
-                <div className="text-sm sm:text-base leading-relaxed whitespace-pre-wrap">
-                  {message.content}
-                </div>
-              </div>
-            </div>
-          ))}
-          
-          {/* Loading indicator - only show when not streaming */}
-          {isLoading && !streamingResponse && (
-            <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 bg-white border border-slate-200 shadow-sm">
-                <div className="text-xs font-medium text-slate-500 mb-1.5">AI Assistant</div>
-                <div className="flex items-center gap-2">
-                  <div className="flex gap-1">
-                    <span className="w-2 h-2 bg-violet-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                    <span className="w-2 h-2 bg-violet-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                    <span className="w-2 h-2 bg-violet-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
-                  </div>
-                  <span className="text-sm text-slate-600">Thinking...</span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </ScrollArea>
-
-      {/* Input Area - Fixed at bottom */}
-      <div className="border-t border-slate-200 bg-white p-4 sm:p-6 flex-shrink-0">
-        <div className="relative">
-          <Textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask me to refactor code, add features, fix issues..."
-            className="w-full resize-none border border-slate-200 rounded-xl px-4 py-3 pr-12 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all min-h-[56px] max-h-[120px] placeholder:text-slate-400 shadow-none"
-            disabled={isLoading}
-          />
-          
-          <Button
-            onClick={handleSubmit}
-            disabled={!input.trim() || isLoading}
-            size="sm"
-            className="absolute right-2 bottom-2 w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 disabled:from-slate-300 disabled:to-slate-400 disabled:cursor-not-allowed rounded-lg flex items-center justify-center transition-all shadow-lg hover:shadow-xl disabled:shadow-none p-0"
-          >
-            <Send className="h-5 w-5 text-white" />
-          </Button>
-        </div>
-        
-        <div className="flex items-center justify-between mt-3 px-1">
-          <div className="text-xs text-slate-500">
-            <span className="hidden sm:inline">Press Enter to send, Shift+Enter for new line</span>
-            <span className="sm:hidden">Tap send button to submit</span>
-          </div>
-          <div className="text-xs text-slate-400">
-            {input.length}/2000
-          </div>
-        </div>
-      </div>
-    </div>
-  )}
       {/* Inline Mode - VS Code Copilot Style */}
 {mode === 'inline' && (
   <>
@@ -254,7 +155,7 @@ function InlineChat({
           <Button 
             size="sm" 
             onClick={handleApplyFix} 
-            className="h-6 px-2 text-xs bg-blue-600 hover:bg-blue-700 text-white border-0 rounded"
+            className="h-6 px-2 text-xs bg-orange-600 hover:bg-orange-500 text-white border-0 rounded"
           >
             Accept
           </Button>
@@ -317,7 +218,7 @@ function InlineChat({
               size="sm" 
               onClick={handleSubmit}
               disabled={!input.trim() || isLoading}
-              className="h-5 px-2 text-[10px] bg-blue-600 hover:bg-blue-700 text-white border-0 rounded"
+              className="h-5 px-2 text-[10px] bg-orange-600 hover:bg-orange-500 text-white border-0 rounded"
             >
               Send
             </Button>
@@ -331,24 +232,70 @@ function InlineChat({
   )
 }
 
+export interface EditorSettings {
+  fontSize: number
+  fontFamily: string
+  theme: 'vs-dark' | 'vs' | 'hc-black' | 'hc-light'
+  minimap: boolean
+  wordWrap: 'on' | 'off' | 'wordWrapColumn' | 'bounded'
+  lineNumbers: 'on' | 'off' | 'relative' | 'interval'
+  tabSize: number
+  insertSpaces: boolean
+  cursorBlinking: 'blink' | 'smooth' | 'phase' | 'expand' | 'solid'
+  cursorStyle: 'line' | 'block' | 'underline' | 'line-thin' | 'block-outline' | 'underline-thin'
+  renderWhitespace: 'none' | 'boundary' | 'selection' | 'trailing' | 'all'
+  bracketPairColorization: boolean
+  indentGuides: boolean
+  smoothScrolling: boolean
+  scrollBeyondLastLine: boolean
+  stickyScroll: boolean
+  linkedEditing: boolean
+  formatOnPaste: boolean
+  formatOnType: boolean
+}
+
+export const defaultEditorSettings: EditorSettings = {
+  fontSize: 14,
+  fontFamily: 'JetBrains Mono, Fira Code, monospace',
+  theme: 'vs-dark',
+  minimap: true,
+  wordWrap: 'on',
+  lineNumbers: 'on',
+  tabSize: 2,
+  insertSpaces: true,
+  cursorBlinking: 'smooth',
+  cursorStyle: 'line',
+  renderWhitespace: 'selection',
+  bracketPairColorization: true,
+  indentGuides: true,
+  smoothScrolling: true,
+  scrollBeyondLastLine: false,
+  stickyScroll: false,
+  linkedEditing: false,
+  formatOnPaste: false,
+  formatOnType: false,
+}
+
 interface CodeEditorProps {
   file: File | null
   onSave?: (file: File, content: string) => void
-  projectFiles?: File[] // Add project files for import resolution
+  projectFiles?: File[]
+  openFiles?: File[]
+  onCloseFile?: (file: File) => void
+  onSelectFile?: (file: File) => void
+  editorSettings?: EditorSettings
 }
 
-export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps) {
-  const { theme } = useTheme()
+export function CodeEditor({ file, onSave, projectFiles = [], openFiles = [], onCloseFile, onSelectFile, editorSettings }: CodeEditorProps) {
+  const settings = editorSettings || defaultEditorSettings
   const { triggerAutoBackup } = useAutoCloudBackup({
-    debounceMs: 1000, // Shorter debounce for code editor saves
-    silent: true // Don't show notifications for every save
+    debounceMs: 1000,
+    silent: true
   })
   const editorRef = useRef<any>(null)
   const [content, setContent] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
-  const [showMinimap, setShowMinimap] = useState(true)
-  const [fontSize, setFontSize] = useState(14)
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   // Inline chat state
@@ -977,11 +924,11 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
 
   if (!file) {
     return (
-      <div className="h-full flex items-center justify-center bg-muted/20">
+      <div className="h-full flex items-center justify-center bg-gray-950">
         <div className="text-center">
-          <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No File Selected</h3>
-          <p className="text-muted-foreground">Select a file from the explorer to start editing</p>
+          <FileText className="h-12 w-12 text-gray-600 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-300 mb-2">No File Selected</h3>
+          <p className="text-gray-500">Select a file from the explorer to start editing</p>
         </div>
       </div>
     )
@@ -993,27 +940,27 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
       <style dangerouslySetInnerHTML={{
         __html: `
           .inline-streaming-area {
-            background-color: rgba(59, 130, 246, 0.1) !important;
-            border-left: 3px solid #3b82f6 !important;
+            background-color: rgba(249, 115, 22, 0.1) !important;
+            border-left: 3px solid #f97316 !important;
           }
-          
+
           .inline-streaming-line-decoration {
-            background: linear-gradient(90deg, 
-              rgba(59, 130, 246, 0.2) 0%, 
-              rgba(59, 130, 246, 0.1) 50%, 
+            background: linear-gradient(90deg,
+              rgba(249, 115, 22, 0.2) 0%,
+              rgba(249, 115, 22, 0.1) 50%,
               transparent 100%
             ) !important;
           }
-          
+
           .inline-streaming-cursor {
             position: relative !important;
           }
-          
+
           .inline-streaming-cursor-line {
-            background: linear-gradient(90deg, 
-              #3b82f6 0%, 
-              #60a5fa 50%, 
-              #93c5fd 100%
+            background: linear-gradient(90deg,
+              #f97316 0%,
+              #fb923c 50%,
+              #fdba74 100%
             ) !important;
             animation: streaming-pulse 1.5s ease-in-out infinite !important;
             border-radius: 2px !important;
@@ -1038,7 +985,7 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
             top: 0;
             bottom: 0;
             width: 2px;
-            background: #3b82f6;
+            background: #f97316;
             animation: streaming-cursor 1s ease-in-out infinite;
             z-index: 10;
           }
@@ -1053,42 +1000,76 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
           }
         `
       }} />
-      {/* Editor Header */}
-      <div className="flex items-center justify-between p-3 border-b border-border bg-card flex-shrink-0">
-        <div className="flex items-center space-x-2">
-          <FileText className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium">{file.name}</span>
-          {hasChanges && <div className="w-2 h-2 bg-accent rounded-full" />}
+      {/* Multi-Tab Bar */}
+      {openFiles && openFiles.length > 0 && (
+        <div className="flex items-center bg-gray-950 border-b border-gray-800/60 flex-shrink-0 overflow-x-auto min-h-[35px]">
+          {openFiles.map((f) => {
+            const isActive = f.path === file?.path
+            const ext = f.name.split('.').pop() || ''
+            const extColors: Record<string, string> = {
+              tsx: 'text-blue-400', ts: 'text-blue-400', jsx: 'text-yellow-400', js: 'text-yellow-400',
+              css: 'text-purple-400', scss: 'text-pink-400', html: 'text-orange-400', json: 'text-yellow-300',
+              md: 'text-gray-400', py: 'text-green-400', go: 'text-cyan-400', rs: 'text-orange-300',
+            }
+            return (
+              <div
+                key={f.path}
+                className={`group flex items-center gap-1.5 px-3 h-[35px] text-xs cursor-pointer border-r border-gray-800/40 transition-colors flex-shrink-0 ${
+                  isActive
+                    ? 'bg-gray-900/80 text-gray-100 border-t-2 border-t-orange-500'
+                    : 'bg-gray-950 text-gray-500 hover:text-gray-300 hover:bg-gray-900/40 border-t-2 border-t-transparent'
+                }`}
+                onClick={() => onSelectFile?.(f)}
+              >
+                <FileText className={`size-3.5 ${extColors[ext] || 'text-gray-500'}`} />
+                <span className="truncate max-w-[120px]">{f.name}</span>
+                {onCloseFile && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onCloseFile(f) }}
+                    className={`size-4 flex items-center justify-center rounded-sm transition-colors ${
+                      isActive ? 'hover:bg-gray-700/60 text-gray-400' : 'md:opacity-0 md:group-hover:opacity-100 hover:bg-gray-700/60 text-gray-500'
+                    }`}
+                  >
+                    <X className="size-3" />
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Editor Header - Breadcrumb Navigation */}
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-800/60 bg-gray-900/80 flex-shrink-0 min-w-0">
+        <div className="flex items-center min-w-0 overflow-hidden">
+          <div className="flex items-center text-xs min-w-0">
+            {(() => {
+              const filePath = file.path || file.name
+              const segments = filePath.split('/').filter(Boolean)
+              return segments.map((segment, i) => {
+                const isLast = i === segments.length - 1
+                return (
+                  <span key={i} className="flex items-center min-w-0 flex-shrink-0">
+                    {i > 0 && <ChevronRight className="size-3 text-gray-600 mx-0.5 flex-shrink-0" />}
+                    <span className={`truncate ${
+                      isLast
+                        ? 'text-gray-200 font-medium'
+                        : 'text-gray-500 hover:text-gray-300 cursor-default'
+                    }`}>
+                      {isLast ? segment : segment}
+                    </span>
+                  </span>
+                )
+              })
+            })()}
+          </div>
+          {hasChanges && <div className="w-2 h-2 bg-orange-500 rounded-full ml-2 flex-shrink-0" />}
         </div>
         <div className="flex items-center space-x-2">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => setShowMinimap(!showMinimap)}
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => setFontSize(fontSize === 14 ? 16 : 14)}
-          >
-            {fontSize}px
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => {
-              openInlineChat("AI Code Assistant - Ask me anything about this file or request changes", 1, 'modal')
-            }}
-            title="AI Assistant (Ctrl+Shift+I)"
-          >
-            <Sparkles className="h-4 w-4" />
-          </Button>
           {isInlineStreaming && (
-            <div className="flex items-center space-x-2 px-2 py-1 bg-blue-100 dark:bg-blue-900 rounded-md">
-              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-              <span className="text-xs text-blue-700 dark:text-blue-300">
+            <div className="flex items-center space-x-2 px-2 py-1 bg-orange-500/10 rounded-md">
+              <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+              <span className="text-xs text-orange-400">
                 AI Streaming
                 {streamingEditMode === 'search_replace' && ' (Targeted Edit)'}
                 {streamingEditMode === 'full_file' && ' (Full File)'}
@@ -1128,7 +1109,7 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
           language={getLanguage(file.name)}
           value={content}
           onChange={handleContentChange}
-          theme="vs-dark"
+          theme={settings.theme}
           onMount={(editor, monaco) => {
             editorRef.current = editor
             
@@ -1222,14 +1203,6 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
               return [...new Set(exports)] // Remove duplicates
             }
             
-            // Add keyboard shortcuts for AI features
-            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyI, () => {
-              const position = editor.getPosition()
-              if (position) {
-                openInlineChat("AI Code Assistant", position.lineNumber)
-              }
-            })
-
             // Add keyboard shortcut for inline streaming (Ctrl+Shift+S)
             editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyS, () => {
               const position = editor.getPosition()
@@ -1535,11 +1508,6 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
               }
             })
 
-            // Add keyboard shortcut for AI Assistant (Ctrl+Shift+I)
-            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyI, () => {
-              openInlineChat("AI Code Assistant - Ask me anything about this file or request changes", 1, 'modal')
-            })
-            
             // Enable quick suggestions
             editor.updateOptions({
               quickSuggestions: {
@@ -1564,27 +1532,34 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
             })
           }}
           options={{
-            minimap: { enabled: showMinimap },
-            fontSize,
-            fontFamily: 'JetBrains Mono, Fira Code, monospace',
-            lineNumbers: 'on',
+            minimap: { enabled: settings.minimap },
+            fontSize: settings.fontSize,
+            fontFamily: settings.fontFamily,
+            lineNumbers: settings.lineNumbers,
+            tabSize: settings.tabSize,
+            insertSpaces: settings.insertSpaces,
             rulers: [80, 120],
-            wordWrap: 'on',
+            wordWrap: settings.wordWrap,
             automaticLayout: true,
-            scrollBeyondLastLine: false,
+            scrollBeyondLastLine: settings.scrollBeyondLastLine,
             scrollbar: {
               vertical: 'visible',
               horizontal: 'visible',
               alwaysConsumeMouseWheel: false,
             },
-            smoothScrolling: true,
-            cursorBlinking: 'smooth',
-            renderWhitespace: 'selection',
-            bracketPairColorization: { enabled: true },
+            smoothScrolling: settings.smoothScrolling,
+            cursorBlinking: settings.cursorBlinking,
+            cursorStyle: settings.cursorStyle,
+            renderWhitespace: settings.renderWhitespace,
+            bracketPairColorization: { enabled: settings.bracketPairColorization },
             guides: {
-              bracketPairs: true,
-              indentation: true,
+              bracketPairs: settings.bracketPairColorization,
+              indentation: settings.indentGuides,
             },
+            stickyScroll: { enabled: settings.stickyScroll },
+            linkedEditing: settings.linkedEditing,
+            formatOnPaste: settings.formatOnPaste,
+            formatOnType: settings.formatOnType,
             // Ensure proper layout within container
             overviewRulerLanes: 0,
             hideCursorInOverviewRuler: true,
@@ -1642,12 +1617,17 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
       </div>
 
       {/* Status Bar */}
-      <div className="px-4 py-2 border-t border-border bg-muted/50 text-xs text-muted-foreground flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <span>{file.path}</span>
-          <span>
-            {content.split("\n").length} lines • {content.length} characters
-          </span>
+      <div className="px-4 py-1 border-t border-gray-800/60 bg-gray-950 text-[11px] text-gray-500 flex-shrink-0">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span>{getLanguage(file.name).charAt(0).toUpperCase() + getLanguage(file.name).slice(1)}</span>
+            <span>Spaces: {settings.tabSize}</span>
+            <span>UTF-8</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span>{content.split("\n").length} lines</span>
+            <span>{content.length} chars</span>
+          </div>
         </div>
       </div>
 

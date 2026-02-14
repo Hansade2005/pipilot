@@ -22,6 +22,9 @@ export interface Workspace {
   netlifySiteId?: string
   netlifyDeploymentUrl?: string
   deploymentStatus: 'not_deployed' | 'in_progress' | 'deployed' | 'failed'
+  // Preview tracking
+  previewUrl?: string
+  previewSlug?: string
   // Supabase project connection
   supabaseProjectId?: string
   supabaseProjectName?: string
@@ -2641,11 +2644,18 @@ class IndexedDBStorage implements StorageInterface {
         'messages',
         'deployments',
         'environmentVariables',
+        'tokens',
+        'checkpoints',
+        'conversationMemories',
+        'conversationSummaries',
+        'repoConversations',
+        'toolExecutions',
         'vercelProjects',
         'vercelDeployments',
         'vercelEnvVariables',
         'vercelDomains',
-        'vercelLogs'
+        'vercelLogs',
+        'vercelPromotions'
       ]
       const transaction = this.db!.transaction(storeNames, 'readwrite')
       let cleared = 0
@@ -2872,9 +2882,9 @@ class IndexedDBStorage implements StorageInterface {
       let importedCount = 0
       const totalItems = data.length
 
-      // Add each item to the store
+      // Upsert each item to the store (put instead of add to handle duplicates)
       data.forEach(item => {
-        const request = store.add(item)
+        const request = store.put(item)
 
         request.onsuccess = () => {
           importedCount++

@@ -137,7 +137,7 @@ export function EmptyWorkspaceView({
     <div className="h-full overflow-y-auto">
       {/* Hero Section with Gradient */}
       <div
-        className={`relative bg-gradient-to-br from-blue-900 via-purple-900 to-pink-900 pt-8 lg:pt-0 flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 pb-4 sm:pb-6 transition-all duration-1000 ${
+        className={`relative bg-gradient-to-br from-orange-950 via-gray-950 to-gray-900 pt-8 lg:pt-0 flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 pb-4 sm:pb-6 transition-all duration-1000 ${
           isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
         }`}
       >
@@ -148,7 +148,7 @@ export function EmptyWorkspaceView({
           {/* Title */}
             <h1 className="text-2xl sm:text-3xl font-bold text-white text-center mt-6 mb-4 sm:mb-5 tracking-tight leading-tight px-2 sm:px-4">
               Ready to build something amazing?
-              <span className="block text-xs sm:text-sm text-pink-300 mt-2 font-normal">Let PiPilot create your next web app in seconds.</span>
+              <span className="block text-xs sm:text-sm text-orange-300 mt-2 font-normal">Let PiPilot create your next web app in seconds.</span>
             </h1>
 
           {/* Chat Input Component */}
@@ -166,14 +166,14 @@ export function EmptyWorkspaceView({
       </div>
 
       {/* Projects Section */}
-      <div className="bg-gray-900 px-4 sm:px-6 py-1 sm:py-2 flex-shrink-0">
+      <div className="bg-gray-950 px-4 sm:px-6 py-1 sm:py-2 flex-shrink-0">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-row items-center justify-between mb-2 sm:mb-3 gap-4">
             <div className="flex gap-2 w-full sm:w-auto overflow-x-auto">
               <button
                 onClick={() => setActiveTab('projects')}
                 className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
-                  activeTab === 'projects' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white'
+                  activeTab === 'projects' ? 'bg-orange-600/15 text-orange-400' : 'text-gray-400 hover:text-white'
                 }`}
               >
                 My projects
@@ -186,7 +186,7 @@ export function EmptyWorkspaceView({
                 <select
                   value={filterBy}
                   onChange={(e) => setFilterBy(e.target.value as any)}
-                  className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                 >
                   <option value="all">All time</option>
                   <option value="recent">Last 24h</option>

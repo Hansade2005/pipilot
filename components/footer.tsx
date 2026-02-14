@@ -63,6 +63,9 @@ export function Footer() {
             <div className="flex items-center overflow-hidden">
               {/* Mobile: Single badge marquee */}
               <div className="flex items-center animate-marquee-mobile md:hidden whitespace-nowrap">
+                <a href="https://e2b.dev/startups" target="_blank" rel="noopener noreferrer" className="mr-4">
+                  <img src="/e2b-badge.svg" alt="Sponsored by E2B for Startups" style={{width: '120px', height: '43px'}} width="120" height="43" />
+                </a>
                 <a href="https://www.producthunt.com/products/pipilot?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-pipilot" target="_blank" rel="noopener noreferrer" className="mr-4">
                   <img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1040549&theme=light&t=1763663329258" alt="PiPilot - Build full apps and websites just by chatting with AI. | Product Hunt" style={{width: '200px', height: '43px'}} width="200" height="43" />
                 </a>
@@ -73,6 +76,9 @@ export function Footer() {
                   <img src="https://softwarebolt.com/assets/images/badge.png" alt="Software Bolt" style={{width: '120px', height: '43px'}} width="120" height="43" />
                 </a>
                 {/* Duplicate for seamless loop */}
+                <a href="https://e2b.dev/startups" target="_blank" rel="noopener noreferrer" className="mr-4">
+                  <img src="/e2b-badge.svg" alt="Sponsored by E2B for Startups" style={{width: '120px', height: '43px'}} width="120" height="43" />
+                </a>
                 <a href="https://www.producthunt.com/products/pipilot?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-pipilot" target="_blank" rel="noopener noreferrer" className="mr-4">
                   <img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1040549&theme=light&t=1763663329258" alt="PiPilot - Build full apps and websites just by chatting with AI. | Product Hunt" style={{width: '200px', height: '43px'}} width="200" height="43" />
                 </a>
@@ -86,6 +92,9 @@ export function Footer() {
 
               {/* Desktop: Multiple badges marquee */}
               <div className="hidden md:flex items-center animate-marquee whitespace-nowrap">
+                <a href="https://e2b.dev/startups" target="_blank" rel="noopener noreferrer" className="mr-8">
+                  <img src="/e2b-badge.svg" alt="Sponsored by E2B for Startups" style={{width: '150px', height: '54px'}} width="150" height="54" />
+                </a>
                 <a href="https://www.producthunt.com/products/pipilot?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-pipilot" target="_blank" rel="noopener noreferrer" className="mr-8">
                   <img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1040549&theme=light&t=1763663329258" alt="PiPilot - Build full apps and websites just by chatting with AI. | Product Hunt" style={{width: '250px', height: '54px'}} width="250" height="54" />
                 </a>
@@ -96,6 +105,9 @@ export function Footer() {
                   <img src="https://softwarebolt.com/assets/images/badge.png" alt="Software Bolt" height="54" />
                 </a>
                 {/* Duplicate for seamless loop */}
+                <a href="https://e2b.dev/startups" target="_blank" rel="noopener noreferrer" className="mr-8">
+                  <img src="/e2b-badge.svg" alt="Sponsored by E2B for Startups" style={{width: '150px', height: '54px'}} width="150" height="54" />
+                </a>
                 <a href="https://www.producthunt.com/products/pipilot?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-pipilot" target="_blank" rel="noopener noreferrer" className="mr-8">
                   <img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1040549&theme=light&t=1763663329258" alt="PiPilot - Build full apps and websites just by chatting with AI. | Product Hunt" style={{width: '250px', height: '54px'}} width="250" height="54" />
                 </a>

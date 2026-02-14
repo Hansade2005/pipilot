@@ -32,6 +32,7 @@ import { useToast } from "@/hooks/use-toast"
 import { storageManager, type Workspace as Project, type Deployment, type EnvironmentVariable } from "@/lib/storage-manager"
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface ProjectDetails extends Project {
   deployments: Deployment[]
@@ -45,6 +46,7 @@ interface ProjectDetails extends Project {
 }
 
 export default function ProjectPage() {
+  usePageTitle('Project')
   const { slug } = useParams()
   const router = useRouter()
   const { toast } = useToast()

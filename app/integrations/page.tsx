@@ -23,6 +23,7 @@ import {
 import Link from "next/link"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 // Custom SVG Icons (matching account page)
 const GitHubIcon = ({ className }: { className?: string }) => (
@@ -199,6 +200,7 @@ const integrations = [
 ]
 
 export default function IntegrationsPage() {
+  usePageTitle('Integrations')
   const [activeTab, setActiveTab] = useState('all')
 
   const filteredIntegrations = activeTab === 'all'

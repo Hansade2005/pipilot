@@ -60,6 +60,7 @@ import {
   Clock,
   LineChart
 } from "lucide-react"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface SubscriptionData {
   id: string
@@ -80,6 +81,7 @@ interface SubscriptionData {
 }
 
 export default function AdminBillingPage() {
+  usePageTitle('Billing Management')
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [subscriptions, setSubscriptions] = useState<SubscriptionData[]>([])

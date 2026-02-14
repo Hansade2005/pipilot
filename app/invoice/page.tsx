@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Plus, Minus, Download, FileText } from 'lucide-react';
+import { usePageTitle } from '@/hooks/use-page-title'
 
 // Type declarations for CDN libraries
 declare global {
@@ -54,6 +55,7 @@ interface InvoiceData {
 }
 
 export default function InvoicePage() {
+  usePageTitle('Invoice Generator')
   const [invoiceData, setInvoiceData] = useState<InvoiceData>({
     companyName: 'PiPilot',
     companyAddress: '123 Innovation Drive',

@@ -24,6 +24,7 @@ import {
   Zap, Download, RefreshCw,
   Webhook
 } from "lucide-react"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface SystemStats {
   totalUsers: number
@@ -55,6 +56,7 @@ interface RecentActivity {
 }
 
 export default function AdminPanel() {
+  usePageTitle('Admin Dashboard')
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<SystemStats | null>(null)

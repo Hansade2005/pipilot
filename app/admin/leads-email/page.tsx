@@ -29,8 +29,10 @@ import {
 } from "lucide-react"
 import { Lead, getLeadsSync } from "@/lib/leads-parser"
 import { EmailComposeModal } from "@/components/email-compose-modal"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function LeadsEmailPage() {
+  usePageTitle('Leads Email')
   const router = useRouter()
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)

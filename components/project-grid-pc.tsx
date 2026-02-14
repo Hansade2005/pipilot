@@ -245,7 +245,7 @@ export function ProjectGridPC() {
                       {project.category}
                     </Badge>
                   </div>
-                  <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <div className="absolute bottom-3 right-3 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
                     <ExternalLink className="w-5 h-5 text-white" />
                   </div>
                 </div>
@@ -264,7 +264,7 @@ export function ProjectGridPC() {
             </Link>
             <button
               onClick={(e) => handleDeleteProject(project.id, e)}
-              className="absolute top-2 left-2 p-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
+              className="absolute top-2 left-2 p-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200 z-10"
               title="Delete project"
             >
               <Trash2 className="w-4 h-4 fill-current" />

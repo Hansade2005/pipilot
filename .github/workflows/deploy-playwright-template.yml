@@ -1,0 +1,71 @@
+name: Deploy Playwright Chromium E2B Template
+
+on:
+  workflow_dispatch:
+    inputs:
+      e2b_access_token:
+        description: 'E2B Access Token (from https://e2b.dev/dashboard?tab=personal)'
+        required: true
+        type: string
+      template_name:
+        description: 'Template Name'
+        required: true
+        type: string
+        default: 'playwright-chromium'
+      cpu_count:
+        description: 'CPU Cores (default: 2, Pro plan required for >2)'
+        required: false
+        type: string
+        default: '2'
+      memory_mb:
+        description: 'Memory in MB (default: 4096, Pro plan required for >4096)'
+        required: false
+        type: string
+        default: '4096'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install pnpm
+      run: npm install -g pnpm
+
+    - name: Install E2B CLI
+      run: pnpm add @e2b/cli
+
+    - name: Set E2B Access Token
+      run: echo "E2B_ACCESS_TOKEN=${{ inputs.e2b_access_token }}" >> $GITHUB_ENV
+
+    - name: Build and deploy Playwright Chromium E2B template
+      run: |
+        npx e2b template build \
+          --name ${{ inputs.template_name }} \
+          --dockerfile e2b-playwright.Dockerfile \
+          --cpu-count ${{ inputs.cpu_count }} \
+          --memory-mb ${{ inputs.memory_mb }}
+      env:
+        E2B_ACCESS_TOKEN: ${{ inputs.e2b_access_token }}
+
+    - name: Display template info
+      run: |
+        echo "Template deployed successfully!"
+        echo "Template name: ${{ inputs.template_name }}"
+        echo "CPU cores: ${{ inputs.cpu_count }}"
+        echo "Memory: ${{ inputs.memory_mb }}MB"
+        echo ""
+        echo "Features included:"
+        echo "  - Playwright with Chromium browser"
+        echo "  - Node.js 20 runtime"
+        echo "  - Pre-initialized /app project directory"
+        echo ""
+        echo "Usage in code:"
+        echo '  const sandbox = await Sandbox.create("${{ inputs.template_name }}")'

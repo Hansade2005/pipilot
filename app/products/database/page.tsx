@@ -26,8 +26,10 @@ import {
   Brain
 } from "lucide-react"
 import Link from "next/link"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function DatabaseProductPage() {
+  usePageTitle('Database')
 
   const features = [
     {

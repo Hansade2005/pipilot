@@ -12,6 +12,7 @@ import { EditRecordDialog } from "@/components/database/edit-record-dialog";
 import { DeleteRecordDialog } from "@/components/database/delete-record-dialog";
 import { getWorkspaceDatabaseId } from "@/lib/get-current-workspace";
 import type { Table } from "@/lib/supabase";
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface RecordData {
   id: number;
@@ -19,6 +20,7 @@ interface RecordData {
 }
 
 export default function TableRecordsPage() {
+  usePageTitle('Database Table')
   const params = useParams();
   const router = useRouter();
   const [table, setTable] = useState<Table | null>(null);

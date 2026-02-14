@@ -1,4 +1,5 @@
 import { streamText, tool, stepCountIs } from 'ai'
+import { experimental_createMCPClient as createMCPClient } from '@ai-sdk/mcp'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { getModel, needsMistralVisionProvider, getDevstralVisionModel } from '@/lib/ai-providers'
@@ -169,6 +170,12 @@ PHASE 4: QUALITY & POLISH
 → Test edge cases and error scenarios
 → Verify responsive behavior across all breakpoints
 → Validate accessibility with semantic markup
+
+PHASE 5: TESTING WITH BROWSE_WEB (RECOMMENDED)
+→ After building or enhancing features, use the \`browse_web\` tool to navigate to each page route and verify it loads correctly
+→ Check for console errors, blank pages, or runtime crashes by browsing the live preview URL
+→ Test key user flows (e.g. navigation, form submissions) using \`browse_web\`
+→ If issues are found, fix them and re-test with \`browse_web\`
 
 ═══════════════════════════════════════════════════════════════
 CORE PRINCIPLES (NON-NEGOTIABLE)
@@ -1956,12 +1963,12 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
         }
       }
 
-      case 'create_database': {
+      case 'pipilotdb_create_database': {
         const { name = 'main' } = input
 
         // Validate inputs
         if (name && typeof name !== 'string') {
-          console.log(`[CONSTRUCT_TOOL_RESULT] create_database failed: Invalid database name - ${name}`)
+          console.log(`[CONSTRUCT_TOOL_RESULT] pipilotdb_create_database failed: Invalid database name - ${name}`)
           return {
             success: false,
             error: `Invalid database name provided`,
@@ -1971,7 +1978,7 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
         }
 
         // Always return success - simple response without IDs or save attempts
-        console.log(`[CONSTRUCT_TOOL_RESULT] create_database: Database "${name}" created for project ${projectId}`)
+        console.log(`[CONSTRUCT_TOOL_RESULT] pipilotdb_create_database: Database "${name}" created for project ${projectId}`)
 
         // Users table schema (matching create route)
         const usersTableSchema = {
@@ -2219,7 +2226,10 @@ export async function POST(req: Request) {
       supabaseProjectDetails, // Supabase project details from client
       supabase_projectId, // Extracted Supabase project ID to avoid conflicts
       supabaseUserId, // Authenticated Supabase user ID from client
-      stripeApiKey // Stripe API key from client for payment operations
+      stripeApiKey, // Stripe API key from client for payment operations
+      mcpServers, // MCP server configurations from client [{url, name, headers?}]
+      disabledToolCategories = [] as string[], // Tool categories disabled by user preferences
+      disabledTools = [] as string[] // Individual tools disabled by user
     } = body || {}
 
     // For binary requests, extract metadata from compressed data
@@ -2239,6 +2249,9 @@ export async function POST(req: Request) {
       supabase_projectId = metadata.supabase_projectId || supabase_projectId
       supabaseUserId = metadata.supabaseUserId || supabaseUserId
       stripeApiKey = metadata.stripeApiKey || stripeApiKey
+      mcpServers = metadata.mcpServers || mcpServers
+      disabledToolCategories = metadata.disabledToolCategories || disabledToolCategories
+      disabledTools = metadata.disabledTools || disabledTools
     }
 
     // Use fileTree from binary metadata if available, otherwise from JSON
@@ -2671,39 +2684,60 @@ export async function POST(req: Request) {
     // Build system prompt based on chat mode
     const isNextJS = true // We're using Next.js
     let systemPrompt = chatMode === 'ask' ? `
-# 💬 PiPilot AI: Ask Mode - Your Knowledge Assistant
+# PiPilot AI: Plan Mode - Strategic Architect
+
 ## Role
-You are PiPilot in Ask Mode - a knowledgeable assistant focused on answering questions, providing guidance, and sharing insights without making any file changes or modifications to the project.
+You are PiPilot in Plan Mode - a senior software architect who analyzes requirements, researches the codebase, and creates detailed execution plans BEFORE any code is written. You do NOT write code or modify files - you create strategic plans that the user can approve and execute with a single click.
 
-## Core Capabilities in Ask Mode
-- Answer questions about code, technologies, and best practices
-- Explain existing code and project structure
-- Provide guidance and suggestions
-- Help debug issues by analyzing code
-- Share knowledge about web development, frameworks, and tools
-- Review and analyze existing files (read-only)
+## Core Mission
+When a user describes what they want to build or change, you MUST:
+1. Analyze their request thoroughly
+2. Research the existing codebase (read files, search code, list structure)
+3. Generate a comprehensive, actionable plan using the \`generate_plan\` tool
+4. Do NOT write any text content - the plan card is your entire response
 
-## Ask Mode Restrictions
-- ❌ NO file modifications, creation, or deletion
-- ❌ NO package installation or removal
-- ❌ NO database modifications
-- ✅ READ-ONLY access to project files for analysis
-- ✅ Web search and content extraction for research
-- ✅ Knowledge sharing and guidance
-- ✅ Code explanation and review
-- ✅ Best practice recommendations
+## MANDATORY: Always Use generate_plan Tool
+For EVERY user request in Plan Mode, you MUST call the \`generate_plan\` tool to create a structured plan. This renders as a beautiful interactive card with a "Build" button the user can click to execute the plan automatically.
 
-## Available Tools (Read-Only + Research)
-- **read_file**: Read and analyze existing project files with line numbers
-- **list_files**: Browse project structure and file listings
-- **grep_search**: Search for specific content within project files
-- **web_search**: Search the web for current information and research
-- **web_extract**: Extract content from web pages for analysis
+The plan should include:
+- **title**: A clear, concise name for what's being built
+- **description**: 1-3 sentences explaining the approach, design direction, and key decisions
+- **steps**: 2-10 ordered implementation steps, each with a title and description
+- **techStack**: Key technologies/libraries that will be used
+- **estimatedFiles**: Approximate number of files to create/modify
 
-## Philosophy
-In Ask Mode, I'm your knowledgeable companion who can help you understand, learn, and plan - but I won't make changes to your project. Think of me as a senior developer pair programming with you, providing insights and guidance while you maintain full control over your codebase.
+## Plan Quality Guidelines
+- Steps should be specific and actionable, not vague
+- Each step should map to concrete file operations
+- Consider the existing codebase structure when planning
+- Include UI/UX considerations (colors, layout, interactions)
+- Mention error handling and edge cases
+- For complex features, break into logical phases
 
-Use emojis sparingly for section headers and key highlights. Keep responses clear and focused.
+## Available Tools (Read-Only + Research + Planning)
+- **read_file**: Read and analyze existing project files
+- **list_files**: Browse project structure
+- **grep_search**: Search for specific code patterns
+- **web_search**: Research best practices and solutions
+- **web_extract**: Extract content from web pages
+- **generate_plan**: Create a structured execution plan (MANDATORY)
+- **suggest_next_steps**: Suggest follow-up actions
+
+## Plan Mode Restrictions
+- NO file modifications, creation, or deletion
+- NO package installation or removal
+- NO database modifications
+- READ-ONLY analysis + plan generation only
+
+## Response Format
+1. If needed, use read_file/list_files/grep_search to understand the codebase
+2. Call \`generate_plan\` with a detailed, well-structured plan
+3. Call \`suggest_next_steps\` with options like "Refine the plan", "Add more detail to step X", "Build now"
+
+**CRITICAL: Do NOT generate ANY text content before or after calling generate_plan. No introductions, no summaries, no explanations, no bullet points, no markdown. The plan card IS your entire response. The only tool calls you should make are generate_plan and suggest_next_steps. Any text you write will clutter the UI and duplicate information already in the plan card.**
+
+## Next Step Suggestions (MANDATORY)
+At the END of every response, you MUST call the \`suggest_next_steps\` tool with 3-4 follow-up suggestions. Always include "Build this plan" as the first suggestion. Other suggestions can be about refining the plan, adding features, or changing approach.
 ` : `
 # PiPilot AI: Web Architect
 ## Role
@@ -2833,7 +2867,7 @@ Each time you are buiding anything that requires images , you should always use 
   - **The \`node_machine\` tool is ABSOLUTELY FORBIDDEN for running npm install, yarn install, or any package installation commands**
   - **To add packages**: Use \`client_replace_string_in_file\` to update the dependencies/devDependencies section of \`package.json\`. Read the file first, then replace the relevant JSON section with the new packages included.
   - **VIOLATION WILL BREAK THE SYSTEM - Never run npm/yarn install, always edit package.json directly**
-- **PiPilot DB (REST API Database)**: \`create_database\`, \`create_table\`, \`list_tables\`, \`read_table\`, \`query_database\`, \`manipulate_table_data\`, \`manage_api_keys\`
+- **PiPilot DB (REST API Database)**: \`pipilotdb_create_database\`, \`pipilotdb_create_table\`, \`pipilotdb_list_tables\`, \`pipilotdb_read_table\`, \`pipilotdb_query_database\`, \`pipilotdb_manipulate_table_data\`, \`pipilotdb_manage_api_keys\`
   - _These manage DATA in PiPilot's server-side REST API database (NOT IndexedDB)_
 - **Server-Side**: \`web_search\`, \`web_extract\`, \`semantic_code_navigator\` (with line numbers),\`grep_search\`, \`check_dev_errors\`, \`list_files\` (client sync), \`read_file\` (client sync)
 
@@ -2850,14 +2884,14 @@ Each time you are buiding anything that requires images , you should always use 
 - **IndexedDB** = Client-side browser storage (ONLY for project files/code, NOT for database operations)
 
 **Complete database workflow in 7 simple steps:**
-1. **\`create_database\`** - Creates database via PiPilot's REST API with auto-generated users table
-2. **\`create_table\`** - AI-powered schema generation from natural language descriptions
-3. **\`list_tables\`** - Discover all tables in a database with optional schema and record counts
-4. **\`read_table\`** - Get detailed table info, schema, structure, and statistics
-5. **\`delete_table\`** - Delete a table and all its records (destructive, requires confirmation)
-6. **\`query_database\`** - Advanced MySQL-like querying with auto-detection, filtering, sorting, pagination
-7. **\`manipulate_table_data\`** - Full CRUD operations (insert, update, delete) with bulk support
-8. **\`manage_api_keys\`** - Generate secure API keys for external database access and setup in .env.local
+1. **\`pipilotdb_create_database\`** - Creates database via PiPilot's REST API with auto-generated users table
+2. **\`pipilotdb_create_table\`** - AI-powered schema generation from natural language descriptions
+3. **\`pipilotdb_list_tables\`** - Discover all tables in a database with optional schema and record counts
+4. **\`pipilotdb_read_table\`** - Get detailed table info, schema, structure, and statistics
+5. **\`pipilotdb_delete_table\`** - Delete a table and all its records (destructive, requires confirmation)
+6. **\`pipilotdb_query_database\`** - Advanced MySQL-like querying with auto-detection, filtering, sorting, pagination
+7. **\`pipilotdb_manipulate_table_data\`** - Full CRUD operations (insert, update, delete) with bulk support
+8. **\`pipilotdb_manage_api_keys\`** - Generate secure API keys for external database access and setup in .env.local
 
 **Features:**
 - 🤖 **AI Schema Generation**: Describe your table needs, get optimized database schema
@@ -2993,7 +3027,9 @@ When using \`generate_report\`, present results using this exact markdown struct
 _Note_: 
 - **IndexedDB** = Browser storage for PROJECT FILES (your code/file tree) - managed automatically
 - **PiPilot DB** = Server-side REST API DATABASE (for data storage, tables, authentication) - separate system
-- Use \`check_dev_errors\` up to 2 times per request in response to error logs. After fixing errors, tell the user to switch  run the app in Preview panel and  they should report any console logs error they see.
+- Use \`check_dev_errors\` up to 2 times per request in response to error logs.
+- After fixing errors, use the \`browse_web\` tool to navigate to the app's pages and verify they load correctly with no console errors or blank screens.
+- If \`browse_web\` reveals issues, fix them and re-test. Include a brief status in your summary (e.g. "Tested: all pages load OK").
 ## ✅ Quality Checklist
 - **Functionality**: Handle happy paths, edge cases, errors, and performance
 - **UX Innovation**: Ensure mobile-first, seamless micro-interactions, and animations 🎨
@@ -3015,7 +3051,8 @@ _Note_:
 
 Use emojis sparingly for section headers and key highlights. Keep responses clear and focused.
 ## 🎨 Design Quality Requirements
-- **Build Checks**: For Vite projects, always use the check dev errors tool to run in build mode  after changes to verify compilation
+- **Build Checks**: For Vite projects, always use the check dev errors tool to run in build mode after changes to verify compilation
+- **Browser Testing**: After building or enhancing features, use the \`browse_web\` tool to navigate to each page and verify it renders correctly with no console errors
 - **Color Combinations**: Use harmonious color palettes (avoid clashing colors like red/green for text)
 For Vite React frameorks it comes with built-in useTheme hook that you can use to implement light and dark theme switching to the project 
 
@@ -3133,6 +3170,23 @@ const { theme, setTheme } = useTheme();
 - Bugs fixed thoroughly with root cause analysis
 - Production-ready code with proper error handling
 
+## Task Management (manage_todos)
+For complex, multi-step tasks (3+ steps), use the \`manage_todos\` tool to create a visible todo list above the chat input. This helps users track your progress in real-time as you work through implementation steps.
+- Send the FULL updated todo list each time (not just changes)
+- Only ONE todo should be "in_progress" at a time
+- Mark todos as "completed" immediately when finished
+- Keep titles short and actionable
+- Use it proactively for multi-step builds, refactors, and feature implementations
+
+## Next Step Suggestions (MANDATORY)
+At the END of every response, you MUST call the \`suggest_next_steps\` tool to provide 3-4 contextual follow-up suggestions. These appear as clickable chips below your message. Make suggestions:
+- **Relevant** to what was just built, discussed, or fixed
+- **Actionable** - each should be a clear next task (e.g. "Add dark mode toggle", "Implement search", "Add loading states")
+- **Progressive** - suggest logical next features or improvements that build on the current work
+- **Varied** - mix between UI enhancements, functionality additions, and optimizations
+- Keep labels short (3-8 words). The prompt can be more detailed.
+- ALWAYS call this tool as your FINAL action in every response, even for simple answers.
+
 `
 
     // Check for UI prototyping mode and use specialized system prompt
@@ -3152,7 +3206,7 @@ const { theme, setTheme } = useTheme();
     const unavailableServices: string[] = []
     if (!stripeApiKey) unavailableServices.push('Stripe (no API key connected)')
     if (!supabaseAccessToken || !supabaseProjectDetails) unavailableServices.push('Supabase remote project (not connected)')
-    if (!databaseId) unavailableServices.push('PiPilot Database (no database created yet - use create_database first if the user needs one)')
+    if (!databaseId) unavailableServices.push('PiPilot Database (no database created yet - use pipilotdb_create_database first if the user needs one)')
     if (!process.env.E2B_API_KEY) unavailableServices.push('Node Machine / terminal (E2B not configured)')
 
     if (unavailableServices.length > 0 && chatMode !== 'ask') {
@@ -5733,6 +5787,135 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
         }
       }),
 
+      browse_web: tool({
+        description: `Browser Automation Tool - Navigate to any URL, take screenshots, click elements, fill forms, read console logs, and test web applications using Playwright in a secure sandbox with Chromium browser.
+
+Use this tool to:
+- Test the user's app by navigating to its preview URL and interacting with it
+- Visit any website to gather visual information or verify behavior
+- Take screenshots of web pages for analysis
+- Fill out forms and click buttons to test user flows
+- Read browser console logs and detect runtime errors
+- Verify responsive layouts at different viewport sizes
+
+IMPORTANT SCRIPT RULES:
+- You receive 'page', 'browser', and 'context' variables already initialized
+- The browser viewport is 1280x720 by default
+- Save ALL screenshots to '/home/user/' directory (e.g., page.screenshot({ path: '/home/user/screenshot.png' }))
+- Console logs, page errors, and network errors are automatically captured
+- Do NOT import chromium or launch browser - it's already done for you
+- Do NOT close the browser - it's handled automatically
+- Use 'await' for all Playwright operations
+- For testing the user's app, first use check_dev_errors to get the preview URL, then use this tool to navigate to it
+
+Example script for taking a screenshot:
+  await page.goto('https://example.com');
+  await page.screenshot({ path: '/home/user/homepage.png', fullPage: true });
+
+Example script for form testing:
+  await page.goto('https://example.com/login');
+  await page.fill('input[name="email"]', 'test@example.com');
+  await page.fill('input[name="password"]', 'password123');
+  await page.click('button[type="submit"]');
+  await page.waitForNavigation();
+  await page.screenshot({ path: '/home/user/after_login.png' });
+
+Example script for responsive testing:
+  await page.goto('https://example.com');
+  await page.screenshot({ path: '/home/user/desktop.png' });
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.screenshot({ path: '/home/user/mobile.png' });
+
+Present results using this markdown structure:
+## Browser Test Results
+
+### Screenshots
+| Screenshot | Description |
+|-----------|-------------|
+| ![Screenshot](url) | Description of what was captured |
+
+### Console Output
+- List any console logs, errors, or warnings detected
+
+### Page Info
+- **URL:** final page URL
+- **Title:** page title
+- **Errors:** any runtime errors detected`,
+        inputSchema: z.object({
+          script: z.string().describe('Playwright script body to execute. You have access to page, browser, and context variables. Save screenshots to /home/user/ directory. Do NOT import chromium or launch/close browser.'),
+          timeoutSeconds: z.number().optional().describe('Execution timeout in seconds (default: 60, max: 120)')
+        }),
+        execute: async ({ script, timeoutSeconds = 60 }, { abortSignal, toolCallId }) => {
+          const toolStartTime = Date.now();
+          const timeStatus = getTimeStatus();
+
+          if (abortSignal?.aborted) {
+            return { success: false, error: 'Tool execution was aborted', toolCallId, executionTimeMs: 0 };
+          }
+
+          if (timeStatus.isApproachingTimeout) {
+            return { success: false, error: timeStatus.warningMessage, toolCallId, executionTimeMs: 0 };
+          }
+
+          try {
+            // Call the browse_web API route
+            const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/browse_web`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                script,
+                timeoutSeconds: Math.min(timeoutSeconds, 120)
+              })
+            });
+
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+
+            const executionTime = Date.now() - toolStartTime;
+            toolExecutionTimes['browse_web'] = (toolExecutionTimes['browse_web'] || 0) + executionTime;
+
+            return {
+              success: result.success,
+              screenshots: result.screenshots || {},
+              browserData: result.browserData || {},
+              stdout: result.stdout || '',
+              stderr: result.stderr || '',
+              exitCode: result.exitCode,
+              uploadResults: result.uploadResults || [],
+              // Formatted data for AI presentation
+              screenshotUrls: Object.entries(result.screenshots || {}).map(([name, url]) => ({
+                name,
+                url,
+                markdown: `![${name}](${url})`
+              })),
+              consoleLogs: result.browserData?.consoleLogs || [],
+              pageErrors: result.browserData?.pageErrors || [],
+              networkErrors: result.browserData?.networkErrors || [],
+              currentUrl: result.browserData?.currentUrl || '',
+              pageTitle: result.browserData?.title || '',
+              toolCallId,
+              executionTimeMs: executionTime,
+              timeWarning: timeStatus.warningMessage
+            };
+          } catch (error) {
+            const executionTime = Date.now() - toolStartTime;
+            toolExecutionTimes['browse_web'] = (toolExecutionTimes['browse_web'] || 0) + executionTime;
+            return {
+              success: false,
+              error: `Browser automation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              toolCallId,
+              executionTimeMs: executionTime,
+              timeWarning: timeStatus.warningMessage
+            };
+          }
+        }
+      }),
+
       list_files: tool({
         description: 'List all files and directories in the project with their structure and metadata.',
         inputSchema: z.object({
@@ -5828,7 +6011,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
       }),
 
       // DATABASE MANAGEMENT TOOLS (CLIENT-SIDE)
-      create_database: tool({
+      pipilotdb_create_database: tool({
         description: 'Create a new database for the current project using PiPilot DB - a built-in server-side REST API database service. Automatically creates a database with a default users table for authentication. This is NOT IndexedDB (which is only for project files). PiPilot DB provides full database capabilities including tables, authentication, and storage via REST API.',
         inputSchema: z.object({
           name: z.string().optional().describe('Database name (defaults to "main")')
@@ -5836,7 +6019,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
         execute: async ({ name = 'main' }, { toolCallId }) => {
           // This is a client-side tool - execution will be handled by client
           // The actual implementation will be in the client-side code with IndexedDB access
-          return await constructToolResult('create_database', { name }, projectId, toolCallId);
+          return await constructToolResult('pipilotdb_create_database', { name }, projectId, toolCallId);
         }
       }),
 
@@ -5881,7 +6064,29 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
         }
       }),
 
-      create_table: tool({
+      generate_image: tool({
+        description: 'Generate an AI image from a text description. Returns a URL that can be used directly in <img> tags. Use this when the user needs placeholder images, illustrations, icons, backgrounds, or any visual asset for their app. Describe the image in detail for best results.',
+        inputSchema: z.object({
+          prompt: z.string().describe('Detailed description of the image to generate (e.g., "modern minimalist dashboard with dark theme and blue accents")'),
+          aspect: z.enum(['1:1', '16:9']).optional().describe('Aspect ratio of the image. Use 1:1 for icons/avatars/squares, 16:9 for banners/heroes/backgrounds. Defaults to 16:9'),
+          seed: z.number().optional().describe('Seed number for reproducible results. Use same seed to get same image.')
+        }),
+        execute: async ({ prompt, aspect, seed }) => {
+          const aspectRatio = aspect || '16:9'
+          const seedValue = seed || Math.floor(Math.random() * 10000)
+          const imageUrl = `https://api.a0.dev/assets/image?text=${encodeURIComponent(prompt)}&aspect=${aspectRatio}&seed=${seedValue}`
+          return {
+            success: true,
+            imageUrl,
+            prompt,
+            aspect: aspectRatio,
+            seed: seedValue,
+            usage: `Use this URL directly in an <img> tag: ${imageUrl}`
+          }
+        }
+      }),
+
+      pipilotdb_create_table: tool({
         description: 'Create a new table in the database. Can either use AI to generate optimal schema from description, or create table with predefined schema. Supports complex relationships, constraints, and indexes.',
         inputSchema: z.object({
           name: z.string().describe('Table name (should be singular, snake_case)'),
@@ -6008,7 +6213,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
             const result = await response.json();
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['create_table'] = (toolExecutionTimes['create_table'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_create_table'] = (toolExecutionTimes['pipilotdb_create_table'] || 0) + executionTime;
 
             if (!response.ok) {
               console.error('[ERROR] Table creation failed:', result);
@@ -6039,7 +6244,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
           } catch (error) {
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['create_table'] = (toolExecutionTimes['create_table'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_create_table'] = (toolExecutionTimes['pipilotdb_create_table'] || 0) + executionTime;
 
             console.error('[ERROR] Table creation failed:', error);
             return {
@@ -6055,7 +6260,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
         }
       }),
 
-      query_database: tool({
+      pipilotdb_query_database: tool({
         description: 'Advanced database querying tool with MySQL-like capabilities. Supports table data retrieval with sorting, filtering, pagination, column selection, and JSONB field querying.',
         inputSchema: z.object({
           tableId: z.string().describe('The table ID to query records from'),
@@ -6217,7 +6422,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
             const result = await response.json();
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['query_database'] = (toolExecutionTimes['query_database'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_query_database'] = (toolExecutionTimes['pipilotdb_query_database'] || 0) + executionTime;
 
             if (!response.ok) {
               console.error('[ERROR] Enhanced database query failed:', result);
@@ -6295,7 +6500,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
           } catch (error) {
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['query_database'] = (toolExecutionTimes['query_database'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_query_database'] = (toolExecutionTimes['pipilotdb_query_database'] || 0) + executionTime;
 
             console.error('[ERROR] Enhanced database query failed:', error);
             return {
@@ -6311,7 +6516,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
         }
       }),
 
-      manipulate_table_data: tool({
+      pipilotdb_manipulate_table_data: tool({
         description: 'Insert, update, or delete records in database tables. Provides full CRUD operations for table data management.',
         inputSchema: z.object({
           tableId: z.string().describe('The table ID to manipulate data in'),
@@ -6469,7 +6674,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
             const result = await response.json();
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['manipulate_table_data'] = (toolExecutionTimes['manipulate_table_data'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_manipulate_table_data'] = (toolExecutionTimes['pipilotdb_manipulate_table_data'] || 0) + executionTime;
 
             if (!response.ok) {
               console.error('[ERROR] Data manipulation failed:', result);
@@ -6504,7 +6709,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
           } catch (error) {
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['manipulate_table_data'] = (toolExecutionTimes['manipulate_table_data'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_manipulate_table_data'] = (toolExecutionTimes['pipilotdb_manipulate_table_data'] || 0) + executionTime;
 
             console.error('[ERROR] Data manipulation failed:', error);
             return {
@@ -6521,7 +6726,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
         }
       }),
 
-      manage_api_keys: tool({
+      pipilotdb_manage_api_keys: tool({
         description: 'Create and manage API keys for external database access. Enables secure access to database from external applications.',
         inputSchema: z.object({
           action: z.enum(['create', 'list', 'delete']).describe('Action to perform on API keys'),
@@ -6635,7 +6840,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
             const result = await response.json();
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['manage_api_keys'] = (toolExecutionTimes['manage_api_keys'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_manage_api_keys'] = (toolExecutionTimes['pipilotdb_manage_api_keys'] || 0) + executionTime;
 
             if (!response.ok) {
               console.error('[ERROR] API key management failed:', result);
@@ -6679,7 +6884,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
           } catch (error) {
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['manage_api_keys'] = (toolExecutionTimes['manage_api_keys'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_manage_api_keys'] = (toolExecutionTimes['pipilotdb_manage_api_keys'] || 0) + executionTime;
 
             console.error('[ERROR] API key management failed:', error);
             return {
@@ -6695,7 +6900,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
         }
       }),
 
-      list_tables: tool({
+      pipilotdb_list_tables: tool({
         description: 'List all tables in the database with their schemas, IDs, and metadata. Essential for discovering available tables before querying or manipulating data. Returns table IDs needed for other database operations.',
         inputSchema: z.object({
           includeSchema: z.boolean().optional().describe('Include detailed schema information for each table (default: true)'),
@@ -6743,7 +6948,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
             const result = await response.json();
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['list_tables'] = (toolExecutionTimes['list_tables'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_list_tables'] = (toolExecutionTimes['pipilotdb_list_tables'] || 0) + executionTime;
 
             if (!response.ok || !result.success) {
               console.error('[ERROR] List tables failed:', result);
@@ -6801,7 +7006,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
               : undefined;
 
             const summary = totalTables === 0
-              ? 'No tables found in database. Create tables using the create_table tool.'
+              ? 'No tables found in database. Create tables using the pipilotdb_create_table tool.'
               : `Found ${totalTables} table(s)${totalRecords !== undefined ? ` with ${totalRecords} total record(s)` : ''}`;
 
             console.log('[SUCCESS] Tables listed:', { totalTables, totalRecords });
@@ -6819,7 +7024,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
           } catch (error) {
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['list_tables'] = (toolExecutionTimes['list_tables'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_list_tables'] = (toolExecutionTimes['pipilotdb_list_tables'] || 0) + executionTime;
 
             console.error('[ERROR] List tables failed:', error);
             return {
@@ -6834,10 +7039,10 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
         }
       }),
 
-      read_table: tool({
+      pipilotdb_read_table: tool({
         description: 'Get detailed information about a specific table including its schema, structure, metadata, and statistics. Use this to inspect table definition before modifying or querying data.',
         inputSchema: z.object({
-          tableId: z.number().describe('The unique ID of the table to read (get from list_tables tool)'),
+          tableId: z.number().describe('The unique ID of the table to read (get from pipilotdb_list_tables tool)'),
           includeRecordCount: z.boolean().optional().describe('Include total record count in the response (default: true)')
         }),
         execute: async ({ tableId, includeRecordCount = true }, { abortSignal, toolCallId }) => {
@@ -6878,7 +7083,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
             const result = await response.json();
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['read_table'] = (toolExecutionTimes['read_table'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_read_table'] = (toolExecutionTimes['pipilotdb_read_table'] || 0) + executionTime;
 
             if (!response.ok || !result.table) {
               console.error('[ERROR] Read table failed:', result);
@@ -6950,7 +7155,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
           } catch (error) {
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['read_table'] = (toolExecutionTimes['read_table'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_read_table'] = (toolExecutionTimes['pipilotdb_read_table'] || 0) + executionTime;
 
             console.error('[ERROR] Read table failed:', error);
             return {
@@ -6965,10 +7170,10 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
         }
       }),
 
-      delete_table: tool({
+      pipilotdb_delete_table: tool({
         description: 'Delete a table and all its records from the database. THIS IS DESTRUCTIVE and cannot be undone.',
         inputSchema: z.object({
-          tableId: z.number().describe('The unique ID of the table to delete (get from list_tables tool)')
+          tableId: z.number().describe('The unique ID of the table to delete (get from pipilotdb_list_tables tool)')
         }),
         execute: async ({ tableId }, { abortSignal, toolCallId }) => {
           const toolStartTime = Date.now();
@@ -7031,7 +7236,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
             const result = await response.json();
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['delete_table'] = (toolExecutionTimes['delete_table'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_delete_table'] = (toolExecutionTimes['pipilotdb_delete_table'] || 0) + executionTime;
 
             if (!response.ok) {
               console.error('[ERROR] Delete table failed:', result);
@@ -7064,7 +7269,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
           } catch (error) {
             const executionTime = Date.now() - toolStartTime;
-            toolExecutionTimes['delete_table'] = (toolExecutionTimes['delete_table'] || 0) + executionTime;
+            toolExecutionTimes['pipilotdb_delete_table'] = (toolExecutionTimes['pipilotdb_delete_table'] || 0) + executionTime;
 
             console.error('[ERROR] Delete table failed:', error);
             return {
@@ -10139,6 +10344,86 @@ ${issues.length > 0 ? issues.map(issue => `- ${issue.suggestion}`).join('\n') : 
         }
       }),
 
+      // PLAN GENERATION - AI generates a structured execution plan for Plan Mode
+      generate_plan: tool({
+        description: 'Generate a structured execution plan for building an app or implementing a feature. Use this tool in Plan Mode to present the user with a clear plan before building. The plan is rendered as a beautiful card with a "Build" button the user can click to execute the plan.',
+        inputSchema: z.object({
+          title: z.string().describe('Short, descriptive title for the plan (e.g. "E-commerce Dashboard", "Authentication System")'),
+          description: z.string().describe('A 1-3 sentence overview of what will be built and the approach'),
+          steps: z.array(z.object({
+            title: z.string().describe('Short step title (e.g. "Set up project structure", "Create authentication flow")'),
+            description: z.string().describe('Brief description of what this step involves')
+          })).min(2).max(10).describe('Array of 2-10 ordered implementation steps'),
+          techStack: z.array(z.string()).optional().describe('Key technologies/libraries to be used (e.g. ["React", "Tailwind CSS", "Supabase"])'),
+          estimatedFiles: z.number().optional().describe('Approximate number of files that will be created/modified')
+        }),
+        execute: async ({ title, description, steps, techStack, estimatedFiles }, { toolCallId }) => {
+          return {
+            success: true,
+            title,
+            description,
+            steps,
+            techStack,
+            estimatedFiles,
+            toolCallId
+          }
+        }
+      }),
+
+      // NEXT STEP SUGGESTIONS - AI calls this at the end of every response to suggest follow-up actions
+      suggest_next_steps: tool({
+        description: 'MANDATORY: Call this tool at the END of every response to suggest 3-4 logical next steps the user could take. These appear as clickable suggestion chips below your message. Each suggestion should be a short, actionable phrase (3-8 words) that the user can click to immediately send as their next message.',
+        inputSchema: z.object({
+          suggestions: z.array(z.object({
+            label: z.string().describe('Short display text for the chip (3-8 words, e.g. "Add dark mode", "Add search functionality")'),
+            prompt: z.string().describe('The full prompt to send when clicked (can be more detailed than the label)')
+          })).min(2).max(5).describe('Array of 2-5 next step suggestions relevant to what was just built or discussed')
+        }),
+        execute: async ({ suggestions }, { toolCallId }) => {
+          // No server-side work needed - the frontend reads the tool input directly
+          return {
+            success: true,
+            suggestions,
+            toolCallId
+          }
+        }
+      }),
+
+      // TODO MANAGEMENT - AI creates and manages a task list displayed in the Queue UI above the chat input
+      manage_todos: tool({
+        description: `Create and manage a structured todo/task list to track progress on multi-step tasks. The todo list is displayed in a collapsible panel above the chat input so the user can see your progress in real-time.
+
+USE THIS TOOL WHEN:
+- A task requires 3 or more distinct steps
+- The user provides multiple tasks to complete
+- Working on complex, multi-step implementations
+- You want to show the user clear progress on what you're doing
+
+RULES:
+- Send the FULL updated todo list each time (not just changes)
+- Only ONE todo should be "in_progress" at a time
+- Mark todos as "completed" immediately when done
+- Keep titles short and actionable (e.g. "Add authentication middleware")
+- Use descriptions for extra context when helpful
+- Each todo must have a unique id (use short descriptive slugs like "add-auth", "fix-nav-bug")`,
+        inputSchema: z.object({
+          todos: z.array(z.object({
+            id: z.string().describe('Unique identifier for the todo (e.g. "setup-db", "add-auth")'),
+            title: z.string().describe('Short, actionable title (e.g. "Set up database schema")'),
+            description: z.string().optional().describe('Optional extra context or details'),
+            status: z.enum(['pending', 'in_progress', 'completed']).describe('Current status of the todo')
+          })).min(1).max(15).describe('The complete, updated list of todos')
+        }),
+        execute: async ({ todos }, { toolCallId }) => {
+          // The frontend reads the tool input directly to display todos in the Queue UI
+          return {
+            success: true,
+            todos,
+            toolCallId
+          }
+        }
+      }),
+
       code_quality_analysis: tool({
         description: 'Create or update code quality analysis documentation with detailed metrics, complexity scores, maintainability analysis, and improvement recommendations in markdown format.',
         inputSchema: z.object({
@@ -10270,12 +10555,12 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
     }
 
     // Filter tools based on chat mode and UI initial prompt detection
-    const readOnlyTools = ['read_file', 'grep_search', 'list_files', 'web_search', 'web_extract']
+    const readOnlyTools = ['read_file', 'grep_search', 'list_files', 'web_search', 'web_extract', 'generate_image', 'suggest_next_steps', 'manage_todos', 'generate_plan']
     const uiInitialPromptTools = [
       'list_files', 'check_dev_errors', 'grep_search', 'semantic_code_navigator',
       'web_search', 'web_extract', 'remove_package',
       'client_replace_string_in_file', 'edit_file', 'delete_folder','continue_backend_implementation',
-      'delete_file', 'read_file', 'write_file'
+      'delete_file', 'read_file', 'write_file', 'suggest_next_steps', 'manage_todos'
     ]
 
     let toolsToUse
@@ -10327,13 +10612,74 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
         unavailableTools.push('node_machine')
       }
 
+      // User tool preferences - filter by disabled categories
+      if (disabledToolCategories && Array.isArray(disabledToolCategories) && disabledToolCategories.length > 0) {
+        const categoryToolMap: Record<string, string[]> = {
+          file_ops: ['write_file', 'read_file', 'edit_file', 'delete_file', 'delete_folder', 'client_replace_string_in_file'],
+          code_search: ['grep_search', 'semantic_code_navigator', 'list_files'],
+          web_tools: ['web_search', 'web_extract'],
+          dev_tools: ['check_dev_errors', 'node_machine', 'remove_package'],
+          pipilot_db: ['pipilotdb_create_database', 'pipilotdb_query_database', 'pipilotdb_manipulate_table_data', 'pipilotdb_manage_api_keys', 'pipilotdb_list_tables', 'pipilotdb_read_table', 'pipilotdb_delete_table', 'pipilotdb_create_table'],
+          supabase: ['supabase_fetch_api_keys', 'supabase_create_table', 'supabase_insert_data', 'supabase_delete_data', 'supabase_read_table', 'supabase_drop_table', 'supabase_execute_sql', 'supabase_list_tables_rls', 'request_supabase_connection'],
+          stripe: ['stripe_validate_key', 'stripe_list_products', 'stripe_create_product', 'stripe_update_product', 'stripe_delete_product', 'stripe_list_prices', 'stripe_create_price', 'stripe_update_price', 'stripe_list_customers', 'stripe_create_customer', 'stripe_update_customer', 'stripe_delete_customer', 'stripe_create_payment_intent', 'stripe_update_payment_intent', 'stripe_cancel_payment_intent', 'stripe_list_charges', 'stripe_list_subscriptions', 'stripe_update_subscription', 'stripe_cancel_subscription', 'stripe_list_coupons', 'stripe_create_coupon', 'stripe_update_coupon', 'stripe_delete_coupon', 'stripe_create_refund', 'stripe_search'],
+          docs_quality: ['generate_report', 'pipilot_get_docs', 'auto_documentation', 'code_review', 'code_quality_analysis'],
+          image_gen: ['generate_image'],
+        }
+        for (const category of disabledToolCategories) {
+          const tools = categoryToolMap[category]
+          if (tools) unavailableTools.push(...tools)
+        }
+        console.log(`[Chat-V2] User disabled ${disabledToolCategories.length} tool categories:`, disabledToolCategories)
+      }
+
+      // Individual tool disabling (granular per-tool control)
+      if (disabledTools && Array.isArray(disabledTools) && disabledTools.length > 0) {
+        unavailableTools.push(...disabledTools)
+        console.log(`[Chat-V2] User disabled ${disabledTools.length} individual tools:`, disabledTools)
+      }
+
       if (unavailableTools.length > 0) {
         toolsToUse = Object.fromEntries(
           Object.entries(allTools).filter(([toolName]) => !unavailableTools.includes(toolName))
         )
-        console.log(`[Chat-V2] Agent mode - filtered out ${unavailableTools.length} unavailable tools (missing keys/config):`, unavailableTools)
+        console.log(`[Chat-V2] Agent mode - filtered out ${unavailableTools.length} unavailable tools`, unavailableTools)
       } else {
         toolsToUse = allTools
+      }
+    }
+
+    // MCP Server Integration - connect to user-configured MCP servers and merge their tools
+    const mcpClients: any[] = []
+    if (mcpServers && Array.isArray(mcpServers) && mcpServers.length > 0) {
+      console.log(`[Chat-V2] 🔌 Connecting to ${mcpServers.length} MCP server(s)...`)
+      for (const server of mcpServers) {
+        try {
+          if (!server.url) continue
+          const headers: Record<string, string> = { ...(server.headers || {}) }
+          const transportType = server.transport === 'sse' ? 'sse' : 'http'
+          const client = await createMCPClient({
+            transport: {
+              type: transportType as 'http' | 'sse',
+              url: server.url,
+              headers: Object.keys(headers).length > 0 ? headers : undefined,
+            },
+          })
+          mcpClients.push(client)
+          const mcpTools = await client.tools()
+          const toolCount = Object.keys(mcpTools).length
+          console.log(`[Chat-V2] 🔌 Connected to MCP server "${server.name || server.url}" - ${toolCount} tools available`)
+          // Merge MCP tools into toolsToUse (local tools take priority)
+          toolsToUse = { ...mcpTools, ...toolsToUse }
+        } catch (err) {
+          console.error(`[Chat-V2] ❌ Failed to connect to MCP server "${server.name || server.url}":`, err)
+        }
+      }
+    }
+
+    // Helper to close all MCP clients
+    const closeMCPClients = async () => {
+      for (const client of mcpClients) {
+        try { await client.close() } catch {}
       }
     }
 
@@ -10550,7 +10896,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
               keep: { type: 'tool_uses', value: 5 },
               clearAtLeast: { type: 'input_tokens', value: 1000 },
               clearToolInputs: true,
-              excludeTools: ['create_database', 'request_supabase_connection'],
+              excludeTools: ['pipilotdb_create_database', 'request_supabase_connection'],
             },
             {
               type: 'clear_thinking_20251015',
@@ -10572,13 +10918,16 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
       tools: toolsToUse,
       stopWhen: stepCountIs(maxStepsAllowed), // Stop when max steps reached
       ...(isAnthropicModel && anthropicProviderOptions ? { providerOptions: anthropicProviderOptions } : {}),
-      onFinish: ({ response }: any) => {
+      onFinish: async ({ response }: any) => {
         console.log(`[Chat-V2] Finished with ${response.messages.length} messages`)
-        
+
         // Log Anthropic metadata if available
         if (isAnthropicModel && response?.providerMetadata?.anthropic) {
           console.log('[Chat-V2] Anthropic metadata:', response.providerMetadata.anthropic)
         }
+
+        // Close MCP clients
+        await closeMCPClients()
       }
     })
 

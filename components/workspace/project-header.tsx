@@ -7,7 +7,6 @@ import { Logo } from "@/components/ui/logo"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import React, { useState, useEffect } from 'react'
 import type { Workspace as Project } from "@/lib/storage-manager"
-import { ModelSelector } from "@/components/ui/model-selector"
 import { ChatSessionSelector } from "@/components/ui/chat-session-selector"
 import { useGitHubPush } from "@/hooks/use-github-push"
 import {
@@ -249,74 +248,69 @@ export function ProjectHeader({
   }
   if (!project) {
     return (
-      <div className="h-16 border-b border-border bg-card px-6 flex items-center justify-between">
+      <div className="h-16 border-b border-gray-800/60 bg-gray-900/80 px-6 flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Logo variant="icon" size="sm" />
           <div>
-            <h1 className="text-lg font-semibold text-card-foreground">Time to Ship something new?</h1>
-            <p className="text-sm text-muted-foreground">Ask PiPilot to build your next app</p>
+            <h1 className="text-lg font-semibold text-gray-100">Time to Ship something new?</h1>
+            <p className="text-sm text-gray-500">Ask PiPilot to build your next app</p>
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          {/* Model selector only when project is selected */}
-          {project && selectedModel && onModelChange && (
-            <ModelSelector
-              selectedModel={selectedModel}
-              onModelChange={onModelChange}
-            />
-          )}
           {/* Create project button */}
           <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
             setIsCreateDialogOpen(open)
             onDialogOpenChange?.(open)
           }}>
-            <Button variant="default" size="sm" onClick={() => setIsCreateDialogOpen(true)}>
+            <Button size="sm" className="bg-orange-600 hover:bg-orange-500 text-white border-0" onClick={() => setIsCreateDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Create Manually
             </Button>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[425px] bg-gray-900 border-gray-800 text-white">
               <DialogHeader>
-                <DialogTitle>Create New Project</DialogTitle>
-                <DialogDescription>
+                <DialogTitle className="text-gray-100">Create New Project</DialogTitle>
+                <DialogDescription className="text-gray-400">
                   Start building your next app with PiPilot.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="name">Project Name</Label>
+                  <Label htmlFor="name" className="text-gray-200">Project Name</Label>
                   <Input
                     id="name"
                     placeholder="My Awesome App"
                     value={newProjectName}
                     onChange={(e) => setNewProjectName(e.target.value)}
+                    className="bg-gray-800 border-gray-700 text-white placeholder-gray-500"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="description">Description (Optional)</Label>
+                  <Label htmlFor="description" className="text-gray-200">Description (Optional)</Label>
                   <Textarea
                     id="description"
                     placeholder="A brief description of your project"
                     value={newProjectDescription}
                     onChange={(e) => setNewProjectDescription(e.target.value)}
+                    className="bg-gray-800 border-gray-700 text-white placeholder-gray-500"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="template">Template</Label>
+                  <Label htmlFor="template" className="text-gray-200">Template</Label>
                   <Select value={selectedTemplate} onValueChange={(value: 'vite-react' | 'nextjs' | 'expo' | 'html') => setSelectedTemplate(value)}>
-                    <SelectTrigger id="template">
+                    <SelectTrigger id="template" className="bg-gray-800 border-gray-700 text-white">
                       <SelectValue placeholder="Select a template..." />
                     </SelectTrigger>
-                    <SelectContent className="z-[110]">
-                      <SelectItem value="vite-react">Vite</SelectItem>
-                      <SelectItem value="nextjs">Next.js</SelectItem>
-                      <SelectItem value="expo">Expo (Mobile)</SelectItem>
-                      <SelectItem value="html">HTML</SelectItem>
+                    <SelectContent className="z-[110] bg-gray-800 border-gray-700">
+                      <SelectItem value="vite-react" className="text-gray-200">Vite</SelectItem>
+                      <SelectItem value="nextjs" className="text-gray-200">Next.js</SelectItem>
+                      <SelectItem value="expo" className="text-gray-200">Expo (Mobile)</SelectItem>
+                      <SelectItem value="html" className="text-gray-200">HTML</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <DialogFooter>
-                <Button onClick={handleCreateProject} disabled={!newProjectName.trim() || isCreating}>
+                <Button className="bg-orange-600 hover:bg-orange-500 text-white" onClick={handleCreateProject} disabled={!newProjectName.trim() || isCreating}>
                   {isCreating ? "Creating..." : "Create Project"}
                 </Button>
               </DialogFooter>
@@ -328,14 +322,14 @@ export function ProjectHeader({
   }
 
   return (
-    <div className="h-16 border-b border-border bg-card px-6 flex items-center justify-between">
+    <div className="h-16 border-b border-gray-800/60 bg-gray-900/80 px-6 flex items-center justify-between">
       <div className="flex items-center space-x-4">
         <Logo variant="icon" size="md" />
         <div>
           {editing ? (
             <input
               type="text"
-              className="text-lg font-semibold text-card-foreground bg-background border border-border rounded px-2 py-1 w-40 focus:outline-none focus:ring-2 focus:ring-primary"
+              className="text-lg font-semibold text-gray-100 bg-gray-800 border border-gray-700 rounded px-2 py-1 w-40 focus:outline-none focus:ring-2 focus:ring-orange-500"
               value={nameInput}
               autoFocus
               onChange={e => setNameInput(e.target.value)}
@@ -347,7 +341,7 @@ export function ProjectHeader({
             />
           ) : (
             <h1
-              className="text-lg font-semibold text-card-foreground cursor-pointer hover:underline"
+              className="text-lg font-semibold text-gray-100 cursor-pointer hover:underline"
               title="Click to edit project name"
               onClick={() => setEditing(true)}
             >
@@ -356,20 +350,6 @@ export function ProjectHeader({
           )}
         </div>
        
-        {/* Model label and selector */}
-        {selectedModel && onModelChange && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-muted-foreground">Model:</span>
-            <ModelSelector
-              selectedModel={selectedModel}
-              onModelChange={onModelChange}
-              userPlan={userPlan}
-              subscriptionStatus={subscriptionStatus}
-              compact={true}
-            />
-          </div>
-        )}
-
         {/* Chat Session Selector */}
         {project && user && (
           <ChatSessionSelector
@@ -407,47 +387,49 @@ export function ProjectHeader({
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-          <DialogContent className="z-50">
+          <DialogContent className="z-50 bg-gray-900 border-gray-800 text-white">
             <DialogHeader>
-              <DialogTitle>Create New Project</DialogTitle>
-              <DialogDescription>Start building your next app with AI assistance.</DialogDescription>
+              <DialogTitle className="text-white">Create New Project</DialogTitle>
+              <DialogDescription className="text-gray-400">Start building your next app with AI assistance.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="name">Project Name</Label>
+                <Label htmlFor="name" className="text-gray-300">Project Name</Label>
                 <Input
                   id="name"
                   placeholder="My Awesome App"
                   value={newProjectName}
                   onChange={(e) => setNewProjectName(e.target.value)}
+                  className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500"
                 />
               </div>
               <div>
-                <Label htmlFor="description">Description (Optional)</Label>
+                <Label htmlFor="description" className="text-gray-300">Description (Optional)</Label>
                 <Textarea
                   id="description"
                   placeholder="Describe what your app will do..."
                   value={newProjectDescription}
                   onChange={(e) => setNewProjectDescription(e.target.value)}
+                  className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500"
                 />
               </div>
               <div>
-                <Label htmlFor="template">Template</Label>
+                <Label htmlFor="template" className="text-gray-300">Template</Label>
                 <Select value={selectedTemplate} onValueChange={(value: 'vite-react' | 'nextjs' | 'expo' | 'html') => setSelectedTemplate(value)}>
-                  <SelectTrigger id="template">
+                  <SelectTrigger id="template" className="bg-gray-800 border-gray-700 text-white">
                     <SelectValue placeholder="Select a template..." />
                   </SelectTrigger>
-                  <SelectContent className="z-[110]">
-                    <SelectItem value="vite-react">Vite</SelectItem>
-                    <SelectItem value="nextjs">Next.js</SelectItem>
-                    <SelectItem value="expo">Expo (Mobile)</SelectItem>
-                    <SelectItem value="html">HTML</SelectItem>
+                  <SelectContent className="z-[110] bg-gray-800 border-gray-700">
+                    <SelectItem value="vite-react" className="text-gray-200 hover:bg-gray-700">Vite</SelectItem>
+                    <SelectItem value="nextjs" className="text-gray-200 hover:bg-gray-700">Next.js</SelectItem>
+                    <SelectItem value="expo" className="text-gray-200 hover:bg-gray-700">Expo (Mobile)</SelectItem>
+                    <SelectItem value="html" className="text-gray-200 hover:bg-gray-700">HTML</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
             <DialogFooter>
-              <Button onClick={handleCreateProject} disabled={!newProjectName.trim() || isCreating}>
+              <Button onClick={handleCreateProject} disabled={!newProjectName.trim() || isCreating} className="bg-orange-600 hover:bg-orange-500 text-white">
                 {isCreating ? "Creating..." : "Create Project"}
               </Button>
             </DialogFooter>
@@ -485,10 +467,10 @@ export function ProjectHeader({
                 size="sm" 
                 onClick={handleBackupToCloud}
                 disabled={!project || isBackingUp}
-                className="h-8 w-8 p-0 sm:w-auto sm:px-3 bg-blue-600/10 border-blue-500 hover:bg-blue-600/20"
+                className="h-8 w-8 p-0 sm:w-auto sm:px-3 bg-orange-600/10 border-orange-500/50 hover:bg-orange-600/20"
               >
-                <Cloud className={`h-4 w-4 text-blue-400 ${isBackingUp ? 'animate-pulse' : ''}`} />
-                <span className="hidden sm:inline ml-2 text-blue-400">
+                <Cloud className={`h-4 w-4 text-orange-400 ${isBackingUp ? 'animate-pulse' : ''}`} />
+                <span className="hidden sm:inline ml-2 text-orange-400">
                   {isBackingUp ? "Backing up..." : "Backup"}
                 </span>
               </Button>
@@ -533,10 +515,10 @@ export function ProjectHeader({
                 size="sm" 
                 onClick={onDatabase}
                 disabled={!project}
-                className="h-8 w-8 p-0 sm:w-auto sm:px-3 bg-purple-600/10 border-purple-500 hover:bg-purple-600/20"
+                className="h-8 w-8 p-0 sm:w-auto sm:px-3 bg-orange-600/10 border-orange-500/50 hover:bg-orange-600/20"
               >
-                <Database className="h-4 w-4 text-purple-400" />
-                <span className="hidden sm:inline ml-2 text-purple-400">Database</span>
+                <Database className="h-4 w-4 text-orange-400" />
+                <span className="hidden sm:inline ml-2 text-orange-400">Database</span>
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">
@@ -549,11 +531,11 @@ export function ProjectHeader({
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button 
-                size="sm" 
-                onClick={onDeploy} 
+              <Button
+                size="sm"
+                onClick={onDeploy}
                 disabled={!project}
-                className="h-8 px-3"
+                className="h-8 px-3 bg-orange-600 hover:bg-orange-500 text-white border-0"
               >
                 <Rocket className="h-4 w-4" />
                 <span className="hidden sm:inline ml-2">Deploy</span>

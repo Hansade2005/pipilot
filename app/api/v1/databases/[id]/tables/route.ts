@@ -11,10 +11,12 @@ import {
 import { validateTableSchema } from '@/lib/validate-schema';
 
 // Create Supabase client with service role (bypasses RLS)
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 /**
  * Middleware to authenticate API key and check rate limits
@@ -46,7 +48,7 @@ async function authenticateApiKey(request: Request, databaseId: string) {
   const keyHash = hashApiKey(apiKey);
 
   // Look up the API key in database
-  const { data: apiKeyRecord, error: keyError } = await supabaseAdmin
+  const { data: apiKeyRecord, error: keyError } = await getSupabaseAdmin()
     .from('api_keys')
     .select('*, databases!inner(*)')
     .eq('key_hash', keyHash)
@@ -67,7 +69,7 @@ async function authenticateApiKey(request: Request, databaseId: string) {
   const rateLimitResult = await checkRateLimit(
     apiKeyRecord.id,
     apiKeyRecord.rate_limit,
-    supabaseAdmin
+    getSupabaseAdmin()
   );
 
   if (rateLimitResult.exceeded) {
@@ -92,7 +94,7 @@ async function authenticateApiKey(request: Request, databaseId: string) {
   }
 
   // Update last_used_at timestamp
-  updateApiKeyLastUsed(apiKeyRecord.id, supabaseAdmin);
+  updateApiKeyLastUsed(apiKeyRecord.id, getSupabaseAdmin());
 
   return {
     apiKeyRecord,
@@ -121,7 +123,7 @@ export async function GET(
     const { apiKeyRecord, startTime } = authResult;
 
     // Get all tables in this database
-    const { data: tables, error: tablesError } = await supabaseAdmin
+    const { data: tables, error: tablesError } = await getSupabaseAdmin()
       .from('tables')
       .select('*')
       .eq('database_id', databaseId)
@@ -138,7 +140,7 @@ export async function GET(
     // Get record counts for each table
     const tablesWithCounts = await Promise.all(
       (tables || []).map(async (table) => {
-        const { count } = await supabaseAdmin
+        const { count } = await getSupabaseAdmin()
           .from('records')
           .select('*', { count: 'exact', head: true })
           .eq('table_id', table.id);
@@ -161,7 +163,7 @@ export async function GET(
       'GET',
       200,
       Date.now() - startTime,
-      supabaseAdmin
+      getSupabaseAdmin()
     );
 
     return NextResponse.json({
@@ -214,7 +216,7 @@ export async function POST(
     const { apiKeyRecord, startTime } = authResult;
 
     // Check if table name already exists in this database
-    const { data: existingTable } = await supabaseAdmin
+    const { data: existingTable } = await getSupabaseAdmin()
       .from('tables')
       .select('id')
       .eq('database_id', databaseId)
@@ -229,7 +231,7 @@ export async function POST(
     }
 
     // Create the table
-    const { data: newTable, error: createError } = await supabaseAdmin
+    const { data: newTable, error: createError } = await getSupabaseAdmin()
       .from('tables')
       .insert({
         database_id: databaseId,
@@ -254,7 +256,7 @@ export async function POST(
       'POST',
       201,
       Date.now() - startTime,
-      supabaseAdmin
+      getSupabaseAdmin()
     );
 
     return NextResponse.json({

@@ -1,0 +1,135 @@
+'use client'
+
+import React from 'react'
+import {
+  Plan,
+  PlanHeader,
+  PlanTitle,
+  PlanDescription,
+  PlanTrigger,
+  PlanContent,
+  PlanFooter,
+} from '@/components/ai-elements/plan'
+import { FileText, Layers, Hammer, CheckCircle2, ChevronRight, Sparkles } from 'lucide-react'
+import { cn } from '@/lib/utils'
+
+interface PlanStep {
+  title: string
+  description: string
+}
+
+interface PlanCardProps {
+  title: string
+  description: string
+  steps: PlanStep[]
+  techStack?: string[]
+  estimatedFiles?: number
+  isStreaming?: boolean
+  onBuild?: () => void
+  onRefine?: () => void
+}
+
+export function PlanCard({
+  title,
+  description,
+  steps,
+  techStack,
+  estimatedFiles,
+  isStreaming = false,
+  onBuild,
+  onRefine,
+}: PlanCardProps) {
+  return (
+    <Plan defaultOpen={true} isStreaming={isStreaming}>
+      <PlanHeader>
+        <div className="flex-1 min-w-0">
+          <div className="mb-2 flex items-center gap-2">
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-orange-600/15">
+              <Layers className="size-3.5 text-orange-400" />
+            </div>
+            <PlanTitle>{title}</PlanTitle>
+          </div>
+          <PlanDescription>{description}</PlanDescription>
+
+          {/* Tech Stack & File Count Badges */}
+          {(techStack?.length || estimatedFiles) && (
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              {techStack?.map((tech, idx) => (
+                <span
+                  key={idx}
+                  className="inline-flex items-center rounded-md bg-gray-800 px-2 py-0.5 text-xs text-gray-300 border border-gray-700/60"
+                >
+                  {tech}
+                </span>
+              ))}
+              {estimatedFiles && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-orange-500/10 px-2 py-0.5 text-xs text-orange-400 border border-orange-500/20">
+                  <FileText className="size-3" />
+                  ~{estimatedFiles} files
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+        <PlanTrigger />
+      </PlanHeader>
+
+      <PlanContent>
+        <div className="space-y-1">
+          {steps.map((step, idx) => (
+            <div
+              key={idx}
+              className={cn(
+                "flex gap-3 rounded-lg px-3 py-2.5 transition-colors",
+                "hover:bg-gray-800/50"
+              )}
+            >
+              {/* Step Number */}
+              <div className="flex-shrink-0 mt-0.5">
+                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-orange-600/15 text-[10px] font-semibold text-orange-400">
+                  {idx + 1}
+                </div>
+              </div>
+
+              {/* Step Content */}
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-gray-200">{step.title}</div>
+                <div className="mt-0.5 text-xs text-gray-500 leading-relaxed">{step.description}</div>
+              </div>
+
+              {/* Step Status Indicator */}
+              <div className="flex-shrink-0 mt-0.5">
+                <ChevronRight className="size-3.5 text-gray-600" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </PlanContent>
+
+      <PlanFooter className="justify-between">
+        <button
+          onClick={onRefine}
+          className="text-xs text-gray-500 hover:text-orange-400 transition-colors"
+        >
+          Refine plan
+        </button>
+        <button
+          onClick={onBuild}
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-all",
+            "bg-orange-600 hover:bg-orange-500 text-white",
+            "shadow-lg shadow-orange-500/20",
+            "disabled:opacity-30 disabled:cursor-not-allowed"
+          )}
+          disabled={isStreaming}
+        >
+          <Hammer className="size-3.5" />
+          Build
+          <kbd className="ml-1 rounded bg-orange-700/50 px-1.5 py-0.5 text-[10px] font-mono text-orange-200">
+            Enter
+          </kbd>
+        </button>
+      </PlanFooter>
+    </Plan>
+  )
+}

@@ -26,6 +26,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface ApiKey {
     id: string
@@ -42,6 +43,7 @@ interface ApiKey {
 }
 
 export default function SettingsPage() {
+  usePageTitle('Database Settings')
     const [database, setDatabase] = useState<any>(null)
     const [apiKeys, setApiKeys] = useState<ApiKey[]>([])
     const [loading, setLoading] = useState(true)

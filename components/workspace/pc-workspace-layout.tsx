@@ -15,19 +15,21 @@ import { ChatPanelV2 } from "./chat-panel-v2"
 import { CodePreviewPanel } from "./code-preview-panel"
 import { ProjectHeader } from "./project-header"
 import { FileExplorer } from "./file-explorer"
-import { CodeEditor } from "./code-editor"
+import { CodeEditor, defaultEditorSettings, type EditorSettings } from "./code-editor"
 import { DatabaseTab } from "./database-tab"
 import { AIPplatformTab } from "./ai-platform-tab"
 import { CloudTab } from "./cloud-tab"
-import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, Square, Monitor, Smartphone, Database, Cloud } from "lucide-react"
+import { Github, Globe, Rocket, Settings, PanelLeft, PanelLeftClose, PanelLeftOpen, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, Square, Monitor, Smartphone, Database, Cloud, Search, Folder } from "lucide-react"
 import { storageManager } from "@/lib/storage-manager"
 import { useToast } from '@/hooks/use-toast'
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useCloudSync } from '@/hooks/use-cloud-sync'
 import { useAutoCloudBackup } from '@/hooks/use-auto-cloud-backup'
+import { useRealtimeSync } from '@/hooks/use-realtime-sync'
 import { useSubscriptionCache } from '@/hooks/use-subscription-cache'
 import { restoreBackupFromCloud, isCloudSyncEnabled } from '@/lib/cloud-sync'
 import { generateFileUpdate, type StyleChange } from '@/lib/visual-editor'
+
 import { ModelSelector } from "@/components/ui/model-selector"
 import { AiModeSelector, type AIMode } from "@/components/ui/ai-mode-selector"
 import { DEFAULT_CHAT_MODEL } from "@/lib/ai-models"
@@ -45,6 +47,11 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
+// Module-level flag: resets on full page refresh (module reloads), but persists
+// across in-session re-renders and client-side navigations. This ensures we only
+// auto-restore once per page load — not while the user is actively working.
+let hasAutoRestoredThisSession = false
 
 interface WorkspaceLayoutProps {
   user: User
@@ -79,6 +86,21 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [aiMode, setAiMode] = useState<AIMode>('agent')
   const [projectFiles, setProjectFiles] = useState<File[]>([])
 
+  // Chat panel toggle (desktop)
+  const [chatPanelVisible, setChatPanelVisible] = useState(true)
+
+  // VS Code-like code view state
+  const [codeViewPanel, setCodeViewPanel] = useState<'files' | 'search' | 'chat' | 'settings' | null>('files')
+  const [openFiles, setOpenFiles] = useState<File[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [editorSettings, setEditorSettings] = useState<EditorSettings>(defaultEditorSettings)
+
+  // Code chat state
+  const [codeChatMessages, setCodeChatMessages] = useState<Array<{role: 'user' | 'assistant', content: string}>>([])
+  const [codeChatInput, setCodeChatInput] = useState('')
+  const [isCodeChatLoading, setIsCodeChatLoading] = useState(false)
+  const codeChatScrollRef = useRef<HTMLDivElement>(null)
+
   // Initialize auto cloud backup when user is available
   const { triggerBackup, getSyncStatus } = useCloudSync(user?.id || null)
   
@@ -89,8 +111,107 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     instantForCritical: true // Enable instant backup for critical operations
   })
 
+  // Real-time cross-device sync: when another device backs up, silently restore here
+  useRealtimeSync(user?.id || null, {
+    onSyncComplete: async () => {
+      try {
+        await storageManager.init()
+        const workspaces = await storageManager.getWorkspaces(user.id)
+        setClientProjects(workspaces || [])
+
+        // Refresh files for the currently selected project
+        if (selectedProject) {
+          const files = await storageManager.getFiles(selectedProject.id)
+          setProjectFiles(files || [])
+          setFileExplorerKey(prev => prev + 1)
+        }
+      } catch (error) {
+        console.error('Failed to reload workspace after cross-device sync:', error)
+      }
+    }
+  })
+
   // GitHub push functionality
   const { pushToGitHub, checkGitHubConnection, isPushing } = useGitHubPush()
+
+  // VS Code tab management helpers
+  const handleOpenFile = (file: File) => {
+    setSelectedFile(file)
+    setOpenFiles(prev => {
+      if (prev.some(f => f.path === file.path)) return prev
+      return [...prev, file]
+    })
+  }
+
+  const handleCloseFile = (file: File) => {
+    setOpenFiles(prev => {
+      const next = prev.filter(f => f.path !== file.path)
+      // If we closed the active file, select the last remaining tab
+      if (selectedFile?.path === file.path) {
+        setSelectedFile(next.length > 0 ? next[next.length - 1] : null)
+      }
+      return next
+    })
+  }
+
+  const handleSelectOpenFile = (file: File) => {
+    setSelectedFile(file)
+  }
+
+  // Code chat handler
+  const handleCodeChatSend = async () => {
+    if (!codeChatInput.trim() || isCodeChatLoading) return
+    const message = codeChatInput.trim()
+    setCodeChatInput('')
+    setCodeChatMessages(prev => [...prev, { role: 'user', content: message }])
+    setIsCodeChatLoading(true)
+
+    try {
+      const response = await fetch('/api/ai-fix', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          error: null,
+          lineNumber: null,
+          fileName: selectedFile?.name || '',
+          fileContent: selectedFile?.content || '',
+          userMessage: message,
+          projectFiles: projectFiles?.map(f => ({ name: f.name, path: f.path })) || [],
+          modelId: selectedModel,
+          mode: 'chat'
+        })
+      })
+
+      if (!response.ok) throw new Error('Failed')
+
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+      let accumulated = ''
+
+      setCodeChatMessages(prev => [...prev, { role: 'assistant', content: '' }])
+
+      if (reader) {
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            accumulated += decoder.decode(value, { stream: true })
+            setCodeChatMessages(prev => {
+              const updated = [...prev]
+              updated[updated.length - 1] = { role: 'assistant', content: accumulated }
+              return updated
+            })
+          }
+        } finally {
+          reader.releaseLock()
+        }
+      }
+    } catch (error) {
+      setCodeChatMessages(prev => [...prev, { role: 'assistant', content: 'Error: Failed to get response' }])
+    } finally {
+      setIsCodeChatLoading(false)
+    }
+  }
 
   // Visual Editor save handler - applies style changes to source files
   const handleVisualEditorSave = async (changes: { 
@@ -269,6 +390,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
   // Initial prompt to auto-send to chat when project is created
   const [initialChatPrompt, setInitialChatPrompt] = useState<string | undefined>(undefined)
+  // Initial chat mode from homepage selection
+  const [initialChatMode, setInitialChatMode] = useState<'plan' | 'agent' | undefined>(undefined)
 
   // Auto-restore state
   const [isAutoRestoring, setIsAutoRestoring] = useState(false)
@@ -333,13 +456,10 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       console.log('[WorkspaceLayout] AI stream complete event received:', { shouldSwitchToPreview, shouldCreatePreview })
 
       if (shouldSwitchToPreview) {
-        // Switch to preview tab
         setActiveTab('preview')
-        // Also switch mobile tab to preview on mobile devices
         if (isMobile) {
           setMobileTab('preview')
         }
-        console.log('[WorkspaceLayout] Switched to preview tab after AI streaming', { isMobile })
       }
 
       if (shouldCreatePreview) {
@@ -371,52 +491,35 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   }, [])
 
   // Auto-restore from cloud and load projects from IndexedDB on client-side
+  // Only runs on fresh page load/refresh (hasAutoRestoredThisSession resets on reload)
   useEffect(() => {
     const loadClientProjects = async () => {
       try {
         setIsLoadingProjects(true)
-        console.log('WorkspaceLayout: Starting to load projects from IndexedDB...')
 
         await storageManager.init()
-        console.log('WorkspaceLayout: Storage manager initialized')
 
-        // Check if we're in a specific project workspace (has projectId in URL)
-        const projectId = searchParams.get('projectId')
         const isDeletingProject = searchParams.get('deleting') === 'true'
         const isNewProject = searchParams.get('newProject') !== null
-        
-        // ✅ CRITICAL FIX: Skip auto-restore for newly created projects from chat-input
-        // Auto-restore clears ALL data and restores from backup, which would DELETE the new project's files!
-        if (isNewProject) {
-          console.log('🆕 WorkspaceLayout: NEW PROJECT detected from chat-input - SKIPPING auto-restore to preserve new project files')
-        }
-        
-        // Only auto-restore when in a project workspace and not during deletion or creation
-        if (projectId && !isDeletingProject && !justCreatedProject && !isNewProject) {
-          console.log('WorkspaceLayout: In project workspace, checking cloud sync for user:', user.id)
+
+        // Auto-restore on any page refresh/navigation, but NOT during active session
+        // hasAutoRestoredThisSession is module-level: resets on page refresh, persists in-session
+        if (!hasAutoRestoredThisSession && !isDeletingProject && !justCreatedProject && !isNewProject) {
           const cloudSyncEnabled = await isCloudSyncEnabled(user.id)
-          console.log('WorkspaceLayout: Cloud sync enabled result:', cloudSyncEnabled)
 
           if (cloudSyncEnabled) {
             setIsAutoRestoring(true)
-            console.log('WorkspaceLayout: Auto-restore enabled for project workspace, attempting to restore latest backup...')
 
             try {
-              console.log('WorkspaceLayout: Calling restoreBackupFromCloud...')
               const restoreSuccess = await restoreBackupFromCloud(user.id)
-              console.log('WorkspaceLayout: restoreBackupFromCloud returned:', restoreSuccess)
 
               if (restoreSuccess) {
-                console.log('WorkspaceLayout: Successfully restored latest backup from cloud')
                 toast({
                   title: "Auto-restore completed",
                   description: "Your latest project data has been restored from the cloud.",
                 })
-              } else {
-                console.log('WorkspaceLayout: No backup found or restore failed, using local data')
               }
             } catch (restoreError) {
-              console.error('WorkspaceLayout: Error during auto-restore:', restoreError)
               toast({
                 title: "Auto-restore failed",
                 description: "Could not restore from cloud. Using local data.",
@@ -425,11 +528,10 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             } finally {
               setIsAutoRestoring(false)
             }
-          } else {
-            console.log('WorkspaceLayout: Cloud sync is disabled, skipping auto-restore')
           }
-        } else {
-          console.log('WorkspaceLayout: Not in project workspace or project is being deleted, skipping auto-restore')
+
+          // Mark as restored for this session — prevents re-restore on in-session navigation
+          hasAutoRestoredThisSession = true
         }
 
         const workspaces = await storageManager.getWorkspaces(user.id)
@@ -516,8 +618,12 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             const storedPrompt = sessionStorage.getItem(`initial-prompt-${projectId}`)
             if (storedPrompt) {
               setInitialChatPrompt(storedPrompt)
-              // Clean up sessionStorage after retrieving
               sessionStorage.removeItem(`initial-prompt-${projectId}`)
+            }
+            const storedMode = sessionStorage.getItem(`initial-chat-mode-${projectId}`)
+            if (storedMode === 'plan' || storedMode === 'agent') {
+              setInitialChatMode(storedMode)
+              sessionStorage.removeItem(`initial-chat-mode-${projectId}`)
             }
           }
           
@@ -1123,110 +1229,480 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
             {/* Main Workspace */}
             {!isLoadingProjects && clientProjects.length > 0 && (
-              <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
-                {/* Left Panel - Chat (Resizable) */}
-                <ResizablePanel defaultSize={40} minSize={20} maxSize={40}>
-                  <div className="h-full flex flex-col border-r border-border">
-                    <ChatPanelV2
-                      project={selectedProject}
-                      selectedModel={selectedModel}
-                      aiMode={aiMode}
-
-                      initialPrompt={initialChatPrompt}
-                    />
-                  </div>
-                </ResizablePanel>
-
-                <ResizableHandle withHandle />
-
-                {/* Right Panel - Code/Preview Area */}
-                <ResizablePanel defaultSize={60} minSize={30}>
-                  <div className="h-full flex flex-col">
-                    {/* Tab Switcher with Preview Controls - Hidden when in preview mode */}
-                    {activeTab !== "preview" && (
-                      <div className="border-b border-border bg-card p-2 flex-shrink-0">
-                        <div className="flex items-center justify-between">
-                          <div className="flex space-x-1">
-                            <Button
-                              variant={activeTab === "code" ? "secondary" : "ghost"}
-                              size="sm"
-                              onClick={() => setActiveTab("code")}
-                              title="Code Editor"
-                            >
-                              <Code className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setActiveTab("preview")}
-                              title="Live Preview"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant={activeTab === "cloud" ? "secondary" : "ghost"}
-                              size="sm"
-                              onClick={() => setActiveTab("cloud")}
-                              title="Cloud Services"
-                            >
-                              <Cloud className="h-4 w-4" />
-                            </Button>
-                          </div>
-
-
-                        </div>
+              <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0" key={chatPanelVisible ? 'with-chat' : 'without-chat'}>
+                {/* Left Panel - Chat (Resizable) - toggleable */}
+                {chatPanelVisible && (
+                  <>
+                    <ResizablePanel defaultSize={40} minSize={20} maxSize={40}>
+                      <div className="h-full flex flex-col border-r border-border">
+                        <ChatPanelV2
+                          project={selectedProject}
+                          selectedModel={selectedModel}
+                          aiMode={aiMode}
+                          initialPrompt={initialChatPrompt}
+                          initialChatMode={initialChatMode}
+                        />
                       </div>
-                    )}
+                    </ResizablePanel>
 
+                    <ResizableHandle withHandle />
+                  </>
+                )}
+
+                {/* Right Panel - VS Code Layout */}
+                <ResizablePanel defaultSize={chatPanelVisible ? 60 : 100} minSize={30}>
+                  <div className="h-full flex flex-col">
                     {/* Content Area */}
                     {activeTab === "code" ? (
-                      /* Code Tab: File Explorer + Code Editor */
-                      <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
-                        {/* File Explorer Panel */}
-                        <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
-                          <div className="h-full flex flex-col border-r border-border">
-                            <FileExplorer
-                              key={fileExplorerKey}
-                              project={selectedProject}
-                              onFileSelect={setSelectedFile}
-                              selectedFile={selectedFile}
-                            />
+                      /* VS Code-like Layout: Activity Bar + Sidebar + Editor */
+                      <div className="flex-1 flex min-h-0">
+                        {/* Activity Bar - VS Code icon strip */}
+                        <div className="w-12 bg-gray-950 border-r border-gray-800/60 flex flex-col items-center py-1 flex-shrink-0">
+                          {/* Toggle Chat Panel */}
+                          <button
+                            onClick={() => setChatPanelVisible(v => !v)}
+                            className={`w-10 h-10 flex items-center justify-center rounded-lg mb-1 transition-colors relative ${
+                              chatPanelVisible
+                                ? 'text-orange-400 bg-orange-600/15'
+                                : 'text-gray-500 hover:text-orange-400 hover:bg-orange-500/10'
+                            }`}
+                            title={chatPanelVisible ? "Hide Chat Panel" : "Show Chat Panel"}
+                          >
+                            {chatPanelVisible ? <PanelLeftClose className="size-5" /> : <PanelLeftOpen className="size-5" />}
+                          </button>
+
+                          <div className="w-6 border-t border-gray-800/60 mb-1" />
+
+                          <button
+                            onClick={() => setCodeViewPanel(codeViewPanel === 'files' ? null : 'files')}
+                            className={`w-10 h-10 flex items-center justify-center rounded-lg mb-0.5 transition-colors relative ${
+                              codeViewPanel === 'files'
+                                ? 'text-white bg-gray-800/60'
+                                : 'text-gray-500 hover:text-gray-300'
+                            }`}
+                            title="Explorer"
+                          >
+                            <Folder className="size-5" />
+                            {codeViewPanel === 'files' && (
+                              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-orange-500 rounded-r" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => setCodeViewPanel(codeViewPanel === 'search' ? null : 'search')}
+                            className={`w-10 h-10 flex items-center justify-center rounded-lg mb-0.5 transition-colors relative ${
+                              codeViewPanel === 'search'
+                                ? 'text-white bg-gray-800/60'
+                                : 'text-gray-500 hover:text-gray-300'
+                            }`}
+                            title="Search"
+                          >
+                            <Search className="size-5" />
+                            {codeViewPanel === 'search' && (
+                              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-orange-500 rounded-r" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => setCodeViewPanel(codeViewPanel === 'chat' ? null : 'chat')}
+                            className={`w-10 h-10 flex items-center justify-center rounded-lg mb-0.5 transition-colors relative ${
+                              codeViewPanel === 'chat'
+                                ? 'text-white bg-gray-800/60'
+                                : 'text-gray-500 hover:text-gray-300'
+                            }`}
+                            title="Chat"
+                          >
+                            <MessageSquare className="size-5" />
+                            {codeViewPanel === 'chat' && (
+                              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-orange-500 rounded-r" />
+                            )}
+                          </button>
+
+                          <div className="flex-1" />
+
+                          {/* Bottom activity bar icons */}
+                          <button
+                            onClick={() => setActiveTab("preview")}
+                            className="w-10 h-10 flex items-center justify-center rounded-lg mb-0.5 transition-colors text-gray-500 hover:text-gray-300"
+                            title="Live Preview"
+                          >
+                            <Eye className="size-5" />
+                          </button>
+                          <button
+                            onClick={() => setActiveTab("cloud")}
+                            className="w-10 h-10 flex items-center justify-center rounded-lg mb-0.5 transition-colors text-gray-500 hover:text-gray-300"
+                            title="Cloud Services"
+                          >
+                            <Cloud className="size-5" />
+                          </button>
+                          <button
+                            onClick={() => setCodeViewPanel(codeViewPanel === 'settings' ? null : 'settings')}
+                            className={`w-10 h-10 flex items-center justify-center rounded-lg mb-0.5 transition-colors relative ${
+                              codeViewPanel === 'settings'
+                                ? 'text-white bg-gray-800/60'
+                                : 'text-gray-500 hover:text-gray-300'
+                            }`}
+                            title="Settings"
+                          >
+                            <Settings className="size-5" />
+                            {codeViewPanel === 'settings' && (
+                              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-orange-500 rounded-r" />
+                            )}
+                          </button>
+                        </div>
+
+                        {/* Sidebar Panel (File Explorer, Search, Chat, or Settings) */}
+                        {codeViewPanel && (
+                          <div className="w-64 bg-gray-950 border-r border-gray-800/60 flex flex-col min-h-0 flex-shrink-0">
+                            {codeViewPanel === 'files' && (
+                              <FileExplorer
+                                key={fileExplorerKey}
+                                project={selectedProject}
+                                onFileSelect={(file) => {
+                                  if (file) handleOpenFile(file)
+                                }}
+                                selectedFile={selectedFile}
+                              />
+                            )}
+                            {codeViewPanel === 'search' && (
+                              <div className="flex flex-col h-full">
+                                <div className="px-4 py-3 border-b border-gray-800/60">
+                                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Search</h3>
+                                </div>
+                                <div className="p-3">
+                                  <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="Search files..."
+                                    className="w-full px-3 py-1.5 bg-gray-900/80 border border-gray-700/60 rounded-lg text-sm text-gray-200 placeholder:text-gray-500 focus:outline-none focus:border-gray-600"
+                                  />
+                                </div>
+                                <div className="flex-1 overflow-y-auto">
+                                  {searchQuery.trim() ? (
+                                    (() => {
+                                      const results = projectFiles.filter(f =>
+                                        f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                        f.path.toLowerCase().includes(searchQuery.toLowerCase())
+                                      )
+                                      return results.length > 0 ? (
+                                        results.map(f => (
+                                          <button
+                                            key={f.path}
+                                            onClick={() => { handleOpenFile(f); setCodeViewPanel('files') }}
+                                            className="w-full px-4 py-2 text-left text-xs hover:bg-gray-800/60 transition-colors flex items-center gap-2"
+                                          >
+                                            <FileText className="size-3.5 text-gray-500 flex-shrink-0" />
+                                            <div className="min-w-0">
+                                              <div className="text-gray-200 truncate">{f.name}</div>
+                                              <div className="text-gray-500 truncate text-[10px]">{f.path}</div>
+                                            </div>
+                                          </button>
+                                        ))
+                                      ) : (
+                                        <div className="flex items-center justify-center h-20 text-gray-600 text-xs">
+                                          No files found
+                                        </div>
+                                      )
+                                    })()
+                                  ) : (
+                                    <div className="flex items-center justify-center h-20 text-gray-600 text-xs">
+                                      Type to search across files
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            {codeViewPanel === 'chat' && (
+                              <div className="flex flex-col h-full">
+                                <div className="px-4 py-3 border-b border-gray-800/60 flex items-center justify-between">
+                                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Chat</h3>
+                                  {codeChatMessages.length > 0 && (
+                                    <button
+                                      onClick={() => setCodeChatMessages([])}
+                                      className="text-gray-500 hover:text-gray-300 transition-colors"
+                                      title="Clear chat"
+                                    >
+                                      <RotateCcw className="size-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+
+                                {/* Messages */}
+                                <div ref={codeChatScrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">
+                                  {codeChatMessages.length === 0 && (
+                                    <div className="text-center py-8">
+                                      <MessageSquare className="size-8 text-gray-600 mx-auto mb-3" />
+                                      <p className="text-xs text-gray-500">Ask questions about your code</p>
+                                      {selectedFile && (
+                                        <p className="text-[10px] text-gray-600 mt-1">Context: {selectedFile.name}</p>
+                                      )}
+                                    </div>
+                                  )}
+                                  {codeChatMessages.map((msg, i) => (
+                                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                      <div className={`max-w-[90%] rounded-xl px-3 py-2 text-xs ${
+                                        msg.role === 'user'
+                                          ? 'bg-orange-600 text-white'
+                                          : 'bg-gray-800/60 text-gray-200 border border-gray-700/40'
+                                      }`}>
+                                        <div className="whitespace-pre-wrap break-words">{msg.content}</div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                  {isCodeChatLoading && codeChatMessages[codeChatMessages.length - 1]?.content === '' && (
+                                    <div className="flex justify-start">
+                                      <div className="bg-gray-800/60 rounded-xl px-3 py-2 border border-gray-700/40">
+                                        <div className="flex gap-1">
+                                          <span className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                          <span className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                          <span className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Input */}
+                                <div className="p-3 border-t border-gray-800/60">
+                                  <div className="flex gap-2">
+                                    <input
+                                      type="text"
+                                      value={codeChatInput}
+                                      onChange={(e) => setCodeChatInput(e.target.value)}
+                                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCodeChatSend() } }}
+                                      placeholder="Ask about your code..."
+                                      className="flex-1 min-w-0 px-3 py-1.5 bg-gray-900/80 border border-gray-700/60 rounded-lg text-sm text-gray-200 placeholder:text-gray-500 focus:outline-none focus:border-gray-600"
+                                      disabled={isCodeChatLoading}
+                                    />
+                                    <button
+                                      onClick={handleCodeChatSend}
+                                      disabled={!codeChatInput.trim() || isCodeChatLoading}
+                                      className="h-8 w-8 rounded-lg bg-orange-600 hover:bg-orange-500 disabled:opacity-40 disabled:hover:bg-orange-600 flex items-center justify-center flex-shrink-0 transition-colors"
+                                    >
+                                      <ArrowUp className="size-4 text-white" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            {codeViewPanel === 'settings' && (
+                              <div className="flex flex-col h-full">
+                                <div className="px-4 py-3 border-b border-gray-800/60">
+                                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Editor Settings</h3>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-3 space-y-4">
+
+                                  {/* Theme */}
+                                  <div>
+                                    <label className="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Theme</label>
+                                    <select
+                                      value={editorSettings.theme}
+                                      onChange={(e) => setEditorSettings(prev => ({ ...prev, theme: e.target.value as EditorSettings['theme'] }))}
+                                      className="mt-1 w-full px-2.5 py-1.5 bg-gray-900/80 border border-gray-700/60 rounded-lg text-xs text-gray-200 focus:outline-none focus:border-gray-600"
+                                    >
+                                      <option value="vs-dark">Dark (Default)</option>
+                                      <option value="vs">Light</option>
+                                      <option value="hc-black">High Contrast Dark</option>
+                                      <option value="hc-light">High Contrast Light</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Font Size */}
+                                  <div>
+                                    <label className="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Font Size</label>
+                                    <div className="mt-1 flex items-center gap-2">
+                                      <input
+                                        type="range"
+                                        min="10"
+                                        max="24"
+                                        value={editorSettings.fontSize}
+                                        onChange={(e) => setEditorSettings(prev => ({ ...prev, fontSize: Number(e.target.value) }))}
+                                        className="flex-1 accent-orange-500 h-1"
+                                      />
+                                      <span className="text-xs text-gray-300 w-8 text-right">{editorSettings.fontSize}px</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Font Family */}
+                                  <div>
+                                    <label className="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Font Family</label>
+                                    <select
+                                      value={editorSettings.fontFamily}
+                                      onChange={(e) => setEditorSettings(prev => ({ ...prev, fontFamily: e.target.value }))}
+                                      className="mt-1 w-full px-2.5 py-1.5 bg-gray-900/80 border border-gray-700/60 rounded-lg text-xs text-gray-200 focus:outline-none focus:border-gray-600"
+                                    >
+                                      <option value="JetBrains Mono, Fira Code, monospace">JetBrains Mono</option>
+                                      <option value="Fira Code, monospace">Fira Code</option>
+                                      <option value="Cascadia Code, monospace">Cascadia Code</option>
+                                      <option value="Source Code Pro, monospace">Source Code Pro</option>
+                                      <option value="Consolas, monospace">Consolas</option>
+                                      <option value="Monaco, monospace">Monaco</option>
+                                      <option value="monospace">System Mono</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Tab Size */}
+                                  <div>
+                                    <label className="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Tab Size</label>
+                                    <select
+                                      value={editorSettings.tabSize}
+                                      onChange={(e) => setEditorSettings(prev => ({ ...prev, tabSize: Number(e.target.value) }))}
+                                      className="mt-1 w-full px-2.5 py-1.5 bg-gray-900/80 border border-gray-700/60 rounded-lg text-xs text-gray-200 focus:outline-none focus:border-gray-600"
+                                    >
+                                      <option value={2}>2 spaces</option>
+                                      <option value={4}>4 spaces</option>
+                                      <option value={8}>8 spaces</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Word Wrap */}
+                                  <div>
+                                    <label className="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Word Wrap</label>
+                                    <select
+                                      value={editorSettings.wordWrap}
+                                      onChange={(e) => setEditorSettings(prev => ({ ...prev, wordWrap: e.target.value as EditorSettings['wordWrap'] }))}
+                                      className="mt-1 w-full px-2.5 py-1.5 bg-gray-900/80 border border-gray-700/60 rounded-lg text-xs text-gray-200 focus:outline-none focus:border-gray-600"
+                                    >
+                                      <option value="on">On</option>
+                                      <option value="off">Off</option>
+                                      <option value="wordWrapColumn">Word Wrap Column</option>
+                                      <option value="bounded">Bounded</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Line Numbers */}
+                                  <div>
+                                    <label className="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Line Numbers</label>
+                                    <select
+                                      value={editorSettings.lineNumbers}
+                                      onChange={(e) => setEditorSettings(prev => ({ ...prev, lineNumbers: e.target.value as EditorSettings['lineNumbers'] }))}
+                                      className="mt-1 w-full px-2.5 py-1.5 bg-gray-900/80 border border-gray-700/60 rounded-lg text-xs text-gray-200 focus:outline-none focus:border-gray-600"
+                                    >
+                                      <option value="on">On</option>
+                                      <option value="off">Off</option>
+                                      <option value="relative">Relative</option>
+                                      <option value="interval">Interval</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Cursor Style */}
+                                  <div>
+                                    <label className="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Cursor Style</label>
+                                    <select
+                                      value={editorSettings.cursorStyle}
+                                      onChange={(e) => setEditorSettings(prev => ({ ...prev, cursorStyle: e.target.value as EditorSettings['cursorStyle'] }))}
+                                      className="mt-1 w-full px-2.5 py-1.5 bg-gray-900/80 border border-gray-700/60 rounded-lg text-xs text-gray-200 focus:outline-none focus:border-gray-600"
+                                    >
+                                      <option value="line">Line</option>
+                                      <option value="block">Block</option>
+                                      <option value="underline">Underline</option>
+                                      <option value="line-thin">Line Thin</option>
+                                      <option value="block-outline">Block Outline</option>
+                                      <option value="underline-thin">Underline Thin</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Cursor Blinking */}
+                                  <div>
+                                    <label className="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Cursor Blinking</label>
+                                    <select
+                                      value={editorSettings.cursorBlinking}
+                                      onChange={(e) => setEditorSettings(prev => ({ ...prev, cursorBlinking: e.target.value as EditorSettings['cursorBlinking'] }))}
+                                      className="mt-1 w-full px-2.5 py-1.5 bg-gray-900/80 border border-gray-700/60 rounded-lg text-xs text-gray-200 focus:outline-none focus:border-gray-600"
+                                    >
+                                      <option value="blink">Blink</option>
+                                      <option value="smooth">Smooth</option>
+                                      <option value="phase">Phase</option>
+                                      <option value="expand">Expand</option>
+                                      <option value="solid">Solid</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Render Whitespace */}
+                                  <div>
+                                    <label className="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Render Whitespace</label>
+                                    <select
+                                      value={editorSettings.renderWhitespace}
+                                      onChange={(e) => setEditorSettings(prev => ({ ...prev, renderWhitespace: e.target.value as EditorSettings['renderWhitespace'] }))}
+                                      className="mt-1 w-full px-2.5 py-1.5 bg-gray-900/80 border border-gray-700/60 rounded-lg text-xs text-gray-200 focus:outline-none focus:border-gray-600"
+                                    >
+                                      <option value="none">None</option>
+                                      <option value="boundary">Boundary</option>
+                                      <option value="selection">Selection</option>
+                                      <option value="trailing">Trailing</option>
+                                      <option value="all">All</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Toggle Settings */}
+                                  <div className="space-y-2 pt-1">
+                                    <label className="text-[11px] text-gray-400 font-medium uppercase tracking-wider block">Features</label>
+                                    {([
+                                      ['minimap', 'Minimap'],
+                                      ['bracketPairColorization', 'Bracket Pair Colors'],
+                                      ['indentGuides', 'Indent Guides'],
+                                      ['smoothScrolling', 'Smooth Scrolling'],
+                                      ['scrollBeyondLastLine', 'Scroll Beyond Last Line'],
+                                      ['stickyScroll', 'Sticky Scroll'],
+                                      ['linkedEditing', 'Linked Editing'],
+                                      ['formatOnPaste', 'Format On Paste'],
+                                      ['formatOnType', 'Format On Type'],
+                                      ['insertSpaces', 'Insert Spaces'],
+                                    ] as const).map(([key, label]) => (
+                                      <label key={key} className="flex items-center justify-between cursor-pointer group">
+                                        <span className="text-xs text-gray-300 group-hover:text-gray-100 transition-colors">{label}</span>
+                                        <button
+                                          onClick={() => setEditorSettings(prev => ({ ...prev, [key]: !prev[key] }))}
+                                          className={`relative w-8 h-[18px] rounded-full transition-colors flex-shrink-0 ${
+                                            editorSettings[key] ? 'bg-orange-600' : 'bg-gray-700'
+                                          }`}
+                                        >
+                                          <div className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white transition-transform ${
+                                            editorSettings[key] ? 'translate-x-[16px]' : 'translate-x-[2px]'
+                                          }`} />
+                                        </button>
+                                      </label>
+                                    ))}
+                                  </div>
+
+                                  {/* Reset */}
+                                  <button
+                                    onClick={() => setEditorSettings(defaultEditorSettings)}
+                                    className="w-full mt-2 px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800/60 border border-gray-700/60 rounded-lg transition-colors"
+                                  >
+                                    Reset to Defaults
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </ResizablePanel>
+                        )}
 
-                        <ResizableHandle withHandle />
+                        {/* Editor Area - fills remaining space */}
+                        <div className="flex-1 min-w-0 flex flex-col">
+                          <CodeEditor
+                            file={selectedFile}
+                            projectFiles={projectFiles}
+                            openFiles={openFiles}
+                            onCloseFile={handleCloseFile}
+                            onSelectFile={handleSelectOpenFile}
+                            editorSettings={editorSettings}
+                            onSave={(file, content) => {
+                              console.log("File saved:", file.name, content.length, "characters")
 
-                        {/* Code Editor Panel */}
-                        <ResizablePanel defaultSize={75} minSize={40}>
-                          <div className="h-full flex flex-col">
-                            <CodeEditor
-                              file={selectedFile}
-                              projectFiles={projectFiles}
-                              onSave={(file, content) => {
-                                // Update the file content in state if needed
-                                console.log("File saved:", file.name, content.length, "characters")
+                              if (selectedProject) {
+                                storageManager.getFiles(selectedProject.id).then(files => {
+                                  setProjectFiles(files || [])
+                                }).catch(error => {
+                                  console.error("Error refreshing project files:", error)
+                                })
+                              }
 
-                                // Refresh project files to update Monaco's extra libraries
-                                if (selectedProject) {
-                                  storageManager.getFiles(selectedProject.id).then(files => {
-                                    setProjectFiles(files || [])
-                                    console.log("Refreshed project files after save:", files?.length || 0, "files")
-                                  }).catch(error => {
-                                    console.error("Error refreshing project files:", error)
-                                  })
-                                }
-
-                                // Trigger instant cloud backup after file save
-                                triggerInstantBackup(`Saved file: ${file.name}`)
-
-                                // Force file explorer refresh to show updated content
-                                setFileExplorerKey(prev => prev + 1)
-                                console.log("File saved successfully, triggering file explorer refresh")
-                              }}
-                            />
-                          </div>
-                        </ResizablePanel>
-                      </ResizablePanelGroup>
+                              triggerInstantBackup(`Saved file: ${file.name}`)
+                              setFileExplorerKey(prev => prev + 1)
+                            }}
+                          />
+                        </div>
+                      </div>
                     ) : activeTab === "preview" ? (
                       /* Preview Tab: Full-width Preview */
                       <CodePreviewPanel 
@@ -1242,7 +1718,20 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       />
                     ) : activeTab === "cloud" ? (
                       /* Cloud Tab */
-                      <CloudTab user={user} selectedProject={selectedProject} /> 
+                      <div className="flex-1 flex flex-col min-h-0">
+                        <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-800/60 bg-gray-950 flex-shrink-0">
+                          <button
+                            onClick={() => setActiveTab("code")}
+                            className="h-7 px-2 flex items-center gap-1.5 rounded-lg text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
+                          >
+                            <Code className="size-3.5" />
+                            <span>Back to Code</span>
+                          </button>
+                        </div>
+                        <div className="flex-1 min-h-0">
+                          <CloudTab user={user} selectedProject={selectedProject} />
+                        </div>
+                      </div>
                     ) : (
                       /* Database Tab - fallback */
                       <DatabaseTab workspaceId={selectedProject?.id || ""} />
@@ -1276,7 +1765,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             )}
 
             {/* Status Bar */}
-            <div className="h-8 border-t border-border bg-muted/50 flex items-center justify-between px-4 text-xs">
+            <div className="h-7 border-t border-gray-800/60 bg-gray-950 flex items-center justify-between px-4 text-xs text-gray-500">
               <div className="flex items-center space-x-4">
                 {/* GitHub Status */}
                 <div className="flex items-center space-x-1">
@@ -1287,7 +1776,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                         return <span className="text-green-600 dark:text-green-400">Connected</span>
                       }
                       if (gitHubConnected) {
-                        return <span className="text-blue-600 dark:text-blue-400">Account Connected</span>
+                        return <span className="text-orange-400">Account Connected</span>
                       }
                       return <span className="text-muted-foreground">Not Connected</span>
                     })()}
@@ -1564,13 +2053,14 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               <Tabs value={mobileTab} onValueChange={(value) => setMobileTab(value as any)} className="h-full flex flex-col">
                 <TabsContent value="chat" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
                   <div className="h-full overflow-hidden">
-                    <ChatPanelV2 
-                      project={selectedProject} 
+                    <ChatPanelV2
+                      project={selectedProject}
                       isMobile={true}
                       selectedModel={selectedModel}
                       onClearChat={handleClearChat}
                       aiMode={aiMode}
                       initialPrompt={initialChatPrompt}
+                      initialChatMode={initialChatMode}
                     />
                   </div>
                 </TabsContent>
@@ -1684,45 +2174,47 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
       {/* Create Project Dialog - available for both desktop and mobile */}
       <Dialog open={isCreateDialogOpen} onOpenChange={handleModalClose}>
-        <DialogContent className="z-[100]">
+        <DialogContent className="z-[100] bg-gray-900 border-gray-800 text-white">
           <DialogHeader>
-            <DialogTitle>Create New Project</DialogTitle>
-            <DialogDescription>Start building your next app with AI assistance.</DialogDescription>
+            <DialogTitle className="text-white">Create New Project</DialogTitle>
+            <DialogDescription className="text-gray-400">Start building your next app with AI assistance.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="project-name">Project Name</Label>
+              <Label htmlFor="project-name" className="text-gray-300">Project Name</Label>
               <Input
                 id="project-name"
                 placeholder="My Awesome App"
                 value={newProjectName}
                 onChange={(e) => setNewProjectName(e.target.value)}
+                className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500"
               />
             </div>
             <div>
-              <Label htmlFor="project-description">Description (Optional)</Label>
+              <Label htmlFor="project-description" className="text-gray-300">Description (Optional)</Label>
               <Textarea
                 id="project-description"
                 placeholder="Describe what your app will do..."
                 value={newProjectDescription}
                 onChange={(e) => setNewProjectDescription(e.target.value)}
+                className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500"
               />
             </div>
             <div>
-              <Label htmlFor="template">Template</Label>
+              <Label htmlFor="template" className="text-gray-300">Template</Label>
               <Select value={selectedTemplate} onValueChange={(value: 'vite-react' | 'nextjs') => setSelectedTemplate(value)}>
-                <SelectTrigger id="template">
+                <SelectTrigger id="template" className="bg-gray-800 border-gray-700 text-white">
                   <SelectValue placeholder="Select a template..." />
                 </SelectTrigger>
-                <SelectContent className="z-[110]">
-                  <SelectItem value="vite-react">Vite</SelectItem>
-                  <SelectItem value="nextjs">Next.js</SelectItem>
+                <SelectContent className="z-[110] bg-gray-800 border-gray-700">
+                  <SelectItem value="vite-react" className="text-gray-200 hover:bg-gray-700">Vite</SelectItem>
+                  <SelectItem value="nextjs" className="text-gray-200 hover:bg-gray-700">Next.js</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={handleCreateProject} disabled={!newProjectName.trim() || isCreating}>
+            <Button onClick={handleCreateProject} disabled={!newProjectName.trim() || isCreating} className="bg-orange-600 hover:bg-orange-500 text-white">
               {isCreating ? "Creating..." : "Create Project"}
             </Button>
           </DialogFooter>

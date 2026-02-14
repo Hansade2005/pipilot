@@ -5,8 +5,10 @@ import { Database, Loader2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import StorageManager from '@/components/database/storage-manager'
 import { toast } from "sonner"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function StoragePage() {
+  usePageTitle('Database Storage')
     const [database, setDatabase] = useState<any>(null)
     const [loading, setLoading] = useState(true)
 

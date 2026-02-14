@@ -50,8 +50,10 @@ import { TemplateManager } from "@/lib/template-manager"
 import { toast } from "sonner"
 import { storageManager } from "@/lib/storage-manager"
 import { TemplatesView } from "@/components/workspace/templates-view"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function LandingPage() {
+  usePageTitle('Home')
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [userProfile, setUserProfile] = useState<{ full_name?: string } | null>(null)
@@ -493,6 +495,13 @@ export default function LandingPage() {
         {/* Chat Input Section */}
         <div className="w-full max-w-4xl mx-auto">
           <ChatInput onAuthRequired={handleAuthRequired} />
+        </div>
+
+        {/* E2B Sponsor Badge */}
+        <div className="mt-8 flex items-center justify-center">
+          <a href="https://e2b.dev/startups" target="_blank" rel="noopener noreferrer" className="opacity-80 hover:opacity-100 transition-opacity">
+            <img src="/e2b-badge.svg" alt="Sponsored by E2B for Startups" className="h-8 md:h-10 w-auto rounded" />
+          </a>
         </div>
       </main>
 

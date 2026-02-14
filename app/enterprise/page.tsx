@@ -19,8 +19,10 @@ import { Footer } from "@/components/footer"
 import Link from "next/link"
 import { enterpriseService } from "@/lib/supabase/enterprise"
 import { toast } from "sonner"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function EnterprisePage() {
+  usePageTitle('Enterprise')
   const enterpriseFeatures = [
     {
       icon: Shield,
@@ -284,6 +286,13 @@ export default function EnterprisePage() {
               Scale your development teams with production-ready AI tools, enterprise security,
               and dedicated support. Trusted by Fortune 500 companies worldwide.
             </p>
+
+            {/* E2B Sponsor Badge */}
+            <div className="mb-8 flex items-center justify-center">
+              <a href="https://e2b.dev/startups" target="_blank" rel="noopener noreferrer" className="opacity-80 hover:opacity-100 transition-opacity">
+                <img src="/e2b-badge.svg" alt="Sponsored by E2B for Startups" className="h-8 md:h-10 w-auto rounded" />
+              </a>
+            </div>
 
             {/* Key Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12 max-w-4xl mx-auto">

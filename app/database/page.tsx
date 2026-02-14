@@ -31,6 +31,7 @@ import { ApiDocsGenerator } from '@/components/database/api-docs-generator'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import ActivityFeed from '@/components/database/activity-feed'
 import type { Table as TableType } from '@/lib/supabase'
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface DatabaseData {
     id: number
@@ -44,6 +45,7 @@ interface TableWithCount extends TableType {
 }
 
 export default function DatabaseDashboard() {
+  usePageTitle('Database')
     const [database, setDatabase] = useState<DatabaseData | null>(null)
     const [tables, setTables] = useState<TableWithCount[]>([])
     const [loading, setLoading] = useState(true)

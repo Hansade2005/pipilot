@@ -13,8 +13,10 @@ import { Bell, Eye, Send, Settings, Clock, Star } from 'lucide-react';
 import { useOneSignal } from '@/hooks/use-onesignal';
 import { toast } from 'sonner';
 import { NOTIFICATION_TEMPLATES } from '@/lib/notification-templates';
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function NotificationSettingsPage() {
+  usePageTitle('Notification Settings')
   const [preferences, setPreferences] = useState<any>(null);
   const [selectedCategory, setSelectedCategory] = useState('morning_motivation');
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);

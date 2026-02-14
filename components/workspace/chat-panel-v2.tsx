@@ -18,16 +18,36 @@ import { useToast } from "@/components/ui/use-toast"
 import { Switch } from "@/components/ui/switch"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { MessageWithTools } from './message-with-tools'
+import { Response } from '@/components/ai-elements/response'
+import { NextStepSuggestions, extractNextStepSuggestions } from './next-step-suggestions'
 import {
   Send, Paperclip, Mic, MicOff, X, FileText, Image as ImageIcon,
   Link as LinkIcon, Loader2, ChevronDown, ChevronUp, StopCircle, Trash2, Plus,
-  Copy, ArrowUp, Undo2, Redo2, Check, AlertTriangle, Zap, Package, PackageMinus,
+  Copy, ArrowUp, ArrowDown, RotateCcw, Undo2, Redo2, Check, AlertTriangle, Zap, Package, PackageMinus,
   Search, Globe, Eye, FolderOpen, Settings, Edit3, CheckCircle2, XCircle,
   Square, Database, CornerDownLeft, Table, Key, Code, Server, BarChart3,
-  CreditCard, Coins, GitBranch
+  CreditCard, Coins, GitBranch, ChevronRight, ChevronLeft, Wrench,
+  ToggleLeft, ToggleRight, Sparkles, FileUp, Hash, ExternalLink, Monitor
 } from 'lucide-react'
+import { ModelSelector } from '@/components/ui/model-selector'
 import { cn, filterUnwantedFiles } from '@/lib/utils'
 import { Actions, Action } from '@/components/ai-elements/actions'
+import {
+  Queue,
+  QueueItem,
+  QueueItemAction,
+  QueueItemActions,
+  QueueItemContent,
+  QueueItemDescription,
+  QueueItemIndicator,
+  QueueList,
+  QueueSection,
+  QueueSectionContent,
+  QueueSectionLabel,
+  QueueSectionTrigger,
+  type QueueTodo,
+} from '@/components/ai-elements/queue'
+import { ListTodo } from 'lucide-react'
 import { FileAttachmentDropdown } from "@/components/ui/file-attachment-dropdown"
 import { FileAttachmentBadge } from "@/components/ui/file-attachment-badge"
 import { FileSearchResult, FileLookupService } from "@/lib/file-lookup-service"
@@ -37,6 +57,7 @@ import { getWorkspaceDatabaseId, getDatabaseIdFromUrl } from '@/lib/get-current-
 import { useSupabaseToken } from '@/hooks/use-supabase-token'
 import { SupabaseConnectionCard } from './supabase-connection-card'
 import { ContinueBackendCard } from './continue-backend-card'
+import { PlanCard } from './plan-card'
 import { zipSync, strToU8 } from 'fflate'
 import { compress } from 'lz4js'
 import { createClient } from '@/lib/supabase/client'
@@ -245,8 +266,8 @@ const ExpandableUserMessage = ({
     return (
       <>
         <div className="relative w-full">
-          <div className="bg-card text-card-foreground border rounded-xl shadow-sm overflow-hidden w-full flex flex-col">
-            <div className="p-4 break-words overflow-wrap-anywhere">
+          <div className="bg-gray-800/70 rounded-2xl overflow-hidden w-full flex flex-col">
+            <div className="px-4 py-3.5 break-words overflow-hidden" style={{ overflowWrap: 'anywhere' }}>
               {/* Image previews */}
               {images && images.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-3">
@@ -255,38 +276,36 @@ const ExpandableUserMessage = ({
                       key={img.id}
                       src={img.base64}
                       alt={img.name}
-                      className="max-w-[120px] max-h-[90px] rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity border border-border"
+                      className="max-w-[120px] max-h-[90px] rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity border border-gray-700/50"
                       onClick={() => setPreviewImage(img.base64)}
                       title={img.name}
                     />
                   ))}
                 </div>
               )}
-              <p className="text-card-foreground text-sm leading-[1.5] whitespace-pre-wrap text-left">
-                {content}
-              </p>
+              <div className="text-gray-100 text-sm leading-[1.6] text-left [&_p]:mb-1 [&_p]:last:mb-0 [&_pre]:text-xs [&_code]:text-xs">
+                <Response>{content}</Response>
+              </div>
             </div>
-          <div className="px-4 pb-2 flex justify-end">
-            <Actions>
-              <Action tooltip="Retry message" onClick={handleIconClick}>
-                <ArrowUp className="w-4 h-4" />
+          </div>
+          <div className="flex items-center justify-end gap-0.5 mt-1 md:opacity-0 md:hover:opacity-100 transition-opacity">
+            <Action tooltip="Retry message" onClick={handleIconClick}>
+              <RotateCcw className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
+            </Action>
+            {renderCheckpointButton()}
+            {onBranch && (
+              <Action tooltip="Branch from here" onClick={handleBranch}>
+                <GitBranch className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
               </Action>
-              {renderCheckpointButton()}
-              {onBranch && (
-                <Action tooltip="Branch from here" onClick={handleBranch}>
-                  <GitBranch className="w-4 h-4" />
-                </Action>
-              )}
-              <Action tooltip="Copy message" onClick={handleCopy}>
-                <Copy className="w-4 h-4" />
-              </Action>
-              <Action tooltip="Delete message" onClick={handleDelete}>
-                <Trash2 className="w-4 h-4" />
-              </Action>
-            </Actions>
+            )}
+            <Action tooltip="Copy message" onClick={handleCopy}>
+              <Copy className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
+            </Action>
+            <Action tooltip="Delete message" onClick={handleDelete}>
+              <Trash2 className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
+            </Action>
           </div>
         </div>
-      </div>
 
       {/* Image preview modal */}
       {previewImage && (
@@ -315,8 +334,8 @@ const ExpandableUserMessage = ({
   return (
     <>
     <div className="relative w-full">
-      <div className="bg-card text-card-foreground border rounded-xl overflow-hidden relative shadow-sm w-full flex flex-col">
-        <div className="p-4 break-words overflow-wrap-anywhere">
+      <div className="bg-gray-800/70 rounded-2xl overflow-hidden relative w-full flex flex-col">
+        <div className="px-4 py-3.5 break-words overflow-hidden" style={{ overflowWrap: 'anywhere' }}>
           {/* Image previews */}
           {images && images.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-3">
@@ -325,7 +344,7 @@ const ExpandableUserMessage = ({
                   key={img.id}
                   src={img.base64}
                   alt={img.name}
-                  className="max-w-[120px] max-h-[90px] rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity border border-border"
+                  className="max-w-[120px] max-h-[90px] rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity border border-gray-700/50"
                   onClick={() => setPreviewImage(img.base64)}
                   title={img.name}
                 />
@@ -334,63 +353,55 @@ const ExpandableUserMessage = ({
           )}
           {/* Show truncated content when collapsed */}
           {!isExpanded ? (
-            <div>
-              <p className="text-card-foreground text-sm leading-[1.5] whitespace-pre-wrap text-left">
-                {content.substring(0, CHAR_LIMIT)}
-                {content.length > CHAR_LIMIT && '...'}
-              </p>
+            <div className="text-gray-100 text-sm leading-[1.6] text-left [&_p]:mb-1 [&_p]:last:mb-0 [&_pre]:text-xs [&_code]:text-xs">
+              <Response>{content.substring(0, CHAR_LIMIT) + (content.length > CHAR_LIMIT ? '...' : '')}</Response>
             </div>
           ) : (
             /* Show full content when expanded with scrollable area */
             <div
               ref={contentRef}
-              className="max-h-[300px] overflow-y-auto"
+              className="max-h-[300px] overflow-y-auto overflow-x-hidden text-gray-100 text-sm leading-[1.6] text-left [&_p]:mb-1 [&_p]:last:mb-0 [&_pre]:text-xs [&_code]:text-xs"
               style={{
                 scrollBehavior: 'smooth',
                 WebkitOverflowScrolling: 'touch'
               }}
             >
-              <p className="text-card-foreground text-sm leading-[1.5] whitespace-pre-wrap text-left">
-                {content}
-              </p>
+              <Response>{content}</Response>
             </div>
           )}
         </div>
 
         {/* Expand/Collapse trigger */}
         <div
-          className="flex items-center justify-center px-4 py-2 border-t hover:bg-muted transition-colors cursor-pointer"
+          className="flex items-center justify-center px-4 py-2 border-t border-gray-700/40 hover:bg-gray-700/30 transition-colors cursor-pointer"
           onClick={() => setIsExpanded(!isExpanded)}
         >
-          <span className="text-xs text-muted-foreground mr-2">
+          <span className="text-xs text-gray-400 mr-2">
             {isExpanded ? 'Show less' : 'Show more'}
           </span>
           {isExpanded ? (
-            <ChevronUp className="w-3 h-3 text-muted-foreground" />
+            <ChevronUp className="w-3 h-3 text-gray-400" />
           ) : (
-            <ChevronDown className="w-3 h-3 text-muted-foreground" />
+            <ChevronDown className="w-3 h-3 text-gray-400" />
           )}
         </div>
-
-        <div className="px-4 pb-2 flex justify-end">
-          <Actions>
-            <Action tooltip="Retry message" onClick={handleIconClick}>
-              <ArrowUp className="w-4 h-4" />
-            </Action>
-            {renderCheckpointButton()}
-            {onBranch && (
-              <Action tooltip="Branch from here" onClick={handleBranch}>
-                <GitBranch className="w-4 h-4" />
-              </Action>
-            )}
-            <Action tooltip="Copy message" onClick={handleCopy}>
-              <Copy className="w-4 h-4" />
-            </Action>
-            <Action tooltip="Delete message" onClick={handleDelete}>
-              <Trash2 className="w-4 h-4" />
-            </Action>
-          </Actions>
-        </div>
+      </div>
+      <div className="flex items-center justify-end gap-0.5 mt-1 md:opacity-0 md:hover:opacity-100 transition-opacity">
+        <Action tooltip="Retry message" onClick={handleIconClick}>
+          <RotateCcw className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
+        </Action>
+        {renderCheckpointButton()}
+        {onBranch && (
+          <Action tooltip="Branch from here" onClick={handleBranch}>
+            <GitBranch className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
+          </Action>
+        )}
+        <Action tooltip="Copy message" onClick={handleCopy}>
+          <Copy className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
+        </Action>
+        <Action tooltip="Delete message" onClick={handleDelete}>
+          <Trash2 className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
+        </Action>
       </div>
     </div>
 
@@ -436,35 +447,43 @@ const ToolActivityPanel = ({
 
   if (!toolCalls || toolCalls.length === 0) return null
 
+  // Helper: normalize prefixed tool names (server uses pipilotdb_ prefix)
+  const normalizeToolName = (name: string) => name.startsWith('pipilotdb_') ? name.replace('pipilotdb_', '') : name;
+
   // Helper functions - defined first to avoid temporal dead zone errors
   const getToolCategory = (toolName: string): string => {
-    if (['write_file', 'edit_file', 'client_replace_string_in_file', 'delete_file', 'delete_folder'].includes(toolName)) {
+    const tn = normalizeToolName(toolName);
+    if (['write_file', 'edit_file', 'client_replace_string_in_file', 'delete_file', 'delete_folder'].includes(tn)) {
       return '✏️ File Operations'
     }
-    if (['read_file', 'list_files', 'grep_search', 'semantic_code_navigator'].includes(toolName)) {
+    if (['read_file', 'list_files', 'grep_search', 'semantic_code_navigator'].includes(tn)) {
       return '📖 Reading Files'
     }
     if (['create_database', 'create_table', 'supabase_create_table', 'query_database', 'supabase_execute_sql',
       'manipulate_table_data', 'supabase_insert_data', 'supabase_delete_data', 'list_tables',
-      'supabase_list_tables_rls', 'read_table', 'supabase_read_table', 'delete_table', 'supabase_drop_table'].includes(toolName)) {
+      'supabase_list_tables_rls', 'read_table', 'supabase_read_table', 'delete_table', 'supabase_drop_table'].includes(tn)) {
       return '💾 Database Operations'
     }
-    if (['remove_package'].includes(toolName)) {
+    if (['remove_package'].includes(tn)) {
       return '📦 Package Management'
     }
-    if (['web_search', 'web_extract'].includes(toolName)) {
+    if (['web_search', 'web_extract'].includes(tn)) {
       return '🌐 Web Operations'
     }
-    if (['manage_api_keys', 'supabase_fetch_api_keys'].includes(toolName)) {
+    if (['browse_web'].includes(tn)) {
+      return '🖥️ Browser Testing'
+    }
+    if (['manage_api_keys', 'supabase_fetch_api_keys'].includes(tn)) {
       return '🔑 API Management'
     }
-    if (['generate_report'].includes(toolName)) {
+    if (['generate_report'].includes(tn)) {
       return '📊 Data Visualization'
     }
     return '⚡ Other Operations'
   }
   const getToolIcon = (tool: string) => {
-    switch (tool) {
+    const t = normalizeToolName(tool);
+    switch (t) {
       case 'write_file':
         return <FileText className="w-3.5 h-3.5" />
       case 'edit_file':
@@ -511,6 +530,8 @@ const ToolActivityPanel = ({
       case 'web_search':
       case 'web_extract':
         return <Globe className="w-3.5 h-3.5" />
+      case 'browse_web':
+        return <Monitor className="w-3.5 h-3.5" />
       case 'check_dev_errors':
         return <Settings className="w-3.5 h-3.5" />
       case 'generate_report':
@@ -521,7 +542,8 @@ const ToolActivityPanel = ({
   }
 
   const getToolLabel = (tool: string, args?: any) => {
-    switch (tool) {
+    const t = normalizeToolName(tool);
+    switch (t) {
       case 'write_file':
         return `Creating ${args?.path ? args.path.split('/').pop() : 'file'}`
       case 'edit_file':
@@ -578,12 +600,14 @@ const ToolActivityPanel = ({
         return `Search web for "${args?.query || 'query'}"`
       case 'web_extract':
         return 'Extracting web content'
+      case 'browse_web':
+        return 'Running browser test'
       case 'check_dev_errors':
         return 'Checking for errors'
       case 'generate_report':
         return 'Generating data visualization report'
       default:
-        return tool
+        return t
     }
   }
 
@@ -783,8 +807,12 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
   input?: any,
   status?: 'executing' | 'completed' | 'failed'
 }) => {
+  // Normalize prefixed tool names (server uses pipilotdb_ prefix)
+  const normalizeToolName = (name: string) => name.startsWith('pipilotdb_') ? name.replace('pipilotdb_', '') : name;
+
   const getToolIcon = (tool: string) => {
-    switch (tool) {
+    const t = normalizeToolName(tool);
+    switch (t) {
       case 'write_file':
         return <FileText className="w-3.5 h-3.5" />
       case 'edit_file':
@@ -831,6 +859,8 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
       case 'web_search':
       case 'web_extract':
         return <Globe className="w-3.5 h-3.5" />
+      case 'browse_web':
+        return <Monitor className="w-3.5 h-3.5" />
       case 'check_dev_errors':
         return <Settings className="w-3.5 h-3.5" />
       case 'generate_report':
@@ -841,7 +871,8 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
   }
 
   const getToolLabel = (tool: string, args?: any) => {
-    switch (tool) {
+    const t = normalizeToolName(tool);
+    switch (t) {
       case 'write_file':
         return `Creating ${args?.path ? args.path.split('/').pop() : 'file'}`
       case 'edit_file':
@@ -898,6 +929,8 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
         return `Search web for "${args?.query || 'query'}"`
       case 'web_extract':
         return 'Extracting web content'
+      case 'browse_web':
+        return 'Running browser test'
       case 'check_dev_errors':
         return 'Checking for errors'
       case 'generate_report':
@@ -1078,14 +1111,28 @@ interface TaggedComponent {
 // Maximum number of images that can be attached
 const MAX_IMAGE_ATTACHMENTS = 5
 
+interface MCPServerConfig {
+  id: string
+  name: string
+  transport: string
+  url?: string
+  headers?: Record<string, string>
+  env?: Record<string, string>
+  enabled: boolean
+}
+
 interface ChatPanelV2Props {
   project: any
   isMobile?: boolean
   selectedModel?: string
+  onModelChange?: (modelId: string) => void
+  userPlan?: string
+  subscriptionStatus?: string
   aiMode?: string
   onModeChange?: (mode: string) => void
   onClearChat?: () => void
   initialPrompt?: string
+  initialChatMode?: 'plan' | 'agent'
   taggedComponent?: TaggedComponent | null
   onClearTaggedComponent?: () => void
 }
@@ -1094,17 +1141,26 @@ export function ChatPanelV2({
   project,
   isMobile = false,
   selectedModel = 'gpt-4o',
+  onModelChange,
+  userPlan = 'free',
+  subscriptionStatus,
   aiMode = 'code',
   onModeChange,
   onClearChat,
   initialPrompt,
+  initialChatMode,
   taggedComponent,
   onClearTaggedComponent
 }: ChatPanelV2Props) {
   const { toast } = useToast()
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const sendButtonRef = useRef<HTMLButtonElement>(null)
+  const [showScrollButton, setShowScrollButton] = useState(false)
+  const userIsNearBottomRef = useRef(true)
+  // Track the model used for planning so build execution uses the same model
+  const planModelOverrideRef = useRef<string | null>(null)
 
   // Debounce utility function
   const debounce = (func: Function, wait: number) => {
@@ -1156,6 +1212,164 @@ export function ChatPanelV2({
   const [showUrlDialog, setShowUrlDialog] = useState(false)
   const [urlInput, setUrlInput] = useState('')
 
+  // Command Menu state (rich "+" palette)
+  const [showCommandMenu, setShowCommandMenu] = useState(false)
+  const [commandMenuSubmenu, setCommandMenuSubmenu] = useState<'none' | 'mcp' | 'tools' | 'slash'>('none')
+  const commandMenuRef = useRef<HTMLDivElement>(null)
+
+  // Feature toggles (persisted per-project in localStorage)
+  const [webSearchEnabled, setWebSearchEnabled] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('pipilot-web-search-enabled')
+        return stored !== null ? JSON.parse(stored) : true
+      } catch { return true }
+    }
+    return true
+  })
+  const [imageGenEnabled, setImageGenEnabled] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('pipilot-image-gen-enabled')
+        return stored !== null ? JSON.parse(stored) : true
+      } catch { return true }
+    }
+    return true
+  })
+
+  // MCP server toggles (per-session runtime toggles)
+  const [mcpServerToggles, setMcpServerToggles] = useState<Record<string, boolean>>({})
+  const [loadedMcpServers, setLoadedMcpServers] = useState<MCPServerConfig[]>([])
+  // MCP inline add/remove
+  const [mcpSubmenuView, setMcpSubmenuView] = useState<'list' | 'add'>('list')
+  const [newMcpName, setNewMcpName] = useState('')
+  const [newMcpUrl, setNewMcpUrl] = useState('')
+  const [newMcpHeaderKey, setNewMcpHeaderKey] = useState('')
+  const [newMcpHeaderValue, setNewMcpHeaderValue] = useState('')
+  const [newMcpHeaders, setNewMcpHeaders] = useState<Record<string, string>>({})
+  const [newMcpScope, setNewMcpScope] = useState<'project' | 'global'>('project')
+  const [mcpDeleteConfirm, setMcpDeleteConfirm] = useState<string | null>(null)
+
+  // Tool category toggles
+  const [toolCategoryToggles, setToolCategoryToggles] = useState<Record<string, boolean>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const toolPrefs = localStorage.getItem('pipilot-tool-preferences')
+        if (toolPrefs) {
+          const parsed = JSON.parse(toolPrefs)
+          const disabledCats = parsed.disabledCategories || []
+          const toggles: Record<string, boolean> = {}
+          const allCats = ['file_ops', 'code_search', 'web_tools', 'dev_tools', 'pipilot_db', 'supabase', 'stripe', 'docs_quality', 'image_gen']
+          allCats.forEach(cat => { toggles[cat] = !disabledCats.includes(cat) })
+          return toggles
+        }
+      } catch {}
+    }
+    return { file_ops: true, code_search: true, web_tools: true, dev_tools: true, pipilot_db: true, supabase: true, stripe: true, docs_quality: true, image_gen: true }
+  })
+
+  // Client-side tool map (mirrors server categoryToolMap)
+  const clientCategoryToolMap: Record<string, { name: string; label: string }[]> = {
+    file_ops: [
+      { name: 'write_file', label: 'Write File' },
+      { name: 'read_file', label: 'Read File' },
+      { name: 'edit_file', label: 'Edit File' },
+      { name: 'delete_file', label: 'Delete File' },
+      { name: 'delete_folder', label: 'Delete Folder' },
+      { name: 'client_replace_string_in_file', label: 'Find & Replace' },
+    ],
+    code_search: [
+      { name: 'grep_search', label: 'Grep Search' },
+      { name: 'semantic_code_navigator', label: 'Semantic Navigator' },
+      { name: 'list_files', label: 'List Files' },
+    ],
+    web_tools: [
+      { name: 'web_search', label: 'Web Search' },
+      { name: 'web_extract', label: 'Web Extract' },
+      { name: 'browse_web', label: 'Browse Web' },
+    ],
+    dev_tools: [
+      { name: 'check_dev_errors', label: 'Check Dev Errors' },
+      { name: 'node_machine', label: 'Node Machine' },
+      { name: 'remove_package', label: 'Remove Package' },
+    ],
+    pipilot_db: [
+      { name: 'pipilotdb_create_database', label: 'Create Database' },
+      { name: 'pipilotdb_create_table', label: 'Create Table' },
+      { name: 'pipilotdb_query_database', label: 'Query Database' },
+      { name: 'pipilotdb_manipulate_table_data', label: 'Manipulate Data' },
+      { name: 'pipilotdb_manage_api_keys', label: 'Manage API Keys' },
+      { name: 'pipilotdb_list_tables', label: 'List Tables' },
+      { name: 'pipilotdb_read_table', label: 'Read Table' },
+      { name: 'pipilotdb_delete_table', label: 'Delete Table' },
+    ],
+    supabase: [
+      { name: 'supabase_fetch_api_keys', label: 'Fetch API Keys' },
+      { name: 'supabase_create_table', label: 'Create Table' },
+      { name: 'supabase_insert_data', label: 'Insert Data' },
+      { name: 'supabase_delete_data', label: 'Delete Data' },
+      { name: 'supabase_read_table', label: 'Read Table' },
+      { name: 'supabase_drop_table', label: 'Drop Table' },
+      { name: 'supabase_execute_sql', label: 'Execute SQL' },
+      { name: 'supabase_list_tables_rls', label: 'List Tables & RLS' },
+      { name: 'request_supabase_connection', label: 'Request Connection' },
+    ],
+    stripe: [
+      { name: 'stripe_validate_key', label: 'Validate Key' },
+      { name: 'stripe_list_products', label: 'List Products' },
+      { name: 'stripe_create_product', label: 'Create Product' },
+      { name: 'stripe_update_product', label: 'Update Product' },
+      { name: 'stripe_delete_product', label: 'Delete Product' },
+      { name: 'stripe_list_prices', label: 'List Prices' },
+      { name: 'stripe_create_price', label: 'Create Price' },
+      { name: 'stripe_update_price', label: 'Update Price' },
+      { name: 'stripe_list_customers', label: 'List Customers' },
+      { name: 'stripe_create_customer', label: 'Create Customer' },
+      { name: 'stripe_update_customer', label: 'Update Customer' },
+      { name: 'stripe_delete_customer', label: 'Delete Customer' },
+      { name: 'stripe_create_payment_intent', label: 'Create Payment' },
+      { name: 'stripe_update_payment_intent', label: 'Update Payment' },
+      { name: 'stripe_cancel_payment_intent', label: 'Cancel Payment' },
+      { name: 'stripe_list_charges', label: 'List Charges' },
+      { name: 'stripe_list_subscriptions', label: 'List Subscriptions' },
+      { name: 'stripe_update_subscription', label: 'Update Subscription' },
+      { name: 'stripe_cancel_subscription', label: 'Cancel Subscription' },
+      { name: 'stripe_list_coupons', label: 'List Coupons' },
+      { name: 'stripe_create_coupon', label: 'Create Coupon' },
+      { name: 'stripe_update_coupon', label: 'Update Coupon' },
+      { name: 'stripe_delete_coupon', label: 'Delete Coupon' },
+      { name: 'stripe_create_refund', label: 'Create Refund' },
+      { name: 'stripe_search', label: 'Search' },
+    ],
+    docs_quality: [
+      { name: 'generate_report', label: 'Generate Report' },
+      { name: 'pipilot_get_docs', label: 'Get Docs' },
+      { name: 'auto_documentation', label: 'Auto Documentation' },
+      { name: 'code_review', label: 'Code Review' },
+      { name: 'code_quality_analysis', label: 'Code Quality' },
+    ],
+    image_gen: [
+      { name: 'generate_image', label: 'Generate Image' },
+    ],
+  }
+
+  // Individual tool toggles (persisted)
+  const [disabledIndividualTools, setDisabledIndividualTools] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const toolPrefs = localStorage.getItem('pipilot-tool-preferences')
+        if (toolPrefs) {
+          const parsed = JSON.parse(toolPrefs)
+          return parsed.disabledTools || []
+        }
+      } catch {}
+    }
+    return []
+  })
+
+  // Which category is drilled-down in tool submenu
+  const [toolDetailCategory, setToolDetailCategory] = useState<string | null>(null)
+
   // Speech-to-text state (Web Speech API real-time implementation)
   const [isRecording, setIsRecording] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
@@ -1183,16 +1397,265 @@ export function ChatPanelV2({
   const isContinuationInProgressRef = useRef(false)
 
   // Broadcast AI streaming state to other panels (e.g. preview panel)
+  // Also pause/resume auto-sync to avoid disruptive background restores during streaming
   useEffect(() => {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('ai-streaming-state', {
         detail: { isStreaming: isLoading }
       }))
     }
+
+    // Pause auto-sync during streaming to prevent clearAll() + re-import disrupting the UI
+    if (isLoading) {
+      import('@/lib/auto-sync-service').then(({ pauseAutoSyncForStreaming }) => {
+        pauseAutoSyncForStreaming()
+      })
+    } else {
+      import('@/lib/auto-sync-service').then(({ resumeAutoSyncAfterStreaming }) => {
+        resumeAutoSyncAfterStreaming()
+      })
+    }
   }, [isLoading])
 
-  // Chat mode state - true for Ask mode, false for Agent mode
-  const [isAskMode, setIsAskMode] = useState(false)
+  // Process prompt queue when AI finishes loading
+  useEffect(() => {
+    if (!isLoading && promptQueueRef.current.length > 0 && !isProcessingQueueRef.current) {
+      isProcessingQueueRef.current = true
+      const nextItem = promptQueueRef.current[0]
+      // Small delay to let the UI settle after previous response
+      const timer = setTimeout(() => {
+        setPromptQueue(prev => prev.slice(1))
+        setInput(nextItem.text)
+        // Trigger submit after input is set
+        setTimeout(() => {
+          const form = document.querySelector('form[data-chat-form]') as HTMLFormElement
+          if (form) {
+            form.requestSubmit()
+          }
+          isProcessingQueueRef.current = false
+        }, 100)
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [isLoading])
+
+  // Chat mode state - true for Plan mode, false for Agent mode (defaults to Plan)
+  const [isAskMode, setIsAskMode] = useState(initialChatMode ? initialChatMode === 'plan' : true)
+
+  // Prompt Queue - queue messages when AI is busy, persist to localStorage
+  const [promptQueue, setPromptQueue] = useState<Array<{ id: string; text: string; timestamp: number }>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('pipilot-prompt-queue')
+        return stored ? JSON.parse(stored) : []
+      } catch { return [] }
+    }
+    return []
+  })
+  const promptQueueRef = useRef(promptQueue)
+  promptQueueRef.current = promptQueue
+  const isProcessingQueueRef = useRef(false)
+
+  // AI-managed todos - populated via manage_todos tool calls from the AI agent
+  const [aiTodos, setAiTodos] = useState<QueueTodo[]>([])
+
+  // Persist prompt queue to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('pipilot-prompt-queue', JSON.stringify(promptQueue))
+    }
+  }, [promptQueue])
+
+  // Load MCP servers for command menu display
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const servers: MCPServerConfig[] = []
+    try {
+      const globalStored = localStorage.getItem('pipilot-mcp-servers-global')
+      if (globalStored) servers.push(...JSON.parse(globalStored))
+    } catch {}
+    if (project?.id) {
+      try {
+        const stored = localStorage.getItem(`pipilot-mcp-servers-${project.id}`)
+        if (stored) servers.push(...JSON.parse(stored))
+      } catch {}
+    }
+    setLoadedMcpServers(servers)
+    // Initialize toggles from existing enabled state
+    const toggles: Record<string, boolean> = {}
+    servers.forEach(s => { toggles[s.id || s.name] = s.enabled !== false })
+    setMcpServerToggles(toggles)
+  }, [project?.id])
+
+  // Reload MCP servers from localStorage (used after add/remove)
+  const reloadMcpServers = useCallback(() => {
+    if (typeof window === 'undefined') return
+    const servers: MCPServerConfig[] = []
+    try {
+      const globalStored = localStorage.getItem('pipilot-mcp-servers-global')
+      if (globalStored) servers.push(...JSON.parse(globalStored))
+    } catch {}
+    if (project?.id) {
+      try {
+        const stored = localStorage.getItem(`pipilot-mcp-servers-${project.id}`)
+        if (stored) servers.push(...JSON.parse(stored))
+      } catch {}
+    }
+    setLoadedMcpServers(servers)
+    const toggles: Record<string, boolean> = {}
+    servers.forEach(s => { toggles[s.id || s.name] = s.enabled !== false })
+    setMcpServerToggles(toggles)
+  }, [project?.id])
+
+  // Add a new MCP server inline
+  const handleAddMcpServer = useCallback(() => {
+    if (!newMcpName.trim() || !newMcpUrl.trim()) return
+    if (!newMcpUrl.startsWith('http://') && !newMcpUrl.startsWith('https://')) return
+
+    // Capture any pending header input
+    const finalHeaders = { ...newMcpHeaders }
+    if (newMcpHeaderKey.trim() && newMcpHeaderValue.trim()) {
+      finalHeaders[newMcpHeaderKey.trim()] = newMcpHeaderValue.trim()
+    }
+
+    const server: MCPServerConfig = {
+      id: crypto.randomUUID(),
+      name: newMcpName.trim(),
+      transport: 'http',
+      url: newMcpUrl.trim(),
+      headers: Object.keys(finalHeaders).length > 0 ? finalHeaders : undefined,
+      enabled: true,
+    }
+
+    const storageKey = newMcpScope === 'global'
+      ? 'pipilot-mcp-servers-global'
+      : `pipilot-mcp-servers-${project?.id}`
+
+    if (!storageKey || (newMcpScope === 'project' && !project?.id)) return
+
+    try {
+      const existing = JSON.parse(localStorage.getItem(storageKey) || '[]')
+      existing.push(server)
+      localStorage.setItem(storageKey, JSON.stringify(existing))
+    } catch {}
+
+    // Reset form
+    setNewMcpName('')
+    setNewMcpUrl('')
+    setNewMcpHeaderKey('')
+    setNewMcpHeaderValue('')
+    setNewMcpHeaders({})
+    setNewMcpScope('project')
+    setMcpSubmenuView('list')
+    reloadMcpServers()
+  }, [newMcpName, newMcpUrl, newMcpHeaders, newMcpHeaderKey, newMcpHeaderValue, newMcpScope, project?.id, reloadMcpServers])
+
+  // Remove an MCP server
+  const handleRemoveMcpServer = useCallback((serverId: string) => {
+    if (typeof window === 'undefined') return
+
+    // Try removing from project-specific storage
+    if (project?.id) {
+      try {
+        const key = `pipilot-mcp-servers-${project.id}`
+        const servers: MCPServerConfig[] = JSON.parse(localStorage.getItem(key) || '[]')
+        const filtered = servers.filter(s => s.id !== serverId)
+        if (filtered.length !== servers.length) {
+          localStorage.setItem(key, JSON.stringify(filtered))
+          reloadMcpServers()
+          setMcpDeleteConfirm(null)
+          return
+        }
+      } catch {}
+    }
+
+    // Try removing from global storage
+    try {
+      const key = 'pipilot-mcp-servers-global'
+      const servers: MCPServerConfig[] = JSON.parse(localStorage.getItem(key) || '[]')
+      const filtered = servers.filter(s => s.id !== serverId)
+      if (filtered.length !== servers.length) {
+        localStorage.setItem(key, JSON.stringify(filtered))
+      }
+    } catch {}
+
+    reloadMcpServers()
+    setMcpDeleteConfirm(null)
+  }, [project?.id, reloadMcpServers])
+
+  // Persist feature toggles
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('pipilot-web-search-enabled', JSON.stringify(webSearchEnabled))
+    }
+  }, [webSearchEnabled])
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('pipilot-image-gen-enabled', JSON.stringify(imageGenEnabled))
+    }
+  }, [imageGenEnabled])
+
+  // Persist tool category toggles + individual tool toggles
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const disabledCategories = Object.entries(toolCategoryToggles)
+        .filter(([, enabled]) => !enabled)
+        .map(([cat]) => cat)
+      localStorage.setItem('pipilot-tool-preferences', JSON.stringify({ disabledCategories, disabledTools: disabledIndividualTools }))
+    }
+  }, [toolCategoryToggles, disabledIndividualTools])
+
+  // Close command menu on outside click
+  useEffect(() => {
+    if (!showCommandMenu) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (commandMenuRef.current && !commandMenuRef.current.contains(e.target as Node)) {
+        setShowCommandMenu(false)
+        setCommandMenuSubmenu('none')
+        setToolDetailCategory(null)
+        setMcpSubmenuView('list')
+        setMcpDeleteConfirm(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showCommandMenu])
+
+  const addToQueue = useCallback((text: string) => {
+    setPromptQueue(prev => [...prev, { id: Date.now().toString(), text, timestamp: Date.now() }])
+  }, [])
+
+  const removeFromQueue = useCallback((id: string) => {
+    setPromptQueue(prev => prev.filter(item => item.id !== id))
+  }, [])
+
+  const clearQueue = useCallback(() => {
+    setPromptQueue([])
+  }, [])
+
+  // Extract AI todos from manage_todos tool calls (uses latest tool call data)
+  const extractAiTodosFromToolCalls = useCallback((toolCalls: Array<{ toolName: string; input?: any; status: string }> | undefined) => {
+    if (!toolCalls || toolCalls.length === 0) return
+    // Find the most recent manage_todos call
+    const todoCalls = toolCalls.filter(tc => tc.toolName === 'manage_todos' && tc.input?.todos)
+    if (todoCalls.length === 0) return
+    const latestCall = todoCalls[todoCalls.length - 1]
+    const todos: QueueTodo[] = latestCall.input.todos.map((t: any) => ({
+      id: t.id || `todo-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      title: t.title,
+      description: t.description || undefined,
+      status: t.status || 'pending',
+    }))
+    setAiTodos(todos)
+  }, [])
+
+  const removeAiTodo = useCallback((id: string) => {
+    setAiTodos(prev => prev.filter(t => t.id !== id))
+  }, [])
+
+  const clearAiTodos = useCallback(() => {
+    setAiTodos([])
+  }, [])
 
   // Supabase token management - automatic refresh
   const { token: supabaseToken, isLoading: tokenLoading, isExpired: tokenExpired, error: tokenError } = useSupabaseToken()
@@ -1376,7 +1839,8 @@ export function ChatPanelV2({
     assistantMessageId: string,
     accumulatedContent: string,
     accumulatedReasoning: string,
-    accumulatedToolInvocations: any[]
+    accumulatedToolInvocations: any[],
+    reasoningBlocks?: { content: string, textPosition: number }[]
   ) => {
     if (!project) {
       console.warn('[ChatPanelV2] Cannot save assistant message: no project selected')
@@ -1417,6 +1881,7 @@ export function ChatPanelV2({
         metadata: {
           toolInvocations: accumulatedToolInvocations,
           reasoning: accumulatedReasoning,
+          reasoningBlocks: reasoningBlocks || [],
           hasToolCalls: accumulatedToolInvocations.length > 0,
           durationSeconds: elapsedSeconds  // Save the actual elapsed time
         }
@@ -2004,25 +2469,15 @@ export function ChatPanelV2({
     const messageToRetry = messages.find(msg => msg.id === messageId)
     if (!messageToRetry) return
 
-    // Clear all messages that came after this message (including AI responses)
+    // Clear the retried message and all messages after it (including AI responses)
+    // This removes the user message from UI to avoid duplication when it's re-sent
     const messageIndex = messages.findIndex(msg => msg.id === messageId)
     if (messageIndex !== -1) {
-      setMessages(prev => prev.slice(0, messageIndex + 1))
+      setMessages(prev => prev.slice(0, messageIndex))
     }
 
-    // Set the content as input and submit fresh
+    // Place the content in the input so the user can edit before sending
     setInput(content)
-    // Note: Don't set isLoading here - handleEnhancedSubmit will handle it
-
-    // Small delay to ensure state is updated
-    setTimeout(() => {
-      // Create a synthetic form event to trigger handleEnhancedSubmit
-      const syntheticEvent = {
-        preventDefault: () => { },
-      } as React.FormEvent
-
-      handleEnhancedSubmit(syntheticEvent)
-    }, 100)
   }
 
   const handleSaveEdit = async () => {
@@ -2066,7 +2521,8 @@ export function ChatPanelV2({
     continuationState: any,
     originalAssistantMessageId: string,
     accumulatedContent: string,
-    accumulatedReasoning: string
+    accumulatedReasoning: string,
+    reasoningBlocks: { content: string, textPosition: number }[] = []
   ) => {
     if (!continuationState || !project) {
       console.error('[ChatPanelV2][Continuation] Invalid continuation state or no project')
@@ -2093,7 +2549,8 @@ export function ChatPanelV2({
           ? {
             ...msg,
             content: accumulatedContent, // Remove thinking indicator
-            reasoning: accumulatedReasoning
+            reasoning: accumulatedReasoning,
+            reasoningBlocks: [...reasoningBlocks]
           }
           : msg
       ))
@@ -2143,6 +2600,10 @@ export function ChatPanelV2({
       let continuationAccumulatedReasoning = ''
       let lineBuffer = ''
 
+      // Track reasoning blocks with text positions for inline rendering (continuation)
+      let continuationReasoningBlocks: { content: string, textPosition: number }[] = []
+      let continuationLastDeltaType: 'text' | 'reasoning' | null = null
+
       // Track tool calls locally during continuation to avoid React state race conditions
       // Include position tracking for inline pill display
       const continuationLocalToolCalls: Array<{
@@ -2190,21 +2651,27 @@ export function ChatPanelV2({
                 // CRITICAL FIX: Filter out tool result JSON that shouldn't be displayed
                 // Some models output tool results as text instead of keeping them internal
                 const textToAdd = parsed.text
-                
+
                 // Check if this text looks like a tool result JSON
                 const trimmedText = textToAdd.trim()
                 const looksLikeToolResult = (
-                  (trimmedText.startsWith('{') || trimmedText.startsWith('Assistant:')) && 
-                  (trimmedText.includes('"success"') || trimmedText.includes('"toolCallId"') || 
+                  (trimmedText.startsWith('{') || trimmedText.startsWith('Assistant:')) &&
+                  (trimmedText.includes('"success"') || trimmedText.includes('"toolCallId"') ||
                    trimmedText.includes('"executionTimeMs"') || trimmedText.includes('"databaseId"'))
                 )
-                
+
                 // Skip text that appears to be a raw tool result JSON
                 if (!looksLikeToolResult) {
                   continuationAccumulatedContent += textToAdd
+                  continuationLastDeltaType = 'text'
+                  // Merge reasoning blocks: original blocks + continuation blocks (with offset)
+                  const mergedBlocks = [...reasoningBlocks, ...continuationReasoningBlocks.map(b => ({
+                    content: b.content,
+                    textPosition: accumulatedContent.length + b.textPosition
+                  }))]
                   setMessages(prev => prev.map(msg =>
                     msg.id === originalAssistantMessageId
-                      ? { ...msg, content: accumulatedContent + continuationAccumulatedContent, reasoning: accumulatedReasoning + continuationAccumulatedReasoning }
+                      ? { ...msg, content: accumulatedContent + continuationAccumulatedContent, reasoning: accumulatedReasoning + continuationAccumulatedReasoning, reasoningBlocks: mergedBlocks }
                       : msg
                   ))
                 } else {
@@ -2213,10 +2680,22 @@ export function ChatPanelV2({
               }
             } else if (parsed.type === 'reasoning-delta') {
               if (parsed.text) {
+                // Start a new reasoning block when transitioning from text/null to reasoning
+                if (continuationLastDeltaType !== 'reasoning') {
+                  continuationReasoningBlocks.push({ content: '', textPosition: continuationAccumulatedContent.length })
+                }
+                continuationReasoningBlocks[continuationReasoningBlocks.length - 1].content += parsed.text
+                continuationLastDeltaType = 'reasoning'
+
                 continuationAccumulatedReasoning += parsed.text
+                // Merge reasoning blocks: original blocks + continuation blocks (with offset)
+                const mergedBlocks = [...reasoningBlocks, ...continuationReasoningBlocks.map(b => ({
+                  content: b.content,
+                  textPosition: accumulatedContent.length + b.textPosition
+                }))]
                 setMessages(prev => prev.map(msg =>
                   msg.id === originalAssistantMessageId
-                    ? { ...msg, content: accumulatedContent + continuationAccumulatedContent, reasoning: accumulatedReasoning + continuationAccumulatedReasoning }
+                    ? { ...msg, content: accumulatedContent + continuationAccumulatedContent, reasoning: accumulatedReasoning + continuationAccumulatedReasoning, reasoningBlocks: mergedBlocks }
                     : msg
                 ))
               }
@@ -2262,6 +2741,17 @@ export function ChatPanelV2({
                 return newMap
               })
 
+              // Handle manage_todos tool in continuation
+              if (toolCall.toolName === 'manage_todos' && toolCall.args?.todos) {
+                const todos: QueueTodo[] = toolCall.args.todos.map((t: any) => ({
+                  id: t.id || `todo-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                  title: t.title,
+                  description: t.description || undefined,
+                  status: t.status || 'pending',
+                }))
+                setAiTodos(todos)
+              }
+
               const clientSideTools = [
                 'write_file',
                 'edit_file',
@@ -2274,6 +2764,7 @@ export function ChatPanelV2({
                 'grep_search',
                 'semantic_code_navigator',
                 'create_database',
+                'pipilotdb_create_database',
                 'request_supabase_connection'
               ]
 
@@ -2363,6 +2854,11 @@ export function ChatPanelV2({
       // Continuation complete - update the original message with combined content
       const finalContent = accumulatedContent + continuationAccumulatedContent
       const finalReasoning = accumulatedReasoning + continuationAccumulatedReasoning
+      // Merge reasoning blocks: original + continuation (with text position offset)
+      const finalReasoningBlocks = [...reasoningBlocks, ...continuationReasoningBlocks.map(b => ({
+        content: b.content,
+        textPosition: accumulatedContent.length + b.textPosition
+      }))]
 
       // Use local tool tracking instead of state (avoids React state race conditions)
       const toolInvocationsForMessage = continuationLocalToolCalls
@@ -2391,7 +2887,7 @@ export function ChatPanelV2({
         // Update the original message with the complete content
         setMessages(prev => prev.map(msg =>
           msg.id === originalAssistantMessageId
-            ? { ...msg, content: finalContent, reasoning: finalReasoning }
+            ? { ...msg, content: finalContent, reasoning: finalReasoning, reasoningBlocks: finalReasoningBlocks }
             : msg
         ))
 
@@ -2400,7 +2896,8 @@ export function ChatPanelV2({
           originalAssistantMessageId,
           finalContent,
           finalReasoning,
-          toolInvocationsData
+          toolInvocationsData,
+          finalReasoningBlocks
         )
       }
 
@@ -2418,7 +2915,8 @@ export function ChatPanelV2({
           ? {
             ...msg,
             content: accumulatedContent, // Remove thinking indicator
-            reasoning: accumulatedReasoning
+            reasoning: accumulatedReasoning,
+            reasoningBlocks: [...reasoningBlocks]
           }
           : msg
       ))
@@ -2723,8 +3221,9 @@ export function ChatPanelV2({
             role: msg.role,
             content: msg.content,
             createdAt: msg.createdAt,
-            // Extract reasoning and toolInvocations from metadata for UI compatibility
+            // Extract reasoning, reasoningBlocks and toolInvocations from metadata for UI compatibility
             reasoning: msg.metadata?.reasoning || '',
+            reasoningBlocks: msg.metadata?.reasoningBlocks || [],
             toolInvocations: msg.metadata?.toolInvocations || [],
             metadata: msg.metadata || {}
           }
@@ -2785,9 +3284,27 @@ export function ChatPanelV2({
         })
 
         setActiveToolCalls(toolCallsMap)
+
+        // Restore AI todos from the most recent manage_todos tool call in history
+        const allToolCalls = Array.from(toolCallsMap.values()).flat()
+        const todoCalls = allToolCalls.filter(tc => tc.toolName === 'manage_todos' && tc.input?.todos)
+        if (todoCalls.length > 0) {
+          const latestTodoCall = todoCalls[todoCalls.length - 1]
+          const restoredTodos: QueueTodo[] = latestTodoCall.input.todos.map((t: any) => ({
+            id: t.id || `todo-${Math.random().toString(36).slice(2, 7)}`,
+            title: t.title,
+            description: t.description || undefined,
+            status: t.status || 'pending',
+          }))
+          // Only restore if there are non-completed todos
+          if (restoredTodos.some((t: QueueTodo) => t.status !== 'completed')) {
+            setAiTodos(restoredTodos)
+          }
+        }
       } else {
         setMessages([])
         setActiveToolCalls(new Map())
+        setAiTodos([])
       }
     } catch (error) {
       console.error(`[ChatPanelV2] Error loading messages for project ${project?.id}:`, error)
@@ -2835,14 +3352,31 @@ export function ChatPanelV2({
     }
   }, [error, toast])
 
-  // Auto-scroll only when new messages are added (not on every streaming token)
-  const prevMessageCountRef = useRef(messages.length)
+  // Smart scroll: only auto-scroll when user is near the bottom
   useEffect(() => {
-    if (messages.length !== prevMessageCountRef.current) {
-      prevMessageCountRef.current = messages.length
+    if (userIsNearBottomRef.current) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
   }, [messages])
+
+  // Track scroll position to show/hide scroll-to-bottom button
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight
+      const isNearBottom = distanceFromBottom < 120
+      userIsNearBottomRef.current = isNearBottom
+      setShowScrollButton(!isNearBottom)
+    }
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    return () => container.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [])
 
   // Fetch credit balance
   useEffect(() => {
@@ -2935,6 +3469,10 @@ export function ChatPanelV2({
       let accumulatedReasoning = ''
       let lineBuffer = ''
 
+      // Track reasoning blocks with text positions for inline rendering (recovery)
+      let recoveryReasoningBlocks: { content: string, textPosition: number }[] = []
+      let recoveryLastDeltaType: 'text' | 'reasoning' | null = null
+
       console.log('[ChatPanelV2][ClientTool] 📥 Processing tool result continuation stream')
 
       while (true) {
@@ -2969,18 +3507,26 @@ export function ChatPanelV2({
             if (parsed.type === 'text-delta') {
               if (parsed.text) {
                 accumulatedContent += parsed.text
+                recoveryLastDeltaType = 'text'
                 setMessages(prev => prev.map(msg =>
                   msg.id === assistantMessageId
-                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
+                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, reasoningBlocks: [...recoveryReasoningBlocks] }
                     : msg
                 ))
               }
             } else if (parsed.type === 'reasoning-delta') {
               if (parsed.text) {
+                // Start a new reasoning block when transitioning from text/null to reasoning
+                if (recoveryLastDeltaType !== 'reasoning') {
+                  recoveryReasoningBlocks.push({ content: '', textPosition: accumulatedContent.length })
+                }
+                recoveryReasoningBlocks[recoveryReasoningBlocks.length - 1].content += parsed.text
+                recoveryLastDeltaType = 'reasoning'
+
                 accumulatedReasoning += parsed.text
                 setMessages(prev => prev.map(msg =>
                   msg.id === assistantMessageId
-                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
+                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, reasoningBlocks: [...recoveryReasoningBlocks] }
                     : msg
                 ))
               }
@@ -2995,9 +3541,20 @@ export function ChatPanelV2({
 
               console.log('[ChatPanelV2][ClientTool][Continuation] 🔧 Continuation tool call:', toolCall.toolName)
 
+              // Handle manage_todos tool in continuation
+              if (toolCall.toolName === 'manage_todos' && toolCall.args?.todos) {
+                const todos: QueueTodo[] = toolCall.args.todos.map((t: any) => ({
+                  id: t.id || `todo-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                  title: t.title,
+                  description: t.description || undefined,
+                  status: t.status || 'pending',
+                }))
+                setAiTodos(todos)
+              }
+
               const clientSideTools = [
-                'write_file', 
-                'edit_file', 
+                'write_file',
+                'edit_file',
                 'client_replace_string_in_file',
                 'delete_file',
                 'delete_folder',
@@ -3007,9 +3564,10 @@ export function ChatPanelV2({
                 'grep_search',
                 'semantic_code_navigator',
                 'create_database',
+                'pipilotdb_create_database',
                 'request_supabase_connection'
               ]
-              
+
               if (clientSideTools.includes(toolCall.toolName)) {
                 const { handleClientFileOperation } = await import('@/lib/client-file-tools')
 
@@ -3059,7 +3617,7 @@ export function ChatPanelV2({
       if (accumulatedContent.trim() || toolInvocationsData.length > 0) {
         setMessages(prev => prev.map(msg =>
           msg.id === assistantMessageId
-            ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
+            ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, reasoningBlocks: [...recoveryReasoningBlocks] }
             : msg
         ))
 
@@ -3068,7 +3626,8 @@ export function ChatPanelV2({
           assistantMessageId,
           accumulatedContent,
           accumulatedReasoning,
-          toolInvocationsData
+          toolInvocationsData,
+          recoveryReasoningBlocks
         )
       }
 
@@ -3339,6 +3898,10 @@ export function ChatPanelV2({
       let continuationReasoning = ''
       let lineBuffer = ''
 
+      // Track reasoning blocks with text positions for inline rendering (stream recovery)
+      let streamRecoveryReasoningBlocks: { content: string, textPosition: number }[] = []
+      let streamRecoveryLastDeltaType: 'text' | 'reasoning' | null = null
+
       // Start with existing accumulated content
       let fullContent = stream.accumulatedContent
       let fullReasoning = stream.accumulatedReasoning
@@ -3391,10 +3954,11 @@ export function ChatPanelV2({
               if (!looksLikeToolResult) {
                 continuationContent += parsed.text
                 fullContent = stream.accumulatedContent + continuationContent
+                streamRecoveryLastDeltaType = 'text'
                 setStreamingContent(fullContent)
                 setMessages(prev => prev.map(msg =>
                   msg.id === stream.id
-                    ? { ...msg, content: fullContent, reasoning: fullReasoning }
+                    ? { ...msg, content: fullContent, reasoning: fullReasoning, reasoningBlocks: [...streamRecoveryReasoningBlocks] }
                     : msg
                 ))
                 // Update recovery progress
@@ -3406,12 +3970,19 @@ export function ChatPanelV2({
                 })
               }
             } else if (parsed.type === 'reasoning-delta' && parsed.text) {
+              // Start a new reasoning block when transitioning from text/null to reasoning
+              if (streamRecoveryLastDeltaType !== 'reasoning') {
+                streamRecoveryReasoningBlocks.push({ content: '', textPosition: fullContent.length })
+              }
+              streamRecoveryReasoningBlocks[streamRecoveryReasoningBlocks.length - 1].content += parsed.text
+              streamRecoveryLastDeltaType = 'reasoning'
+
               continuationReasoning += parsed.text
               fullReasoning = stream.accumulatedReasoning + continuationReasoning
               setStreamingReasoning(fullReasoning)
               setMessages(prev => prev.map(msg =>
                 msg.id === stream.id
-                  ? { ...msg, content: fullContent, reasoning: fullReasoning }
+                  ? { ...msg, content: fullContent, reasoning: fullReasoning, reasoningBlocks: [...streamRecoveryReasoningBlocks] }
                   : msg
               ))
               // Update recovery progress
@@ -3441,12 +4012,23 @@ export function ChatPanelV2({
                   return newMap
                 })
 
+                // Handle manage_todos tool in continuation
+                if (parsed.toolName === 'manage_todos' && parsed.input?.todos) {
+                  const todos: QueueTodo[] = parsed.input.todos.map((t: any) => ({
+                    id: t.id || `todo-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                    title: t.title,
+                    description: t.description || undefined,
+                    status: t.status || 'pending',
+                  }))
+                  setAiTodos(todos)
+                }
+
                 // Execute client-side tools
                 const clientSideTools = [
                   'write_file', 'edit_file', 'client_replace_string_in_file',
                   'delete_file', 'delete_folder', 'remove_package',
                   'read_file', 'list_files', 'grep_search', 'semantic_code_navigator',
-                  'create_database', 'request_supabase_connection'
+                  'create_database', 'pipilotdb_create_database', 'request_supabase_connection'
                 ]
 
                 if (clientSideTools.includes(parsed.toolName)) {
@@ -3489,6 +4071,7 @@ export function ChatPanelV2({
         createdAt: new Date().toISOString(),
         metadata: {
           reasoning: fullReasoning,
+          reasoningBlocks: streamRecoveryReasoningBlocks,
           toolInvocations: continuationToolCalls,
           hasToolCalls: continuationToolCalls.length > 0,
           wasRecovered: true
@@ -3924,6 +4507,23 @@ export function ChatPanelV2({
       return
     }
 
+    // If AI is busy and not processing from queue, add to queue instead
+    if (isLoading && !isProcessingQueueRef.current) {
+      const messageText = input.trim()
+      if (messageText) {
+        addToQueue(messageText)
+        setInput('')
+        if (textareaRef.current) {
+          textareaRef.current.style.height = '48px'
+        }
+        toast({
+          title: 'Added to queue',
+          description: 'Your message will be sent when the current response completes',
+        })
+      }
+      return
+    }
+
     // Check if images are still processing
     if (attachedImages.some((img: AttachedImage) => img.isProcessing)) {
       toast({
@@ -4223,6 +4823,28 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
       // Compress project files for efficient transfer (only for initial requests, not continuations)
       console.log(`[ChatPanelV2] 📦 Compressing ${projectFiles.length} project files...`)
       const isInitialPrompt = messages.length === 0 // No previous messages (first prompt)
+      // Build MCP servers list using runtime toggles from command menu
+      const mcpServersForProject: any[] = loadedMcpServers
+        .filter(s => s.transport !== 'stdio' && s.url && (mcpServerToggles[s.id || s.name] !== false))
+        .map(s => ({
+          name: s.name,
+          url: s.url,
+          transport: s.transport || 'http',
+          headers: { ...(s.headers || {}), ...(s.env || {}) },
+        }))
+
+      // Build disabled tool categories from runtime toggles + feature toggles
+      const disabledToolCategories = Object.entries(toolCategoryToggles)
+        .filter(([, enabled]) => !enabled)
+        .map(([cat]) => cat)
+      // Also disable web_tools and image_gen based on feature toggles
+      if (!webSearchEnabled && !disabledToolCategories.includes('web_tools')) {
+        disabledToolCategories.push('web_tools')
+      }
+      if (!imageGenEnabled && !disabledToolCategories.includes('image_gen')) {
+        disabledToolCategories.push('image_gen')
+      }
+
       const metadata = {
         project,
         databaseId,
@@ -4231,15 +4853,24 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
         supabase_projectId: supabaseProjectDetails?.supabaseProjectId,
         supabaseUserId,
         stripeApiKey,
-        isInitialPrompt
+        isInitialPrompt,
+        mcpServers: mcpServersForProject.length > 0 ? mcpServersForProject : undefined,
+        disabledToolCategories: disabledToolCategories.length > 0 ? disabledToolCategories : undefined,
+        disabledTools: disabledIndividualTools.length > 0 ? disabledIndividualTools : undefined,
       }
       const compressedData = await compressProjectFiles(projectFiles, fileTree, messagesToSend, metadata)
 
       // For initial prompt, force use anthropic/claude-haiku-4.5 model for UI prototyping
+      // For plan build execution, use the same model that generated the plan
       // Subsequent requests follow user/default model selection
-      const modelToUse = isInitialPrompt ? 'anthropic/claude-haiku-4.5' : selectedModel
+      const planOverride = planModelOverrideRef.current
+      const modelToUse = isInitialPrompt ? 'anthropic/claude-haiku-4.5' : (planOverride || selectedModel)
+      // Clear the plan model override after using it (one-time use for build execution)
+      if (planOverride) {
+        planModelOverrideRef.current = null
+      }
 
-      console.log(`[ChatPanelV2] Using model: ${modelToUse} (${isInitialPrompt ? 'initial prompt override (UI prototyping)' : 'user selection'})`)
+      console.log(`[ChatPanelV2] Using model: ${modelToUse} (${isInitialPrompt ? 'initial prompt override (UI prototyping)' : planOverride ? 'plan build override' : 'user selection'})`)
 
       // Check compressed data size and use storage for large payloads (> 1MB)
       const compressedSize = compressedData.byteLength
@@ -4319,6 +4950,11 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
       let accumulatedReasoning = ''
       let lineBuffer = '' // Buffer for incomplete lines across chunks
 
+      // Track reasoning blocks with their text positions for inline rendering
+      // Each block captures a contiguous reasoning segment and where in the text it occurred
+      let reasoningBlocks: { content: string, textPosition: number }[] = []
+      let lastDeltaType: 'text' | 'reasoning' | null = null
+
       // Track tool calls locally during this stream to avoid React state race conditions
       // textPosition tracks where in the text stream the tool was called (for inline rendering)
       // reasoningPosition tracks where in the reasoning stream the tool was called
@@ -4392,10 +5028,11 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 // Skip text that appears to be a raw tool result JSON
                 if (!looksLikeToolResult) {
                   accumulatedContent += textToAdd
+                  lastDeltaType = 'text'
                   setStreamingContent(accumulatedContent) // Store in component state
                   setMessages(prev => prev.map(msg =>
                     msg.id === assistantMessageId
-                      ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
+                      ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, reasoningBlocks: [...reasoningBlocks] }
                       : msg
                   ))
                   // Update stream recovery progress (debounced)
@@ -4410,13 +5047,20 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 }
               }
             } else if (parsed.type === 'reasoning-delta') {
-              // Reasoning delta - accumulate reasoning separately
+              // Reasoning delta - accumulate reasoning separately and track position
               if (parsed.text) {
+                // Start a new reasoning block when transitioning from text/null to reasoning
+                if (lastDeltaType !== 'reasoning') {
+                  reasoningBlocks.push({ content: '', textPosition: accumulatedContent.length })
+                }
+                reasoningBlocks[reasoningBlocks.length - 1].content += parsed.text
+                lastDeltaType = 'reasoning'
+
                 accumulatedReasoning += parsed.text
                 setStreamingReasoning(accumulatedReasoning) // Store in component state
                 setMessages(prev => prev.map(msg =>
                   msg.id === assistantMessageId
-                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
+                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, reasoningBlocks: [...reasoningBlocks] }
                     : msg
                 ))
                 // Update stream recovery progress (debounced)
@@ -4445,7 +5089,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
 
               // Automatically trigger continuation after a brief delay
               setTimeout(async () => {
-                await handleStreamContinuation(parsed.continuationState, assistantMessageId, accumulatedContent, accumulatedReasoning)
+                await handleStreamContinuation(parsed.continuationState, assistantMessageId, accumulatedContent, accumulatedReasoning, reasoningBlocks)
               }, 1000)
 
               // Don't process any more chunks after continuation signal
@@ -4498,6 +5142,17 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 return newMap
               })
 
+              // Handle manage_todos tool - extract and display todos in the Queue UI
+              if (toolCall.toolName === 'manage_todos' && toolCall.args?.todos) {
+                const todos: QueueTodo[] = toolCall.args.todos.map((t: any) => ({
+                  id: t.id || `todo-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                  title: t.title,
+                  description: t.description || undefined,
+                  status: t.status || 'pending',
+                }))
+                setAiTodos(todos)
+              }
+
               // Check if this is a client-side tool (both read and write operations)
               const clientSideTools = [
                 'write_file',
@@ -4511,6 +5166,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 'grep_search',
                 'semantic_code_navigator',
                 'create_database',
+                'pipilotdb_create_database',
                 'request_supabase_connection'
               ]
 
@@ -4668,7 +5324,8 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
           assistantMessageId,
           accumulatedContent,
           accumulatedReasoning,
-          toolInvocationsData
+          toolInvocationsData,
+          reasoningBlocks
         )
       }
 
@@ -5102,6 +5759,42 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
     }
   }
 
+  // Combined handler: routes images to handleImageUpload, other files to handleFileUpload
+  const handleCombinedUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+
+    const imageFiles: File[] = []
+    const otherFiles: File[] = []
+
+    for (const file of Array.from(files)) {
+      if (file.type.startsWith('image/')) {
+        imageFiles.push(file)
+      } else {
+        otherFiles.push(file)
+      }
+    }
+
+    // Route images through the image pipeline (base64 + AI description)
+    if (imageFiles.length > 0) {
+      const dt = new DataTransfer()
+      imageFiles.forEach(f => dt.items.add(f))
+      const syntheticEvent = { target: { files: dt.files } } as React.ChangeEvent<HTMLInputElement>
+      await handleImageUpload(syntheticEvent)
+    }
+
+    // Route non-image files through the file pipeline (text content)
+    if (otherFiles.length > 0) {
+      const dt = new DataTransfer()
+      otherFiles.forEach(f => dt.items.add(f))
+      const syntheticEvent = { target: { files: dt.files } } as React.ChangeEvent<HTMLInputElement>
+      await handleFileUpload(syntheticEvent)
+    }
+
+    // Reset the input so the same file can be re-selected
+    e.target.value = ''
+  }
+
   const handleUrlAttachment = async () => {
     if (!urlInput.trim()) return
 
@@ -5154,11 +5847,16 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
   }
 
   return (
-    <div className={`flex flex-col ${isMobile ? 'h-[calc(100vh-9.5rem)]' : 'h-full'}`}>
+    <div className={`flex flex-col overflow-hidden ${isMobile ? 'h-[calc(100vh-9.5rem)]' : 'h-full'}`} style={{ backgroundColor: 'rgba(17, 24, 39, 0.8)' }}>
       {/* Messages Area - Scrollable container */}
-      <div className={`flex-1 min-h-0 overflow-y-auto space-y-4 ${isMobile ? 'p-4 pb-20' : 'p-4'}`}>
+      <div className="relative flex-1 min-h-0">
+        <div
+          ref={scrollContainerRef}
+          className={`h-full min-w-0 overflow-y-auto overflow-x-hidden space-y-5 ${isMobile ? 'px-4 pt-4 pb-20' : 'px-4 pt-4 pb-4'}`}
+          style={{ backgroundColor: 'rgba(17, 24, 39, 0.8)' }}
+        >
         {messages.length === 0 && (
-          <div className="flex items-center justify-center h-full text-muted-foreground">
+          <div className="flex items-center justify-center h-full text-gray-500">
             <p>Start a conversation with PiPilot...</p>
           </div>
         )}
@@ -5167,12 +5865,12 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
           <div
             key={message.id}
             className={cn(
-              'flex',
+              'flex min-w-0',
               message.role === 'user' ? 'justify-end' : 'justify-start'
             )}
           >
             {message.role === 'user' ? (
-              <div className="w-full">
+              <div className="max-w-[85%] min-w-0 ml-auto">
                 <ExpandableUserMessage
                   content={message.content}
                   messageId={message.id}
@@ -5186,12 +5884,8 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 />
               </div>
             ) : (
-              <Card className={cn("w-full overflow-hidden",
-                message.reasoning || message.content || (message.toolInvocations && message.toolInvocations.length > 0)
-                  ? "bg-muted"
-                  : "bg-transparent border-0"
-              )}>
-                <div className="p-4 break-words overflow-wrap-anywhere">
+              <div className="w-full">
+                <div className="py-1 break-words overflow-hidden" style={{ overflowWrap: 'anywhere' }}>
                   {/* Special Rendering: Supabase Connection Card */}
                   {(() => {
                     const toolCalls = activeToolCalls.get(message.id)
@@ -5263,7 +5957,10 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                     // Filter out tools with special rendering
                     const inlineToolCalls = toolCalls.filter(tc =>
                       tc.toolName !== 'request_supabase_connection' &&
-                      tc.toolName !== 'continue_backend_implementation'
+                      tc.toolName !== 'continue_backend_implementation' &&
+                      tc.toolName !== 'suggest_next_steps' &&
+                      tc.toolName !== 'manage_todos' &&
+                      tc.toolName !== 'generate_plan'
                     )
                     return (
                       <MessageWithTools
@@ -5276,13 +5973,71 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                     )
                   })()}
 
+                  {/* Special Rendering: Plan Card from generate_plan tool - shown before Activities */}
+                  {(() => {
+                    const toolCalls = activeToolCalls.get(message.id)
+                    const planCalls = toolCalls?.filter(tc =>
+                      tc.toolName === 'generate_plan' && (tc.status === 'completed' || tc.status === 'executing')
+                    )
+
+                    if (planCalls && planCalls.length > 0) {
+                      return (
+                        <div className="space-y-4 mb-4">
+                          {planCalls.map((toolCall) => {
+                            const input = toolCall.input || {}
+                            return (
+                              <PlanCard
+                                key={toolCall.toolCallId}
+                                title={input.title || 'Generating plan...'}
+                                description={input.description || ''}
+                                steps={input.steps || []}
+                                techStack={input.techStack}
+                                estimatedFiles={input.estimatedFiles}
+                                isStreaming={toolCall.status === 'executing'}
+                                onBuild={() => {
+                                  // Switch to agent mode and send the plan as a build command
+                                  setIsAskMode(false)
+                                  // Use the same model that generated the plan for build execution
+                                  planModelOverrideRef.current = 'anthropic/claude-haiku-4.5'
+                                  const planSteps = (input.steps || []).map((s: any, i: number) => `${i + 1}. ${s.title}: ${s.description}`).join('\n')
+                                  const buildPrompt = `Build the following plan now:\n\n**${input.title}**\n${input.description}\n\nSteps:\n${planSteps}\n\nTech Stack: ${(input.techStack || []).join(', ')}\n\nBuild this complete application following the plan above. Start implementing immediately.`
+                                  setInput(buildPrompt)
+                                  // Use sendButtonRef.click() like initial prompt to avoid stale closure issue
+                                  setTimeout(() => {
+                                    if (sendButtonRef.current) {
+                                      sendButtonRef.current.click()
+                                    }
+                                  }, 150)
+                                }}
+                                onRefine={() => {
+                                  // Use the same model that generated the plan for refinement
+                                  planModelOverrideRef.current = 'anthropic/claude-haiku-4.5'
+                                  setInput('Please refine the plan.')
+                                  setTimeout(() => {
+                                    if (sendButtonRef.current) {
+                                      sendButtonRef.current.click()
+                                    }
+                                  }, 150)
+                                }}
+                              />
+                            )
+                          })}
+                        </div>
+                      )
+                    }
+                    return null
+                  })()}
+
                   {/* Tool Activity Panel - Always show for summary/tracking purposes */}
                   {(() => {
                     const toolCalls = activeToolCalls.get(message.id)
-                    // Filter out tools with special rendering (like request_supabase_connection, continue_backend_implementation)
+                    // Filter out tools with special rendering (like request_supabase_connection, continue_backend_implementation, suggest_next_steps, generate_plan)
                     const regularToolCalls = toolCalls?.filter(tc =>
                       tc.toolName !== 'request_supabase_connection' &&
-                      tc.toolName !== 'continue_backend_implementation'
+                      tc.toolName !== 'continue_backend_implementation' &&
+                      tc.toolName !== 'suggest_next_steps' &&
+                      tc.toolName !== 'manage_todos' &&
+                      tc.toolName !== 'generate_plan'
                     )
                     return regularToolCalls && regularToolCalls.length > 0 ? (
                       <ToolActivityPanel
@@ -5291,27 +6046,51 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                       />
                     ) : null
                   })()}
+
+                  {/* Next Step Suggestions - Only show for the LAST assistant message */}
+                  {(() => {
+                    // Find the last assistant message - only show suggestions on it
+                    const lastAssistantMsg = [...messages].reverse().find(m => m.role === 'assistant')
+                    if (!lastAssistantMsg || message.id !== lastAssistantMsg.id) return null
+
+                    const toolCalls = activeToolCalls.get(message.id)
+                    const isMessageStreaming = (isLoading && message.id === messages[messages.length - 1]?.id) || message.id === continuingMessageId
+                    const suggestions = extractNextStepSuggestions(toolCalls)
+                    return suggestions.length > 0 ? (
+                      <NextStepSuggestions
+                        suggestions={suggestions}
+                        isVisible={!isMessageStreaming}
+                        onSuggestionClick={(prompt) => {
+                          setInput(prompt)
+                          // Use sendButtonRef.click() like build plan to avoid stale closure issue
+                          setTimeout(() => {
+                            if (sendButtonRef.current) {
+                              sendButtonRef.current.click()
+                            }
+                          }, 150)
+                        }}
+                      />
+                    ) : null
+                  })()}
                 </div>
                 {/* AI Message Actions - Only show if message has content */}
                 {message.content && message.content.trim().length > 0 && (
-                  <div className="px-4 pb-2 flex justify-end">
-                    <Actions>
-                      <Action
-                        tooltip="Copy message"
-                        onClick={() => handleCopyMessage(message.id, message.content)}
-                      >
-                        <Copy className="w-4 h-4" />
-                      </Action>
-                      <Action
-                        tooltip="Delete message"
-                        onClick={() => handleDeleteMessage(message.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Action>
-                    </Actions>
+                  <div className="pt-1 flex items-center gap-1">
+                    <Action
+                      tooltip="Copy message"
+                      onClick={() => handleCopyMessage(message.id, message.content)}
+                    >
+                      <Copy className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
+                    </Action>
+                    <Action
+                      tooltip="Delete message"
+                      onClick={() => handleDeleteMessage(message.id)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
+                    </Action>
                   </div>
                 )}
-              </Card>
+              </div>
             )}
           </div>
         ))}
@@ -5319,154 +6098,247 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
         {/* Don't show separate loading spinner - MessageWithTools handles it */}
 
         <div ref={messagesEndRef} />
+        </div>
+
+        {/* Scroll to bottom button - Claude style */}
+        {showScrollButton && (
+          <button
+            onClick={scrollToBottom}
+            className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 h-8 w-8 rounded-full bg-orange-600 text-white hover:bg-orange-500 flex items-center justify-center shadow-lg transition-all"
+            aria-label="Scroll to bottom"
+          >
+            <ArrowDown className="size-4" />
+          </button>
+        )}
       </div>
 
       {/* Input Area - Fixed at bottom */}
-      <div className={`border-t bg-background p-4 ${isMobile
-        ? 'fixed bottom-12 left-0 right-0 p-4 z-[60] border-b'
-        : 'p-4'
-        }`}>
-        {/* Tagged Component Context Pill */}
-        {taggedComponent && (
-          <div className="mb-2">
-            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800 px-3 py-1.5 rounded-full text-xs">
-              <Square className="size-3 text-blue-600 dark:text-blue-400" />
-              <span className="font-medium text-blue-800 dark:text-blue-200">
-                &lt;{taggedComponent.tagName}&gt;
-              </span>
-              {taggedComponent.sourceFile && (
-                <span className="text-blue-600/70 dark:text-blue-400/70">
-                  {taggedComponent.sourceFile}
-                  {taggedComponent.sourceLine && `:${taggedComponent.sourceLine}`}
-                </span>
-              )}
-              {taggedComponent.textContent && (
-                <span className="text-blue-600/60 dark:text-blue-400/60 truncate max-w-[100px]" title={taggedComponent.textContent}>
-                  "{taggedComponent.textContent.slice(0, 20)}{taggedComponent.textContent.length > 20 ? '...' : ''}"
-                </span>
-              )}
-              <button
-                onClick={onClearTaggedComponent}
-                className="ml-1 hover:bg-blue-200 dark:hover:bg-blue-800 rounded-full p-0.5"
-              >
-                <X className="size-3 text-blue-600 dark:text-blue-400" />
-              </button>
-            </div>
-          </div>
+      <div className={`px-3 pb-3 pt-2 ${isMobile
+        ? 'fixed bottom-12 left-0 right-0 z-[60]'
+        : ''
+        }`} style={{ backgroundColor: 'rgba(17, 24, 39, 0.8)' }}>
+
+        {/* Queue Panel - Prompt Queue + AI Todos using Queue component */}
+        {(promptQueue.length > 0 || aiTodos.length > 0) && (
+          <Queue className="mb-2">
+            {/* Queued Messages Section */}
+            {promptQueue.length > 0 && (
+              <QueueSection>
+                <QueueSectionTrigger>
+                  <QueueSectionLabel count={promptQueue.length} label="Queued" />
+                  {promptQueue.length > 1 && (
+                    <button
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); clearQueue() }}
+                      className="text-[11px] text-gray-500 hover:text-red-400 transition-colors"
+                    >
+                      Clear all
+                    </button>
+                  )}
+                </QueueSectionTrigger>
+                <QueueSectionContent>
+                  <QueueList>
+                    {promptQueue.map((item) => (
+                      <QueueItem key={item.id}>
+                        <div className="flex items-center gap-2">
+                          <QueueItemIndicator />
+                          <QueueItemContent>{item.text}</QueueItemContent>
+                          <QueueItemActions>
+                            <QueueItemAction
+                              aria-label="Send now"
+                              title="Send now"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                // Move this item to front of queue so it processes next
+                                setPromptQueue(prev => {
+                                  const item_ = prev.find(p => p.id === item.id)
+                                  if (!item_) return prev
+                                  return [item_, ...prev.filter(p => p.id !== item.id)]
+                                })
+                              }}
+                            >
+                              <ArrowUp size={12} />
+                            </QueueItemAction>
+                            <QueueItemAction
+                              aria-label="Remove from queue"
+                              title="Remove from queue"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                removeFromQueue(item.id)
+                              }}
+                            >
+                              <Trash2 size={12} />
+                            </QueueItemAction>
+                          </QueueItemActions>
+                        </div>
+                      </QueueItem>
+                    ))}
+                  </QueueList>
+                </QueueSectionContent>
+              </QueueSection>
+            )}
+
+            {/* AI-Managed Todos Section */}
+            {aiTodos.length > 0 && (
+              <QueueSection>
+                <QueueSectionTrigger>
+                  <QueueSectionLabel
+                    count={aiTodos.filter(t => t.status !== 'completed').length}
+                    label="Todo"
+                    icon={<ListTodo size={13} className="text-orange-400" />}
+                  />
+                  {aiTodos.every(t => t.status === 'completed') && (
+                    <button
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); clearAiTodos() }}
+                      className="text-[11px] text-gray-500 hover:text-red-400 transition-colors"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </QueueSectionTrigger>
+                <QueueSectionContent>
+                  <QueueList>
+                    {aiTodos.map((todo) => (
+                      <QueueItem key={todo.id}>
+                        <div className="flex items-center gap-2">
+                          <QueueItemIndicator
+                            completed={todo.status === 'completed'}
+                            inProgress={todo.status === 'in_progress'}
+                          />
+                          <QueueItemContent completed={todo.status === 'completed'}>
+                            {todo.title}
+                          </QueueItemContent>
+                          <QueueItemActions>
+                            <QueueItemAction
+                              aria-label="Remove todo"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                removeAiTodo(todo.id)
+                              }}
+                            >
+                              <X size={12} />
+                            </QueueItemAction>
+                          </QueueItemActions>
+                        </div>
+                        {todo.description && (
+                          <QueueItemDescription completed={todo.status === 'completed'}>
+                            {todo.description}
+                          </QueueItemDescription>
+                        )}
+                      </QueueItem>
+                    ))}
+                  </QueueList>
+                </QueueSectionContent>
+              </QueueSection>
+            )}
+          </Queue>
         )}
 
-        {/* Attachments Display */}
-        {(attachedFiles.length > 0 || attachedImages.length > 0 || attachedUploadedFiles.length > 0 || attachedUrls.length > 0 || attachedSearchContexts.length > 0) && (
-          <div className="mb-2 flex flex-wrap gap-2">
-            {attachedFiles.map((file: AttachedFile) => (
-              <div key={file.id} className="flex items-center gap-1 bg-secondary px-2 py-1 rounded text-xs">
-                <FileText className="size-3" />
-                <span>{file.name}</span>
-                <button onClick={() => setAttachedFiles((prev: AttachedFile[]) => prev.filter((f: AttachedFile) => f.id !== file.id))}>
+        {/* Main Input Container - Claude-style rounded card */}
+        <div className="relative rounded-2xl border border-gray-700/60 bg-gray-900/80 focus-within:border-gray-600 transition-colors">
+
+          {/* Tagged Component Context */}
+          {taggedComponent && (
+            <div className="px-3 pt-2.5">
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-blue-950/30 border border-blue-800/40 text-xs">
+                <Square className="size-3 text-blue-400" />
+                <span className="font-medium text-blue-300">&lt;{taggedComponent.tagName}&gt;</span>
+                {taggedComponent.sourceFile && (
+                  <span className="text-blue-400/60">{taggedComponent.sourceFile}{taggedComponent.sourceLine && `:${taggedComponent.sourceLine}`}</span>
+                )}
+                <button onClick={onClearTaggedComponent} className="hover:text-red-400 text-blue-400/60 transition-colors">
                   <X className="size-3" />
                 </button>
               </div>
-            ))}
-            {attachedImages.map((img: AttachedImage) => (
-              <div key={img.id} className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${img.isProcessing ? 'bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700' : 'bg-secondary'}`}>
-                <ImageIcon className="size-3" />
-                <span>{img.name}</span>
-                {img.isProcessing ? (
-                  <>
-                    <Loader2 className="size-3 animate-spin text-blue-500" />
-                    <button
-                      onClick={() => {
-                        // Cancel the processing
-                        if (img.abortController) {
-                          img.abortController.abort()
-                        }
-                      }}
-                      className="ml-1 text-red-500 hover:text-red-700"
-                      title="Cancel processing"
-                    >
-                      <X className="size-3" />
-                    </button>
-                  </>
-                ) : (
-                  <button onClick={() => setAttachedImages((prev: AttachedImage[]) => prev.filter((i: AttachedImage) => i.id !== img.id))}>
+            </div>
+          )}
+
+          {/* Attachments inside the card */}
+          {(attachedFiles.length > 0 || attachedImages.length > 0 || attachedUploadedFiles.length > 0 || attachedUrls.length > 0 || attachedSearchContexts.length > 0) && (
+            <div className="px-3 pt-2.5 flex flex-wrap gap-1.5">
+              {attachedFiles.map((file: AttachedFile) => (
+                <div key={file.id} className="flex items-center gap-1.5 bg-gray-800 px-2 py-1 rounded-lg text-xs text-gray-300 group">
+                  <FileText className="size-3 text-gray-500" />
+                  <span className="truncate max-w-[120px]">{file.name}</span>
+                  <button className="md:opacity-0 md:group-hover:opacity-100 hover:text-red-400 text-gray-500 transition-all" onClick={() => setAttachedFiles((prev: AttachedFile[]) => prev.filter((f: AttachedFile) => f.id !== file.id))}>
                     <X className="size-3" />
                   </button>
-                )}
-              </div>
-            ))}
-            {attachedUploadedFiles.map((file: AttachedUploadedFile) => (
-              <div key={file.id} className="flex items-center gap-1 bg-secondary px-2 py-1 rounded text-xs">
-                <FileText className="size-3" />
-                <span>{file.name}</span>
-                <button onClick={() => setAttachedUploadedFiles((prev: AttachedUploadedFile[]) => prev.filter((f: AttachedUploadedFile) => f.id !== file.id))}>
-                  <X className="size-3" />
-                </button>
-              </div>
-            ))}
-            {attachedUrls.map((url: AttachedUrl) => (
-              <div key={url.id} className="flex items-center gap-1 bg-secondary px-2 py-1 rounded text-xs">
-                <LinkIcon className="size-3" />
-                <span>{url.title || url.url}</span>
-                {url.isProcessing && <Loader2 className="size-3 animate-spin" />}
-                <button onClick={() => setAttachedUrls((prev: AttachedUrl[]) => prev.filter((u: AttachedUrl) => u.id !== url.id))}>
-                  <X className="size-3" />
-                </button>
-              </div>
-            ))}
-            {/* Search Context Attachments */}
-            {attachedSearchContexts.map((ctx: AttachedSearchContext) => (
-              <SearchContextPill
-                key={ctx.id}
-                context={ctx}
-                onRemove={() => handleRemoveSearchContext(ctx.id)}
-                onClick={() => handleOpenFileFromSearch(ctx.filePath, ctx.lineNumber)}
-              />
-            ))}
-          </div>
-        )}
+                </div>
+              ))}
+              {attachedImages.map((img: AttachedImage) => (
+                <div key={img.id} className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs group ${img.isProcessing ? 'bg-blue-900/30 text-blue-300' : 'bg-gray-800 text-gray-300'}`}>
+                  <ImageIcon className="size-3 text-gray-500" />
+                  <span className="truncate max-w-[120px]">{img.name}</span>
+                  {img.isProcessing ? (
+                    <>
+                      <Loader2 className="size-3 animate-spin text-blue-400" />
+                      <button onClick={() => { if (img.abortController) img.abortController.abort() }} className="hover:text-red-400 text-blue-400/60 transition-colors">
+                        <X className="size-3" />
+                      </button>
+                    </>
+                  ) : (
+                    <button className="md:opacity-0 md:group-hover:opacity-100 hover:text-red-400 text-gray-500 transition-all" onClick={() => setAttachedImages((prev: AttachedImage[]) => prev.filter((i: AttachedImage) => i.id !== img.id))}>
+                      <X className="size-3" />
+                    </button>
+                  )}
+                </div>
+              ))}
+              {attachedUploadedFiles.map((file: AttachedUploadedFile) => (
+                <div key={file.id} className="flex items-center gap-1.5 bg-gray-800 px-2 py-1 rounded-lg text-xs text-gray-300 group">
+                  <FileText className="size-3 text-gray-500" />
+                  <span className="truncate max-w-[120px]">{file.name}</span>
+                  <button className="md:opacity-0 md:group-hover:opacity-100 hover:text-red-400 text-gray-500 transition-all" onClick={() => setAttachedUploadedFiles((prev: AttachedUploadedFile[]) => prev.filter((f: AttachedUploadedFile) => f.id !== file.id))}>
+                    <X className="size-3" />
+                  </button>
+                </div>
+              ))}
+              {attachedUrls.map((url: AttachedUrl) => (
+                <div key={url.id} className="flex items-center gap-1.5 bg-gray-800 px-2 py-1 rounded-lg text-xs text-gray-300 group">
+                  <LinkIcon className="size-3 text-gray-500" />
+                  <span className="truncate max-w-[120px]">{url.title || url.url}</span>
+                  {url.isProcessing && <Loader2 className="size-3 animate-spin text-gray-400" />}
+                  <button className="md:opacity-0 md:group-hover:opacity-100 hover:text-red-400 text-gray-500 transition-all" onClick={() => setAttachedUrls((prev: AttachedUrl[]) => prev.filter((u: AttachedUrl) => u.id !== url.id))}>
+                    <X className="size-3" />
+                  </button>
+                </div>
+              ))}
+              {attachedSearchContexts.map((ctx: AttachedSearchContext) => (
+                <SearchContextPill
+                  key={ctx.id}
+                  context={ctx}
+                  onRemove={() => handleRemoveSearchContext(ctx.id)}
+                  onClick={() => handleOpenFileFromSearch(ctx.filePath, ctx.lineNumber)}
+                />
+              ))}
+            </div>
+          )}
 
-        <div className="relative">
-          {/* Credit Alert Pill - Positioned inside the textarea area */}
+          {/* Credit Alert - inside card top */}
           {!loadingCredits && creditBalance !== null && creditBalance <= 3 && (
-            <div className="absolute top-2 right-16 z-10">
-              <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20 border border-yellow-200 dark:border-yellow-800">
-                <AlertTriangle className="h-3 w-3 text-yellow-600 dark:text-yellow-400" />
-                <span className="text-xs font-medium text-yellow-800 dark:text-yellow-200">
-                  {creditBalance.toFixed(1)} credits
-                </span>
+            <div className="px-3 pt-2">
+              <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-yellow-950/20 border border-yellow-800/30 text-xs">
+                <AlertTriangle className="h-3 w-3 text-yellow-500" />
+                <span className="text-yellow-400 font-medium">{creditBalance.toFixed(1)} credits</span>
                 {(() => {
                   const planConfig = PRODUCT_CONFIGS[currentPlan]
                   const canPurchase = planConfig ? planConfig.limits.canPurchaseCredits : false
                   return canPurchase ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-5 px-2 text-xs border-yellow-300 text-yellow-700 hover:bg-yellow-50 dark:border-yellow-700 dark:text-yellow-300 dark:hover:bg-yellow-950 ml-1"
-                      onClick={() => setShowTopUpDialog(true)}
-                    >
-                      <CreditCard className="h-2.5 w-2.5 mr-1" />
-                      Buy
-                    </Button>
+                    <button className="text-yellow-500 hover:text-yellow-300 font-medium ml-1 transition-colors" onClick={() => setShowTopUpDialog(true)}>Buy</button>
                   ) : (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-5 px-2 text-xs border-yellow-300 text-yellow-700 hover:bg-yellow-50 dark:border-yellow-700 dark:text-yellow-300 dark:hover:bg-yellow-950 ml-1"
-                      onClick={() => window.location.href = '/pricing'}
-                    >
-                      Upgrade
-                    </Button>
+                    <button className="text-yellow-500 hover:text-yellow-300 font-medium ml-1 transition-colors" onClick={() => window.location.href = '/pricing'}>Upgrade</button>
                   )
                 })()}
               </div>
             </div>
           )}
 
-          <form onSubmit={handleEnhancedSubmit}>
+          {/* Textarea */}
+          <form data-chat-form onSubmit={handleEnhancedSubmit}>
             <Textarea
               ref={textareaRef}
               value={input}
-              disabled={isLoading}
               onChange={(e) => {
                 const newValue = e.target.value
                 setInput(newValue)
@@ -5511,7 +6383,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 }, 0)
               }}
               placeholder="Type, @ for files, paste images or URLs, or attach..."
-              className="min-h-[48px] max-h-[140px] resize-none pr-12 pb-12"
+              className="min-h-[44px] max-h-[140px] resize-none border-0 bg-transparent text-gray-100 placeholder:text-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0 px-3.5 pt-3 pb-2 text-sm"
               onKeyDown={(e: any) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
@@ -5747,121 +6619,732 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
             />
           </form>
 
-          {/* Bottom Left: Attachment and Voice Buttons */}
-          <div className="absolute bottom-2 left-2 flex gap-2">
-            {/* Attachment Popover */}
-            <Popover open={showAttachmentMenu} onOpenChange={setShowAttachmentMenu}>
-              <PopoverTrigger asChild>
-                <Button
+          {/* Hidden file inputs */}
+          <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" id="image-upload" />
+          <input type="file" multiple onChange={handleCombinedUpload} className="hidden" id="file-upload" />
+
+          {/* Bottom Bar inside the card */}
+          <div className="flex items-center justify-between px-2 pb-2">
+            {/* Left Side: + Command Menu and Voice */}
+            <div className="flex items-center gap-1">
+              {/* + Command Menu Button */}
+              <div className="relative" ref={commandMenuRef}>
+                <button
                   type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  disabled={isLoading}
+                  className="h-8 w-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
+                  onClick={() => {
+                    setShowCommandMenu(!showCommandMenu)
+                    setCommandMenuSubmenu('none')
+                    setToolDetailCategory(null)
+                  }}
                 >
-                  <Plus className="size-4" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-48 p-2 z-[70]" side="top" align="start">
-                <div className="flex flex-col gap-1">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={handleImageUpload}
-                    className="hidden"
-                    id="image-upload"
-                  />
-                  <label htmlFor="image-upload">
-                    <Button type="button" variant="ghost" size="sm" className="w-full justify-start" asChild>
-                      <span><ImageIcon className="size-4 mr-2" /> Images</span>
-                    </Button>
-                  </label>
+                  <Plus className={`size-4 transition-transform ${showCommandMenu ? 'rotate-45' : ''}`} />
+                </button>
 
-                  <input
-                    type="file"
-                    multiple
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    id="file-upload"
-                  />
-                  <label htmlFor="file-upload">
-                    <Button type="button" variant="ghost" size="sm" className="w-full justify-start" asChild>
-                      <span><FileText className="size-4 mr-2" /> Files</span>
-                    </Button>
-                  </label>
+                {/* Command Menu Palette */}
+                {showCommandMenu && (
+                  <div className="absolute bottom-10 left-0 w-[280px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[80] overflow-hidden">
+                    {commandMenuSubmenu === 'none' && (
+                      <div className="py-1.5">
+                        {/* Attachments Section */}
+                        <button
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                          onClick={() => {
+                            setShowCommandMenu(false)
+                            document.getElementById('file-upload')?.click()
+                          }}
+                        >
+                          <FileUp className="size-4 text-gray-400" />
+                          <span>Add images or files</span>
+                        </button>
+                        <button
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                          onClick={() => {
+                            setShowCommandMenu(false)
+                            setShowUrlDialog(true)
+                          }}
+                        >
+                          <LinkIcon className="size-4 text-gray-400" />
+                          <span>Attach URL</span>
+                        </button>
+                        <button
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                          onClick={() => {
+                            setShowCommandMenu(false)
+                            // Trigger @ file dropdown
+                            if (textareaRef.current) {
+                              const currentVal = input
+                              setInput(currentVal + '@')
+                              textareaRef.current.focus()
+                              setTimeout(() => {
+                                if (textareaRef.current) {
+                                  const pos = textareaRef.current.value.length
+                                  textareaRef.current.selectionStart = pos
+                                  textareaRef.current.selectionEnd = pos
+                                  const atCmd = detectAtCommand(textareaRef.current.value, pos)
+                                  if (atCmd) {
+                                    setFileQuery(atCmd.query)
+                                    setAtCommandStartIndex(atCmd.startIndex)
+                                    const position = calculateDropdownPosition(textareaRef.current, atCmd.startIndex)
+                                    setDropdownPosition(position)
+                                    setShowFileDropdown(true)
+                                  }
+                                }
+                              }, 50)
+                            }
+                          }}
+                        >
+                          <FolderOpen className="size-4 text-gray-400" />
+                          <span>Browse project files</span>
+                        </button>
 
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="w-full justify-start"
-                    onClick={() => setShowUrlDialog(true)}
+                        {/* Separator */}
+                        <div className="my-1.5 border-t border-gray-700/50" />
+
+                        {/* Feature Toggles */}
+                        <button
+                          className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                          onClick={() => setWebSearchEnabled(!webSearchEnabled)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Globe className="size-4 text-gray-400" />
+                            <span>Web search</span>
+                          </div>
+                          {webSearchEnabled && <Check className="size-4 text-green-400" />}
+                        </button>
+                        <button
+                          className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                          onClick={() => setIsAskMode(!isAskMode)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Eye className="size-4 text-gray-400" />
+                            <span>Plan mode</span>
+                          </div>
+                          {isAskMode && <Check className="size-4 text-green-400" />}
+                        </button>
+                        <button
+                          className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                          onClick={() => setImageGenEnabled(!imageGenEnabled)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Sparkles className="size-4 text-gray-400" />
+                            <span>Image generation</span>
+                          </div>
+                          {imageGenEnabled && <Check className="size-4 text-green-400" />}
+                        </button>
+
+                        {/* Separator */}
+                        <div className="my-1.5 border-t border-gray-700/50" />
+
+                        {/* Submenus */}
+                        <button
+                          className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                          onClick={() => setCommandMenuSubmenu('mcp')}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Server className="size-4 text-gray-400" />
+                            <span>MCP Servers</span>
+                            {loadedMcpServers.filter(s => mcpServerToggles[s.id || s.name] !== false).length > 0 && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-green-900/40 text-green-400 rounded-full">
+                                {loadedMcpServers.filter(s => mcpServerToggles[s.id || s.name] !== false).length}
+                              </span>
+                            )}
+                          </div>
+                          <ChevronRight className="size-4 text-gray-500" />
+                        </button>
+                        <button
+                          className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                          onClick={() => setCommandMenuSubmenu('tools')}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Wrench className="size-4 text-gray-400" />
+                            <span>Tool categories</span>
+                          </div>
+                          <ChevronRight className="size-4 text-gray-500" />
+                        </button>
+
+                        {/* Separator */}
+                        <div className="my-1.5 border-t border-gray-700/50" />
+
+                        {/* Slash commands */}
+                        <button
+                          className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                          onClick={() => setCommandMenuSubmenu('slash')}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Hash className="size-4 text-gray-400" />
+                            <span>Slash commands</span>
+                          </div>
+                          <ChevronRight className="size-4 text-gray-500" />
+                        </button>
+
+                        {/* Project Settings */}
+                        <button
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                          onClick={() => {
+                            setShowCommandMenu(false)
+                            if (project?.slug) {
+                              window.open(`/workspace/projects/${project.slug}`, '_blank')
+                            }
+                          }}
+                        >
+                          <Settings className="size-4 text-gray-400" />
+                          <span>Project settings</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* MCP Servers Submenu */}
+                    {commandMenuSubmenu === 'mcp' && (
+                      <div className="py-1.5">
+                        <button
+                          className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors border-b border-gray-700/50"
+                          onClick={() => {
+                            if (mcpSubmenuView === 'add') {
+                              setMcpSubmenuView('list')
+                            } else {
+                              setCommandMenuSubmenu('none')
+                            }
+                          }}
+                        >
+                          <ChevronLeft className="size-4" />
+                          <span className="font-medium">{mcpSubmenuView === 'add' ? 'Add MCP Server' : 'MCP Servers'}</span>
+                          {mcpSubmenuView === 'list' && (
+                            <span className="text-[11px] text-gray-500 ml-auto">{loadedMcpServers.length} server{loadedMcpServers.length !== 1 ? 's' : ''}</span>
+                          )}
+                        </button>
+
+                        {mcpSubmenuView === 'list' ? (
+                          <>
+                            {loadedMcpServers.length === 0 ? (
+                              <div className="px-4 py-6 text-center">
+                                <Server className="size-8 text-gray-600 mx-auto mb-2" />
+                                <div className="text-sm text-gray-500">No MCP servers configured</div>
+                                <div className="text-[11px] text-gray-600 mt-1">Add a server to extend AI capabilities</div>
+                              </div>
+                            ) : (
+                              <div className="max-h-[240px] overflow-y-auto">
+                                {loadedMcpServers.map((server) => {
+                                  const key = server.id || server.name
+                                  const isOn = mcpServerToggles[key] !== false
+                                  return (
+                                    <div key={key} className="flex items-center hover:bg-gray-800 transition-colors group">
+                                      <button
+                                        className="flex-1 flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 min-w-0"
+                                        onClick={() => setMcpServerToggles(prev => ({ ...prev, [key]: !isOn }))}
+                                      >
+                                        <Server className={`size-4 flex-shrink-0 ${isOn ? 'text-green-400' : 'text-gray-500'}`} />
+                                        <div className="text-left min-w-0 flex-1">
+                                          <div className="flex items-center gap-2">
+                                            <span className={`truncate ${isOn ? 'text-gray-200' : 'text-gray-500'}`}>{server.name}</span>
+                                            {server.transport === 'stdio' && (
+                                              <span className="text-[10px] px-1 py-0.5 bg-yellow-900/30 text-yellow-500 rounded flex-shrink-0">local</span>
+                                            )}
+                                          </div>
+                                          {server.url && (
+                                            <div className="text-[10px] text-gray-600 truncate">{server.url}</div>
+                                          )}
+                                        </div>
+                                      </button>
+                                      <div className="flex items-center gap-1 pr-2">
+                                        {mcpDeleteConfirm === key ? (
+                                          <div className="flex items-center gap-1">
+                                            <button
+                                              className="p-1 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors"
+                                              onClick={() => handleRemoveMcpServer(server.id)}
+                                              title="Confirm remove"
+                                            >
+                                              <Check className="size-3.5" />
+                                            </button>
+                                            <button
+                                              className="p-1 text-gray-500 hover:text-gray-300 hover:bg-gray-700 rounded transition-colors"
+                                              onClick={() => setMcpDeleteConfirm(null)}
+                                              title="Cancel"
+                                            >
+                                              <X className="size-3.5" />
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          <button
+                                            className="p-1 text-gray-600 hover:text-red-400 hover:bg-red-500/10 rounded md:opacity-0 md:group-hover:opacity-100 transition-all"
+                                            onClick={() => setMcpDeleteConfirm(key)}
+                                            title="Remove server"
+                                          >
+                                            <Trash2 className="size-3.5" />
+                                          </button>
+                                        )}
+                                        <Switch
+                                          checked={isOn}
+                                          onCheckedChange={(checked) => setMcpServerToggles(prev => ({ ...prev, [key]: checked }))}
+                                          className="h-4 w-7 flex-shrink-0"
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )}
+                            <div className="border-t border-gray-700/50 mt-1 flex">
+                              <button
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-orange-400 hover:bg-gray-800 transition-colors"
+                                onClick={() => {
+                                  setMcpSubmenuView('add')
+                                  setMcpDeleteConfirm(null)
+                                }}
+                              >
+                                <Plus className="size-4" />
+                                <span>Add server</span>
+                              </button>
+                              <div className="w-px bg-gray-700/50" />
+                              <button
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-gray-400 hover:text-gray-300 hover:bg-gray-800 transition-colors"
+                                onClick={() => {
+                                  setShowCommandMenu(false)
+                                  if (project?.slug) {
+                                    window.open(`/workspace/projects/${project.slug}?tab=mcp`, '_blank')
+                                  }
+                                }}
+                              >
+                                <ExternalLink className="size-4" />
+                                <span>Full settings</span>
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          /* Add MCP Server Form */
+                          <div className="px-4 py-3 space-y-3">
+                            <div>
+                              <label className="text-[11px] text-gray-500 mb-1 block">Server name</label>
+                              <input
+                                type="text"
+                                value={newMcpName}
+                                onChange={(e) => setNewMcpName(e.target.value)}
+                                placeholder="e.g. my-mcp-server"
+                                className="w-full h-8 px-2.5 text-sm bg-gray-800 border border-gray-700/60 rounded-lg text-gray-100 placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[11px] text-gray-500 mb-1 block">Server URL</label>
+                              <input
+                                type="url"
+                                value={newMcpUrl}
+                                onChange={(e) => setNewMcpUrl(e.target.value)}
+                                placeholder="https://mcp.example.com/sse"
+                                className="w-full h-8 px-2.5 text-sm bg-gray-800 border border-gray-700/60 rounded-lg text-gray-100 placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
+                              />
+                            </div>
+
+                            {/* Headers */}
+                            <div>
+                              <label className="text-[11px] text-gray-500 mb-1 block">Headers (optional)</label>
+                              {Object.entries(newMcpHeaders).length > 0 && (
+                                <div className="space-y-1 mb-2">
+                                  {Object.entries(newMcpHeaders).map(([hk, hv]) => (
+                                    <div key={hk} className="flex items-center gap-1.5 text-[11px]">
+                                      <span className="text-gray-400 font-mono truncate">{hk}</span>
+                                      <span className="text-gray-600">:</span>
+                                      <span className="text-gray-500 font-mono truncate flex-1">{'*'.repeat(Math.min(hv.length, 12))}</span>
+                                      <button
+                                        className="p-0.5 text-gray-600 hover:text-red-400 transition-colors"
+                                        onClick={() => setNewMcpHeaders(prev => {
+                                          const next = { ...prev }
+                                          delete next[hk]
+                                          return next
+                                        })}
+                                      >
+                                        <X className="size-3" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              <div className="flex gap-1.5">
+                                <input
+                                  type="text"
+                                  value={newMcpHeaderKey}
+                                  onChange={(e) => setNewMcpHeaderKey(e.target.value)}
+                                  placeholder="Key"
+                                  className="flex-1 h-7 px-2 text-[12px] bg-gray-800 border border-gray-700/60 rounded-md text-gray-100 placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50"
+                                />
+                                <input
+                                  type="text"
+                                  value={newMcpHeaderValue}
+                                  onChange={(e) => setNewMcpHeaderValue(e.target.value)}
+                                  placeholder="Value"
+                                  className="flex-1 h-7 px-2 text-[12px] bg-gray-800 border border-gray-700/60 rounded-md text-gray-100 placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50"
+                                />
+                                <button
+                                  className="h-7 w-7 flex items-center justify-center rounded-md bg-gray-800 border border-gray-700/60 text-gray-400 hover:text-orange-400 hover:border-orange-500/50 transition-colors disabled:opacity-30"
+                                  disabled={!newMcpHeaderKey.trim() || !newMcpHeaderValue.trim()}
+                                  onClick={() => {
+                                    if (newMcpHeaderKey.trim() && newMcpHeaderValue.trim()) {
+                                      setNewMcpHeaders(prev => ({ ...prev, [newMcpHeaderKey.trim()]: newMcpHeaderValue.trim() }))
+                                      setNewMcpHeaderKey('')
+                                      setNewMcpHeaderValue('')
+                                    }
+                                  }}
+                                >
+                                  <Plus className="size-3.5" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Scope selector */}
+                            <div>
+                              <label className="text-[11px] text-gray-500 mb-1.5 block">Scope</label>
+                              <div className="flex gap-2">
+                                <button
+                                  className={`flex-1 text-[12px] py-1.5 rounded-md border transition-colors ${newMcpScope === 'project' ? 'border-orange-500/50 bg-orange-600/15 text-orange-400' : 'border-gray-700/60 text-gray-500 hover:text-gray-300'}`}
+                                  onClick={() => setNewMcpScope('project')}
+                                >
+                                  This project
+                                </button>
+                                <button
+                                  className={`flex-1 text-[12px] py-1.5 rounded-md border transition-colors ${newMcpScope === 'global' ? 'border-orange-500/50 bg-orange-600/15 text-orange-400' : 'border-gray-700/60 text-gray-500 hover:text-gray-300'}`}
+                                  onClick={() => setNewMcpScope('global')}
+                                >
+                                  All projects
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex gap-2 pt-1">
+                              <button
+                                className="flex-1 h-8 text-sm rounded-lg bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700 transition-colors"
+                                onClick={() => {
+                                  setMcpSubmenuView('list')
+                                  setNewMcpName('')
+                                  setNewMcpUrl('')
+                                  setNewMcpHeaderKey('')
+                                  setNewMcpHeaderValue('')
+                                  setNewMcpHeaders({})
+                                  setNewMcpScope('project')
+                                }}
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                className="flex-1 h-8 text-sm rounded-lg bg-orange-600 hover:bg-orange-500 text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                disabled={!newMcpName.trim() || !newMcpUrl.trim() || (!newMcpUrl.startsWith('http://') && !newMcpUrl.startsWith('https://'))}
+                                onClick={handleAddMcpServer}
+                              >
+                                Add server
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Tool Categories Submenu (with drill-down into individual tools) */}
+                    {commandMenuSubmenu === 'tools' && (
+                      <div className="py-1.5">
+                        {/* Category list or individual tools drill-down */}
+                        {toolDetailCategory === null ? (
+                          <>
+                            <button
+                              className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors border-b border-gray-700/50"
+                              onClick={() => setCommandMenuSubmenu('none')}
+                            >
+                              <ChevronLeft className="size-4" />
+                              <span className="font-medium">Tool Categories</span>
+                            </button>
+                            <div className="max-h-[280px] overflow-y-auto">
+                              {[
+                                { id: 'file_ops', label: 'File Operations', icon: FileText, desc: 'Read, write, edit, delete files' },
+                                { id: 'code_search', label: 'Code Search', icon: Search, desc: 'Grep, semantic nav, list files' },
+                                { id: 'web_tools', label: 'Web Tools', icon: Globe, desc: 'Web search & extraction' },
+                                { id: 'dev_tools', label: 'Dev Tools', icon: Code, desc: 'Error check, Node, packages' },
+                                { id: 'pipilot_db', label: 'PiPilot Database', icon: Database, desc: 'Create/query PiPilot databases' },
+                                { id: 'supabase', label: 'Supabase', icon: Database, desc: 'Supabase tables, auth, storage' },
+                                { id: 'stripe', label: 'Stripe', icon: CreditCard, desc: 'Payments, products, customers' },
+                                { id: 'docs_quality', label: 'Docs & Quality', icon: BarChart3, desc: 'Reports, docs, code review' },
+                                { id: 'image_gen', label: 'Image Generation', icon: Sparkles, desc: 'AI image generation' },
+                              ].map((cat) => {
+                                const isOn = toolCategoryToggles[cat.id] !== false
+                                const Icon = cat.icon
+                                const tools = clientCategoryToolMap[cat.id] || []
+                                const disabledCount = isOn ? tools.filter(t => disabledIndividualTools.includes(t.name)).length : tools.length
+                                return (
+                                  <div key={cat.id} className="flex items-center hover:bg-gray-800 transition-colors">
+                                    {/* Category info - click to drill down */}
+                                    <button
+                                      className="flex-1 flex items-center gap-3 px-4 py-2 text-sm text-gray-200 min-w-0"
+                                      onClick={() => setToolDetailCategory(cat.id)}
+                                    >
+                                      <Icon className={`size-4 flex-shrink-0 ${isOn ? 'text-blue-400' : 'text-gray-600'}`} />
+                                      <div className="text-left min-w-0 flex-1">
+                                        <div className="flex items-center gap-2">
+                                          <span className={isOn ? 'text-gray-200' : 'text-gray-500'}>{cat.label}</span>
+                                          {isOn && disabledCount > 0 && (
+                                            <span className="text-[10px] px-1.5 py-0.5 bg-yellow-900/30 text-yellow-500 rounded-full">
+                                              {tools.length - disabledCount}/{tools.length}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="text-[11px] text-gray-500 truncate">{cat.desc}</div>
+                                      </div>
+                                      <ChevronRight className="size-3.5 text-gray-600 flex-shrink-0" />
+                                    </button>
+                                    {/* Category master toggle */}
+                                    <div className="px-3">
+                                      <Switch
+                                        checked={isOn}
+                                        onCheckedChange={(checked) => {
+                                          setToolCategoryToggles(prev => ({ ...prev, [cat.id]: checked }))
+                                          // When enabling category, also re-enable all its individual tools
+                                          if (checked) {
+                                            const toolNames = tools.map(t => t.name)
+                                            setDisabledIndividualTools(prev => prev.filter(t => !toolNames.includes(t)))
+                                          }
+                                        }}
+                                        className="h-4 w-7 flex-shrink-0"
+                                      />
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                            <div className="border-t border-gray-700/50 mt-1">
+                              <button
+                                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-blue-400 hover:bg-gray-800 transition-colors"
+                                onClick={() => {
+                                  setShowCommandMenu(false)
+                                  window.open('/workspace/account', '_blank')
+                                }}
+                              >
+                                <ExternalLink className="size-4" />
+                                <span>Manage in settings</span>
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            {/* Individual tools drill-down */}
+                            {(() => {
+                              const catId = toolDetailCategory
+                              const catLabels: Record<string, string> = {
+                                file_ops: 'File Operations', code_search: 'Code Search', web_tools: 'Web Tools',
+                                dev_tools: 'Dev Tools', pipilot_db: 'PiPilot Database', supabase: 'Supabase',
+                                stripe: 'Stripe', docs_quality: 'Docs & Quality', image_gen: 'Image Generation',
+                              }
+                              const tools = clientCategoryToolMap[catId] || []
+                              const categoryEnabled = toolCategoryToggles[catId] !== false
+                              const enabledToolCount = tools.filter(t => !disabledIndividualTools.includes(t.name)).length
+                              return (
+                                <>
+                                  <button
+                                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors border-b border-gray-700/50"
+                                    onClick={() => setToolDetailCategory(null)}
+                                  >
+                                    <ChevronLeft className="size-4" />
+                                    <span className="font-medium">{catLabels[catId] || catId}</span>
+                                    <span className="text-[11px] text-gray-500 ml-auto">{enabledToolCount}/{tools.length} active</span>
+                                  </button>
+
+                                  {/* Master toggle for this category */}
+                                  <div className="flex items-center justify-between px-4 py-2 border-b border-gray-700/30">
+                                    <span className="text-xs text-gray-400">Enable all</span>
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        className="text-[11px] text-blue-400 hover:text-blue-300"
+                                        onClick={() => {
+                                          // Enable all tools in this category
+                                          const toolNames = tools.map(t => t.name)
+                                          setDisabledIndividualTools(prev => prev.filter(t => !toolNames.includes(t)))
+                                          if (!categoryEnabled) {
+                                            setToolCategoryToggles(prev => ({ ...prev, [catId]: true }))
+                                          }
+                                        }}
+                                      >
+                                        All on
+                                      </button>
+                                      <span className="text-gray-600">|</span>
+                                      <button
+                                        className="text-[11px] text-red-400 hover:text-red-300"
+                                        onClick={() => {
+                                          // Disable all tools in this category
+                                          const toolNames = tools.map(t => t.name)
+                                          setDisabledIndividualTools(prev => [...prev.filter(t => !toolNames.includes(t)), ...toolNames])
+                                        }}
+                                      >
+                                        All off
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  <div className="max-h-[240px] overflow-y-auto">
+                                    {tools.map((tool) => {
+                                      const isToolOn = categoryEnabled && !disabledIndividualTools.includes(tool.name)
+                                      return (
+                                        <button
+                                          key={tool.name}
+                                          className="w-full flex items-center justify-between px-4 py-2 text-sm hover:bg-gray-800 transition-colors"
+                                          onClick={() => {
+                                            if (!categoryEnabled) {
+                                              // Auto-enable category when enabling a tool
+                                              setToolCategoryToggles(prev => ({ ...prev, [catId]: true }))
+                                            }
+                                            setDisabledIndividualTools(prev =>
+                                              prev.includes(tool.name)
+                                                ? prev.filter(t => t !== tool.name)
+                                                : [...prev, tool.name]
+                                            )
+                                          }}
+                                        >
+                                          <div className="flex items-center gap-3 min-w-0">
+                                            <Wrench className={`size-3.5 flex-shrink-0 ${isToolOn ? 'text-green-400' : 'text-gray-600'}`} />
+                                            <div className="text-left min-w-0">
+                                              <div className={`text-sm ${isToolOn ? 'text-gray-200' : 'text-gray-500'}`}>{tool.label}</div>
+                                              <div className="text-[10px] text-gray-600 font-mono truncate">{tool.name}</div>
+                                            </div>
+                                          </div>
+                                          <Switch
+                                            checked={isToolOn}
+                                            onCheckedChange={(checked) => {
+                                              if (!categoryEnabled && checked) {
+                                                setToolCategoryToggles(prev => ({ ...prev, [catId]: true }))
+                                              }
+                                              setDisabledIndividualTools(prev =>
+                                                checked
+                                                  ? prev.filter(t => t !== tool.name)
+                                                  : [...prev, tool.name]
+                                              )
+                                            }}
+                                            className="h-4 w-7 flex-shrink-0"
+                                            onClick={(e) => e.stopPropagation()}
+                                          />
+                                        </button>
+                                      )
+                                    })}
+                                  </div>
+                                </>
+                              )
+                            })()}
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Slash Commands Submenu */}
+                    {commandMenuSubmenu === 'slash' && (
+                      <div className="py-1.5">
+                        <button
+                          className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors border-b border-gray-700/50"
+                          onClick={() => setCommandMenuSubmenu('none')}
+                        >
+                          <ChevronLeft className="size-4" />
+                          <span className="font-medium">Slash Commands</span>
+                        </button>
+                        <div className="max-h-[240px] overflow-y-auto">
+                          {getDefaultSlashCommands({}).map((cmd: SlashCommand) => (
+                            <button
+                              key={cmd.id}
+                              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                              onClick={() => {
+                                setShowCommandMenu(false)
+                                setInput(`/${cmd.id} `)
+                                textareaRef.current?.focus()
+                              }}
+                            >
+                              <Hash className="size-4 text-gray-500" />
+                              <div className="text-left min-w-0">
+                                <div className="text-gray-200">/{cmd.id}</div>
+                                <div className="text-[11px] text-gray-500 truncate">{cmd.description}</div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Voice Button - Waveform icon */}
+              <button
+                type="button"
+                className="h-8 w-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                onClick={handleMicrophoneClick}
+                disabled={isTranscribing}
+              >
+                {isRecording ? (
+                  <svg width="16" height="16" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-red-400 animate-pulse">
+                    <rect x="0" y="7.5" height="6" fill="currentColor" width="1" rx="0.5" ry="0.5" />
+                    <rect x="4" y="5.5" height="10" fill="currentColor" width="1" rx="0.5" ry="0.5" />
+                    <rect x="8" y="2.5" height="16" fill="currentColor" width="1" rx="0.5" ry="0.5" />
+                    <rect x="12" y="5.5" height="10" fill="currentColor" width="1" rx="0.5" ry="0.5" />
+                    <rect x="16" y="2.5" height="16" fill="currentColor" width="1" rx="0.5" ry="0.5" />
+                    <rect x="20" y="7.5" height="6" fill="currentColor" width="1" rx="0.5" ry="0.5" />
+                  </svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="0" y="7.5" height="6" fill="currentColor" fillOpacity="0.5" width="1" rx="0.5" ry="0.5" />
+                    <rect x="4" y="5.5" height="10" fill="currentColor" fillOpacity="0.5" width="1" rx="0.5" ry="0.5" />
+                    <rect x="8" y="2.5" height="16" fill="currentColor" fillOpacity="0.5" width="1" rx="0.5" ry="0.5" />
+                    <rect x="12" y="5.5" height="10" fill="currentColor" fillOpacity="0.5" width="1" rx="0.5" ry="0.5" />
+                    <rect x="16" y="2.5" height="16" fill="currentColor" fillOpacity="0.5" width="1" rx="0.5" ry="0.5" />
+                    <rect x="20" y="7.5" height="6" fill="currentColor" fillOpacity="0.5" width="1" rx="0.5" ry="0.5" />
+                  </svg>
+                )}
+              </button>
+            </div>
+
+            {/* Right Side: Model Selector, Plan Toggle, Send/Stop */}
+            <div className="flex items-center gap-2">
+              {/* Compact Model Selector */}
+              {onModelChange && (
+                <ModelSelector
+                  selectedModel={selectedModel}
+                  onModelChange={onModelChange}
+                  userPlan={userPlan}
+                  subscriptionStatus={subscriptionStatus}
+                  compact={true}
+                  className=""
+                />
+              )}
+
+              {/* Plan Mode Toggle */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className={`text-sm font-medium transition-colors ${isAskMode
+                      ? 'text-orange-400'
+                      : 'text-gray-400 hover:text-gray-200'
+                    }`}
+                    onClick={() => setIsAskMode(!isAskMode)}
                   >
-                    <LinkIcon className="size-4 mr-2" /> URL
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
+                    Plan
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Plan mode - AI creates a strategic plan before building</p>
+                </TooltipContent>
+              </Tooltip>
 
-            {/* Voice Button */}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={handleMicrophoneClick}
-              disabled={isTranscribing || isLoading}
-            >
-              {isRecording ? <MicOff className="size-4" /> : <Mic className="size-4" />}
-            </Button>
-          </div>
-
-          {/* Bottom Right: Mode Toggle and Send/Stop Button */}
-          <div className="absolute bottom-2 right-2 flex items-center gap-2">
-            {/* Ask Mode Toggle */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-2">
-                  <label htmlFor="ask-mode-switch" className="text-xs text-gray-400 cursor-pointer select-none">
-                    Ask
-                  </label>
-                  <Switch
-                    id="ask-mode-switch"
-                    checked={isAskMode}
-                    onCheckedChange={setIsAskMode}
-                    className="h-4 w-7"
-                  />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Chat with PiPilot for guidance and research without making file changes</p>
-              </TooltipContent>
-            </Tooltip>
-
-            {/* Send/Stop Button */}
-            {isLoading ? (
-              <Button
-                type="button"
-                variant="default"
-                size="icon"
-                className="h-8 w-8"
-                onClick={handleStop}
-              >
-                <Square className="w-4 h-4 bg-red-500 animate-pulse" />
-              </Button>
-            ) : (
-              <Button
-                ref={sendButtonRef}
-                type="button"
-                size="icon"
-                className="h-8 w-8"
-                disabled={(!input.trim() && attachedFiles.length === 0 && attachedImages.length === 0) || attachedImages.some((img: AttachedImage) => img.isProcessing)}
-                onClick={handleEnhancedSubmit}
-              >
-                <CornerDownLeft className="size-4" />
-              </Button>
-            )}
+              {/* Send/Stop Button */}
+              {isLoading ? (
+                <button
+                  type="button"
+                  className="h-7 w-7 rounded-lg bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors"
+                  onClick={handleStop}
+                >
+                  <Square className="w-3.5 h-3.5 text-white fill-white" />
+                </button>
+              ) : (
+                <button
+                  ref={sendButtonRef}
+                  type="button"
+                  className="h-7 w-7 rounded-lg bg-orange-600 hover:bg-orange-500 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+                  disabled={(!input.trim() && attachedFiles.length === 0 && attachedImages.length === 0) || attachedImages.some((img: AttachedImage) => img.isProcessing)}
+                  onClick={handleEnhancedSubmit}
+                >
+                  <ArrowUp className="size-4 text-white" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 

@@ -37,8 +37,19 @@ import {
   Receipt,
   AlertTriangle,
   Plus,
-  Coins
+  Coins,
+  Wrench,
+  Server,
+  Code,
+  Database,
+  Globe,
+  FileText,
+  Search,
+  Terminal,
+  Palette,
+  Shield
 } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import { storageManager } from "@/lib/storage-manager"
@@ -193,10 +204,32 @@ function AccountSettingsPageContent() {
   // Delete account state
   const [deleteConfirmation, setDeleteConfirmation] = useState("")
 
+  // Tool preferences state
+  const [disabledToolCategories, setDisabledToolCategories] = useState<string[]>([])
+
   const supabase = createClient()
   const searchParams = useSearchParams()
 
   // Handle OAuth callback parameters
+  // Load tool preferences from localStorage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('pipilot-tool-preferences')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setDisabledToolCategories(parsed.disabledCategories || [])
+      }
+    } catch {}
+  }, [])
+
+  const toggleToolCategory = (category: string) => {
+    setDisabledToolCategories(prev => {
+      const next = prev.includes(category) ? prev.filter(c => c !== category) : [...prev, category]
+      localStorage.setItem('pipilot-tool-preferences', JSON.stringify({ disabledCategories: next }))
+      return next
+    })
+  }
+
   useEffect(() => {
     const handleOAuthCallback = async () => {
       const token = searchParams.get('token')
@@ -2380,6 +2413,65 @@ function AccountSettingsPageContent() {
                       </p>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* AI Tool Preferences Card */}
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Wrench className="h-5 w-5" />
+                    AI Tool Preferences
+                  </CardTitle>
+                  <CardDescription>
+                    Enable or disable tool categories to control what your AI assistant can do. Disabling unused categories reduces token usage and prevents context overflow errors.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[
+                      { id: 'file_ops', name: 'File Operations', desc: 'Read, write, edit, delete files', icon: FileText, tools: 'write_file, read_file, edit_file, delete_file, delete_folder' },
+                      { id: 'code_search', name: 'Code Search & Analysis', desc: 'Grep search, semantic navigator, list files', icon: Search, tools: 'grep_search, semantic_code_navigator, list_files' },
+                      { id: 'web_tools', name: 'Web Search & Extract', desc: 'Search the web, extract page content', icon: Globe, tools: 'web_search, web_extract' },
+                      { id: 'dev_tools', name: 'Dev Server & Sandbox', desc: 'Check errors, run Node.js commands', icon: Terminal, tools: 'check_dev_errors, node_machine' },
+                      { id: 'pipilot_db', name: 'PiPilot Database', desc: 'Create/query/manage PiPilot DB tables', icon: Database, tools: 'pipilotdb_create_database, pipilotdb_query_database, pipilotdb_create_table, etc.' },
+                      { id: 'supabase', name: 'Supabase Integration', desc: 'Remote Supabase table operations', icon: Server, tools: 'supabase_create_table, supabase_execute_sql, etc.' },
+                      { id: 'stripe', name: 'Stripe Payments', desc: 'Products, prices, customers, payments', icon: CreditCard, tools: 'stripe_list_products, stripe_create_product, etc.' },
+                      { id: 'docs_quality', name: 'Documentation & Reports', desc: 'Generate docs, code review, quality analysis', icon: Code, tools: 'auto_documentation, code_review, code_quality_analysis' },
+                      { id: 'image_gen', name: 'Image Generation', desc: 'Generate AI images from text prompts', icon: Palette, tools: 'generate_image' },
+                    ].map((category) => {
+                      const isDisabled = disabledToolCategories.includes(category.id)
+                      return (
+                        <div
+                          key={category.id}
+                          className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
+                            isDisabled ? 'border-gray-800 bg-gray-900/30 opacity-60' : 'border-gray-700 bg-gray-900/50'
+                          }`}
+                        >
+                          <category.icon className={`h-4 w-4 mt-0.5 shrink-0 ${isDisabled ? 'text-gray-600' : 'text-indigo-400'}`} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className={`text-sm font-medium ${isDisabled ? 'text-gray-500' : 'text-white'}`}>{category.name}</span>
+                              <Switch
+                                checked={!isDisabled}
+                                onCheckedChange={() => toggleToolCategory(category.id)}
+                              />
+                            </div>
+                            <p className="text-xs text-gray-500 mt-0.5">{category.desc}</p>
+                            <p className="text-[10px] text-gray-600 mt-1 font-mono truncate">{category.tools}</p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {disabledToolCategories.length > 0 && (
+                    <div className="flex items-center gap-2 mt-4 p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                      <p className="text-xs text-amber-400/80">
+                        {disabledToolCategories.length} category{disabledToolCategories.length !== 1 ? 'ies' : 'y'} disabled. The AI will not have access to these tools during chat.
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

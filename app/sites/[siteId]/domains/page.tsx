@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "@/components/ui/use-toast"
 import { AlertCircle, CheckCircle, Clock, ExternalLink, Plus, RefreshCw, Trash2, Globe } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface CustomDomain {
   id: string
@@ -28,6 +29,7 @@ interface CustomDomain {
 }
 
 export default function SiteDomainsPage() {
+  usePageTitle('Site Domains')
   const params = useParams()
   const router = useRouter()
   const siteId = params.siteId as string

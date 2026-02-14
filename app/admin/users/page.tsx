@@ -70,6 +70,7 @@ import {
   RefreshCw,
   UserCog
 } from "lucide-react"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface UserData {
   id: string
@@ -93,6 +94,7 @@ interface UserData {
 }
 
 export default function AdminUsersPage() {
+  usePageTitle('User Management')
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [users, setUsers] = useState<UserData[]>([])

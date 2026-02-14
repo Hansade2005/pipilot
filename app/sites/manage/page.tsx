@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/components/ui/use-toast"
 import { Globe, Plus, ExternalLink, Settings } from "lucide-react"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function SitesManagePage() {
+  usePageTitle('Manage Sites')
   const router = useRouter()
   const [sites, setSites] = useState<any[]>([])
   const [loading, setLoading] = useState(true)

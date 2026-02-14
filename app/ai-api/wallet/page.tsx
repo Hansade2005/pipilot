@@ -20,6 +20,7 @@ import {
     Loader2
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface Transaction {
     id: string
@@ -257,6 +258,7 @@ function WalletPageContent() {
 }
 
 export default function WalletPage() {
+  usePageTitle('AI API Wallet')
     return (
         <Suspense fallback={
             <div className="min-h-screen flex items-center justify-center">

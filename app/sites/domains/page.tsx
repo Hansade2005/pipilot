@@ -22,6 +22,7 @@ import {
   RefreshCw,
   AlertCircle
 } from "lucide-react"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface CustomDomain {
   id: string
@@ -39,6 +40,7 @@ interface Site {
 }
 
 export default function DomainsPage() {
+  usePageTitle('Domain Management')
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [domains, setDomains] = useState<CustomDomain[]>([])

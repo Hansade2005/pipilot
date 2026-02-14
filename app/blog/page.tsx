@@ -21,6 +21,7 @@ import {
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import Link from "next/link"
+import { usePageTitle } from '@/hooks/use-page-title'
 
 interface BlogPost {
   id: string
@@ -52,6 +53,7 @@ interface Category {
 }
 
 export default function BlogPage() {
+  usePageTitle('Blog')
   const [posts, setPosts] = useState<BlogPost[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [filteredPosts, setFilteredPosts] = useState<BlogPost[]>([])

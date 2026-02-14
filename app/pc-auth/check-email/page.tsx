@@ -1,5 +1,11 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Mail } from "lucide-react"
+import type { Metadata } from 'next'
+
+
+export const metadata: Metadata = {
+  title: 'Check Your Email | PiPilot',
+}
 
 export default function CheckEmailPage() {
   return (

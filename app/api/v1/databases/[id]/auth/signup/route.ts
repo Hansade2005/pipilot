@@ -17,10 +17,12 @@ import {
 } from '@/lib/auth-jwt';
 
 // Create Supabase client with service role (bypasses RLS)
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 /**
  * Middleware to authenticate API key and check rate limits
@@ -50,7 +52,7 @@ async function authenticateApiKey(request: Request, databaseId: string) {
 
   const keyHash = hashApiKey(apiKey);
 
-  const { data: apiKeyRecord, error: keyError } = await supabaseAdmin
+  const { data: apiKeyRecord, error: keyError } = await getSupabaseAdmin()
     .from('api_keys')
     .select('*, databases!inner(*)')
     .eq('key_hash', keyHash)
@@ -70,7 +72,7 @@ async function authenticateApiKey(request: Request, databaseId: string) {
   const rateLimitResult = await checkRateLimit(
     apiKeyRecord.id,
     apiKeyRecord.rate_limit,
-    supabaseAdmin
+    getSupabaseAdmin()
   );
 
   if (rateLimitResult.exceeded) {
@@ -87,7 +89,7 @@ async function authenticateApiKey(request: Request, databaseId: string) {
     };
   }
 
-  updateApiKeyLastUsed(apiKeyRecord.id, supabaseAdmin);
+  updateApiKeyLastUsed(apiKeyRecord.id, getSupabaseAdmin());
 
   return {
     apiKeyRecord,
@@ -139,7 +141,7 @@ export async function POST(
     }
 
     // Check if users table exists
-    const { data: tables, error: tableError } = await supabaseAdmin
+    const { data: tables, error: tableError } = await getSupabaseAdmin()
       .from('tables')
       .select('*')
       .eq('database_id', params.id)
@@ -154,7 +156,7 @@ export async function POST(
     }
 
     // Check if user already exists
-    const { data: existingUsers, error: checkError } = await supabaseAdmin
+    const { data: existingUsers, error: checkError } = await getSupabaseAdmin()
       .from('records')
       .select('*')
       .eq('table_id', tables.id)
@@ -188,7 +190,7 @@ export async function POST(
       updated_at: new Date().toISOString(),
     };
 
-    const { data: newUser, error: insertError } = await supabaseAdmin
+    const { data: newUser, error: insertError } = await getSupabaseAdmin()
       .from('records')
       .insert({
         table_id: tables.id,
@@ -220,7 +222,7 @@ export async function POST(
       'POST',
       201,
       responseTime,
-      supabaseAdmin
+      getSupabaseAdmin()
     );
 
     return NextResponse.json(

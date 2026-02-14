@@ -240,7 +240,7 @@ export function SchemaVisualizer() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="opacity-0 group-hover:opacity-100 h-6 w-6 p-0"
+                      className="md:opacity-0 md:group-hover:opacity-100 h-6 w-6 p-0"
                       onClick={(e) => {
                         e.stopPropagation()
                         toggleTableVisibility(table.name)
