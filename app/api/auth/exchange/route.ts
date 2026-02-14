@@ -13,8 +13,11 @@ export async function POST(request: NextRequest) {
 
     if (provider === 'github') {
       // Exchange code for access token with GitHub
-      const clientId = process.env.GITHUB_CLIENT_ID || 'Ov23lihgU0dNPk4ct1Au'
-      const clientSecret = process.env.GITHUB_CLIENT_SECRET || 'c8723d7d32704b6ab8ec235ef720ec955789fb7a'
+      const clientId = process.env.GITHUB_CLIENT_ID
+      const clientSecret = process.env.GITHUB_CLIENT_SECRET
+      if (!clientId || !clientSecret) {
+        return new Response(JSON.stringify({ error: 'GitHub OAuth not configured' }), { status: 500 })
+      }
       const tokenResp = await fetch('https://github.com/login/oauth/access_token', {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
