@@ -1159,6 +1159,8 @@ export function ChatPanelV2({
   const sendButtonRef = useRef<HTMLButtonElement>(null)
   const [showScrollButton, setShowScrollButton] = useState(false)
   const userIsNearBottomRef = useRef(true)
+  // Track the model used for planning so build execution uses the same model
+  const planModelOverrideRef = useRef<string | null>(null)
 
   // Debounce utility function
   const debounce = (func: Function, wait: number) => {
@@ -4847,10 +4849,16 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
       const compressedData = await compressProjectFiles(projectFiles, fileTree, messagesToSend, metadata)
 
       // For initial prompt, force use anthropic/claude-haiku-4.5 model for UI prototyping
+      // For plan build execution, use the same model that generated the plan
       // Subsequent requests follow user/default model selection
-      const modelToUse = isInitialPrompt ? 'anthropic/claude-haiku-4.5' : selectedModel
+      const planOverride = planModelOverrideRef.current
+      const modelToUse = isInitialPrompt ? 'anthropic/claude-haiku-4.5' : (planOverride || selectedModel)
+      // Clear the plan model override after using it (one-time use for build execution)
+      if (planOverride) {
+        planModelOverrideRef.current = null
+      }
 
-      console.log(`[ChatPanelV2] Using model: ${modelToUse} (${isInitialPrompt ? 'initial prompt override (UI prototyping)' : 'user selection'})`)
+      console.log(`[ChatPanelV2] Using model: ${modelToUse} (${isInitialPrompt ? 'initial prompt override (UI prototyping)' : planOverride ? 'plan build override' : 'user selection'})`)
 
       // Check compressed data size and use storage for large payloads (> 1MB)
       const compressedSize = compressedData.byteLength
@@ -5977,6 +5985,8 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                                 onBuild={() => {
                                   // Switch to agent mode and send the plan as a build command
                                   setIsAskMode(false)
+                                  // Use the same model that generated the plan for build execution
+                                  planModelOverrideRef.current = 'anthropic/claude-haiku-4.5'
                                   const planSteps = (input.steps || []).map((s: any, i: number) => `${i + 1}. ${s.title}: ${s.description}`).join('\n')
                                   const buildPrompt = `Build the following plan now:\n\n**${input.title}**\n${input.description}\n\nSteps:\n${planSteps}\n\nTech Stack: ${(input.techStack || []).join(', ')}\n\nBuild this complete application following the plan above. Start implementing immediately.`
                                   setInput(buildPrompt)
@@ -5988,6 +5998,8 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                                   }, 150)
                                 }}
                                 onRefine={() => {
+                                  // Use the same model that generated the plan for refinement
+                                  planModelOverrideRef.current = 'anthropic/claude-haiku-4.5'
                                   setInput('Please refine the plan.')
                                   setTimeout(() => {
                                     if (sendButtonRef.current) {
