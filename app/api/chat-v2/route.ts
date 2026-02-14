@@ -12,7 +12,7 @@ import lz4 from 'lz4js'
 import unzipper from 'unzipper'
 import { Readable } from 'stream'
 import { authenticateUser, processRequestBilling } from '@/lib/billing/auth-middleware'
-import { deductCreditsFromUsage, checkRequestLimits, MAX_STEPS_PER_REQUEST, MAX_STEPS_PER_PLAN } from '@/lib/billing/credit-manager'
+import { deductCreditsFromUsage, checkRequestLimits, checkMonthlyRequestLimit, MAX_STEPS_PER_REQUEST, MAX_STEPS_PER_PLAN } from '@/lib/billing/credit-manager'
 import { downloadLargePayload, cleanupLargePayload } from '@/lib/cloud-sync'
 
 // Disable Next.js body parser for binary data handling
@@ -2437,6 +2437,25 @@ export async function POST(req: Request) {
     console.log(
       `[Chat-V2] ✅ Authenticated: User ${authContext.userId}, Plan: ${authContext.currentPlan}, Balance: ${authContext.creditsBalance} credits`
     )
+
+    // Check monthly request limit before processing
+    const supabaseForBilling = await createClient()
+    const requestLimitCheck = await checkMonthlyRequestLimit(authContext.userId, supabaseForBilling)
+    if (!requestLimitCheck.allowed) {
+      console.warn(`[Chat-V2] ⚠️ Monthly request limit reached for user ${authContext.userId}: ${requestLimitCheck.requestsUsed}/${requestLimitCheck.requestsLimit}`)
+      return NextResponse.json(
+        {
+          error: {
+            message: requestLimitCheck.reason || 'Monthly request limit reached.',
+            code: 'REQUEST_LIMIT_REACHED',
+            type: 'credit_error',
+            requestsUsed: requestLimitCheck.requestsUsed,
+            requestsLimit: requestLimitCheck.requestsLimit
+          }
+        },
+        { status: 429 }
+      )
+    }
 
     // Initialize in-memory project storage for this session
     console.log(`[DEBUG] Initializing in-memory storage with ${clientFiles.length} files and ${clientFileTree.length} tree entries for session ${projectId}`)

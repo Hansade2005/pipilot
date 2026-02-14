@@ -14,6 +14,7 @@ export interface ProductConfig {
   features: string[]
   limits: {
     credits: number
+    requestsPerMonth: number
     messages: number
     deploymentPlatforms: string[]
     deploymentsPerMonth: number
@@ -48,6 +49,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     features: [
       'Basic AI chat & code generation',
       '150 monthly credits (~5-10 AI messages)',
+      '20 requests per month',
       'Token-based billing (pay for what you use)',
       'Deploy to Vercel',
       'Visual editing with Design Mode',
@@ -58,6 +60,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     ],
     limits: {
       credits: 150,
+      requestsPerMonth: 20,
       messages: 9999, // No hard message limit, only credit-based
       deploymentPlatforms: ['vercel'],
       deploymentsPerMonth: 5,
@@ -88,6 +91,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     features: [
       'All Free features',
       '1,000 monthly credits (~50-100 messages)',
+      '250 requests per month',
       'Token-based billing - only pay for actual usage',
       'Access to all premium AI models (Claude, GPT, Gemini)',
       'Up to 30 agent steps per request',
@@ -100,6 +104,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     ],
     limits: {
       credits: 1000,
+      requestsPerMonth: 250,
       messages: 9999,
       deploymentPlatforms: ['vercel', 'netlify'],
       deploymentsPerMonth: 10,
@@ -130,6 +135,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     features: [
       'All Creator features',
       '2,500 monthly credits (~125-250 messages)',
+      '600 requests per month',
       'Shared credit pool across unlimited users',
       'Up to 40 agent steps per request',
       'Centralized billing on Vercel',
@@ -140,6 +146,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     ],
     limits: {
       credits: 2500,
+      requestsPerMonth: 600,
       messages: 9999,
       deploymentPlatforms: ['vercel', 'netlify'],
       deploymentsPerMonth: 20,
@@ -171,6 +178,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     features: [
       'All Collaborate features',
       '5,000 monthly credits (~250-500 messages)',
+      '2,000 requests per month',
       'Up to 50 agent steps per request',
       'Priority AI model access',
       'Internal publish',
@@ -183,6 +191,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     ],
     limits: {
       credits: 5000,
+      requestsPerMonth: 2000,
       messages: 9999,
       deploymentPlatforms: ['vercel', 'netlify'],
       deploymentsPerMonth: 50,
@@ -249,7 +258,8 @@ export function getSavings(planId: string, isAnnual: boolean): string | null {
 export function getLimits(planId: string) {
   const config = getProductConfig(planId)
   return config?.limits || {
-    credits: 20,
+    credits: 150,
+    requestsPerMonth: 20,
     messages: 80,
     deploymentPlatforms: ['vercel'],
     deploymentsPerMonth: 5,

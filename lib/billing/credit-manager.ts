@@ -82,11 +82,22 @@ export const MAX_STEPS_PER_PLAN: Record<string, number> = {
 // Fallback for backward compatibility
 export const MAX_STEPS_PER_REQUEST = 50
 
+// Monthly request limits per plan (hard cap regardless of credits remaining)
+// Prevents abuse: someone sending hundreds of tiny 1-credit messages, API hammering, etc.
+// Set above what credits would naturally allow, so credits run out first in normal usage.
+export const MAX_REQUESTS_PER_MONTH: Record<string, number> = {
+  free: 20,          // Enough for a real trial (3-5 tasks, some follow-ups)
+  creator: 250,      // ~8/day, covers daily development workflow
+  collaborate: 600,  // ~20/day across a team
+  scale: 2000        // ~65/day, enterprise-level usage
+}
+
 export interface WalletBalance {
   userId: string
   creditsBalance: number
   creditsUsedThisMonth: number
   creditsUsedTotal: number
+  requestsThisMonth: number
   currentPlan: 'free' | 'creator' | 'collaborate' | 'scale'
   subscriptionStatus: 'active' | 'inactive' | 'cancelled' | 'past_due'
   canPurchaseCredits: boolean
@@ -203,6 +214,7 @@ export async function getWalletBalance(
         creditsBalance: newWallet.credits_balance,
         creditsUsedThisMonth: newWallet.credits_used_this_month,
         creditsUsedTotal: newWallet.credits_used_total,
+        requestsThisMonth: newWallet.requests_this_month || 0,
         currentPlan: newWallet.current_plan,
         subscriptionStatus: newWallet.subscription_status,
         canPurchaseCredits: false // Free plan cannot purchase
@@ -214,6 +226,7 @@ export async function getWalletBalance(
       creditsBalance: data.credits_balance,
       creditsUsedThisMonth: data.credits_used_this_month,
       creditsUsedTotal: data.credits_used_total,
+      requestsThisMonth: data.requests_this_month || 0,
       currentPlan: data.current_plan,
       subscriptionStatus: data.subscription_status,
       canPurchaseCredits: data.current_plan !== 'free' // Only paid plans can purchase
@@ -274,13 +287,14 @@ export async function deductCredits(
       }
     }
 
-    // Deduct credits (atomic operation)
+    // Deduct credits and increment request count (atomic operation)
     const { data: updatedWallet, error: updateError } = await supabase
       .from('wallet')
       .update({
         credits_balance: wallet.creditsBalance - creditsToDeduct,
         credits_used_this_month: wallet.creditsUsedThisMonth + creditsToDeduct,
-        credits_used_total: wallet.creditsUsedTotal + creditsToDeduct
+        credits_used_total: wallet.creditsUsedTotal + creditsToDeduct,
+        requests_this_month: (wallet.requestsThisMonth || 0) + 1
       })
       .eq('user_id', userId)
       .select()
@@ -470,6 +484,34 @@ export async function checkRequestLimits(
   }
   
   return { allowed: true }
+}
+
+/**
+ * Check if user has exceeded their monthly request limit.
+ * Call this BEFORE making the AI call to block excessive usage.
+ * Returns remaining requests if allowed, or an error with the limit info.
+ */
+export async function checkMonthlyRequestLimit(
+  userId: string,
+  supabase: SupabaseClient
+): Promise<{ allowed: boolean; requestsUsed: number; requestsLimit: number; reason?: string }> {
+  const wallet = await getWalletBalance(userId, supabase)
+
+  if (!wallet) {
+    return { allowed: false, requestsUsed: 0, requestsLimit: 0, reason: 'Wallet not found' }
+  }
+
+  const limit = MAX_REQUESTS_PER_MONTH[wallet.currentPlan] || MAX_REQUESTS_PER_MONTH.free
+  const used = wallet.requestsThisMonth || 0
+
+  if (used >= limit) {
+    const message = wallet.currentPlan === 'free'
+      ? `Monthly request limit reached (${limit} requests). Upgrade to a paid plan for more requests.`
+      : `Monthly request limit reached (${limit} requests). Your limit resets next month, or upgrade your plan for more.`
+    return { allowed: false, requestsUsed: used, requestsLimit: limit, reason: message }
+  }
+
+  return { allowed: true, requestsUsed: used, requestsLimit: limit }
 }
 
 /**

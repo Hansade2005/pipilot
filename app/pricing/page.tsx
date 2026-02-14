@@ -193,7 +193,7 @@ export default function PricingPage() {
     },
     {
       question: "What are the credit and message limits?",
-      answer: "Free: 150 credits (~5-10 messages). Creator: 1,000 credits (~50-100 messages). Collaborate: 2,500 credits (~125-250 messages). Scale: 5,000 credits (~250-500 messages). Costs vary by AI model and task complexity. Paid users can purchase extra credits."
+      answer: "Free: 150 credits, 20 requests/month. Creator: 1,000 credits, 250 requests/month. Collaborate: 2,500 credits, 600 requests/month. Scale: 5,000 credits, 2,000 requests/month. Credits control cost per request, while request limits prevent abuse. Costs vary by AI model and task complexity. Paid users can purchase extra credits."
     },
     {
       question: "What does 'credits' mean?",
