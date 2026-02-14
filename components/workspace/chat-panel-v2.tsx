@@ -2466,19 +2466,8 @@ export function ChatPanelV2({
       setMessages(prev => prev.slice(0, messageIndex))
     }
 
-    // Set the content as input and submit fresh
+    // Place the content in the input so the user can edit before sending
     setInput(content)
-    // Note: Don't set isLoading here - handleEnhancedSubmit will handle it
-
-    // Small delay to ensure state is updated
-    setTimeout(() => {
-      // Create a synthetic form event to trigger handleEnhancedSubmit
-      const syntheticEvent = {
-        preventDefault: () => { },
-      } as React.FormEvent
-
-      handleEnhancedSubmit(syntheticEvent)
-    }, 100)
   }
 
   const handleSaveEdit = async () => {
