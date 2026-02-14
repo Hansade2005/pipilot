@@ -18,6 +18,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { Switch } from "@/components/ui/switch"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { MessageWithTools } from './message-with-tools'
+import { Response } from '@/components/ai-elements/response'
 import { NextStepSuggestions, extractNextStepSuggestions } from './next-step-suggestions'
 import {
   Send, Paperclip, Mic, MicOff, X, FileText, Image as ImageIcon,
@@ -282,9 +283,9 @@ const ExpandableUserMessage = ({
                   ))}
                 </div>
               )}
-              <p className="text-gray-100 text-sm leading-[1.6] whitespace-pre-wrap text-left">
-                {content}
-              </p>
+              <div className="text-gray-100 text-sm leading-[1.6] text-left [&_p]:mb-1 [&_p]:last:mb-0 [&_pre]:text-xs [&_code]:text-xs">
+                <Response>{content}</Response>
+              </div>
             </div>
           </div>
           <div className="flex items-center justify-end gap-0.5 mt-1 md:opacity-0 md:hover:opacity-100 transition-opacity">
@@ -352,25 +353,20 @@ const ExpandableUserMessage = ({
           )}
           {/* Show truncated content when collapsed */}
           {!isExpanded ? (
-            <div>
-              <p className="text-gray-100 text-sm leading-[1.6] whitespace-pre-wrap text-left">
-                {content.substring(0, CHAR_LIMIT)}
-                {content.length > CHAR_LIMIT && '...'}
-              </p>
+            <div className="text-gray-100 text-sm leading-[1.6] text-left [&_p]:mb-1 [&_p]:last:mb-0 [&_pre]:text-xs [&_code]:text-xs">
+              <Response>{content.substring(0, CHAR_LIMIT) + (content.length > CHAR_LIMIT ? '...' : '')}</Response>
             </div>
           ) : (
             /* Show full content when expanded with scrollable area */
             <div
               ref={contentRef}
-              className="max-h-[300px] overflow-y-auto overflow-x-hidden"
+              className="max-h-[300px] overflow-y-auto overflow-x-hidden text-gray-100 text-sm leading-[1.6] text-left [&_p]:mb-1 [&_p]:last:mb-0 [&_pre]:text-xs [&_code]:text-xs"
               style={{
                 scrollBehavior: 'smooth',
                 WebkitOverflowScrolling: 'touch'
               }}
             >
-              <p className="text-gray-100 text-sm leading-[1.6] whitespace-pre-wrap text-left">
-                {content}
-              </p>
+              <Response>{content}</Response>
             </div>
           )}
         </div>
