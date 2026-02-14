@@ -2,7 +2,7 @@ import { streamText, tool, stepCountIs } from 'ai'
 import { experimental_createMCPClient as createMCPClient } from '@ai-sdk/mcp'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { getModel, needsMistralVisionProvider, getDevstralVisionModel } from '@/lib/ai-providers'
+import { getModel, needsMistralVisionProvider, getDevstralVisionModel, getFallbackModel, isProviderError, FALLBACK_MODEL_ID } from '@/lib/ai-providers'
 import { DEFAULT_CHAT_MODEL, getModelById, modelSupportsVision } from '@/lib/ai-models'
 import { NextResponse } from 'next/server'
 import { getWorkspaceDatabaseId, workspaceHasDatabase, setWorkspaceDatabase } from '@/lib/get-current-workspace'
@@ -10239,28 +10239,60 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
     )
     console.log(`[Chat-V2] Max steps: ${maxStepsAllowed} (plan: ${userPlan}, model: ${modelId}, ~${estimatedCostPerStep} credits/step, budget: ~${totalEstimatedCost} credits, balance: ${userCredits})`)
 
-    const result = await streamText({
-      model,
-      temperature: 0.7,
-      messages: messagesWithSystem, // Use messages with system prompt and cache control
-      tools: toolsToUse,
-      stopWhen: stepCountIs(maxStepsAllowed), // Stop when max steps reached
-      abortSignal: controller.signal, // Stop AI generation on client abort or request timeout
-      ...(isAnthropicModel && anthropicProviderOptions ? { providerOptions: anthropicProviderOptions } : {}),
-      onFinish: async ({ response }: any) => {
-        console.log(`[Chat-V2] Finished with ${response.messages.length} messages`)
+    // Attempt streamText with automatic fallback to Grok Code Fast 1 on provider failure
+    let result: any
+    let usedFallbackModel = false
+    let originalError: Error | null = null
 
-        // Log Anthropic metadata if available
-        if (isAnthropicModel && response?.providerMetadata?.anthropic) {
-          console.log('[Chat-V2] Anthropic metadata:', response.providerMetadata.anthropic)
+    try {
+      result = await streamText({
+        model,
+        temperature: 0.7,
+        messages: messagesWithSystem,
+        tools: toolsToUse,
+        stopWhen: stepCountIs(maxStepsAllowed),
+        abortSignal: controller.signal,
+        ...(isAnthropicModel && anthropicProviderOptions ? { providerOptions: anthropicProviderOptions } : {}),
+        onFinish: async ({ response }: any) => {
+          console.log(`[Chat-V2] Finished with ${response.messages.length} messages`)
+          if (isAnthropicModel && response?.providerMetadata?.anthropic) {
+            console.log('[Chat-V2] Anthropic metadata:', response.providerMetadata.anthropic)
+          }
+          await closeMCPClients()
         }
+      })
+    } catch (primaryError: any) {
+      // Check if this is a provider-level failure that a different model can fix
+      if (isProviderError(primaryError) && modelId !== FALLBACK_MODEL_ID) {
+        originalError = primaryError
+        console.warn(`[Chat-V2] Provider failed for ${modelId}: ${primaryError.message}`)
+        console.log(`[Chat-V2] Auto-switching to fallback model: ${FALLBACK_MODEL_ID}`)
 
-        // Close MCP clients
-        await closeMCPClients()
+        // Retry with fallback model (direct xAI provider, no Vercel gateway)
+        const fallbackModel = getFallbackModel()
+        modelId = FALLBACK_MODEL_ID
+        usedFallbackModel = true
+
+        result = await streamText({
+          model: fallbackModel,
+          temperature: 0.7,
+          messages: messagesWithSystem,
+          tools: toolsToUse,
+          stopWhen: stepCountIs(maxStepsAllowed),
+          abortSignal: controller.signal,
+          // No Anthropic provider options for fallback model
+          onFinish: async () => {
+            console.log(`[Chat-V2] Fallback model finished`)
+            await closeMCPClients()
+          }
+        })
+      } else {
+        // Not a provider error or already on fallback - rethrow
+        throw primaryError
       }
-    })
+    }
 
-    console.log('[Chat-V2] Streaming with newline-delimited JSON (same as stream.ts)')
+    console.log(`[Chat-V2] Streaming with newline-delimited JSON${usedFallbackModel ? ` (fallback: ${FALLBACK_MODEL_ID})` : ''}`)
 
     // Helper function to capture streaming state for continuation
     const captureStreamingState = (currentMessages: any[], toolResults: any[] = []) => {
@@ -10324,6 +10356,17 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
               streamErrored = true
               throw new Error('Client aborted')
             }
+
+            // Notify frontend if we switched to fallback model
+            if (usedFallbackModel && originalError) {
+              controller.enqueue(encoder.encode(JSON.stringify({
+                type: 'provider_fallback',
+                originalModel: originalError.message,
+                fallbackModel: FALLBACK_MODEL_ID,
+                message: `The selected model is temporarily unavailable. Switched to Grok Code Fast 1 to keep you going.`
+              }) + '\n'))
+            }
+
             // Stream the text and tool calls with continuation monitoring
             for await (const part of result.fullStream) {
               // Check if we should trigger continuation
@@ -10378,36 +10421,127 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
               controller.enqueue(encoder.encode(JSON.stringify(part) + '\n'))
             }
           } catch (error) {
-            streamErrored = true
             const isAbort = clientAborted || (error instanceof Error && (error.name === 'AbortError' || error.message.includes('aborted') || error.message.includes('Client aborted')))
-            if (isAbort) {
-              console.log(`[Chat-V2] Stream aborted by ${clientAborted ? 'client disconnect' : 'timeout'} - will bill for consumed tokens`)
-            } else {
-              console.error('[Chat-V2] Stream error:', error)
-            }
 
-            // If we error out near timeout, still try to send continuation signal
-            const timeStatus = getTimeStatus();
-            if (!clientAborted && timeStatus.elapsed > STREAM_CONTINUE_THRESHOLD_MS - 10000) { // Within 10s of threshold
+            // Mid-stream provider fallback: if stream dies from provider error and we haven't
+            // already fallen back, retry with Grok Code Fast 1 (direct xAI, bypasses gateway)
+            if (!isAbort && !usedFallbackModel && isProviderError(error) && modelId !== FALLBACK_MODEL_ID) {
+              console.warn(`[Chat-V2] Mid-stream provider failure for ${modelId}: ${error instanceof Error ? error.message : error}`)
+              console.log(`[Chat-V2] Retrying with fallback model: ${FALLBACK_MODEL_ID}`)
+
+              // Notify frontend about the switch
+              controller.enqueue(encoder.encode(JSON.stringify({
+                type: 'provider_fallback',
+                originalModel: modelId,
+                fallbackModel: FALLBACK_MODEL_ID,
+                message: `The selected model encountered an error mid-stream. Switching to Grok Code Fast 1 to continue.`,
+                hadPartialContent: accumulatedContent.length > 0
+              }) + '\n'))
+
+              usedFallbackModel = true
+              modelId = FALLBACK_MODEL_ID
+
               try {
-                // Update currentMessages with accumulated content before capturing state
-                if (currentMessages.length > 0 && currentMessages[currentMessages.length - 1].role === 'assistant') {
-                  currentMessages[currentMessages.length - 1] = {
-                    ...currentMessages[currentMessages.length - 1],
-                    content: accumulatedContent,
-                    reasoning: accumulatedReasoning
-                  }
+                // Build continuation messages: include partial content as context so the
+                // fallback model can continue from where the original left off
+                const fallbackMessages = [...messagesWithSystem]
+                if (accumulatedContent.length > 0) {
+                  fallbackMessages.push(
+                    { role: 'assistant', content: accumulatedContent } as any,
+                    { role: 'user', content: 'Continue from where you left off. The previous model encountered an error mid-response. Pick up exactly where the response stopped.' } as any
+                  )
                 }
 
-                const continuationState = captureStreamingState(currentMessages, toolResults);
-                controller.enqueue(encoder.encode(JSON.stringify({
-                  type: 'continuation_signal',
-                  continuationState,
-                  message: 'Stream interrupted, continuing in new request',
-                  error: error instanceof Error ? error.message : 'Unknown streaming error'
-                }) + '\n'));
-              } catch (continuationError) {
-                console.error('[Chat-V2] Failed to send continuation signal:', continuationError);
+                const fallbackResult = await streamText({
+                  model: getFallbackModel(),
+                  temperature: 0.7,
+                  messages: fallbackMessages,
+                  tools: toolsToUse,
+                  stopWhen: stepCountIs(maxStepsAllowed),
+                  abortSignal: controller.signal,
+                  onFinish: async () => {
+                    console.log('[Chat-V2] Fallback stream finished')
+                    await closeMCPClients()
+                  }
+                })
+
+                // Stream the fallback result
+                for await (const part of fallbackResult.fullStream) {
+                  const timeStatus = getTimeStatus()
+                  if (timeStatus.shouldContinue && !shouldContinue) {
+                    shouldContinue = true
+                    console.log('[Chat-V2] Triggering continuation during fallback stream')
+                    if (currentMessages.length > 0 && currentMessages[currentMessages.length - 1].role === 'assistant') {
+                      currentMessages[currentMessages.length - 1] = {
+                        ...currentMessages[currentMessages.length - 1],
+                        content: accumulatedContent,
+                        reasoning: accumulatedReasoning
+                      }
+                    }
+                    const continuationState = captureStreamingState(currentMessages, toolResults)
+                    controller.enqueue(encoder.encode(JSON.stringify({
+                      type: 'continuation_signal',
+                      continuationState,
+                      message: 'Stream will continue in new request'
+                    }) + '\n'))
+                    break
+                  }
+
+                  if (part.type === 'text-delta' && part.text) {
+                    accumulatedContent += part.text
+                  } else if (part.type === 'reasoning-delta' && part.text) {
+                    accumulatedReasoning += part.text
+                  } else if (part.type === 'tool-call') {
+                    toolResults.push(part)
+                  } else if (part.type === 'tool-result') {
+                    toolResults.push(part)
+                  } else if (part.type === 'step-finish' && (part as any).usage) {
+                    const stepUsage = (part as any).usage
+                    accumulatedUsage.inputTokens += stepUsage.inputTokens || stepUsage.promptTokens || 0
+                    accumulatedUsage.outputTokens += stepUsage.outputTokens || stepUsage.completionTokens || 0
+                    accumulatedSteps++
+                  }
+
+                  controller.enqueue(encoder.encode(JSON.stringify(part) + '\n'))
+                }
+
+                // Replace result reference so billing uses fallback's usage data
+                result = fallbackResult
+                // Fallback succeeded - don't mark stream as errored
+              } catch (fallbackError) {
+                console.error('[Chat-V2] Fallback model also failed:', fallbackError)
+                streamErrored = true
+              }
+            } else {
+              streamErrored = true
+              if (isAbort) {
+                console.log(`[Chat-V2] Stream aborted by ${clientAborted ? 'client disconnect' : 'timeout'} - will bill for consumed tokens`)
+              } else {
+                console.error('[Chat-V2] Stream error:', error)
+              }
+
+              // If we error out near timeout, still try to send continuation signal
+              const timeStatus = getTimeStatus();
+              if (!clientAborted && timeStatus.elapsed > STREAM_CONTINUE_THRESHOLD_MS - 10000) {
+                try {
+                  if (currentMessages.length > 0 && currentMessages[currentMessages.length - 1].role === 'assistant') {
+                    currentMessages[currentMessages.length - 1] = {
+                      ...currentMessages[currentMessages.length - 1],
+                      content: accumulatedContent,
+                      reasoning: accumulatedReasoning
+                    }
+                  }
+
+                  const continuationState = captureStreamingState(currentMessages, toolResults);
+                  controller.enqueue(encoder.encode(JSON.stringify({
+                    type: 'continuation_signal',
+                    continuationState,
+                    message: 'Stream interrupted, continuing in new request',
+                    error: error instanceof Error ? error.message : 'Unknown streaming error'
+                  }) + '\n'));
+                } catch (continuationError) {
+                  console.error('[Chat-V2] Failed to send continuation signal:', continuationError);
+                }
               }
             }
           } finally {
