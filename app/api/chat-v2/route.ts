@@ -1595,6 +1595,18 @@ export async function POST(req: Request) {
     controller.abort();
   }, REQUEST_TIMEOUT_MS);
 
+  // Combine our timeout signal with the client's request signal (fires when user clicks Stop)
+  // This ensures AI provider stops generating tokens when either:
+  // 1. Our request timeout fires, or 2. The client disconnects/aborts
+  let clientAborted = false
+  if (req.signal) {
+    req.signal.addEventListener('abort', () => {
+      clientAborted = true
+      console.log('[Chat-V2] Client disconnected/aborted - stopping AI generation')
+      controller.abort()
+    })
+  }
+
   // Track tool execution times
   const toolExecutionTimes: Record<string, number> = {};
 
@@ -10233,6 +10245,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
       messages: messagesWithSystem, // Use messages with system prompt and cache control
       tools: toolsToUse,
       stopWhen: stepCountIs(maxStepsAllowed), // Stop when max steps reached
+      abortSignal: controller.signal, // Stop AI generation on client abort or request timeout
       ...(isAnthropicModel && anthropicProviderOptions ? { providerOptions: anthropicProviderOptions } : {}),
       onFinish: async ({ response }: any) => {
         console.log(`[Chat-V2] Finished with ${response.messages.length} messages`)
@@ -10305,6 +10318,12 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
           let accumulatedSteps = 0
 
           try {
+            // Check if client already disconnected before we start streaming
+            if (clientAborted) {
+              console.log('[Chat-V2] Client already aborted before streaming started')
+              streamErrored = true
+              throw new Error('Client aborted')
+            }
             // Stream the text and tool calls with continuation monitoring
             for await (const part of result.fullStream) {
               // Check if we should trigger continuation
@@ -10360,11 +10379,16 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
             }
           } catch (error) {
             streamErrored = true
-            console.error('[Chat-V2] Stream error:', error)
+            const isAbort = clientAborted || (error instanceof Error && (error.name === 'AbortError' || error.message.includes('aborted') || error.message.includes('Client aborted')))
+            if (isAbort) {
+              console.log(`[Chat-V2] Stream aborted by ${clientAborted ? 'client disconnect' : 'timeout'} - will bill for consumed tokens`)
+            } else {
+              console.error('[Chat-V2] Stream error:', error)
+            }
 
             // If we error out near timeout, still try to send continuation signal
             const timeStatus = getTimeStatus();
-            if (timeStatus.elapsed > STREAM_CONTINUE_THRESHOLD_MS - 10000) { // Within 10s of threshold
+            if (!clientAborted && timeStatus.elapsed > STREAM_CONTINUE_THRESHOLD_MS - 10000) { // Within 10s of threshold
               try {
                 // Update currentMessages with accumulated content before capturing state
                 if (currentMessages.length > 0 && currentMessages[currentMessages.length - 1].role === 'assistant') {
@@ -10390,7 +10414,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
             // ============================================================================
             // ABE BILLING - Token-based credit deduction with AI SDK usage
             // ============================================================================
-            console.log('[Chat-V2] 🔍 FINALLY BLOCK: Starting token-based billing...')
+            console.log(`[Chat-V2] 🔍 FINALLY BLOCK: Starting token-based billing...${clientAborted ? ' (client aborted)' : ''}${streamErrored ? ' (stream errored)' : ''}`)
 
             const responseTime = Date.now() - startTime
             const VERCEL_HARD_LIMIT_MS = 300000 // Vercel's absolute 300s limit
@@ -10407,7 +10431,8 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
             // If we triggered continuation OR if we've exceeded the continuation threshold
             // (which can happen if stream was blocked mid-generation), skip billing await
             // Billing will be handled on the continuation request
-            if (shouldContinue || elapsedMs >= STREAM_CONTINUE_THRESHOLD_MS) {
+            // BUT: if client aborted, always bill now (there won't be a continuation request)
+            if (!clientAborted && (shouldContinue || elapsedMs >= STREAM_CONTINUE_THRESHOLD_MS)) {
               console.log(`[Chat-V2] ⏭️ Skipping billing await - ${shouldContinue ? 'continuation triggered' : 'exceeded continuation threshold (' + elapsedMs + 'ms)'}, will bill on next request`)
               controller.close()
               return
@@ -10506,7 +10531,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                     endpoint: '/api/chat-v2',
                     steps: stepsCount,
                     responseTimeMs: responseTime,
-                    status: streamErrored ? 'error' : 'success'
+                    status: clientAborted ? 'aborted' : streamErrored ? 'error' : 'success'
                   },
                   supabase
                 )
