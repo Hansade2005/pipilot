@@ -11,6 +11,7 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js'
+import { getVercelModelPricing, VERCEL_MODEL_PRICING } from './model-pricing-data'
 
 // Credit constants - Token-based pricing system
 // 1 credit = $0.01 (with 4x markup on API costs for profit margin)
@@ -29,40 +30,15 @@ export const CREATOR_PLAN_MONTHLY_CREDITS = 1000   // ~$2.50 API cost, charge $2
 export const COLLABORATE_PLAN_MONTHLY_CREDITS = 2500 // ~$6.25 API cost, charge $75 (12x margin)
 export const SCALE_PLAN_MONTHLY_CREDITS = 5000     // ~$12.50 API cost, charge $150 (12x margin)
 
-// Per-model API pricing (cost per token via Vercel AI Gateway)
-// These MUST match your actual Vercel AI Gateway / provider costs
-// Verified against actual gateway charges (not the displayed "base" prices)
-// Vercel charges Anthropic's direct pricing through the gateway pass-through
-// Last verified: 2026-02-14 against actual billing logs
-export const MODEL_PRICING: Record<string, { input: number; output: number }> = {
-  // Anthropic models (actual gateway charges match Anthropic direct pricing)
-  'anthropic/claude-sonnet-4.5':  { input: 0.000003,    output: 0.000015 },   // $3/$15 per 1M (verified from logs)
-  'anthropic/claude-haiku-4.5':   { input: 0.0000008,   output: 0.000004 },   // $0.80/$4 per 1M
-  'anthropic/claude-opus-4.5':    { input: 0.000015,    output: 0.000075 },   // $15/$75 per 1M
-  // Google models
-  'google/gemini-2.5-flash':      { input: 0.000000075, output: 0.0000003 },  // $0.075/$0.30 per 1M
-  'google/gemini-2.5-pro':        { input: 0.00000125,  output: 0.00001 },    // $1.25/$10 per 1M
-  // xAI models
-  'xai/grok-code-fast-1':         { input: 0.0000001,   output: 0.0000004 },  // $0.10/$0.40 per 1M
-  'xai/glm-4.7':                  { input: 0.0000005,   output: 0.000002 },   // $0.50/$2 per 1M
-  // Mistral models
-  'mistral/devstral-2':           { input: 0.00000014,  output: 0.00000014 }, // $0.14/$0.14 per 1M
-  'mistral/devstral-small-2':     { input: 0.0000001,   output: 0.0000001 },  // $0.10/$0.10 per 1M
-  'codestral-latest':             { input: 0.0000003,   output: 0.0000009 },  // $0.30/$0.90 per 1M
-  // OpenAI models
-  'openai/gpt-5.1-thinking':      { input: 0.000003,   output: 0.000015 },   // $3/$15 per 1M
-  'openai/gpt-5.2-codex':         { input: 0.000003,   output: 0.000015 },   // $3/$15 per 1M
-  'openai/o3':                     { input: 0.000002,   output: 0.000008 },   // $2/$8 per 1M
-  // Other models
-  'moonshotai/kimi-k2-thinking':  { input: 0.0000005,  output: 0.000002 },   // $0.50/$2 per 1M
-  'minimax/minimax-m2.1':         { input: 0.0000003,  output: 0.000001 },   // $0.30/$1 per 1M
-  'alibaba/qwen3-max':            { input: 0.0000004,  output: 0.0000016 },  // $0.40/$1.60 per 1M
-  'zai/glm-4.7-flash':            { input: 0.0000002,  output: 0.0000008 },  // $0.20/$0.80 per 1M
-}
-
-// Default pricing for unknown models (uses Claude Sonnet 4.5 pricing as safe default)
-const DEFAULT_INPUT_COST_PER_TOKEN = 0.000003   // $3 per 1M input tokens
-const DEFAULT_OUTPUT_COST_PER_TOKEN = 0.000015  // $15 per 1M output tokens
+// Per-model API pricing is now sourced from the comprehensive model-pricing-data.ts
+// which contains 100+ models with full Vercel AI Gateway pricing, verified 2026-02-14.
+// Legacy MODEL_PRICING export is derived from VERCEL_MODEL_PRICING for backward compatibility.
+export const MODEL_PRICING: Record<string, { input: number; output: number }> = Object.fromEntries(
+  Object.entries(VERCEL_MODEL_PRICING).map(([key, entry]) => [
+    key,
+    { input: entry.inputPerToken, output: entry.outputPerToken }
+  ])
+)
 
 // 4x markup for sustainable profit margin (covers infrastructure, Vercel hosting, support, development)
 const MARKUP_MULTIPLIER = 4
@@ -198,31 +174,19 @@ export interface UsageLogEntry {
   completionTokens?: number
   stepsCount?: number
   responseTimeMs?: number
-  status: 'success' | 'error' | 'timeout'
+  status: 'success' | 'error' | 'timeout' | 'aborted'
   errorMessage?: string
   metadata?: Record<string, any>
 }
 
 /**
  * Get the per-token pricing for a specific model.
- * Falls back to expensive default (Claude Sonnet) to prevent undercharging.
+ * Delegates to comprehensive VERCEL_MODEL_PRICING data (100+ models) with fuzzy matching.
+ * Falls back to Claude Sonnet 4.5 pricing to prevent undercharging.
  */
 export function getModelPricing(model: string): { input: number; output: number } {
-  // Direct match
-  if (MODEL_PRICING[model]) return MODEL_PRICING[model]
-
-  // Try matching by partial name (e.g. 'claude-sonnet-4.5' -> 'anthropic/claude-sonnet-4.5')
-  const normalizedModel = model.toLowerCase()
-  for (const [key, pricing] of Object.entries(MODEL_PRICING)) {
-    if (normalizedModel.includes(key.split('/').pop()!.toLowerCase()) ||
-        key.toLowerCase().includes(normalizedModel)) {
-      return pricing
-    }
-  }
-
-  // Default to Claude Sonnet pricing (most expensive common model) to avoid undercharging
-  console.warn(`[CreditManager] Unknown model "${model}" - using default Claude Sonnet pricing`)
-  return { input: DEFAULT_INPUT_COST_PER_TOKEN, output: DEFAULT_OUTPUT_COST_PER_TOKEN }
+  const pricing = getVercelModelPricing(model)
+  return { input: pricing.input, output: pricing.output }
 }
 
 /**
@@ -486,7 +450,7 @@ export async function deductCreditsFromUsage(
     endpoint?: string
     steps?: number  // Number of tool call steps from AI SDK
     responseTimeMs?: number
-    status?: 'success' | 'error' | 'timeout'
+    status?: 'success' | 'error' | 'timeout' | 'aborted'
     errorMessage?: string
   },
   supabase: SupabaseClient
