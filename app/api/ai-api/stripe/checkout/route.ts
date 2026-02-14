@@ -2,14 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-08-27.basil',
-});
+function getStripe() {
+  return new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    apiVersion: '2025-08-27.basil',
+  });
+}
 
 /**
  * POST /api/ai-api/stripe/checkout - Create Stripe checkout session for wallet top-up
@@ -26,7 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const { data: { user }, error: authError } = await getSupabase().auth.getUser(token);
 
     if (authError || !user) {
       return NextResponse.json(
@@ -54,7 +58,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get or create Stripe customer
-    const { data: wallet } = await supabase
+    const { data: wallet } = await getSupabase()
       .from('ai_wallets')
       .select('stripe_customer_id')
       .eq('user_id', user.id)
@@ -64,7 +68,7 @@ export async function POST(request: NextRequest) {
 
     if (!customerId) {
       // Create new Stripe customer
-      const customer = await stripe.customers.create({
+      const customer = await getStripe().customers.create({
         email: user.email,
         metadata: {
           user_id: user.id,
@@ -74,14 +78,14 @@ export async function POST(request: NextRequest) {
       customerId = customer.id;
 
       // Update wallet with customer ID
-      await supabase
+      await getSupabase()
         .from('ai_wallets')
         .update({ stripe_customer_id: customerId })
         .eq('user_id', user.id);
     }
 
     // Create checkout session
-    const session = await stripe.checkout.sessions.create({
+    const session = await getStripe().checkout.sessions.create({
       customer: customerId,
       payment_method_types: ['card'],
       line_items: [

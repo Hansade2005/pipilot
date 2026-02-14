@@ -10,10 +10,12 @@ import {
 } from '@/lib/api-keys';
 
 // Create Supabase client with service role (bypasses RLS)
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 interface QueryCondition {
   field: string;
@@ -58,7 +60,7 @@ async function authenticateApiKey(request: Request, databaseId: string) {
   const keyHash = hashApiKey(apiKey);
 
   // Look up the API key in database
-  const { data: apiKeyRecord, error: keyError } = await supabaseAdmin
+  const { data: apiKeyRecord, error: keyError } = await getSupabaseAdmin()
     .from('api_keys')
     .select('*, databases!inner(*)')
     .eq('key_hash', keyHash)
@@ -79,7 +81,7 @@ async function authenticateApiKey(request: Request, databaseId: string) {
   const rateLimitResult = await checkRateLimit(
     apiKeyRecord.id,
     apiKeyRecord.rate_limit,
-    supabaseAdmin
+    getSupabaseAdmin()
   );
 
   if (rateLimitResult.exceeded) {
@@ -104,7 +106,7 @@ async function authenticateApiKey(request: Request, databaseId: string) {
   }
 
   // Update last_used_at timestamp
-  updateApiKeyLastUsed(apiKeyRecord.id, supabaseAdmin);
+  updateApiKeyLastUsed(apiKeyRecord.id, getSupabaseAdmin());
 
   return {
     apiKeyRecord,
@@ -146,7 +148,7 @@ export async function GET(
     const { apiKeyRecord, startTime } = authResult;
 
     // Verify table exists
-    const { data: table, error: tableError } = await supabaseAdmin
+    const { data: table, error: tableError } = await getSupabaseAdmin()
       .from('tables')
       .select('*')
       .eq('id', tableId)
@@ -161,7 +163,7 @@ export async function GET(
     }
 
     // Build query for records
-    let query = supabaseAdmin
+    let query = getSupabaseAdmin()
       .from('records')
       .select(select ? select.join(',') : '*', { count: includeCount ? 'exact' : undefined })
       .eq('table_id', tableId);
@@ -253,7 +255,7 @@ export async function GET(
       'GET',
       200,
       Date.now() - startTime,
-      supabaseAdmin
+      getSupabaseAdmin()
     );
 
     return NextResponse.json({

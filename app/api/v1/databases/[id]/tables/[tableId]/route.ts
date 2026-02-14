@@ -10,10 +10,12 @@ import {
 } from '@/lib/api-keys';
 
 // Create Supabase client with service role (bypasses RLS)
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 /**
  * Middleware to authenticate API key and check rate limits
@@ -45,7 +47,7 @@ async function authenticateApiKey(request: Request, databaseId: string) {
   const keyHash = hashApiKey(apiKey);
 
   // Look up the API key in database
-  const { data: apiKeyRecord, error: keyError } = await supabaseAdmin
+  const { data: apiKeyRecord, error: keyError } = await getSupabaseAdmin()
     .from('api_keys')
     .select('*, databases!inner(*)')
     .eq('key_hash', keyHash)
@@ -66,7 +68,7 @@ async function authenticateApiKey(request: Request, databaseId: string) {
   const rateLimitResult = await checkRateLimit(
     apiKeyRecord.id,
     apiKeyRecord.rate_limit,
-    supabaseAdmin
+    getSupabaseAdmin()
   );
 
   if (rateLimitResult.exceeded) {
@@ -91,7 +93,7 @@ async function authenticateApiKey(request: Request, databaseId: string) {
   }
 
   // Update last_used_at timestamp
-  updateApiKeyLastUsed(apiKeyRecord.id, supabaseAdmin);
+  updateApiKeyLastUsed(apiKeyRecord.id, getSupabaseAdmin());
 
   return {
     apiKeyRecord,
@@ -120,7 +122,7 @@ export async function GET(
     const { apiKeyRecord, startTime } = authResult;
 
     // Get table
-    const { data: table, error: tableError } = await supabaseAdmin
+    const { data: table, error: tableError } = await getSupabaseAdmin()
       .from('tables')
       .select('*')
       .eq('id', tableId)
@@ -135,7 +137,7 @@ export async function GET(
     }
 
     // Get record count
-    const { count: recordCount } = await supabaseAdmin
+    const { count: recordCount } = await getSupabaseAdmin()
       .from('records')
       .select('*', { count: 'exact', head: true })
       .eq('table_id', tableId);
@@ -172,7 +174,7 @@ export async function GET(
       'GET',
       200,
       Date.now() - startTime,
-      supabaseAdmin
+      getSupabaseAdmin()
     );
 
     return NextResponse.json({
@@ -209,7 +211,7 @@ export async function DELETE(
     const { apiKeyRecord, startTime } = authResult;
 
     // Verify table exists
-    const { data: table, error: tableError } = await supabaseAdmin
+    const { data: table, error: tableError } = await getSupabaseAdmin()
       .from('tables')
       .select('*')
       .eq('id', tableId)
@@ -224,13 +226,13 @@ export async function DELETE(
     }
 
     // Get record count for response
-    const { count: recordCount } = await supabaseAdmin
+    const { count: recordCount } = await getSupabaseAdmin()
       .from('records')
       .select('*', { count: 'exact', head: true })
       .eq('table_id', tableId);
 
     // Delete table (records will cascade delete due to FK constraint)
-    const { error: deleteError } = await supabaseAdmin
+    const { error: deleteError } = await getSupabaseAdmin()
       .from('tables')
       .delete()
       .eq('id', tableId);
@@ -250,7 +252,7 @@ export async function DELETE(
       'DELETE',
       200,
       Date.now() - startTime,
-      supabaseAdmin
+      getSupabaseAdmin()
     );
 
     return NextResponse.json({
