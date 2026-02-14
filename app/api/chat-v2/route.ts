@@ -12,7 +12,7 @@ import lz4 from 'lz4js'
 import unzipper from 'unzipper'
 import { Readable } from 'stream'
 import { authenticateUser, processRequestBilling } from '@/lib/billing/auth-middleware'
-import { deductCreditsFromUsage, checkRequestLimits, checkMonthlyRequestLimit, MAX_STEPS_PER_REQUEST, MAX_STEPS_PER_PLAN, getMaxStepsForRequest, getAffordableSteps, estimateCreditsPerStep } from '@/lib/billing/credit-manager'
+import { deductCreditsFromUsage, checkRequestLimits, checkMonthlyRequestLimit, MAX_STEPS_PER_REQUEST, MAX_STEPS_PER_PLAN, getMaxStepsForRequest, getAffordableSteps, estimateCreditsPerStep, getModelPricing } from '@/lib/billing/credit-manager'
 import { downloadLargePayload, cleanupLargePayload } from '@/lib/cloud-sync'
 
 // Disable Next.js body parser for binary data handling
@@ -10693,6 +10693,78 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
           console.error(`[Chat-V2] ❌ Failed to connect to MCP server "${server.name || server.url}":`, err)
         }
       }
+    }
+
+    // Cost-aware tool filtering: expensive models get fewer tools to reduce input tokens
+    // 67 tool definitions = ~15-20K tokens per step. Dropping non-essential tools saves ~8-12K tokens/step.
+    // On Claude Sonnet 4.5 ($3/1M input): 12K fewer tokens × 8 steps = 96K tokens saved = $0.29 per request
+    const expensiveModelToolFilter = [
+      // Core file operations (essential for coding)
+      'write_file', 'read_file', 'edit_file', 'delete_file', 'delete_folder',
+      'client_replace_string_in_file', 'list_files',
+      // Code search (essential for understanding codebase)
+      'grep_search', 'semantic_code_navigator',
+      // Dev tools
+      'check_dev_errors', 'remove_package',
+      // Web (frequently needed)
+      'web_search', 'web_extract',
+      // UX helpers
+      'suggest_next_steps', 'manage_todos', 'generate_plan',
+      // Continue backend (for multi-part tasks)
+      'continue_backend_implementation',
+      // Image generation
+      'generate_image',
+    ]
+
+    // Check if the selected model is expensive (>= $1/1M input)
+    const modelPricingInfo = getModelPricing(modelId || 'anthropic/claude-sonnet-4.5')
+    const isExpensiveModel = modelPricingInfo.input >= 0.000001 // >= $1/1M input tokens
+
+    if (isExpensiveModel && chatMode !== 'ask') {
+      const fullToolCount = Object.keys(toolsToUse).length
+      // Keep essential tools + any integration tools the user's message explicitly mentions
+      const userMessage = (preprocessedMessages[preprocessedMessages.length - 1]?.content || '').toString().toLowerCase()
+      const mentionsStripe = userMessage.includes('stripe') || userMessage.includes('payment') || userMessage.includes('subscription')
+      const mentionsSupabase = userMessage.includes('supabase') || userMessage.includes('database') || userMessage.includes('sql')
+      const mentionsPipilotDB = userMessage.includes('pipilotdb') || userMessage.includes('pipilot db') || userMessage.includes('create database')
+      const mentionsBrowse = userMessage.includes('browse') || userMessage.includes('screenshot') || userMessage.includes('playwright')
+      const mentionsDocs = userMessage.includes('documentation') || userMessage.includes('report') || userMessage.includes('code review')
+
+      // Build the allowed tool set: always include core tools
+      const allowedTools = new Set(expensiveModelToolFilter)
+
+      // Add integration tools only if user mentions them
+      if (mentionsStripe) {
+        ['stripe_validate_key', 'stripe_list_products', 'stripe_create_product', 'stripe_update_product', 'stripe_delete_product',
+         'stripe_list_prices', 'stripe_create_price', 'stripe_update_price',
+         'stripe_list_customers', 'stripe_create_customer', 'stripe_update_customer', 'stripe_delete_customer',
+         'stripe_create_payment_intent', 'stripe_update_payment_intent', 'stripe_cancel_payment_intent', 'stripe_list_charges',
+         'stripe_list_subscriptions', 'stripe_update_subscription', 'stripe_cancel_subscription',
+         'stripe_list_coupons', 'stripe_create_coupon', 'stripe_update_coupon', 'stripe_delete_coupon',
+         'stripe_create_refund', 'stripe_search'].forEach(t => allowedTools.add(t))
+      }
+      if (mentionsSupabase) {
+        ['supabase_fetch_api_keys', 'supabase_create_table', 'supabase_insert_data', 'supabase_delete_data',
+         'supabase_read_table', 'supabase_drop_table', 'supabase_execute_sql', 'supabase_list_tables_rls',
+         'request_supabase_connection'].forEach(t => allowedTools.add(t))
+      }
+      if (mentionsPipilotDB) {
+        ['pipilotdb_create_database', 'pipilotdb_query_database', 'pipilotdb_manipulate_table_data',
+         'pipilotdb_manage_api_keys', 'pipilotdb_list_tables', 'pipilotdb_read_table',
+         'pipilotdb_delete_table', 'pipilotdb_create_table'].forEach(t => allowedTools.add(t))
+      }
+      if (mentionsBrowse) {
+        allowedTools.add('browse_web')
+      }
+      if (mentionsDocs) {
+        ['generate_report', 'pipilot_get_docs', 'auto_documentation', 'code_review', 'code_quality_analysis'].forEach(t => allowedTools.add(t))
+      }
+
+      toolsToUse = Object.fromEntries(
+        Object.entries(toolsToUse).filter(([toolName]) => allowedTools.has(toolName))
+      )
+      const filteredCount = Object.keys(toolsToUse).length
+      console.log(`[Chat-V2] 💰 Expensive model (${modelId}) - filtered tools: ${fullToolCount} → ${filteredCount} (saving ~${Math.round((fullToolCount - filteredCount) * 250)} tokens/step)`)
     }
 
     // Helper to close all MCP clients
