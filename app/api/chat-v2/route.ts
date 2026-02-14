@@ -10300,6 +10300,9 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
           let shouldContinue = false
           let accumulatedContent = ''
           let accumulatedReasoning = ''
+          let streamErrored = false
+          let accumulatedUsage = { inputTokens: 0, outputTokens: 0 }
+          let accumulatedSteps = 0
 
           try {
             // Stream the text and tool calls with continuation monitoring
@@ -10344,12 +10347,19 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                 toolResults.push(part);
               } else if (part.type === 'tool-result') {
                 toolResults.push(part);
+              } else if (part.type === 'step-finish' && (part as any).usage) {
+                // Capture per-step usage for fallback billing when stream errors
+                const stepUsage = (part as any).usage
+                accumulatedUsage.inputTokens += stepUsage.inputTokens || stepUsage.promptTokens || 0
+                accumulatedUsage.outputTokens += stepUsage.outputTokens || stepUsage.completionTokens || 0
+                accumulatedSteps++
               }
 
               // Send each part as newline-delimited JSON (no SSE "data:" prefix)
               controller.enqueue(encoder.encode(JSON.stringify(part) + '\n'))
             }
           } catch (error) {
+            streamErrored = true
             console.error('[Chat-V2] Stream error:', error)
 
             // If we error out near timeout, still try to send continuation signal
@@ -10408,54 +10418,106 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
             const billingTimeoutMs = Math.max(5000, Math.min(remainingTimeMs - 5000, 15000)) // 5-15 seconds, with 5s buffer
 
             try {
-              // Get total token usage from AI SDK with timeout to prevent blocking
-              const billingPromise = (async () => {
-                const totalUsage = await result.usage
-                const stepsCount = (await result.steps).length
-                return { totalUsage, stepsCount }
-              })()
+              let totalUsage: { inputTokens: number; outputTokens: number } | null = null
+              let stepsCount = 0
 
-              const timeoutPromise = new Promise<null>((_, reject) =>
-                setTimeout(() => reject(new Error(`Billing timeout after ${billingTimeoutMs}ms`)), billingTimeoutMs)
-              )
+              if (streamErrored) {
+                // Stream errored (e.g. socket closed by provider) - result.usage will never resolve.
+                // Use accumulated usage from step-finish events captured during streaming.
+                if (accumulatedUsage.inputTokens > 0 || accumulatedUsage.outputTokens > 0) {
+                  totalUsage = accumulatedUsage
+                  stepsCount = accumulatedSteps
+                  console.log(`[Chat-V2] 📊 Using accumulated step-finish usage (stream errored): ${totalUsage.inputTokens} input + ${totalUsage.outputTokens} output (${stepsCount} steps)`)
+                } else {
+                  // No step-finish events were captured - try result.usage with a very short timeout
+                  try {
+                    const quickResult = await Promise.race([
+                      (async () => {
+                        const u = await result.usage
+                        const s = (await result.steps).length
+                        return { usage: u, steps: s }
+                      })(),
+                      new Promise<null>((_, reject) =>
+                        setTimeout(() => reject(new Error('Quick billing timeout')), 3000)
+                      )
+                    ])
+                    if (quickResult) {
+                      totalUsage = { inputTokens: quickResult.usage.inputTokens || 0, outputTokens: quickResult.usage.outputTokens || 0 }
+                      stepsCount = quickResult.steps
+                    }
+                  } catch {
+                    // result.usage didn't resolve (expected for errored streams)
+                    // Estimate usage from accumulated content to ensure billing isn't skipped entirely
+                    const estimatedInputTokens = Math.ceil(processedMessages.reduce((sum: number, m: any) => {
+                      const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
+                      return sum + content.length / 4
+                    }, 0))
+                    const estimatedOutputTokens = Math.ceil(accumulatedContent.length / 4) + Math.ceil(accumulatedReasoning.length / 4)
+                    if (estimatedOutputTokens > 0) {
+                      totalUsage = { inputTokens: estimatedInputTokens, outputTokens: estimatedOutputTokens }
+                      stepsCount = Math.max(1, accumulatedSteps)
+                      console.log(`[Chat-V2] 📊 Using estimated usage (stream errored, no step data): ~${totalUsage.inputTokens} input + ~${totalUsage.outputTokens} output (${stepsCount} steps)`)
+                    } else {
+                      console.log('[Chat-V2] ⚠️ Stream errored with no output produced - skipping billing')
+                    }
+                  }
+                }
+              } else {
+                // Stream completed normally - await result.usage with timeout
+                const billingPromise = (async () => {
+                  const u = await result.usage
+                  const s = (await result.steps).length
+                  return { usage: u, steps: s }
+                })()
 
-              const billingData = await Promise.race([billingPromise, timeoutPromise])
+                const timeoutPromise = new Promise<null>((_, reject) =>
+                  setTimeout(() => reject(new Error(`Billing timeout after ${billingTimeoutMs}ms`)), billingTimeoutMs)
+                )
 
-              if (!billingData) {
-                throw new Error('Billing timed out')
+                const billingData = await Promise.race([billingPromise, timeoutPromise])
+
+                if (billingData) {
+                  totalUsage = { inputTokens: billingData.usage.inputTokens || 0, outputTokens: billingData.usage.outputTokens || 0 }
+                  stepsCount = billingData.steps
+                  console.log(`[Chat-V2] 📊 Token Usage: ${totalUsage.inputTokens} input + ${totalUsage.outputTokens} output (${stepsCount} steps)`)
+                } else {
+                  // Normal stream but usage timed out - use accumulated data
+                  if (accumulatedUsage.inputTokens > 0 || accumulatedUsage.outputTokens > 0) {
+                    totalUsage = accumulatedUsage
+                    stepsCount = accumulatedSteps
+                    console.log(`[Chat-V2] 📊 Using accumulated step-finish usage (timeout fallback): ${totalUsage.inputTokens} input + ${totalUsage.outputTokens} output (${stepsCount} steps)`)
+                  }
+                }
               }
 
-              const { totalUsage, stepsCount } = billingData
+              // Bill if we have usage data
+              if (totalUsage && (totalUsage.inputTokens > 0 || totalUsage.outputTokens > 0)) {
+                const supabase = await createClient()
 
-              console.log(`[Chat-V2] 📊 Token Usage: ${totalUsage.inputTokens || 0} input + ${totalUsage.outputTokens || 0} output (${stepsCount} steps)`)
-
-              // Create server-side Supabase client for billing
-              const supabase = await createClient()
-
-              // Deduct credits based on actual token usage
-              const billingResult = await deductCreditsFromUsage(
-                authContext.userId,
-                {
-                  promptTokens: totalUsage.inputTokens || 0,
-                  completionTokens: totalUsage.outputTokens || 0
-                },
-                {
-                  model: modelId || DEFAULT_CHAT_MODEL,
-                  requestType: 'chat',
-                  endpoint: '/api/chat-v2',
-                  steps: stepsCount,
-                  responseTimeMs: responseTime,
-                  status: 'success'
-                },
-                supabase
-              )
-
-              if (billingResult.success) {
-                console.log(
-                  `[Chat-V2] 💰 Deducted ${billingResult.creditsUsed} credits (${(totalUsage.inputTokens || 0) + (totalUsage.outputTokens || 0)} tokens). New balance: ${billingResult.newBalance} credits`
+                const billingResult = await deductCreditsFromUsage(
+                  authContext.userId,
+                  {
+                    promptTokens: totalUsage.inputTokens,
+                    completionTokens: totalUsage.outputTokens
+                  },
+                  {
+                    model: modelId || DEFAULT_CHAT_MODEL,
+                    requestType: 'chat',
+                    endpoint: '/api/chat-v2',
+                    steps: stepsCount,
+                    responseTimeMs: responseTime,
+                    status: streamErrored ? 'error' : 'success'
+                  },
+                  supabase
                 )
-              } else {
-                console.error(`[Chat-V2] ⚠️ Failed to deduct credits:`, billingResult.error)
+
+                if (billingResult.success) {
+                  console.log(
+                    `[Chat-V2] 💰 Deducted ${billingResult.creditsUsed} credits (${totalUsage.inputTokens + totalUsage.outputTokens} tokens). New balance: ${billingResult.newBalance} credits`
+                  )
+                } else {
+                  console.error(`[Chat-V2] ⚠️ Failed to deduct credits:`, billingResult.error)
+                }
               }
             } catch (usageError) {
               console.error('[Chat-V2] ⚠️ Error processing token-based billing:', usageError)
