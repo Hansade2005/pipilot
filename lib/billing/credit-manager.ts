@@ -19,16 +19,24 @@ export const CREDIT_TO_USD_RATE = 0.01 // 1 credit = $0.01 USD
 // Monthly credits per plan - sustainable allocations
 // Formula: plan_price / CREDIT_TO_USD_RATE * coverage_ratio
 // Coverage ratio ensures we never give more credit value than revenue
-export const FREE_PLAN_MONTHLY_CREDITS = 150       // ~$0.38 API cost, enough for ~3-5 complete tasks with cheap models
-export const CREATOR_PLAN_MONTHLY_CREDITS = 1000   // ~$2.50 API cost, you charge $25
-export const COLLABORATE_PLAN_MONTHLY_CREDITS = 2500 // ~$6.25 API cost, you charge $75
-export const SCALE_PLAN_MONTHLY_CREDITS = 5000     // ~$12.50 API cost, you charge $150
+//
+// Real usage per request (with model-aware step limits):
+// - Cheap models (Devstral/Grok): ~5-15 credits/request  -> Creator gets ~65-200 requests
+// - Claude Sonnet 4.5 ($3/$15):   ~40-100 credits/request -> Creator gets ~10-25 requests
+// - Claude Opus 4.5 ($15/$75):    ~200-500 credits/request -> needs Scale plan
+export const FREE_PLAN_MONTHLY_CREDITS = 150       // ~3-10 tasks with cheap models, ~1-3 with Claude
+export const CREATOR_PLAN_MONTHLY_CREDITS = 1000   // ~$2.50 API cost, charge $25 (10x margin)
+export const COLLABORATE_PLAN_MONTHLY_CREDITS = 2500 // ~$6.25 API cost, charge $75 (12x margin)
+export const SCALE_PLAN_MONTHLY_CREDITS = 5000     // ~$12.50 API cost, charge $150 (12x margin)
 
 // Per-model API pricing (cost per token via Vercel AI Gateway)
 // These MUST match your actual Vercel AI Gateway / provider costs
+// Verified against actual gateway charges (not the displayed "base" prices)
+// Vercel charges Anthropic's direct pricing through the gateway pass-through
+// Last verified: 2026-02-14 against actual billing logs
 export const MODEL_PRICING: Record<string, { input: number; output: number }> = {
-  // Anthropic models
-  'anthropic/claude-sonnet-4.5':  { input: 0.000003,    output: 0.000015 },   // $3/$15 per 1M
+  // Anthropic models (actual gateway charges match Anthropic direct pricing)
+  'anthropic/claude-sonnet-4.5':  { input: 0.000003,    output: 0.000015 },   // $3/$15 per 1M (verified from logs)
   'anthropic/claude-haiku-4.5':   { input: 0.0000008,   output: 0.000004 },   // $0.80/$4 per 1M
   'anthropic/claude-opus-4.5':    { input: 0.000015,    output: 0.000075 },   // $15/$75 per 1M
   // Google models
@@ -59,28 +67,96 @@ const DEFAULT_OUTPUT_COST_PER_TOKEN = 0.000015  // $15 per 1M output tokens
 // 4x markup for sustainable profit margin (covers infrastructure, Vercel hosting, support, development)
 const MARKUP_MULTIPLIER = 4
 
-// Request limits per plan (safety against expensive operations)
-export const MAX_CREDITS_PER_REQUEST = {
-  free: 30,         // Enough for a complete simple task
-  creator: 150,     // Allows moderate complexity
-  collaborate: 250,  // Allows high complexity
-  scale: 500        // Allows very high complexity
+// Per-request credit budget per plan (max credits ONE request can consume)
+// This is the primary cost control - prevents a single request from draining the wallet
+// Budget should be ~10-20% of monthly credits so users can't blow everything in one shot
+export const MAX_CREDITS_PER_REQUEST: Record<string, number> = {
+  free: 30,         // ~20% of 150 monthly credits
+  creator: 100,     // ~10% of 1,000 monthly credits (~$1 API cost)
+  collaborate: 200, // ~8% of 2,500 monthly credits (~$2 API cost)
+  scale: 400        // ~8% of 5,000 monthly credits (~$4 API cost)
 }
 
-// Per-plan step limits to control agent costs
-// A typical task needs: ~3-5 steps reading project + ~5-15 steps writing code + ~2-3 tool calls
-// So minimum ~15 steps for a useful task. Lower than that = broken UX (premature stop, user forced to say "continue")
-// Cost control comes from CREDITS (token-based billing), not step limits.
-// Step limits are a safety net against infinite loops, not a billing mechanism.
+// Model cost tiers - determines step limits per model
+// Expensive models (>$1/1M input) get fewer steps; cheap models get more
+type ModelCostTier = 'expensive' | 'moderate' | 'cheap'
+
+function getModelCostTier(model: string): ModelCostTier {
+  const pricing = getModelPricing(model)
+  const avgCostPerToken = (pricing.input + pricing.output) / 2
+  if (avgCostPerToken >= 0.000005) return 'expensive'  // Claude Sonnet 4.5, Opus, GPT-5
+  if (avgCostPerToken >= 0.0000005) return 'moderate'   // Gemini Pro, etc.
+  return 'cheap'                                         // Devstral, Grok, Flash, Haiku
+}
+
+// Per-plan step limits, adjusted by model cost tier
+// Expensive models: fewer steps to control costs (users can always "continue")
+// Cheap models: more steps for better UX
+const STEPS_BY_PLAN_AND_TIER: Record<string, Record<ModelCostTier, number>> = {
+  free:        { expensive: 5,  moderate: 10, cheap: 15 },
+  creator:     { expensive: 8,  moderate: 15, cheap: 30 },
+  collaborate: { expensive: 12, moderate: 25, cheap: 40 },
+  scale:       { expensive: 15, moderate: 35, cheap: 50 },
+}
+
+/**
+ * Get the max steps allowed for a given plan and model combination
+ * Accounts for model cost so expensive models don't burn through credits
+ */
+export function getMaxStepsForRequest(plan: string, model: string): number {
+  const tier = getModelCostTier(model)
+  const planSteps = STEPS_BY_PLAN_AND_TIER[plan] || STEPS_BY_PLAN_AND_TIER.free
+  return planSteps[tier]
+}
+
+// Legacy exports for backward compatibility
 export const MAX_STEPS_PER_PLAN: Record<string, number> = {
-  free: 15,         // Enough to complete one simple task end-to-end
-  creator: 30,      // Handles moderate multi-file tasks
-  collaborate: 40,  // Complex multi-file refactors
-  scale: 50         // Full agent capability for enterprise tasks
+  free: 15,
+  creator: 30,
+  collaborate: 40,
+  scale: 50
+}
+export const MAX_STEPS_PER_REQUEST = 50
+
+/**
+ * Estimate the credit cost of one agent step for a given model
+ * Based on typical token usage: ~35K input (context re-sent), ~400 output per step
+ * Used for pre-request budget estimation
+ */
+export function estimateCreditsPerStep(model: string): number {
+  const pricing = getModelPricing(model)
+  // Typical agent step: ~35K input tokens (growing context), ~400 output tokens
+  const typicalInputTokens = 35000
+  const typicalOutputTokens = 400
+  const apiCost = (typicalInputTokens * pricing.input) + (typicalOutputTokens * pricing.output)
+  return Math.ceil(apiCost * 100 * MARKUP_MULTIPLIER)
 }
 
-// Fallback for backward compatibility
-export const MAX_STEPS_PER_REQUEST = 50
+/**
+ * Calculate the max steps a user can afford for a given model,
+ * capped by both their plan step limit and their remaining credit balance
+ */
+export function getAffordableSteps(
+  plan: string,
+  model: string,
+  remainingCredits: number
+): { maxSteps: number; estimatedCostPerStep: number; totalEstimatedCost: number } {
+  const planMaxSteps = getMaxStepsForRequest(plan, model)
+  const costPerStep = estimateCreditsPerStep(model)
+
+  // Max steps the user can afford based on remaining credits
+  const maxCreditBudget = MAX_CREDITS_PER_REQUEST[plan] || MAX_CREDITS_PER_REQUEST.free
+  const budgetSteps = costPerStep > 0 ? Math.floor(Math.min(remainingCredits, maxCreditBudget) / costPerStep) : planMaxSteps
+
+  // Take the minimum of plan limit and affordable steps
+  const maxSteps = Math.max(1, Math.min(planMaxSteps, budgetSteps))
+
+  return {
+    maxSteps,
+    estimatedCostPerStep: costPerStep,
+    totalEstimatedCost: maxSteps * costPerStep
+  }
+}
 
 // Monthly request limits per plan (hard cap regardless of credits remaining)
 // Prevents abuse: someone sending hundreds of tiny 1-credit messages, API hammering, etc.

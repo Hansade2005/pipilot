@@ -12,7 +12,7 @@ import lz4 from 'lz4js'
 import unzipper from 'unzipper'
 import { Readable } from 'stream'
 import { authenticateUser, processRequestBilling } from '@/lib/billing/auth-middleware'
-import { deductCreditsFromUsage, checkRequestLimits, checkMonthlyRequestLimit, MAX_STEPS_PER_REQUEST, MAX_STEPS_PER_PLAN } from '@/lib/billing/credit-manager'
+import { deductCreditsFromUsage, checkRequestLimits, checkMonthlyRequestLimit, MAX_STEPS_PER_REQUEST, MAX_STEPS_PER_PLAN, getMaxStepsForRequest, getAffordableSteps, estimateCreditsPerStep } from '@/lib/billing/credit-manager'
 import { downloadLargePayload, cleanupLargePayload } from '@/lib/cloud-sync'
 
 // Disable Next.js body parser for binary data handling
@@ -10926,11 +10926,17 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
       }
     } as any : undefined;
 
-    // Apply per-plan step limit to control agent costs (most impactful cost control)
-    // Free users get fewer steps to prevent expensive multi-step tasks on free tier
+    // Apply model-aware + credit-budget-aware step limits
+    // Expensive models (Claude Sonnet 4.5 = $3/$15 per 1M) get fewer steps
+    // Steps are also capped by the user's remaining credit balance
     const userPlan = authContext?.currentPlan || 'free'
-    const maxStepsAllowed = MAX_STEPS_PER_PLAN[userPlan] || MAX_STEPS_PER_REQUEST
-    console.log(`[Chat-V2] Max steps allowed: ${maxStepsAllowed} (plan: ${userPlan})`)
+    const userCredits = authContext?.creditsBalance || 0
+    const { maxSteps: maxStepsAllowed, estimatedCostPerStep, totalEstimatedCost } = getAffordableSteps(
+      userPlan,
+      modelId || 'anthropic/claude-sonnet-4.5',
+      userCredits
+    )
+    console.log(`[Chat-V2] Max steps: ${maxStepsAllowed} (plan: ${userPlan}, model: ${modelId}, ~${estimatedCostPerStep} credits/step, budget: ~${totalEstimatedCost} credits, balance: ${userCredits})`)
 
     const result = await streamText({
       model,
