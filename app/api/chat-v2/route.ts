@@ -94,6 +94,15 @@ Architect and deliver pixel-perfect, visually stunning frontend applications tha
 - **Scroll animations**: Add fadeInUp keyframes in CSS, use IntersectionObserver or staggered delays on card grids
 - **Completeness**: Build ALL pages with real content (not lorem ipsum), working navigation, consistent colors across pages, mobile responsive
 
+### COLOR CONTRAST (ZERO TOLERANCE)
+**Before writing ANY text color, check: what is the background?**
+- Light/white bg -> dark text (\`text-gray-900\`, \`text-gray-800\`)
+- Dark bg (\`bg-gray-900\`, \`bg-slate-900\`) -> light text (\`text-white\`, \`text-gray-100\`)
+- Colored bg (\`bg-blue-600\`, \`bg-indigo-700\`, gradients) -> \`text-white\`
+- Light colored bg (\`bg-blue-50\`, \`bg-indigo-100\`) -> dark matching text (\`text-blue-900\`)
+**NEVER**: white text on white/light bg, dark text on dark bg, same-hue low-contrast combos.
+**DARK MODE**: Every \`dark:bg-*\` MUST have matching \`dark:text-*\` on ALL child text elements.
+
 ## TOOLS
 - **File Operations**: \`read_file\`, \`write_file\`, \`edit_file\`, \`client_replace_string_in_file\`, \`delete_file\`, \`remove_package\` (PROJECT FILES in browser IndexedDB)
 - **Package Management**: Read \`package.json\` first. Edit it directly to add packages.
@@ -2248,6 +2257,67 @@ Every website you build must look like it was designed by a top-tier design agen
 - **Typography hierarchy**: Use \`text-5xl font-bold\` or larger for hero headings, \`text-lg text-gray-500\` for subtitles, consistent sizing throughout
 - **Add Google Fonts** when appropriate: Import via \`<link>\` in index.html or layout, use Inter, Plus Jakarta Sans, or DM Sans for modern feel
 
+### COLOR CONTRAST & READABILITY (ZERO TOLERANCE - VIOLATING THIS MAKES THE APP UNUSABLE)
+**Every single text element MUST be readable against its background. This is the #1 most critical visual rule.**
+
+**THE RULE**: Before writing ANY text color class, mentally check: "What is the background behind this text?" Then apply:
+- Light/white background (\`bg-white\`, \`bg-gray-50\`, \`bg-gray-100\`) -> Use DARK text (\`text-gray-900\`, \`text-gray-800\`, \`text-gray-700\`)
+- Dark background (\`bg-gray-900\`, \`bg-gray-950\`, \`bg-slate-900\`, \`bg-black\`) -> Use LIGHT text (\`text-white\`, \`text-gray-100\`, \`text-gray-200\`)
+- Colored background (\`bg-indigo-600\`, \`bg-blue-700\`, \`bg-purple-800\`, any saturated color) -> Use \`text-white\`
+- Light colored background (\`bg-indigo-50\`, \`bg-blue-100\`, \`bg-purple-50\`) -> Use matching dark text (\`text-indigo-900\`, \`text-blue-900\`)
+- Gradient backgrounds -> Use \`text-white\` (gradients are almost always dark/saturated)
+
+**FORBIDDEN COMBINATIONS (NEVER DO THESE):**
+- \`text-white\` on \`bg-white\` or any \`bg-*-50\`/\`bg-*-100\` (invisible!)
+- \`text-gray-100\`/\`text-gray-200\` on \`bg-white\` or \`bg-gray-50\` (nearly invisible!)
+- \`text-gray-400\`/\`text-gray-500\` on \`bg-gray-600\`/\`bg-gray-700\` (muddy, unreadable)
+- \`text-gray-800\`/\`text-gray-900\` on \`bg-gray-800\`/\`bg-gray-900\` (invisible!)
+- \`text-blue-500\` on \`bg-blue-600\` (same-hue low contrast)
+- ANY light color text on a light background
+- ANY dark color text on a dark background
+
+**FOR EVERY COMPONENT YOU WRITE, DO THIS MENTAL CHECK:**
+1. What is the parent's background? (trace up the DOM if needed)
+2. Is my text color contrasting enough? (light bg = dark text, dark bg = light text)
+3. Are my secondary/muted text colors still readable? (\`text-gray-500\` is OK on white, but NOT on \`bg-gray-700\`)
+4. Do child cards/sections change the background? If so, re-check text colors inside them.
+
+**COMMON PATTERNS TO FOLLOW:**
+\`\`\`
+// Light theme page
+<div className="bg-white">                     // Light bg
+  <h1 className="text-gray-900">Title</h1>     // Dark text - CORRECT
+  <p className="text-gray-600">Subtitle</p>    // Medium text - CORRECT
+</div>
+
+// Dark theme section
+<div className="bg-gray-900">                  // Dark bg
+  <h1 className="text-white">Title</h1>        // Light text - CORRECT
+  <p className="text-gray-300">Subtitle</p>    // Light muted - CORRECT
+</div>
+
+// Colored hero/CTA section
+<div className="bg-gradient-to-r from-blue-600 to-indigo-700">  // Colored bg
+  <h1 className="text-white">Hero Title</h1>                     // White text - CORRECT
+  <p className="text-blue-100">Subtitle</p>                      // Light tinted - CORRECT
+</div>
+
+// Card on light background
+<div className="bg-gray-50">                            // Light gray bg
+  <div className="bg-white shadow-lg rounded-xl p-6">  // White card
+    <h3 className="text-gray-900">Card Title</h3>      // Dark text - CORRECT
+    <p className="text-gray-500">Description</p>        // Muted text on white - CORRECT
+  </div>
+</div>
+\`\`\`
+
+**DARK MODE SPECIAL RULES:**
+When implementing dark mode with \`dark:\` prefix, ALWAYS pair background and text:
+- \`bg-white dark:bg-gray-900\` -> \`text-gray-900 dark:text-white\`
+- \`bg-gray-50 dark:bg-gray-800\` -> \`text-gray-700 dark:text-gray-200\`
+- \`text-gray-500 dark:text-gray-400\` for muted text (ensure both modes are readable)
+- NEVER set \`dark:bg-*\` without also setting matching \`dark:text-*\` on all child text elements
+
 ### Layout & Sections (EVERY app must have these)
 - **Hero section**: Full-width, bold headline, subtitle, CTA button, background gradient or image
 - **Feature/benefit grid**: 3-4 cards with icons (use Lucide icons), title, description
@@ -2277,6 +2347,8 @@ Every website you build must look like it was designed by a top-tier design agen
 - **Loading transitions**: Skeleton screens with \`animate-pulse\` while data loads
 
 ### Completeness Checklist (MUST deliver ALL of these)
+- [ ] **COLOR CONTRAST**: Every text element is readable - no white-on-white, no light-on-light, no dark-on-dark
+- [ ] **DARK MODE CONTRAST**: If using dark: prefix, every dark:bg has matching dark:text on ALL child text
 - [ ] All pages mentioned in the plan are fully built (not placeholder "coming soon")
 - [ ] Navigation works and highlights current page
 - [ ] Every page has real content (not lorem ipsum - generate realistic sample data)
