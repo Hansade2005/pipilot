@@ -522,29 +522,21 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
   // OLD renderToolInvocation function removed - now using ChainOfThought steps
   
 
-  // Shared prose classes for content rendering
-  const reasoningProseClasses = cn(
-    'prose prose-sm dark:prose-invert max-w-none mt-2',
-    'prose-pre:bg-gray-800/60 prose-pre:text-gray-200 prose-pre:overflow-x-auto',
-    'prose-code:text-gray-200 prose-code:bg-gray-800/60 prose-code:px-1 prose-code:py-0.5 prose-code:rounded',
-    'prose-p:text-gray-300 prose-p:break-words',
-    'prose-headings:text-gray-100',
-    'prose-strong:text-gray-100',
-    'prose-ul:text-gray-300',
-    'prose-ol:text-gray-300',
-    'prose-a:break-all prose-a:text-blue-400',
-    'overflow-hidden break-words [overflow-wrap:anywhere]'
-  )
+  // Content wrapper classes - no prose, let Streamdown/Shiki handle code blocks natively
+  const reasoningWrapperClasses = 'mt-2 text-sm text-gray-300 leading-relaxed overflow-hidden break-words [overflow-wrap:anywhere]'
+  const textWrapperClasses = 'text-sm text-gray-200 leading-relaxed overflow-hidden break-words [overflow-wrap:anywhere]'
 
-  const textProseClasses = cn(
-    'prose prose-sm dark:prose-invert max-w-none',
-    'prose-pre:bg-gray-800/60 prose-pre:text-gray-200 prose-pre:overflow-x-auto',
-    'prose-code:text-gray-200 prose-code:bg-gray-800/60 prose-code:px-1 prose-code:py-0.5 prose-code:rounded',
-    'prose-p:text-gray-300 prose-p:break-words',
-    'prose-headings:text-gray-100',
-    'prose-strong:text-gray-100',
-    'prose-a:break-all prose-a:text-blue-400',
-    'overflow-hidden break-words [overflow-wrap:anywhere]'
+  // Response className overrides for links, strong text, and code styling
+  const reasoningResponseClasses = cn(
+    '[&>pre]:bg-gray-900/80 [&>pre]:border [&>pre]:border-gray-800/60',
+    '[&_a]:text-blue-400 [&_a]:break-all',
+    '[&_strong]:text-gray-100',
+    '[&>p]:text-gray-300 [&>ul]:text-gray-300 [&>ol]:text-gray-300',
+  )
+  const textResponseClasses = cn(
+    '[&>pre]:bg-gray-900/80 [&>pre]:border [&>pre]:border-gray-800/60',
+    '[&_a]:text-blue-400 [&_a]:break-all',
+    '[&_strong]:text-gray-100',
   )
 
   // Filter text-stream tool calls (used by both old and new rendering)
@@ -621,7 +613,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
                           label="Thinking Process"
                           status={isStreaming && !hasResponse ? 'active' : 'complete'}
                         >
-                          <div className={reasoningProseClasses}>
+                          <div className={reasoningWrapperClasses}>
                             {reasoningToolCalls.length > 0 ? (
                               <InterleavedContent
                                 content={segment.content}
@@ -629,10 +621,10 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
                                 isStreaming={isStreaming}
                                 positionKey="reasoningPosition"
                               >
-                                {(text) => <Response>{text}</Response>}
+                                {(text) => <Response className={reasoningResponseClasses}>{text}</Response>}
                               </InterleavedContent>
                             ) : (
-                              <Response>{segment.content}</Response>
+                              <Response className={reasoningResponseClasses}>{segment.content}</Response>
                             )}
                           </div>
                         </ChainOfThoughtStep>
@@ -653,17 +645,17 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
                   }))
 
                   return (
-                    <div key={`text-${idx}`} className={textProseClasses}>
+                    <div key={`text-${idx}`} className={textWrapperClasses}>
                       {segmentToolCalls.length > 0 ? (
                         <InterleavedContent
                           content={segment.content}
                           toolCalls={segmentToolCalls}
                           isStreaming={isStreaming}
                         >
-                          {(text) => <Response>{text}</Response>}
+                          {(text) => <Response className={textResponseClasses}>{text}</Response>}
                         </InterleavedContent>
                       ) : (
-                        <Response>{segment.content}</Response>
+                        <Response className={textResponseClasses}>{segment.content}</Response>
                       )}
                     </div>
                   )
@@ -692,7 +684,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
                     label="Thinking Process"
                     status={isStreaming && !hasResponse ? "active" : "complete"}
                   >
-                    <div className={reasoningProseClasses}>
+                    <div className={reasoningWrapperClasses}>
                       {inlineToolCalls && inlineToolCalls.length > 0 ? (
                         <InterleavedContent
                           content={reasoningContent}
@@ -700,10 +692,10 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
                           isStreaming={isStreaming}
                           positionKey="reasoningPosition"
                         >
-                          {(text) => <Response>{text}</Response>}
+                          {(text) => <Response className={reasoningResponseClasses}>{text}</Response>}
                         </InterleavedContent>
                       ) : (
-                        <Response>{reasoningContent}</Response>
+                        <Response className={reasoningResponseClasses}>{reasoningContent}</Response>
                       )}
                     </div>
                   </ChainOfThoughtStep>
@@ -713,17 +705,17 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
           )}
 
           {hasResponse && (
-            <div className={textProseClasses}>
+            <div className={textWrapperClasses}>
               {textStreamToolCalls.length > 0 ? (
                 <InterleavedContent
                   content={responseContent}
                   toolCalls={textStreamToolCalls}
                   isStreaming={isStreaming}
                 >
-                  {(text) => <Response>{text}</Response>}
+                  {(text) => <Response className={textResponseClasses}>{text}</Response>}
                 </InterleavedContent>
               ) : (
-                <Response>{responseContent}</Response>
+                <Response className={textResponseClasses}>{responseContent}</Response>
               )}
             </div>
           )}
