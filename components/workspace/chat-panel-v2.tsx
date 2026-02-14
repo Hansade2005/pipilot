@@ -1397,11 +1397,23 @@ export function ChatPanelV2({
   const isContinuationInProgressRef = useRef(false)
 
   // Broadcast AI streaming state to other panels (e.g. preview panel)
+  // Also pause/resume auto-sync to avoid disruptive background restores during streaming
   useEffect(() => {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('ai-streaming-state', {
         detail: { isStreaming: isLoading }
       }))
+    }
+
+    // Pause auto-sync during streaming to prevent clearAll() + re-import disrupting the UI
+    if (isLoading) {
+      import('@/lib/auto-sync-service').then(({ pauseAutoSyncForStreaming }) => {
+        pauseAutoSyncForStreaming()
+      })
+    } else {
+      import('@/lib/auto-sync-service').then(({ resumeAutoSyncAfterStreaming }) => {
+        resumeAutoSyncAfterStreaming()
+      })
     }
   }, [isLoading])
 

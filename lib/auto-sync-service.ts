@@ -23,6 +23,8 @@ class AutoSyncService {
   private eventBuffer: StorageEventData[] = []
   private bufferTimeout: NodeJS.Timeout | null = null
   private bufferDelayMs = 2000 // Buffer events for 2 seconds before sync
+  private isPausedForStreaming = false
+  private resumeSyncTimeout: NodeJS.Timeout | null = null
 
   /**
    * Initialize the auto-sync service
@@ -89,6 +91,9 @@ class AutoSyncService {
    */
   private async processBufferedEvents(): Promise<void> {
     if (this.eventBuffer.length === 0) return
+
+    // If paused for streaming, keep events buffered — they'll be processed on resume
+    if (this.isPausedForStreaming) return
 
     // Clear buffer and timeout
     const events = [...this.eventBuffer]
@@ -204,8 +209,16 @@ class AutoSyncService {
    * Determine if sync should be skipped for certain events
    */
   private shouldSkipSync(event: StorageEventData): boolean {
-    // Skip sync for read-only operations or certain tables
-    const skipTables = ['checkpoints', 'conversationMemories'] // These might be too frequent
+    // Skip high-frequency tables that change during AI streaming.
+    // These tables are still included in the backup payload when a sync IS
+    // triggered by other events (e.g. file changes), but they won't CAUSE
+    // a sync on their own — preventing constant uploads during streaming.
+    const skipTables = [
+      'checkpoints',
+      'conversationMemories',
+      'messages',       // Written on every AI stream chunk — too frequent
+      'chatSessions',   // Updated alongside messages during streaming
+    ]
 
     if (skipTables.includes(event.tableName)) {
       return true
@@ -287,6 +300,50 @@ class AutoSyncService {
   }
 
   /**
+   * Pause auto-sync while AI is actively streaming.
+   * Events are still buffered and will be processed when resume is called.
+   * Includes a safety timeout to auto-resume after 5 minutes.
+   */
+  pauseForStreaming(): void {
+    this.isPausedForStreaming = true
+
+    // Clear any pending buffer timeout — we'll process on resume
+    if (this.bufferTimeout) {
+      clearTimeout(this.bufferTimeout)
+      this.bufferTimeout = null
+    }
+
+    // Safety: auto-resume after 5 minutes in case resume is never called
+    if (this.resumeSyncTimeout) {
+      clearTimeout(this.resumeSyncTimeout)
+    }
+    this.resumeSyncTimeout = setTimeout(() => {
+      this.resumeAfterStreaming()
+    }, 300000)
+  }
+
+  /**
+   * Resume auto-sync after streaming completes.
+   * Processes any buffered events that accumulated during the pause.
+   */
+  resumeAfterStreaming(): void {
+    this.isPausedForStreaming = false
+
+    if (this.resumeSyncTimeout) {
+      clearTimeout(this.resumeSyncTimeout)
+      this.resumeSyncTimeout = null
+    }
+
+    // Process any events that were buffered during the pause
+    if (this.eventBuffer.length > 0) {
+      // Small delay to let the UI settle after streaming ends
+      this.bufferTimeout = setTimeout(async () => {
+        await this.processBufferedEvents()
+      }, 3000)
+    }
+  }
+
+  /**
    * Cleanup event listeners and timeouts
    */
   private cleanup(): void {
@@ -303,6 +360,12 @@ class AutoSyncService {
       this.retryTimeout = null
     }
 
+    if (this.resumeSyncTimeout) {
+      clearTimeout(this.resumeSyncTimeout)
+      this.resumeSyncTimeout = null
+    }
+
+    this.isPausedForStreaming = false
     this.pendingSync = null
     this.eventBuffer = []
   }
@@ -355,4 +418,19 @@ export async function forceAutoSync(): Promise<boolean> {
  */
 export function getAutoSyncStatus() {
   return autoSyncService.getStatus()
+}
+
+/**
+ * Pause auto-sync during AI streaming to avoid UI disruption.
+ * Call resumeAutoSyncAfterStreaming() when streaming completes.
+ */
+export function pauseAutoSyncForStreaming(): void {
+  autoSyncService.pauseForStreaming()
+}
+
+/**
+ * Resume auto-sync after AI streaming completes.
+ */
+export function resumeAutoSyncAfterStreaming(): void {
+  autoSyncService.resumeAfterStreaming()
 }
