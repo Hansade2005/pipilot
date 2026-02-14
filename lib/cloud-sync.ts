@@ -169,6 +169,11 @@ export async function uploadBackupToCloud(userId: string): Promise<boolean> {
         onConflict: 'user_id'
       })
 
+    // Notify other hooks/devices that a backup just completed
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('pipilot-backup-completed'))
+    }
+
     return true
   } catch (error) {
     console.error("Error uploading backup to cloud:", error)

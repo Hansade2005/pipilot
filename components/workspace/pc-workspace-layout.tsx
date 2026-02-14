@@ -25,6 +25,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useCloudSync } from '@/hooks/use-cloud-sync'
 import { useAutoCloudBackup } from '@/hooks/use-auto-cloud-backup'
+import { useRealtimeSync } from '@/hooks/use-realtime-sync'
 import { useSubscriptionCache } from '@/hooks/use-subscription-cache'
 import { restoreBackupFromCloud, isCloudSyncEnabled } from '@/lib/cloud-sync'
 import { generateFileUpdate, type StyleChange } from '@/lib/visual-editor'
@@ -102,6 +103,26 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     debounceMs: 1000, // Reduced to 1 second for faster file backups
     silent: true, // Don't show backup notifications for saves (to avoid spam)
     instantForCritical: true // Enable instant backup for critical operations
+  })
+
+  // Real-time cross-device sync: when another device backs up, silently restore here
+  useRealtimeSync(user?.id || null, {
+    onSyncComplete: async () => {
+      try {
+        await storageManager.init()
+        const workspaces = await storageManager.getWorkspaces(user.id)
+        setClientProjects(workspaces || [])
+
+        // Refresh files for the currently selected project
+        if (selectedProject) {
+          const files = await storageManager.getFiles(selectedProject.id)
+          setProjectFiles(files || [])
+          setFileExplorerKey(prev => prev + 1)
+        }
+      } catch (error) {
+        console.error('Failed to reload workspace after cross-device sync:', error)
+      }
+    }
   })
 
   // GitHub push functionality
