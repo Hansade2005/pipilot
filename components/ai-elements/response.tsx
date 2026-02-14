@@ -9,6 +9,7 @@ type ResponseProps = ComponentProps<typeof Streamdown>;
 export const Response = memo(
   ({ className, ...props }: ResponseProps) => (
     <Streamdown
+      shikiTheme={['github-light', 'github-dark-dimmed']}
       className={cn(
         "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 break-words overflow-hidden [overflow-wrap:anywhere]",
         // Enhanced spacing and readability for reasoning content
@@ -18,7 +19,7 @@ export const Response = memo(
         "[&>ol]:mb-4 [&>ol]:last:mb-0", // Ordered list spacing
         "[&>li]:mb-2", // List item spacing
         "[&>blockquote]:mb-4 [&>blockquote]:border-l-4 [&>blockquote]:border-gray-300 [&>blockquote]:pl-4 [&>blockquote]:italic", // Blockquote styling
-        "[&>pre]:mb-4 [&>pre]:overflow-x-auto", // Code block spacing
+        "[&>pre]:mb-4 [&>pre]:overflow-x-auto [&>pre]:rounded-lg [&>pre]:border [&>pre]:border-gray-700/50", // Code block spacing and styling
         "[&>h1]:mb-4 [&>h1]:text-2xl [&>h1]:font-bold", // Heading spacing
         "[&>h2]:mb-3 [&>h2]:text-xl [&>h2]:font-semibold",
         "[&>h3]:mb-2 [&>h3]:text-lg [&>h3]:font-medium",
