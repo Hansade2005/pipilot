@@ -258,13 +258,37 @@ export async function restoreBackupFromCloud(userId: string): Promise<boolean> {
     // Handle new storage-based backups
     if (data.storage_url) {
       try {
-        const response = await fetch(data.storage_url)
-        if (!response.ok) {
-          throw new Error(`Failed to download backup: ${response.status} ${response.statusText}`)
+        // Extract filename from storage URL
+        const filename = data.storage_url.split('/').pop()
+        if (!filename) {
+          throw new Error('Invalid storage URL: could not extract filename')
         }
 
-        const jsonString = await response.text()
-        backupData = JSON.parse(jsonString)
+        // Use Supabase storage client to download (works regardless of bucket privacy)
+        const { data: fileData, error: dlError } = await supabase.storage
+          .from('backups')
+          .download(filename)
+
+        if (dlError || !fileData) {
+          // Fallback: try a signed URL
+          const { data: signedData, error: signError } = await supabase.storage
+            .from('backups')
+            .createSignedUrl(filename, 60)
+
+          if (signError || !signedData?.signedUrl) {
+            throw new Error(`Failed to download backup: ${dlError?.message || signError?.message || 'unknown error'}`)
+          }
+
+          const response = await fetch(signedData.signedUrl)
+          if (!response.ok) {
+            throw new Error(`Failed to download backup: ${response.status} ${response.statusText}`)
+          }
+          const jsonString = await response.text()
+          backupData = JSON.parse(jsonString)
+        } else {
+          const jsonString = await fileData.text()
+          backupData = JSON.parse(jsonString)
+        }
       } catch (downloadError) {
         throw downloadError
       }
