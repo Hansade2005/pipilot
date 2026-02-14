@@ -451,38 +451,43 @@ const ToolActivityPanel = ({
 
   if (!toolCalls || toolCalls.length === 0) return null
 
+  // Helper: normalize prefixed tool names (server uses pipilotdb_ prefix)
+  const normalizeToolName = (name: string) => name.startsWith('pipilotdb_') ? name.replace('pipilotdb_', '') : name;
+
   // Helper functions - defined first to avoid temporal dead zone errors
   const getToolCategory = (toolName: string): string => {
-    if (['write_file', 'edit_file', 'client_replace_string_in_file', 'delete_file', 'delete_folder'].includes(toolName)) {
+    const tn = normalizeToolName(toolName);
+    if (['write_file', 'edit_file', 'client_replace_string_in_file', 'delete_file', 'delete_folder'].includes(tn)) {
       return '✏️ File Operations'
     }
-    if (['read_file', 'list_files', 'grep_search', 'semantic_code_navigator'].includes(toolName)) {
+    if (['read_file', 'list_files', 'grep_search', 'semantic_code_navigator'].includes(tn)) {
       return '📖 Reading Files'
     }
     if (['create_database', 'create_table', 'supabase_create_table', 'query_database', 'supabase_execute_sql',
       'manipulate_table_data', 'supabase_insert_data', 'supabase_delete_data', 'list_tables',
-      'supabase_list_tables_rls', 'read_table', 'supabase_read_table', 'delete_table', 'supabase_drop_table'].includes(toolName)) {
+      'supabase_list_tables_rls', 'read_table', 'supabase_read_table', 'delete_table', 'supabase_drop_table'].includes(tn)) {
       return '💾 Database Operations'
     }
-    if (['remove_package'].includes(toolName)) {
+    if (['remove_package'].includes(tn)) {
       return '📦 Package Management'
     }
-    if (['web_search', 'web_extract'].includes(toolName)) {
+    if (['web_search', 'web_extract'].includes(tn)) {
       return '🌐 Web Operations'
     }
-    if (['browse_web'].includes(toolName)) {
+    if (['browse_web'].includes(tn)) {
       return '🖥️ Browser Testing'
     }
-    if (['manage_api_keys', 'supabase_fetch_api_keys'].includes(toolName)) {
+    if (['manage_api_keys', 'supabase_fetch_api_keys'].includes(tn)) {
       return '🔑 API Management'
     }
-    if (['generate_report'].includes(toolName)) {
+    if (['generate_report'].includes(tn)) {
       return '📊 Data Visualization'
     }
     return '⚡ Other Operations'
   }
   const getToolIcon = (tool: string) => {
-    switch (tool) {
+    const t = normalizeToolName(tool);
+    switch (t) {
       case 'write_file':
         return <FileText className="w-3.5 h-3.5" />
       case 'edit_file':
@@ -541,7 +546,8 @@ const ToolActivityPanel = ({
   }
 
   const getToolLabel = (tool: string, args?: any) => {
-    switch (tool) {
+    const t = normalizeToolName(tool);
+    switch (t) {
       case 'write_file':
         return `Creating ${args?.path ? args.path.split('/').pop() : 'file'}`
       case 'edit_file':
@@ -605,7 +611,7 @@ const ToolActivityPanel = ({
       case 'generate_report':
         return 'Generating data visualization report'
       default:
-        return tool
+        return t
     }
   }
 
@@ -805,8 +811,12 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
   input?: any,
   status?: 'executing' | 'completed' | 'failed'
 }) => {
+  // Normalize prefixed tool names (server uses pipilotdb_ prefix)
+  const normalizeToolName = (name: string) => name.startsWith('pipilotdb_') ? name.replace('pipilotdb_', '') : name;
+
   const getToolIcon = (tool: string) => {
-    switch (tool) {
+    const t = normalizeToolName(tool);
+    switch (t) {
       case 'write_file':
         return <FileText className="w-3.5 h-3.5" />
       case 'edit_file':
@@ -865,7 +875,8 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
   }
 
   const getToolLabel = (tool: string, args?: any) => {
-    switch (tool) {
+    const t = normalizeToolName(tool);
+    switch (t) {
       case 'write_file':
         return `Creating ${args?.path ? args.path.split('/').pop() : 'file'}`
       case 'edit_file':
@@ -2753,6 +2764,7 @@ export function ChatPanelV2({
                 'grep_search',
                 'semantic_code_navigator',
                 'create_database',
+                'pipilotdb_create_database',
                 'request_supabase_connection'
               ]
 
@@ -3552,6 +3564,7 @@ export function ChatPanelV2({
                 'grep_search',
                 'semantic_code_navigator',
                 'create_database',
+                'pipilotdb_create_database',
                 'request_supabase_connection'
               ]
 
@@ -4015,7 +4028,7 @@ export function ChatPanelV2({
                   'write_file', 'edit_file', 'client_replace_string_in_file',
                   'delete_file', 'delete_folder', 'remove_package',
                   'read_file', 'list_files', 'grep_search', 'semantic_code_navigator',
-                  'create_database', 'request_supabase_connection'
+                  'create_database', 'pipilotdb_create_database', 'request_supabase_connection'
                 ]
 
                 if (clientSideTools.includes(parsed.toolName)) {
@@ -5147,6 +5160,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 'grep_search',
                 'semantic_code_navigator',
                 'create_database',
+                'pipilotdb_create_database',
                 'request_supabase_connection'
               ]
 
