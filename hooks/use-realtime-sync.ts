@@ -6,6 +6,9 @@ import { restoreBackupFromCloud, isCloudSyncEnabled } from '@/lib/cloud-sync'
 import { storageManager } from '@/lib/storage-manager'
 
 const DEVICE_ID_KEY = 'pipilot_device_session_id'
+// How long after our own backup we ignore incoming sync events (prevents self-restore).
+// 120 seconds is generous — auto-sync fires at most every 5s so this covers many cycles.
+const OWN_BACKUP_IGNORE_WINDOW_MS = 120_000
 
 /** Generate or retrieve a unique ID for this browser session */
 function getDeviceId(): string {
@@ -59,6 +62,13 @@ export function useRealtimeSync(
   const performSilentRestore = useCallback(async () => {
     if (!userId || isRestoring.current) return
 
+    // Don't restore while the user is actively on the page — it calls clearAll()
+    // which wipes IndexedDB and causes a full re-render, disrupting streaming.
+    // Only restore when the tab is in the background (cross-device sync scenario).
+    if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+      return
+    }
+
     isRestoring.current = true
     try {
       await storageManager.init()
@@ -100,8 +110,8 @@ export function useRealtimeSync(
             filter: `user_id=eq.${userId}`
           },
           () => {
-            // If we backed up in the last 15 seconds, this is our own event
-            if (Date.now() - lastOwnBackupTime.current < 15000) return
+            // If we backed up recently, this is our own event — skip restore
+            if (Date.now() - lastOwnBackupTime.current < OWN_BACKUP_IGNORE_WINDOW_MS) return
             performSilentRestore()
           }
         )

@@ -13,6 +13,7 @@ export function useCloudSync(userId: string | null) {
   const lastBackupTime = useRef<number>(Date.now())
   const isSyncing = useRef<boolean>(false)
   const autoSyncInitialized = useRef<boolean>(false)
+  const isAiStreaming = useRef<boolean>(false)
 
   useEffect(() => {
     if (!userId) {
@@ -37,10 +38,17 @@ export function useCloudSync(userId: string | null) {
       })
     }
 
+    // Listen for AI streaming state changes to skip backups during streaming
+    const handleStreamingState = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      isAiStreaming.current = !!detail?.isStreaming
+    }
+    window.addEventListener('ai-streaming-state', handleStreamingState)
+
     // Fallback periodic sync function
     const checkAndBackup = async () => {
-      // Skip if already syncing or if not enough time has passed since last backup
-      if (isSyncing.current || Date.now() - lastBackupTime.current < 60000) return // Increased to 60 seconds for fallback
+      // Skip if already syncing, AI is streaming, or not enough time has passed
+      if (isSyncing.current || isAiStreaming.current || Date.now() - lastBackupTime.current < 60000) return
 
       try {
         // Check if cloud sync is enabled
@@ -86,9 +94,10 @@ export function useCloudSync(userId: string | null) {
     // Set up periodic check as fallback (less frequent)
     const interval = setInterval(checkAndBackup, 60000) // Check every 60 seconds as fallback
 
-    // Clean up interval on unmount
+    // Clean up interval and listener on unmount
     return () => {
       clearInterval(interval)
+      window.removeEventListener('ai-streaming-state', handleStreamingState)
     }
   }, [userId])
 
