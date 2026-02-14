@@ -12,7 +12,7 @@ import lz4 from 'lz4js'
 import unzipper from 'unzipper'
 import { Readable } from 'stream'
 import { authenticateUser, processRequestBilling } from '@/lib/billing/auth-middleware'
-import { deductCreditsFromUsage, checkRequestLimits, MAX_STEPS_PER_REQUEST } from '@/lib/billing/credit-manager'
+import { deductCreditsFromUsage, checkRequestLimits, MAX_STEPS_PER_REQUEST, MAX_STEPS_PER_PLAN } from '@/lib/billing/credit-manager'
 import { downloadLargePayload, cleanupLargePayload } from '@/lib/cloud-sync'
 
 // Disable Next.js body parser for binary data handling
@@ -10907,9 +10907,11 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
       }
     } as any : undefined;
 
-    // Apply universal step limit to prevent infinite loops
-    const maxStepsAllowed = MAX_STEPS_PER_REQUEST
-    console.log(`[Chat-V2] Max steps allowed: ${maxStepsAllowed}`)
+    // Apply per-plan step limit to control agent costs (most impactful cost control)
+    // Free users get fewer steps to prevent expensive multi-step tasks on free tier
+    const userPlan = authContext?.currentPlan || 'free'
+    const maxStepsAllowed = MAX_STEPS_PER_PLAN[userPlan] || MAX_STEPS_PER_REQUEST
+    console.log(`[Chat-V2] Max steps allowed: ${maxStepsAllowed} (plan: ${userPlan})`)
 
     const result = await streamText({
       model,

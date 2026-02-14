@@ -181,7 +181,7 @@ export default function PricingPage() {
     },
     {
       question: "What does the free plan include?",
-      answer: "The free plan includes 200 credits (~20 messages), access to Mistral Devstral 2, Google Gemini 2.5 Flash, and Claude Sonnet 4.5, Vercel deployment, visual editing, GitHub sync, and 1 app/project. It's perfect for trying out PiPilot and building small projects."
+      answer: "The free plan includes 50 credits (~5 messages), access to Mistral Devstral 2, Google Gemini 2.5 Flash, and Claude Sonnet 4.5, Vercel deployment, visual editing, GitHub sync, and 1 app/project. It's perfect for trying out PiPilot."
     },
     {
       question: "What deployment platforms are available?",
@@ -193,11 +193,11 @@ export default function PricingPage() {
     },
     {
       question: "What are the credit and message limits?",
-      answer: "Free: 200 credits (~20 messages). Creator: 1,500 credits (~150 messages). Collaborate: 2,500 credits (~250 messages). Scale: 6,000 credits (~600 messages). Paid users can purchase extra credits."
+      answer: "Free: 50 credits (~5 messages). Creator: 1,000 credits (~50-100 messages). Collaborate: 2,500 credits (~125-250 messages). Scale: 5,000 credits (~250-500 messages). Costs vary by AI model and task complexity. Paid users can purchase extra credits."
     },
     {
       question: "What does 'credits' mean?",
-      answer: "Credits are used for AI requests based on actual token usage (1 credit = $0.01). Costs vary by message complexity and model used (~10 credits average per message). Free users cannot buy extra credits and must upgrade when exhausted."
+      answer: "Credits are used for AI requests based on actual token usage (1 credit = $0.01). Costs vary by message complexity, AI model chosen, and number of agent steps. Cheaper models like Gemini Flash use fewer credits, while Claude Sonnet uses more. Free users cannot buy extra credits and must upgrade when exhausted."
     },
     {
       question: "Who owns the projects and code?",
@@ -205,7 +205,7 @@ export default function PricingPage() {
     },
     {
       question: "How much does it cost to use?",
-      answer: "PiPilot offers a free tier with 200 credits (~20 messages). Creator is $15/month (1,500 credits), Collaborate $25/month (2,500 credits), Scale $60/month (6,000 credits). Annual plans save 20%. Costs vary by message complexity."
+      answer: "PiPilot offers a free trial with 50 credits (~5 messages). Creator is $25/month (1,000 credits), Collaborate $75/month (2,500 credits), Scale $150/month (5,000 credits). Annual plans save ~17%. Costs vary by AI model and message complexity."
     },
     {
       question: "Can I upgrade or downgrade my plan?",
@@ -445,17 +445,17 @@ export default function PricingPage() {
                 </p>
                 <div className="mt-4 p-4 bg-gray-800/50 rounded-lg backdrop-blur-sm border border-gray-700/50 inline-block">
                   <p className="text-white">
-                    Current Balance: <span className="font-bold text-purple-400">{creditBalance} credits</span>
-                    <span className="text-gray-400 ml-2">(~{Math.floor(creditBalance / 10)} messages remaining)</span>
+                    Current Balance: <span className="font-bold text-orange-400">{creditBalance} credits</span>
+                    <span className="text-gray-400 ml-2">(~{Math.floor(creditBalance / 20)} messages remaining)</span>
                   </p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
                 {[
-                  { credits: 1000, price: 10, messages: 100 },
-                  { credits: 2500, price: 25, messages: 250 },
-                  { credits: 5000, price: 50, messages: 500 }
+                  { credits: 1000, price: 10, messages: 50 },
+                  { credits: 2500, price: 25, messages: 125 },
+                  { credits: 5000, price: 50, messages: 250 }
                 ].map(({ credits, price, messages }) => (
                   <Card key={credits} className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm">
                     <CardHeader className="text-center pb-4">
@@ -466,7 +466,7 @@ export default function PricingPage() {
                     </CardHeader>
                     <CardContent className="text-center">
                       <Button
-                        className="w-full bg-purple-600 hover:bg-purple-700"
+                        className="w-full bg-orange-600 hover:bg-orange-500"
                         disabled={loadingPlan === 'credits'}
                         onClick={() => handlePurchaseCredits(credits)}
                       >

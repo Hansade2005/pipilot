@@ -234,7 +234,7 @@ export async function getUserCreditInfo(userId: string): Promise<{
       creditsUsedThisMonth: wallet.creditsUsedThisMonth,
       currentPlan: wallet.currentPlan,
       canPurchaseCredits: wallet.canPurchaseCredits,
-      estimatedRemainingMessages: Math.floor(wallet.creditsBalance / 10) // ~10 credits per message average
+      estimatedRemainingMessages: Math.floor(wallet.creditsBalance / 20) // ~20 credits per message average (accounts for multi-step agent tasks)
     }
   } catch (error) {
     console.error('[AuthMiddleware] Exception in getUserCreditInfo:', error)

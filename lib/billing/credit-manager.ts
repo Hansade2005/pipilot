@@ -1,41 +1,82 @@
 /**
  * ABE Credit Manager - Core credit operations
  * Handles credit deduction, validation, and balance checks
- * 
+ *
  * Payment Systems Integrated:
  * - Stripe: Primary payment system for subscriptions and credit top-ups
  * - Polar: Backup payment system (1 credit = $1, Product ID: 09991226-466e-4983-b409-c986577a8599)
- * 
- * Credit Conversion Rate: 1 credit = $1 USD
- * AI Message Rate: 0.25 credits per message request
+ *
+ * Credit Conversion Rate: 1 credit = $0.01 USD
+ * Markup: 4x on actual API costs for profit margin + infrastructure
  */
 
 import { SupabaseClient } from '@supabase/supabase-js'
 
 // Credit constants - Token-based pricing system
-// 1 credit = $0.01 (with 3x markup on API costs for profit margin)
+// 1 credit = $0.01 (with 4x markup on API costs for profit margin)
 export const CREDIT_TO_USD_RATE = 0.01 // 1 credit = $0.01 USD
 
-// Monthly credits per plan (adjusted for new token-based pricing)
-export const FREE_PLAN_MONTHLY_CREDITS = 200      // ~$0.66 API cost (~20 messages)
-export const CREATOR_PLAN_MONTHLY_CREDITS = 1500  // ~$5 API cost, you charge $15
-export const COLLABORATE_PLAN_MONTHLY_CREDITS = 2500  // ~$8 API cost, you charge $25
-export const SCALE_PLAN_MONTHLY_CREDITS = 6000    // ~$20 API cost, you charge $60
+// Monthly credits per plan - sustainable allocations
+// Formula: plan_price / CREDIT_TO_USD_RATE * coverage_ratio
+// Coverage ratio ensures we never give more credit value than revenue
+export const FREE_PLAN_MONTHLY_CREDITS = 50        // ~$0.13 API cost, trial tier
+export const CREATOR_PLAN_MONTHLY_CREDITS = 1000   // ~$2.50 API cost, you charge $25
+export const COLLABORATE_PLAN_MONTHLY_CREDITS = 2500 // ~$6.25 API cost, you charge $75
+export const SCALE_PLAN_MONTHLY_CREDITS = 5000     // ~$12.50 API cost, you charge $150
 
-// Claude Sonnet 4 API pricing (per token)
-const INPUT_COST_PER_TOKEN = 0.000003   // $3 per 1M input tokens
-const OUTPUT_COST_PER_TOKEN = 0.000015  // $15 per 1M output tokens
-const MARKUP_MULTIPLIER = 3  // 3x markup for profit margin
+// Per-model API pricing (cost per token via Vercel AI Gateway)
+// These MUST match your actual Vercel AI Gateway / provider costs
+export const MODEL_PRICING: Record<string, { input: number; output: number }> = {
+  // Anthropic models
+  'anthropic/claude-sonnet-4.5':  { input: 0.000003,    output: 0.000015 },   // $3/$15 per 1M
+  'anthropic/claude-haiku-4.5':   { input: 0.0000008,   output: 0.000004 },   // $0.80/$4 per 1M
+  'anthropic/claude-opus-4.5':    { input: 0.000015,    output: 0.000075 },   // $15/$75 per 1M
+  // Google models
+  'google/gemini-2.5-flash':      { input: 0.000000075, output: 0.0000003 },  // $0.075/$0.30 per 1M
+  'google/gemini-2.5-pro':        { input: 0.00000125,  output: 0.00001 },    // $1.25/$10 per 1M
+  // xAI models
+  'xai/grok-code-fast-1':         { input: 0.0000001,   output: 0.0000004 },  // $0.10/$0.40 per 1M
+  'xai/glm-4.7':                  { input: 0.0000005,   output: 0.000002 },   // $0.50/$2 per 1M
+  // Mistral models
+  'mistral/devstral-2':           { input: 0.00000014,  output: 0.00000014 }, // $0.14/$0.14 per 1M
+  'mistral/devstral-small-2':     { input: 0.0000001,   output: 0.0000001 },  // $0.10/$0.10 per 1M
+  'codestral-latest':             { input: 0.0000003,   output: 0.0000009 },  // $0.30/$0.90 per 1M
+  // OpenAI models
+  'openai/gpt-5.1-thinking':      { input: 0.000003,   output: 0.000015 },   // $3/$15 per 1M
+  'openai/gpt-5.2-codex':         { input: 0.000003,   output: 0.000015 },   // $3/$15 per 1M
+  'openai/o3':                     { input: 0.000002,   output: 0.000008 },   // $2/$8 per 1M
+  // Other models
+  'moonshotai/kimi-k2-thinking':  { input: 0.0000005,  output: 0.000002 },   // $0.50/$2 per 1M
+  'minimax/minimax-m2.1':         { input: 0.0000003,  output: 0.000001 },   // $0.30/$1 per 1M
+  'alibaba/qwen3-max':            { input: 0.0000004,  output: 0.0000016 },  // $0.40/$1.60 per 1M
+  'zai/glm-4.7-flash':            { input: 0.0000002,  output: 0.0000008 },  // $0.20/$0.80 per 1M
+}
+
+// Default pricing for unknown models (uses Claude Sonnet 4.5 pricing as safe default)
+const DEFAULT_INPUT_COST_PER_TOKEN = 0.000003   // $3 per 1M input tokens
+const DEFAULT_OUTPUT_COST_PER_TOKEN = 0.000015  // $15 per 1M output tokens
+
+// 4x markup for sustainable profit margin (covers infrastructure, Vercel hosting, support, development)
+const MARKUP_MULTIPLIER = 4
 
 // Request limits per plan (safety against expensive operations)
 export const MAX_CREDITS_PER_REQUEST = {
-  free: 50,        // Blocks very expensive operations
-  creator: 200,    // Allows moderate complexity
-  collaborate: 300, // Allows high complexity
-  scale: 500       // Allows very high complexity
+  free: 15,         // Limits expensive operations on free tier
+  creator: 150,     // Allows moderate complexity
+  collaborate: 250,  // Allows high complexity
+  scale: 500        // Allows very high complexity
 }
 
-// Universal step limit for all plans to prevent infinite loops while allowing complex operations
+// Per-plan step limits to control agent costs (most impactful cost control)
+// Each step = 1 API call with growing context, so more steps = exponentially more tokens
+export const MAX_STEPS_PER_PLAN: Record<string, number> = {
+  free: 8,          // Simple tasks only - prevents expensive multi-step on free tier
+  creator: 20,      // Moderate agent tasks
+  collaborate: 35,  // Complex agent tasks
+  scale: 50         // Full agent capability
+}
+
+// Fallback for backward compatibility
 export const MAX_STEPS_PER_REQUEST = 50
 
 export interface WalletBalance {
@@ -73,21 +114,46 @@ export interface UsageLogEntry {
 }
 
 /**
+ * Get the per-token pricing for a specific model.
+ * Falls back to expensive default (Claude Sonnet) to prevent undercharging.
+ */
+export function getModelPricing(model: string): { input: number; output: number } {
+  // Direct match
+  if (MODEL_PRICING[model]) return MODEL_PRICING[model]
+
+  // Try matching by partial name (e.g. 'claude-sonnet-4.5' -> 'anthropic/claude-sonnet-4.5')
+  const normalizedModel = model.toLowerCase()
+  for (const [key, pricing] of Object.entries(MODEL_PRICING)) {
+    if (normalizedModel.includes(key.split('/').pop()!.toLowerCase()) ||
+        key.toLowerCase().includes(normalizedModel)) {
+      return pricing
+    }
+  }
+
+  // Default to Claude Sonnet pricing (most expensive common model) to avoid undercharging
+  console.warn(`[CreditManager] Unknown model "${model}" - using default Claude Sonnet pricing`)
+  return { input: DEFAULT_INPUT_COST_PER_TOKEN, output: DEFAULT_OUTPUT_COST_PER_TOKEN }
+}
+
+/**
  * Calculate credits from actual token usage (AI SDK integration)
- * Returns credit cost based on real API usage with 3x markup
+ * Returns credit cost based on real API usage with per-model pricing and 4x markup
  */
 export function calculateCreditsFromTokens(
   promptTokens: number,
   completionTokens: number,
-  model: string = 'claude-sonnet'
+  model: string = 'anthropic/claude-sonnet-4.5'
 ): number {
-  // Calculate actual API cost in USD
-  const apiCost = (promptTokens * INPUT_COST_PER_TOKEN) + 
-                  (completionTokens * OUTPUT_COST_PER_TOKEN)
-  
-  // Convert to credits: API cost in dollars * 100 (to get cents) * 3x markup
+  // Get model-specific pricing
+  const pricing = getModelPricing(model)
+
+  // Calculate actual API cost in USD using model-specific rates
+  const apiCost = (promptTokens * pricing.input) +
+                  (completionTokens * pricing.output)
+
+  // Convert to credits: API cost in dollars * 100 (to get cents) * 4x markup
   const credits = Math.ceil(apiCost * 100 * MARKUP_MULTIPLIER)
-  
+
   // Minimum 1 credit per request to prevent free usage
   return Math.max(1, credits)
 }
