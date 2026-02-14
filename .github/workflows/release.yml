@@ -1,20 +1,10 @@
 name: Deploy to Vercel
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
-    inputs:
-      vercel_token:
-        description: 'Vercel Deploy Token (from https://vercel.com/account/tokens)'
-        required: true
-        type: string
-      supabase_url:
-        description: 'Supabase Project URL'
-        required: true
-        type: string
-      supabase_anon_key:
-        description: 'Supabase Anon Key'
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -34,8 +24,4 @@ jobs:
           node-version: 20
 
       - name: Deploy to Vercel
-        run: npx vercel --prod --token ${{ inputs.vercel_token }} --yes
-        env:
-          SUPABASE_URL: ${{ inputs.supabase_url }}
-          SUPABASE_ANON_KEY: ${{ inputs.supabase_anon_key }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ inputs.supabase_anon_key }}
+        run: npx vercel --prod --token ${{ secrets.VERCEL_TOKEN }} --yes
