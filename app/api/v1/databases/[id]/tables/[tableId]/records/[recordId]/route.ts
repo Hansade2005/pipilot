@@ -10,10 +10,12 @@ import {
 } from '@/lib/api-keys';
 
 // Create Supabase client with service role (bypasses RLS)
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 /**
  * Middleware to authenticate API key and check rate limits
@@ -43,7 +45,7 @@ async function authenticateApiKey(request: Request, databaseId: string) {
 
   const keyHash = hashApiKey(apiKey);
 
-  const { data: apiKeyRecord, error: keyError } = await supabaseAdmin
+  const { data: apiKeyRecord, error: keyError } = await getSupabaseAdmin()
     .from('api_keys')
     .select('*, databases!inner(*)')
     .eq('key_hash', keyHash)
@@ -63,7 +65,7 @@ async function authenticateApiKey(request: Request, databaseId: string) {
   const rateLimitResult = await checkRateLimit(
     apiKeyRecord.id,
     apiKeyRecord.rate_limit,
-    supabaseAdmin
+    getSupabaseAdmin()
   );
 
   if (rateLimitResult.exceeded) {
@@ -87,7 +89,7 @@ async function authenticateApiKey(request: Request, databaseId: string) {
     };
   }
 
-  updateApiKeyLastUsed(apiKeyRecord.id, supabaseAdmin);
+  updateApiKeyLastUsed(apiKeyRecord.id, getSupabaseAdmin());
 
   return {
     apiKeyRecord,
@@ -108,7 +110,7 @@ export async function GET(
   if (auth.error) return auth.error;
 
   try {
-    const { data: record, error } = await supabaseAdmin
+    const { data: record, error } = await getSupabaseAdmin()
       .from('records')
       .select('*')
       .eq('id', params.recordId)
@@ -129,7 +131,7 @@ export async function GET(
       'GET',
       200,
       responseTime,
-      supabaseAdmin
+      getSupabaseAdmin()
     );
 
     return NextResponse.json({ record });
@@ -163,7 +165,7 @@ export async function PUT(
       );
     }
 
-    const { data: updatedRecord, error } = await supabaseAdmin
+    const { data: updatedRecord, error } = await getSupabaseAdmin()
       .from('records')
       .update({ data_json: data })
       .eq('id', params.recordId)
@@ -186,7 +188,7 @@ export async function PUT(
       'PUT',
       200,
       responseTime,
-      supabaseAdmin
+      getSupabaseAdmin()
     );
 
     return NextResponse.json({ record: updatedRecord });
@@ -211,7 +213,7 @@ export async function DELETE(
   if (auth.error) return auth.error;
 
   try {
-    const { error } = await supabaseAdmin
+    const { error } = await getSupabaseAdmin()
       .from('records')
       .delete()
       .eq('id', params.recordId)
@@ -232,7 +234,7 @@ export async function DELETE(
       'DELETE',
       200,
       responseTime,
-      supabaseAdmin
+      getSupabaseAdmin()
     );
 
     return NextResponse.json({ message: 'Record deleted successfully' });

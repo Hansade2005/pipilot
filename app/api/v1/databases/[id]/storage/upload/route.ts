@@ -10,10 +10,12 @@ import {
 } from '@/lib/api-keys';
 import { uploadFile, getDatabaseBucket, createDatabaseBucket } from '@/lib/storage';
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 /**
  * Middleware to authenticate API key
@@ -34,7 +36,7 @@ async function authenticateApiKey(request: Request, databaseId: string) {
 
   const keyHash = hashApiKey(apiKey);
 
-  const { data: apiKeyRecord, error: keyError } = await supabaseAdmin
+  const { data: apiKeyRecord, error: keyError } = await getSupabaseAdmin()
     .from('api_keys')
     .select('*')
     .eq('key_hash', keyHash)
@@ -54,7 +56,7 @@ async function authenticateApiKey(request: Request, databaseId: string) {
   const rateLimitResult = await checkRateLimit(
     apiKeyRecord.id,
     apiKeyRecord.rate_limit,
-    supabaseAdmin
+    getSupabaseAdmin()
   );
 
   if (rateLimitResult.exceeded) {
@@ -71,7 +73,7 @@ async function authenticateApiKey(request: Request, databaseId: string) {
     };
   }
 
-  updateApiKeyLastUsed(apiKeyRecord.id, supabaseAdmin);
+  updateApiKeyLastUsed(apiKeyRecord.id, getSupabaseAdmin());
 
   return {
     apiKeyRecord,
@@ -96,7 +98,7 @@ export async function POST(
     
     if (!bucket) {
       // Get database info to create bucket
-      const { data: database, error: dbError } = await supabaseAdmin
+      const { data: database, error: dbError } = await getSupabaseAdmin()
         .from('databases')
         .select('name')
         .eq('id', parseInt(params.id))
@@ -162,7 +164,7 @@ export async function POST(
       'POST',
       200,
       responseTime,
-      supabaseAdmin
+      getSupabaseAdmin()
     );
 
     return NextResponse.json({
@@ -191,7 +193,7 @@ export async function POST(
         'POST',
         500,
         responseTime,
-        supabaseAdmin
+        getSupabaseAdmin()
       );
     }
 
