@@ -17,13 +17,15 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files
-#.env*
-
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
 
 # vercel
 .vercel
 .vscode/mcp.json
-.env
 
 
 # typescript
