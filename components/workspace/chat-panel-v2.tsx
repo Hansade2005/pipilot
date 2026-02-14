@@ -1680,8 +1680,6 @@ export function ChatPanelV2({
   const [topUpAmount, setTopUpAmount] = useState('10')
   const [processingTopUp, setProcessingTopUp] = useState(false)
   const [showCreditExhaustionModal, setShowCreditExhaustionModal] = useState(false)
-  const [showRequestLimitModal, setShowRequestLimitModal] = useState(false)
-  const [requestLimitError, setRequestLimitError] = useState<{ requestsUsed: number; requestsLimit: number } | null>(null)
 
   // Auto-adjust textarea height on input change
   useEffect(() => {
@@ -4950,54 +4948,39 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
         const errorCode = errorInfo?.code || ''
         const errorMessage = errorInfo?.message || 'Failed to send message'
 
-        if (errorCode === 'REQUEST_LIMIT_REACHED') {
-          setRequestLimitError({
-            requestsUsed: errorInfo.requestsUsed || 0,
-            requestsLimit: errorInfo.requestsLimit || 0
-          })
-          setShowRequestLimitModal(true)
-          // Remove the empty assistant placeholder message
-          setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
+        // Replace the empty assistant placeholder with an inline error message
+        // so the error stays visible in chat history (not just a popup)
+        const setBillingError = (code: string, extra?: Record<string, any>) => {
+          setMessages(prev => prev.map(msg =>
+            msg.id === assistantMessageId
+              ? { ...msg, content: '', metadata: { ...msg.metadata, billingError: code, billingErrorMessage: errorMessage, ...extra } }
+              : msg
+          ))
           setStreamingMessageId(null)
           setStreamingContent('')
           setStreamingReasoning('')
+        }
+
+        if (errorCode === 'REQUEST_LIMIT_REACHED') {
+          setBillingError('REQUEST_LIMIT_REACHED', {
+            requestsUsed: errorInfo.requestsUsed || 0,
+            requestsLimit: errorInfo.requestsLimit || 0
+          })
           return
         }
 
         if (errorCode === 'INSUFFICIENT_CREDITS') {
-          setShowCreditExhaustionModal(true)
-          setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
-          setStreamingMessageId(null)
-          setStreamingContent('')
-          setStreamingReasoning('')
+          setBillingError('INSUFFICIENT_CREDITS')
           return
         }
 
         if (errorCode === 'MODEL_NOT_ALLOWED') {
-          toast({
-            title: 'Model not available on your plan',
-            description: errorMessage,
-            variant: 'destructive',
-            duration: 6000
-          })
-          setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
-          setStreamingMessageId(null)
-          setStreamingContent('')
-          setStreamingReasoning('')
+          setBillingError('MODEL_NOT_ALLOWED')
           return
         }
 
         if (errorCode === 'UNAUTHORIZED' || errorCode === 'INVALID_SESSION' || errorCode === 'NO_WALLET') {
-          toast({
-            title: 'Authentication error',
-            description: errorMessage,
-            variant: 'destructive',
-            duration: 6000
-          })
-          setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
-          setStreamingMessageId(null)
-          setStreamingContent('')
-          setStreamingReasoning('')
+          setBillingError(errorCode)
           return
         }
 
@@ -6015,6 +5998,129 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                     return null
                   })()}
 
+                  {/* Inline Billing Error Cards - shown in chat history */}
+                  {(() => {
+                    const billingError = (message as any).metadata?.billingError
+                    if (!billingError) return null
+
+                    const meta = (message as any).metadata
+                    const errorMsg = meta?.billingErrorMessage || ''
+
+                    if (billingError === 'REQUEST_LIMIT_REACHED') {
+                      const used = meta?.requestsUsed || 0
+                      const limit = meta?.requestsLimit || 0
+                      return (
+                        <div className="rounded-xl border border-orange-500/30 bg-orange-950/20 p-4 my-2">
+                          <div className="flex items-center gap-2 mb-2">
+                            <AlertTriangle className="w-5 h-5 text-orange-400 shrink-0" />
+                            <span className="text-orange-400 font-semibold text-sm">Monthly Request Limit Reached</span>
+                          </div>
+                          <p className="text-gray-300 text-sm mb-3">
+                            You've used all <span className="text-orange-300 font-medium">{limit}</span> requests for this month.
+                            {currentPlan === 'free'
+                              ? ' Upgrade your plan to get more requests.'
+                              : ' Your limit resets on the 1st of next month.'}
+                          </p>
+                          <div className="w-full bg-gray-800 rounded-full h-2 mb-3">
+                            <div className="bg-orange-500 h-2 rounded-full" style={{ width: '100%' }} />
+                          </div>
+                          <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
+                            <span>{used} / {limit} requests used</span>
+                            <span>Resets monthly</span>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => window.location.href = '/pricing'}
+                            className="bg-orange-600 hover:bg-orange-500 text-white text-xs h-8"
+                          >
+                            <Zap className="mr-1.5 h-3.5 w-3.5" />
+                            Upgrade Plan
+                          </Button>
+                        </div>
+                      )
+                    }
+
+                    if (billingError === 'INSUFFICIENT_CREDITS') {
+                      const planConfig = PRODUCT_CONFIGS[currentPlan]
+                      const canPurchase = planConfig ? planConfig.limits.canPurchaseCredits : false
+                      return (
+                        <div className="rounded-xl border border-red-500/30 bg-red-950/20 p-4 my-2">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Coins className="w-5 h-5 text-red-400 shrink-0" />
+                            <span className="text-red-400 font-semibold text-sm">Credits Exhausted</span>
+                          </div>
+                          <p className="text-gray-300 text-sm mb-3">
+                            You've run out of credits. {canPurchase
+                              ? 'Purchase more credits to continue building.'
+                              : 'Upgrade to a paid plan to continue.'}
+                          </p>
+                          <div className="flex items-center gap-2 bg-red-950/30 rounded-lg px-3 py-2 mb-3">
+                            <Coins className="w-4 h-4 text-red-400" />
+                            <span className="text-red-300 text-xs font-medium">Balance: {creditBalance?.toFixed(2) || '0.00'} credits</span>
+                          </div>
+                          {canPurchase ? (
+                            <Button
+                              size="sm"
+                              onClick={() => setShowTopUpDialog(true)}
+                              className="bg-orange-600 hover:bg-orange-500 text-white text-xs h-8"
+                            >
+                              <CreditCard className="mr-1.5 h-3.5 w-3.5" />
+                              Buy Credits
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              onClick={() => window.location.href = '/pricing'}
+                              className="bg-orange-600 hover:bg-orange-500 text-white text-xs h-8"
+                            >
+                              <Zap className="mr-1.5 h-3.5 w-3.5" />
+                              Upgrade Plan
+                            </Button>
+                          )}
+                        </div>
+                      )
+                    }
+
+                    if (billingError === 'MODEL_NOT_ALLOWED') {
+                      return (
+                        <div className="rounded-xl border border-orange-500/30 bg-orange-950/20 p-4 my-2">
+                          <div className="flex items-center gap-2 mb-2">
+                            <XCircle className="w-5 h-5 text-orange-400 shrink-0" />
+                            <span className="text-orange-400 font-semibold text-sm">Model Not Available</span>
+                          </div>
+                          <p className="text-gray-300 text-sm mb-3">{errorMsg}</p>
+                          <Button
+                            size="sm"
+                            onClick={() => window.location.href = '/pricing'}
+                            className="bg-orange-600 hover:bg-orange-500 text-white text-xs h-8"
+                          >
+                            <Zap className="mr-1.5 h-3.5 w-3.5" />
+                            Upgrade Plan
+                          </Button>
+                        </div>
+                      )
+                    }
+
+                    // Auth errors (UNAUTHORIZED, INVALID_SESSION, NO_WALLET)
+                    return (
+                      <div className="rounded-xl border border-red-500/30 bg-red-950/20 p-4 my-2">
+                        <div className="flex items-center gap-2 mb-2">
+                          <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
+                          <span className="text-red-400 font-semibold text-sm">Authentication Error</span>
+                        </div>
+                        <p className="text-gray-300 text-sm mb-3">{errorMsg || 'Your session has expired. Please sign in again.'}</p>
+                        <Button
+                          size="sm"
+                          onClick={() => window.location.reload()}
+                          className="bg-orange-600 hover:bg-orange-500 text-white text-xs h-8"
+                        >
+                          <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                          Refresh Page
+                        </Button>
+                      </div>
+                    )
+                  })()}
+
                   {/* Pass inline tool calls with positions to MessageWithTools for inline rendering */}
                   {(() => {
                     const toolCalls = activeToolCalls.get(message.id) || []
@@ -6026,6 +6132,9 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                       tc.toolName !== 'manage_todos' &&
                       tc.toolName !== 'generate_plan'
                     )
+                    // Don't render MessageWithTools if this is a billing error (content is empty)
+                    const hasBillingError = (message as any).metadata?.billingError
+                    if (hasBillingError) return null
                     return (
                       <MessageWithTools
                         message={message}
@@ -7612,60 +7721,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Monthly Request Limit Modal */}
-        <AlertDialog open={showRequestLimitModal} onOpenChange={setShowRequestLimitModal}>
-          <AlertDialogContent className="bg-gray-900 border-orange-500/20 z-[80]">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="text-orange-400 flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5" />
-                Monthly Request Limit Reached
-              </AlertDialogTitle>
-              <AlertDialogDescription className="text-gray-300">
-                You've used all your monthly requests. {currentPlan === 'free'
-                  ? 'Upgrade to a paid plan for more requests.'
-                  : 'Your limit resets at the start of next month, or upgrade for more.'}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <div className="py-4">
-              <div className="bg-orange-950/20 border border-orange-500/20 rounded-lg p-4 mb-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <BarChart3 className="w-4 h-4 text-orange-400" />
-                    <span className="text-orange-300 font-medium">Requests Used</span>
-                  </div>
-                  <span className="text-orange-400 font-bold">
-                    {requestLimitError?.requestsUsed || 0} / {requestLimitError?.requestsLimit || 0}
-                  </span>
-                </div>
-                {/* Progress bar */}
-                <div className="mt-3 w-full bg-gray-800 rounded-full h-2">
-                  <div
-                    className="bg-orange-500 h-2 rounded-full"
-                    style={{ width: '100%' }}
-                  />
-                </div>
-                <p className="text-xs text-orange-300/70 mt-2">
-                  Monthly requests reset on the 1st of each month.
-                </p>
-              </div>
-            </div>
-            <AlertDialogFooter className="gap-2">
-              <AlertDialogCancel className="bg-gray-700 text-gray-300 hover:bg-gray-600 border-gray-600">
-                Close
-              </AlertDialogCancel>
-              <Button
-                onClick={() => {
-                  setShowRequestLimitModal(false)
-                  window.location.href = '/pricing'
-                }}
-                className="bg-orange-600 hover:bg-orange-500 text-white"
-              >
-                <Zap className="mr-2 h-4 w-4" />
-                Upgrade Plan
-              </Button>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+
 
         {/* Slash Commands Popup */}
         <SlashCommands
