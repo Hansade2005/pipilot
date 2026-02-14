@@ -181,7 +181,7 @@ export default function PricingPage() {
     },
     {
       question: "What does the free plan include?",
-      answer: "The free plan includes 50 credits (~5 messages), access to Mistral Devstral 2, Google Gemini 2.5 Flash, and Claude Sonnet 4.5, Vercel deployment, visual editing, GitHub sync, and 1 app/project. It's perfect for trying out PiPilot."
+      answer: "The free plan includes 150 credits (~5-10 messages), access to Mistral Devstral 2, Google Gemini 2.5 Flash, and Claude Sonnet 4.5, Vercel deployment, visual editing, GitHub sync, and 1 app/project. It's perfect for trying out PiPilot."
     },
     {
       question: "What deployment platforms are available?",
@@ -193,7 +193,7 @@ export default function PricingPage() {
     },
     {
       question: "What are the credit and message limits?",
-      answer: "Free: 50 credits (~5 messages). Creator: 1,000 credits (~50-100 messages). Collaborate: 2,500 credits (~125-250 messages). Scale: 5,000 credits (~250-500 messages). Costs vary by AI model and task complexity. Paid users can purchase extra credits."
+      answer: "Free: 150 credits (~5-10 messages). Creator: 1,000 credits (~50-100 messages). Collaborate: 2,500 credits (~125-250 messages). Scale: 5,000 credits (~250-500 messages). Costs vary by AI model and task complexity. Paid users can purchase extra credits."
     },
     {
       question: "What does 'credits' mean?",
@@ -205,7 +205,7 @@ export default function PricingPage() {
     },
     {
       question: "How much does it cost to use?",
-      answer: "PiPilot offers a free trial with 50 credits (~5 messages). Creator is $25/month (1,000 credits), Collaborate $75/month (2,500 credits), Scale $150/month (5,000 credits). Annual plans save ~17%. Costs vary by AI model and message complexity."
+      answer: "PiPilot offers a free trial with 150 credits (~5-10 messages). Creator is $25/month (1,000 credits), Collaborate $75/month (2,500 credits), Scale $150/month (5,000 credits). Annual plans save ~17%. Costs vary by AI model and message complexity."
     },
     {
       question: "Can I upgrade or downgrade my plan?",

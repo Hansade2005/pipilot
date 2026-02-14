@@ -47,17 +47,17 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     description: 'Community Tier',
     features: [
       'Basic AI chat & code generation',
-      '50 monthly credits (~5 AI messages)',
+      '150 monthly credits (~5-10 AI messages)',
       'Token-based billing (pay for what you use)',
       'Deploy to Vercel',
       'Visual editing with Design Mode',
       'GitHub sync',
       '1 app/project',
-      'Up to 8 agent steps per request',
+      'Up to 15 agent steps per request',
       'Public/open-source unlimited'
     ],
     limits: {
-      credits: 50,
+      credits: 150,
       messages: 9999, // No hard message limit, only credit-based
       deploymentPlatforms: ['vercel'],
       deploymentsPerMonth: 5,
@@ -90,7 +90,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
       '1,000 monthly credits (~50-100 messages)',
       'Token-based billing - only pay for actual usage',
       'Access to all premium AI models (Claude, GPT, Gemini)',
-      'Up to 20 agent steps per request',
+      'Up to 30 agent steps per request',
       '5x higher attachment size limits',
       'Import from Figma',
       'Custom domains',
@@ -131,7 +131,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
       'All Creator features',
       '2,500 monthly credits (~125-250 messages)',
       'Shared credit pool across unlimited users',
-      'Up to 35 agent steps per request',
+      'Up to 40 agent steps per request',
       'Centralized billing on Vercel',
       'Share chats and collaborate in real-time',
       'User roles & permissions',

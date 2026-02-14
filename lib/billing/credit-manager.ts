@@ -19,7 +19,7 @@ export const CREDIT_TO_USD_RATE = 0.01 // 1 credit = $0.01 USD
 // Monthly credits per plan - sustainable allocations
 // Formula: plan_price / CREDIT_TO_USD_RATE * coverage_ratio
 // Coverage ratio ensures we never give more credit value than revenue
-export const FREE_PLAN_MONTHLY_CREDITS = 50        // ~$0.13 API cost, trial tier
+export const FREE_PLAN_MONTHLY_CREDITS = 150       // ~$0.38 API cost, enough for ~3-5 complete tasks with cheap models
 export const CREATOR_PLAN_MONTHLY_CREDITS = 1000   // ~$2.50 API cost, you charge $25
 export const COLLABORATE_PLAN_MONTHLY_CREDITS = 2500 // ~$6.25 API cost, you charge $75
 export const SCALE_PLAN_MONTHLY_CREDITS = 5000     // ~$12.50 API cost, you charge $150
@@ -61,19 +61,22 @@ const MARKUP_MULTIPLIER = 4
 
 // Request limits per plan (safety against expensive operations)
 export const MAX_CREDITS_PER_REQUEST = {
-  free: 15,         // Limits expensive operations on free tier
+  free: 30,         // Enough for a complete simple task
   creator: 150,     // Allows moderate complexity
   collaborate: 250,  // Allows high complexity
   scale: 500        // Allows very high complexity
 }
 
-// Per-plan step limits to control agent costs (most impactful cost control)
-// Each step = 1 API call with growing context, so more steps = exponentially more tokens
+// Per-plan step limits to control agent costs
+// A typical task needs: ~3-5 steps reading project + ~5-15 steps writing code + ~2-3 tool calls
+// So minimum ~15 steps for a useful task. Lower than that = broken UX (premature stop, user forced to say "continue")
+// Cost control comes from CREDITS (token-based billing), not step limits.
+// Step limits are a safety net against infinite loops, not a billing mechanism.
 export const MAX_STEPS_PER_PLAN: Record<string, number> = {
-  free: 8,          // Simple tasks only - prevents expensive multi-step on free tier
-  creator: 20,      // Moderate agent tasks
-  collaborate: 35,  // Complex agent tasks
-  scale: 50         // Full agent capability
+  free: 15,         // Enough to complete one simple task end-to-end
+  creator: 30,      // Handles moderate multi-file tasks
+  collaborate: 40,  // Complex multi-file refactors
+  scale: 50         // Full agent capability for enterprise tasks
 }
 
 // Fallback for backward compatibility
