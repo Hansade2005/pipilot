@@ -1,48 +1,155 @@
 /**
  * ABE Credit Manager - Core credit operations
  * Handles credit deduction, validation, and balance checks
- * 
+ *
  * Payment Systems Integrated:
  * - Stripe: Primary payment system for subscriptions and credit top-ups
  * - Polar: Backup payment system (1 credit = $1, Product ID: 09991226-466e-4983-b409-c986577a8599)
- * 
- * Credit Conversion Rate: 1 credit = $1 USD
- * AI Message Rate: 0.25 credits per message request
+ *
+ * Credit Conversion Rate: 1 credit = $0.01 USD
+ * Markup: 4x on actual API costs for profit margin + infrastructure
  */
 
 import { SupabaseClient } from '@supabase/supabase-js'
+import { getVercelModelPricing, VERCEL_MODEL_PRICING } from './model-pricing-data'
 
 // Credit constants - Token-based pricing system
-// 1 credit = $0.01 (with 3x markup on API costs for profit margin)
+// 1 credit = $0.01 (with 4x markup on API costs for profit margin)
 export const CREDIT_TO_USD_RATE = 0.01 // 1 credit = $0.01 USD
 
-// Monthly credits per plan (adjusted for new token-based pricing)
-export const FREE_PLAN_MONTHLY_CREDITS = 200      // ~$0.66 API cost (~20 messages)
-export const CREATOR_PLAN_MONTHLY_CREDITS = 1500  // ~$5 API cost, you charge $15
-export const COLLABORATE_PLAN_MONTHLY_CREDITS = 2500  // ~$8 API cost, you charge $25
-export const SCALE_PLAN_MONTHLY_CREDITS = 6000    // ~$20 API cost, you charge $60
+// Monthly credits per plan - sustainable allocations
+// Formula: plan_price / CREDIT_TO_USD_RATE * coverage_ratio
+// Coverage ratio ensures we never give more credit value than revenue
+//
+// Real usage per request (with model-aware step limits):
+// - Cheap models (Devstral/Grok): ~5-15 credits/request  -> Creator gets ~65-200 requests
+// - Claude Sonnet 4.5 ($3/$15):   ~40-100 credits/request -> Creator gets ~10-25 requests
+// - Claude Opus 4.5 ($15/$75):    ~200-500 credits/request -> needs Scale plan
+export const FREE_PLAN_MONTHLY_CREDITS = 150       // ~3-10 tasks with cheap models, ~1-3 with Claude
+export const CREATOR_PLAN_MONTHLY_CREDITS = 1000   // ~$2.50 API cost, charge $25 (10x margin)
+export const COLLABORATE_PLAN_MONTHLY_CREDITS = 2500 // ~$6.25 API cost, charge $75 (12x margin)
+export const SCALE_PLAN_MONTHLY_CREDITS = 5000     // ~$12.50 API cost, charge $150 (12x margin)
 
-// Claude Sonnet 4 API pricing (per token)
-const INPUT_COST_PER_TOKEN = 0.000003   // $3 per 1M input tokens
-const OUTPUT_COST_PER_TOKEN = 0.000015  // $15 per 1M output tokens
-const MARKUP_MULTIPLIER = 3  // 3x markup for profit margin
+// Per-model API pricing is now sourced from the comprehensive model-pricing-data.ts
+// which contains 100+ models with full Vercel AI Gateway pricing, verified 2026-02-14.
+// Legacy MODEL_PRICING export is derived from VERCEL_MODEL_PRICING for backward compatibility.
+export const MODEL_PRICING: Record<string, { input: number; output: number }> = Object.fromEntries(
+  Object.entries(VERCEL_MODEL_PRICING).map(([key, entry]) => [
+    key,
+    { input: entry.inputPerToken, output: entry.outputPerToken }
+  ])
+)
 
-// Request limits per plan (safety against expensive operations)
-export const MAX_CREDITS_PER_REQUEST = {
-  free: 50,        // Blocks very expensive operations
-  creator: 200,    // Allows moderate complexity
-  collaborate: 300, // Allows high complexity
-  scale: 500       // Allows very high complexity
+// 4x markup for sustainable profit margin (covers infrastructure, Vercel hosting, support, development)
+const MARKUP_MULTIPLIER = 4
+
+// Per-request credit budget per plan (max credits ONE request can consume)
+// This is the primary cost control - prevents a single request from draining the wallet
+// Budget should be ~10-20% of monthly credits so users can't blow everything in one shot
+export const MAX_CREDITS_PER_REQUEST: Record<string, number> = {
+  free: 30,         // ~20% of 150 monthly credits
+  creator: 100,     // ~10% of 1,000 monthly credits (~$1 API cost)
+  collaborate: 200, // ~8% of 2,500 monthly credits (~$2 API cost)
+  scale: 400        // ~8% of 5,000 monthly credits (~$4 API cost)
 }
 
-// Universal step limit for all plans to prevent infinite loops while allowing complex operations
+// Model cost tiers - determines step limits per model
+// Expensive models (>$1/1M input) get fewer steps; cheap models get more
+type ModelCostTier = 'expensive' | 'moderate' | 'cheap'
+
+function getModelCostTier(model: string): ModelCostTier {
+  const pricing = getModelPricing(model)
+  const avgCostPerToken = (pricing.input + pricing.output) / 2
+  if (avgCostPerToken >= 0.000005) return 'expensive'  // Claude Sonnet 4.5, Opus, GPT-5
+  if (avgCostPerToken >= 0.0000005) return 'moderate'   // Gemini Pro, etc.
+  return 'cheap'                                         // Devstral, Grok, Flash, Haiku
+}
+
+// Per-plan step limits, adjusted by model cost tier
+// Expensive models: fewer steps to control costs (users can always "continue")
+// Cheap models: more steps for better UX
+const STEPS_BY_PLAN_AND_TIER: Record<string, Record<ModelCostTier, number>> = {
+  free:        { expensive: 5,  moderate: 10, cheap: 15 },
+  creator:     { expensive: 8,  moderate: 15, cheap: 30 },
+  collaborate: { expensive: 12, moderate: 25, cheap: 40 },
+  scale:       { expensive: 15, moderate: 35, cheap: 50 },
+}
+
+/**
+ * Get the max steps allowed for a given plan and model combination
+ * Accounts for model cost so expensive models don't burn through credits
+ */
+export function getMaxStepsForRequest(plan: string, model: string): number {
+  const tier = getModelCostTier(model)
+  const planSteps = STEPS_BY_PLAN_AND_TIER[plan] || STEPS_BY_PLAN_AND_TIER.free
+  return planSteps[tier]
+}
+
+// Legacy exports for backward compatibility
+export const MAX_STEPS_PER_PLAN: Record<string, number> = {
+  free: 15,
+  creator: 30,
+  collaborate: 40,
+  scale: 50
+}
 export const MAX_STEPS_PER_REQUEST = 50
+
+/**
+ * Estimate the credit cost of one agent step for a given model
+ * Based on typical token usage: ~35K input (context re-sent), ~400 output per step
+ * Used for pre-request budget estimation
+ */
+export function estimateCreditsPerStep(model: string): number {
+  const pricing = getModelPricing(model)
+  // Typical agent step: ~35K input tokens (growing context), ~400 output tokens
+  const typicalInputTokens = 35000
+  const typicalOutputTokens = 400
+  const apiCost = (typicalInputTokens * pricing.input) + (typicalOutputTokens * pricing.output)
+  return Math.ceil(apiCost * 100 * MARKUP_MULTIPLIER)
+}
+
+/**
+ * Calculate the max steps a user can afford for a given model,
+ * capped by both their plan step limit and their remaining credit balance
+ */
+export function getAffordableSteps(
+  plan: string,
+  model: string,
+  remainingCredits: number
+): { maxSteps: number; estimatedCostPerStep: number; totalEstimatedCost: number } {
+  const planMaxSteps = getMaxStepsForRequest(plan, model)
+  const costPerStep = estimateCreditsPerStep(model)
+
+  // Max steps the user can afford based on remaining credits
+  const maxCreditBudget = MAX_CREDITS_PER_REQUEST[plan] || MAX_CREDITS_PER_REQUEST.free
+  const budgetSteps = costPerStep > 0 ? Math.floor(Math.min(remainingCredits, maxCreditBudget) / costPerStep) : planMaxSteps
+
+  // Take the minimum of plan limit and affordable steps
+  const maxSteps = Math.max(1, Math.min(planMaxSteps, budgetSteps))
+
+  return {
+    maxSteps,
+    estimatedCostPerStep: costPerStep,
+    totalEstimatedCost: maxSteps * costPerStep
+  }
+}
+
+// Monthly request limits per plan (hard cap regardless of credits remaining)
+// Prevents abuse: someone sending hundreds of tiny 1-credit messages, API hammering, etc.
+// Set above what credits would naturally allow, so credits run out first in normal usage.
+export const MAX_REQUESTS_PER_MONTH: Record<string, number> = {
+  free: 20,          // Enough for a real trial (3-5 tasks, some follow-ups)
+  creator: 250,      // ~8/day, covers daily development workflow
+  collaborate: 600,  // ~20/day across a team
+  scale: 2000        // ~65/day, enterprise-level usage
+}
 
 export interface WalletBalance {
   userId: string
   creditsBalance: number
   creditsUsedThisMonth: number
   creditsUsedTotal: number
+  requestsThisMonth: number
   currentPlan: 'free' | 'creator' | 'collaborate' | 'scale'
   subscriptionStatus: 'active' | 'inactive' | 'cancelled' | 'past_due'
   canPurchaseCredits: boolean
@@ -67,27 +174,40 @@ export interface UsageLogEntry {
   completionTokens?: number
   stepsCount?: number
   responseTimeMs?: number
-  status: 'success' | 'error' | 'timeout'
+  status: 'success' | 'error' | 'timeout' | 'aborted'
   errorMessage?: string
   metadata?: Record<string, any>
 }
 
 /**
+ * Get the per-token pricing for a specific model.
+ * Delegates to comprehensive VERCEL_MODEL_PRICING data (100+ models) with fuzzy matching.
+ * Falls back to Claude Sonnet 4.5 pricing to prevent undercharging.
+ */
+export function getModelPricing(model: string): { input: number; output: number } {
+  const pricing = getVercelModelPricing(model)
+  return { input: pricing.input, output: pricing.output }
+}
+
+/**
  * Calculate credits from actual token usage (AI SDK integration)
- * Returns credit cost based on real API usage with 3x markup
+ * Returns credit cost based on real API usage with per-model pricing and 4x markup
  */
 export function calculateCreditsFromTokens(
   promptTokens: number,
   completionTokens: number,
-  model: string = 'claude-sonnet'
+  model: string = 'anthropic/claude-sonnet-4.5'
 ): number {
-  // Calculate actual API cost in USD
-  const apiCost = (promptTokens * INPUT_COST_PER_TOKEN) + 
-                  (completionTokens * OUTPUT_COST_PER_TOKEN)
-  
-  // Convert to credits: API cost in dollars * 100 (to get cents) * 3x markup
+  // Get model-specific pricing
+  const pricing = getModelPricing(model)
+
+  // Calculate actual API cost in USD using model-specific rates
+  const apiCost = (promptTokens * pricing.input) +
+                  (completionTokens * pricing.output)
+
+  // Convert to credits: API cost in dollars * 100 (to get cents) * 4x markup
   const credits = Math.ceil(apiCost * 100 * MARKUP_MULTIPLIER)
-  
+
   // Minimum 1 credit per request to prevent free usage
   return Math.max(1, credits)
 }
@@ -134,6 +254,7 @@ export async function getWalletBalance(
         creditsBalance: newWallet.credits_balance,
         creditsUsedThisMonth: newWallet.credits_used_this_month,
         creditsUsedTotal: newWallet.credits_used_total,
+        requestsThisMonth: newWallet.requests_this_month || 0,
         currentPlan: newWallet.current_plan,
         subscriptionStatus: newWallet.subscription_status,
         canPurchaseCredits: false // Free plan cannot purchase
@@ -145,6 +266,7 @@ export async function getWalletBalance(
       creditsBalance: data.credits_balance,
       creditsUsedThisMonth: data.credits_used_this_month,
       creditsUsedTotal: data.credits_used_total,
+      requestsThisMonth: data.requests_this_month || 0,
       currentPlan: data.current_plan,
       subscriptionStatus: data.subscription_status,
       canPurchaseCredits: data.current_plan !== 'free' // Only paid plans can purchase
@@ -205,13 +327,14 @@ export async function deductCredits(
       }
     }
 
-    // Deduct credits (atomic operation)
+    // Deduct credits and increment request count (atomic operation)
     const { data: updatedWallet, error: updateError } = await supabase
       .from('wallet')
       .update({
         credits_balance: wallet.creditsBalance - creditsToDeduct,
         credits_used_this_month: wallet.creditsUsedThisMonth + creditsToDeduct,
-        credits_used_total: wallet.creditsUsedTotal + creditsToDeduct
+        credits_used_total: wallet.creditsUsedTotal + creditsToDeduct,
+        requests_this_month: (wallet.requestsThisMonth || 0) + 1
       })
       .eq('user_id', userId)
       .select()
@@ -327,7 +450,7 @@ export async function deductCreditsFromUsage(
     endpoint?: string
     steps?: number  // Number of tool call steps from AI SDK
     responseTimeMs?: number
-    status?: 'success' | 'error' | 'timeout'
+    status?: 'success' | 'error' | 'timeout' | 'aborted'
     errorMessage?: string
   },
   supabase: SupabaseClient
@@ -401,6 +524,34 @@ export async function checkRequestLimits(
   }
   
   return { allowed: true }
+}
+
+/**
+ * Check if user has exceeded their monthly request limit.
+ * Call this BEFORE making the AI call to block excessive usage.
+ * Returns remaining requests if allowed, or an error with the limit info.
+ */
+export async function checkMonthlyRequestLimit(
+  userId: string,
+  supabase: SupabaseClient
+): Promise<{ allowed: boolean; requestsUsed: number; requestsLimit: number; reason?: string }> {
+  const wallet = await getWalletBalance(userId, supabase)
+
+  if (!wallet) {
+    return { allowed: false, requestsUsed: 0, requestsLimit: 0, reason: 'Wallet not found' }
+  }
+
+  const limit = MAX_REQUESTS_PER_MONTH[wallet.currentPlan] || MAX_REQUESTS_PER_MONTH.free
+  const used = wallet.requestsThisMonth || 0
+
+  if (used >= limit) {
+    const message = wallet.currentPlan === 'free'
+      ? `Monthly request limit reached (${limit} requests). Upgrade to a paid plan for more requests.`
+      : `Monthly request limit reached (${limit} requests). Your limit resets next month, or upgrade your plan for more.`
+    return { allowed: false, requestsUsed: used, requestsLimit: limit, reason: message }
+  }
+
+  return { allowed: true, requestsUsed: used, requestsLimit: limit }
 }
 
 /**

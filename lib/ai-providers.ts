@@ -285,6 +285,68 @@ const devstralVisionModels: Record<string, string> = {
   'mistral/devstral-small-2': 'labs-devstral-small-2512',
 };
 
+// =============================================================================
+// PROVIDER FALLBACK SYSTEM
+// =============================================================================
+// When any model provider fails (Vercel gateway down, API errors, rate limits),
+// we auto-switch to this direct-provider model that bypasses the gateway entirely.
+export const FALLBACK_MODEL_ID = 'xai/grok-code-fast-1'
+
+/**
+ * Get the fallback model instance (direct xAI provider, bypasses Vercel gateway).
+ * Used when the primary model provider fails with connection/API errors.
+ */
+export function getFallbackModel() {
+  return xaiProvider('grok-code-fast-1')
+}
+
+/**
+ * Check if an error is a provider-level failure that warrants a model fallback.
+ * Returns true for: API 402/429/500/502/503/504, connection resets, DNS failures, timeouts.
+ * Returns false for: client aborts, validation errors, auth errors (won't help to retry).
+ *
+ * Checks both error.message AND the AI SDK's statusCode property (AI_APICallError).
+ */
+export function isProviderError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  const msg = error.message.toLowerCase()
+  const name = error.name.toLowerCase()
+
+  // Client-side aborts - not a provider issue
+  if (name === 'aborterror' || msg.includes('aborted') || msg.includes('client aborted')) return false
+
+  // Auth errors - fallback won't help if our API keys are bad
+  // Note: 401/403 are OUR auth failures. 402 is gateway billing - fallback CAN fix that.
+  if (msg.includes('401') || msg.includes('403') || msg.includes('unauthorized') || msg.includes('forbidden')) return false
+
+  // Check AI SDK's statusCode property (AI_APICallError has this)
+  const statusCode = (error as any).statusCode as number | undefined
+  if (statusCode) {
+    // 402 = Payment Required (Vercel gateway ran out of credits - bypass with direct provider)
+    // 429 = Rate limited
+    // 5xx = Server errors
+    if (statusCode === 402 || statusCode === 429 || statusCode >= 500) return true
+  }
+
+  // Provider failures that a different model/provider can fix:
+  return (
+    // HTTP server errors from provider
+    msg.includes('500') || msg.includes('502') || msg.includes('503') || msg.includes('504') ||
+    msg.includes('internal server error') || msg.includes('bad gateway') || msg.includes('service unavailable') ||
+    // Rate limiting & billing
+    msg.includes('429') || msg.includes('rate limit') || msg.includes('too many requests') ||
+    msg.includes('402') || msg.includes('payment required') || msg.includes('insufficient funds') ||
+    msg.includes('insufficient_funds') || msg.includes('top up') || msg.includes('credits') ||
+    // Connection failures
+    msg.includes('econnrefused') || msg.includes('econnreset') || msg.includes('enotfound') ||
+    msg.includes('etimedout') || msg.includes('socket hang up') || msg.includes('socket close') ||
+    msg.includes('fetch failed') || msg.includes('network') ||
+    // Provider-specific
+    msg.includes('overloaded') || msg.includes('capacity') || msg.includes('unavailable') ||
+    msg.includes('gateway') || msg.includes('upstream')
+  )
+}
+
 // Helper function to get a model by ID
 export function getModel(modelId: string) {
   const model = modelProviders[modelId];
