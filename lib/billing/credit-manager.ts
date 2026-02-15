@@ -44,54 +44,36 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
 const MARKUP_MULTIPLIER = 4
 
 // Per-request credit budget per plan (max credits ONE request can consume)
-// This is the primary cost control - prevents a single request from draining the wallet
-// Budget should be ~10-20% of monthly credits so users can't blow everything in one shot
+// Set high enough that the agent can actually finish tasks without being cut short.
+// Users are already billed per-token - this just prevents a single runaway request
+// from draining the entire monthly balance.
 export const MAX_CREDITS_PER_REQUEST: Record<string, number> = {
-  free: 30,         // ~20% of 150 monthly credits
-  creator: 100,     // ~10% of 1,000 monthly credits (~$1 API cost)
-  collaborate: 200, // ~8% of 2,500 monthly credits (~$2 API cost)
-  scale: 400        // ~8% of 5,000 monthly credits (~$4 API cost)
+  free: 75,         // ~50% of 150 monthly credits (enough for a real task)
+  creator: 500,     // ~50% of 1,000 monthly credits (~$5 API cost)
+  collaborate: 1250, // ~50% of 2,500 monthly credits (~$12.50 API cost)
+  scale: 2500       // ~50% of 5,000 monthly credits (~$25 API cost)
 }
 
-// Model cost tiers - determines step limits per model
-// Expensive models (>$1/1M input) get fewer steps; cheap models get more
-type ModelCostTier = 'expensive' | 'moderate' | 'cheap'
-
-function getModelCostTier(model: string): ModelCostTier {
-  const pricing = getModelPricing(model)
-  const avgCostPerToken = (pricing.input + pricing.output) / 2
-  if (avgCostPerToken >= 0.000005) return 'expensive'  // Claude Sonnet 4.5, Opus, GPT-5
-  if (avgCostPerToken >= 0.0000005) return 'moderate'   // Gemini Pro, etc.
-  return 'cheap'                                         // Devstral, Grok, Flash, Haiku
-}
-
-// Per-plan step limits - generous because token-based billing is the real cost control.
-// Steps only limit how many tool-call rounds the AI can make in one request.
-// The per-request credit budget (MAX_CREDITS_PER_REQUEST) is the primary cost gate.
-const STEPS_BY_PLAN_AND_TIER: Record<string, Record<ModelCostTier, number>> = {
-  free:        { expensive: 15, moderate: 25, cheap: 30 },
-  creator:     { expensive: 25, moderate: 35, cheap: 50 },
-  collaborate: { expensive: 35, moderate: 50, cheap: 50 },
-  scale:       { expensive: 50, moderate: 50, cheap: 50 },
-}
-
-/**
- * Get the max steps allowed for a given plan and model combination
- * Accounts for model cost so expensive models don't burn through credits
- */
-export function getMaxStepsForRequest(plan: string, model: string): number {
-  const tier = getModelCostTier(model)
-  const planSteps = STEPS_BY_PLAN_AND_TIER[plan] || STEPS_BY_PLAN_AND_TIER.free
-  return planSteps[tier]
-}
-
-// Legacy exports for backward compatibility
-export const MAX_STEPS_PER_PLAN: Record<string, number> = {
+// Flat per-plan step limits. No model-based tier throttling.
+// Token-based billing + MAX_CREDITS_PER_REQUEST are the real cost controls.
+// Steps just cap how many tool-call rounds the AI can make in one request.
+const STEPS_BY_PLAN: Record<string, number> = {
   free: 30,
   creator: 50,
   collaborate: 50,
-  scale: 50
+  scale: 50,
 }
+
+/**
+ * Get the max steps allowed for a given plan.
+ * Model cost no longer reduces steps - billing handles cost control.
+ */
+export function getMaxStepsForRequest(plan: string, _model: string): number {
+  return STEPS_BY_PLAN[plan] || STEPS_BY_PLAN.free
+}
+
+// Legacy exports for backward compatibility
+export const MAX_STEPS_PER_PLAN: Record<string, number> = STEPS_BY_PLAN
 export const MAX_STEPS_PER_REQUEST = 50
 
 /**
@@ -109,8 +91,9 @@ export function estimateCreditsPerStep(model: string): number {
 }
 
 /**
- * Calculate the max steps a user can afford for a given model,
- * capped by both their plan step limit and their remaining credit balance
+ * Calculate the max steps a user can afford for a given model.
+ * Uses the flat plan step limit - billing deducts actual token cost after each request.
+ * Only blocks if user literally has 0 credits remaining.
  */
 export function getAffordableSteps(
   plan: string,
@@ -120,12 +103,11 @@ export function getAffordableSteps(
   const planMaxSteps = getMaxStepsForRequest(plan, model)
   const costPerStep = estimateCreditsPerStep(model)
 
-  // Max steps the user can afford based on remaining credits
-  const maxCreditBudget = MAX_CREDITS_PER_REQUEST[plan] || MAX_CREDITS_PER_REQUEST.free
-  const budgetSteps = costPerStep > 0 ? Math.floor(Math.min(remainingCredits, maxCreditBudget) / costPerStep) : planMaxSteps
-
-  // Take the minimum of plan limit and affordable steps
-  const maxSteps = Math.max(1, Math.min(planMaxSteps, budgetSteps))
+  // Only reduce steps if user is nearly out of credits entirely
+  // (less than 1 step worth of credits remaining)
+  const maxSteps = (costPerStep > 0 && remainingCredits < costPerStep)
+    ? 1  // Allow at least 1 step so user gets a response
+    : planMaxSteps
 
   return {
     maxSteps,
