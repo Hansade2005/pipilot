@@ -10280,8 +10280,6 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
         stopWhen: stepCountIs(maxStepsAllowed),
         abortSignal: controller.signal,
         ...(providerOptions ? { providerOptions } : {}),
-        // Cap Qwen thinking model output to 800 reasoning + response tokens
-        ...(isQwenThinking ? { maxTokens: 800 } : {}),
         onFinish: async ({ response }: any) => {
           console.log(`[Chat-V2] Finished with ${response.messages.length} messages`)
           if (isAnthropicModel && response?.providerMetadata?.anthropic) {
