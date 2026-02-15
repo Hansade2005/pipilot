@@ -482,16 +482,93 @@ async function collectAllFiles(e2bSandbox: any, dirPath: string): Promise<any[]>
   return allFiles
 }
 
+/**
+ * Remove all existing files for a site from Supabase storage before re-uploading.
+ * Without this, stale Vite hashed assets (e.g. index-OldHash.js) linger and
+ * browsers with cached HTML can load outdated bundles.
+ */
+async function clearSiteStorage(projectSlug: string, supabase: any) {
+  const prefix = `sites/${projectSlug}`
+  console.log(`[Hosting] Clearing existing files at ${prefix}/ ...`)
+
+  // Supabase list returns max 1000 items per call; loop until empty
+  let removed = 0
+  while (true) {
+    const { data: files, error: listError } = await supabase.storage
+      .from('documents')
+      .list(prefix, { limit: 1000 })
+
+    if (listError) {
+      console.warn(`[Hosting] Could not list ${prefix}:`, listError.message)
+      break
+    }
+    if (!files || files.length === 0) break
+
+    // Supabase .list() returns items AND folders at this level.
+    // For nested dirs we need to recurse. But .remove() works on full paths,
+    // and Supabase storage is flat (folder-like prefixes), so list + remove works
+    // only for files at this level. We need to handle subdirectories.
+    const fileItems = files.filter((f: any) => f.id) // files have id, folders don't
+    const folderItems = files.filter((f: any) => !f.id)
+
+    // Remove files at this level
+    if (fileItems.length > 0) {
+      const paths = fileItems.map((f: any) => `${prefix}/${f.name}`)
+      const { error: removeError } = await supabase.storage
+        .from('documents')
+        .remove(paths)
+      if (removeError) {
+        console.warn(`[Hosting] Error removing files:`, removeError.message)
+      } else {
+        removed += paths.length
+      }
+    }
+
+    // Recurse into subdirectories (e.g. assets/)
+    for (const folder of folderItems) {
+      await clearSubdirectory(`${prefix}/${folder.name}`, supabase)
+    }
+
+    // If we only had folders and no files, we're done at this level
+    if (fileItems.length === 0) break
+  }
+
+  console.log(`[Hosting] Cleared ${removed} existing files from ${prefix}/`)
+}
+
+async function clearSubdirectory(dirPath: string, supabase: any) {
+  const { data: files, error } = await supabase.storage
+    .from('documents')
+    .list(dirPath, { limit: 1000 })
+
+  if (error || !files || files.length === 0) return
+
+  const fileItems = files.filter((f: any) => f.id)
+  const folderItems = files.filter((f: any) => !f.id)
+
+  if (fileItems.length > 0) {
+    const paths = fileItems.map((f: any) => `${dirPath}/${f.name}`)
+    await supabase.storage.from('documents').remove(paths)
+  }
+
+  for (const folder of folderItems) {
+    await clearSubdirectory(`${dirPath}/${folder.name}`, supabase)
+  }
+}
+
 async function uploadViteBuildToSupabase(sandbox: any, projectSlug: string, supabase: any, isProduction: boolean = false) {
   try {
     console.log('[Vite Hosting] Starting upload of built files...')
-    
+
+    // Clear old files first so stale hashed assets don't linger
+    await clearSiteStorage(projectSlug, supabase)
+
     // Access the underlying E2B sandbox container (same as generate_report route)
     const e2bSandbox = sandbox.container || sandbox
-    
+
     // Recursively collect all files from the dist directory
     const userFiles = await collectAllFiles(e2bSandbox, "/project/dist")
-    
+
     console.log(`[Vite Hosting] Found ${userFiles.length} files in dist directory`)
     
     // Log the files and their relative paths for debugging
@@ -501,26 +578,30 @@ async function uploadViteBuildToSupabase(sandbox: any, projectSlug: string, supa
     })
     
     // Upload each file to Supabase storage (same approach as generate_report)
+    let uploadedCount = 0
+    let failedCount = 0
+    const failedFiles: string[] = []
+
     for (const file of userFiles) {
       if (file.type === "file") {
         // Extract relative path from /project/dist/ to preserve directory structure
         const relativePath = file.path.replace('/project/dist/', '')
-        
+
         try {
           // Read file content from sandbox (same as generate_report)
           const content = await e2bSandbox.files.read(file.path)
-          
+
           // Process HTML files to fix asset paths and add SEO metadata
           let processedContent = content
           if (relativePath.endsWith('.html')) {
             console.log(`[Vite Hosting] Processing HTML file ${relativePath} with AI...`)
-            
+
             // First fix asset paths
             processedContent = await fixHtmlAssetPaths(content, './')
-            
+
             // Then add comprehensive SEO metadata
             processedContent = await addSEOMetadata(processedContent, projectSlug)
-            
+
             // Only inject badge for preview sites (not production)
             if (!isProduction) {
               processedContent = injectPiPilotBadge(processedContent)
@@ -528,22 +609,15 @@ async function uploadViteBuildToSupabase(sandbox: any, projectSlug: string, supa
             } else {
               console.log(`[Vite Hosting] Skipping badge injection for production site: ${relativePath}`)
             }
-            
+
             console.log(`[Vite Hosting] AI processed and SEO enhanced for ${relativePath}`)
           } else if (relativePath.endsWith('.js') || relativePath.endsWith('.ts')) {
-            console.log(`[Vite Hosting] Skipping JS/TS file ${relativePath} (JS assets processing disabled)`)
-
-            // JS assets processing has been disabled
-            // processedContent = await fixJsAssetPaths(content, './', relativePath)
-
             processedContent = content // Use original content without processing
-
-            console.log(`[Vite Hosting] JS/TS file ${relativePath} left unprocessed`)
           }
-          
+
           // Determine content type
           const contentType = getContentType(file.name)
-          
+
           // Upload to Supabase storage preserving directory structure
           const { data, error } = await supabase.storage
             .from('documents')
@@ -551,19 +625,34 @@ async function uploadViteBuildToSupabase(sandbox: any, projectSlug: string, supa
               contentType,
               upsert: true
             })
-          
+
           if (error) {
             console.error(`[Vite Hosting] Error uploading ${relativePath}:`, error)
+            failedCount++
+            failedFiles.push(relativePath)
           } else {
+            uploadedCount++
             console.log(`[Vite Hosting] Uploaded ${relativePath}`)
           }
         } catch (fileError) {
           console.error(`[Vite Hosting] Error processing ${relativePath}:`, fileError)
+          failedCount++
+          failedFiles.push(relativePath)
         }
       }
     }
-    
-    console.log('[Vite Hosting] Upload completed')
+
+    console.log(`[Vite Hosting] Upload completed: ${uploadedCount} succeeded, ${failedCount} failed`)
+    if (failedCount > 0) {
+      console.error(`[Vite Hosting] Failed files: ${failedFiles.join(', ')}`)
+    }
+
+    // Fail the deployment if critical files (index.html) failed to upload
+    if (failedFiles.includes('index.html')) {
+      console.error('[Vite Hosting] CRITICAL: index.html failed to upload - marking deployment as failed')
+      return false
+    }
+
     return true
   } catch (error) {
     console.error('[Vite Hosting] Upload failed:', error)
@@ -575,6 +664,9 @@ async function uploadViteBuildToSupabase(sandbox: any, projectSlug: string, supa
 async function uploadHtmlProjectToSupabase(files: any[], projectSlug: string, supabase: any, isProduction: boolean = false) {
   try {
     console.log('[HTML Hosting] Starting upload of HTML project files...')
+
+    // Clear old files first so stale assets don't linger
+    await clearSiteStorage(projectSlug, supabase)
 
     // Filter out unwanted files (same logic as filterUnwantedFiles)
     const allowedExtensions = ['.html', '.css', '.js', '.json', '.svg', '.png', '.jpg', '.jpeg', '.webp', '.ico', '.woff', '.woff2', '.ttf', '.eot']
@@ -596,6 +688,10 @@ async function uploadHtmlProjectToSupabase(files: any[], projectSlug: string, su
     })
 
     // Upload each file to Supabase storage
+    let uploadedCount = 0
+    let failedCount = 0
+    const failedFiles: string[] = []
+
     for (const file of userFiles) {
       const relativePath = file.path.startsWith('/') ? file.path.substring(1) : file.path
 
@@ -632,15 +728,30 @@ async function uploadHtmlProjectToSupabase(files: any[], projectSlug: string, su
 
         if (error) {
           console.error(`[HTML Hosting] Error uploading ${relativePath}:`, error)
+          failedCount++
+          failedFiles.push(relativePath)
         } else {
+          uploadedCount++
           console.log(`[HTML Hosting] Uploaded ${relativePath}`)
         }
       } catch (fileError) {
         console.error(`[HTML Hosting] Error processing ${relativePath}:`, fileError)
+        failedCount++
+        failedFiles.push(relativePath)
       }
     }
 
-    console.log('[HTML Hosting] Upload completed')
+    console.log(`[HTML Hosting] Upload completed: ${uploadedCount} succeeded, ${failedCount} failed`)
+    if (failedCount > 0) {
+      console.error(`[HTML Hosting] Failed files: ${failedFiles.join(', ')}`)
+    }
+
+    // Fail if index.html didn't upload
+    if (failedFiles.some(f => f.endsWith('index.html'))) {
+      console.error('[HTML Hosting] CRITICAL: index.html failed to upload - marking deployment as failed')
+      return false
+    }
+
     return true
   } catch (error) {
     console.error('[HTML Hosting] Upload failed:', error)
