@@ -65,14 +65,14 @@ function getModelCostTier(model: string): ModelCostTier {
   return 'cheap'                                         // Devstral, Grok, Flash, Haiku
 }
 
-// Per-plan step limits, adjusted by model cost tier
-// Expensive models: fewer steps to control costs (users can always "continue")
-// Cheap models: more steps for better UX
+// Per-plan step limits - generous because token-based billing is the real cost control.
+// Steps only limit how many tool-call rounds the AI can make in one request.
+// The per-request credit budget (MAX_CREDITS_PER_REQUEST) is the primary cost gate.
 const STEPS_BY_PLAN_AND_TIER: Record<string, Record<ModelCostTier, number>> = {
-  free:        { expensive: 5,  moderate: 10, cheap: 15 },
-  creator:     { expensive: 8,  moderate: 15, cheap: 30 },
-  collaborate: { expensive: 12, moderate: 25, cheap: 40 },
-  scale:       { expensive: 15, moderate: 35, cheap: 50 },
+  free:        { expensive: 15, moderate: 25, cheap: 30 },
+  creator:     { expensive: 25, moderate: 35, cheap: 50 },
+  collaborate: { expensive: 35, moderate: 50, cheap: 50 },
+  scale:       { expensive: 50, moderate: 50, cheap: 50 },
 }
 
 /**
@@ -87,9 +87,9 @@ export function getMaxStepsForRequest(plan: string, model: string): number {
 
 // Legacy exports for backward compatibility
 export const MAX_STEPS_PER_PLAN: Record<string, number> = {
-  free: 15,
-  creator: 30,
-  collaborate: 40,
+  free: 30,
+  creator: 50,
+  collaborate: 50,
   scale: 50
 }
 export const MAX_STEPS_PER_REQUEST = 50
