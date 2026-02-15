@@ -1,4 +1,4 @@
-import { streamText, tool, stepCountIs, extractReasoningMiddleware, wrapLanguageModel } from 'ai'
+import { streamText, tool, stepCountIs, hasToolCall, smoothStream, extractReasoningMiddleware, wrapLanguageModel } from 'ai'
 import { experimental_createMCPClient as createMCPClient } from '@ai-sdk/mcp'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
@@ -10003,6 +10003,40 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
       }
     }
 
+    // Repair malformed tool calls instead of crashing the agent loop.
+    // When the model hallucinates a tool name or sends invalid JSON input,
+    // this gives it one chance to self-correct before the step fails.
+    const repairToolCall: Parameters<typeof streamText>[0]['experimental_repairToolCall'] = async ({
+      toolCall,
+      tools: availableTools,
+      inputSchema,
+      error,
+    }) => {
+      const toolNames = Object.keys(availableTools)
+      console.warn(`[Chat-V2] Tool call repair triggered for "${toolCall.toolName}": ${error.message}`)
+
+      // If the tool doesn't exist, try to find a close match
+      if (!availableTools[toolCall.toolName]) {
+        const lower = toolCall.toolName.toLowerCase().replace(/[^a-z0-9]/g, '')
+        const match = toolNames.find(n => n.toLowerCase().replace(/[^a-z0-9]/g, '') === lower)
+        if (match) {
+          console.log(`[Chat-V2] Repaired tool name: "${toolCall.toolName}" -> "${match}"`)
+          return { ...toolCall, toolName: match }
+        }
+        // No match found - cannot repair
+        return null
+      }
+
+      // Tool exists but input was invalid - try parsing the args as-is
+      // (handles cases where model sends stringified JSON in args)
+      try {
+        const rawArgs = typeof toolCall.args === 'string' ? JSON.parse(toolCall.args) : toolCall.args
+        return { ...toolCall, args: JSON.stringify(rawArgs) }
+      } catch {
+        return null
+      }
+    }
+
     // Stream with AI SDK native tools
     // Pass messages directly without conversion (same as stream.ts)
     // For proper prompt caching, convert system prompt to a message with cache control
@@ -10279,12 +10313,22 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
         tools: toolsToUse,
         stopWhen: stepCountIs(maxStepsAllowed),
         abortSignal: controller.signal,
+        experimental_repairToolCall: repairToolCall,
+        experimental_transform: smoothStream({ chunking: 'word' }),
         ...(providerOptions ? { providerOptions } : {}),
+        onStepFinish: ({ toolCalls, usage, finishReason }) => {
+          const toolNames = toolCalls?.map((tc: any) => tc.toolName).join(', ') || 'none'
+          console.log(`[Chat-V2] Step finished: tools=[${toolNames}], reason=${finishReason}, tokens=${(usage?.inputTokens || 0) + (usage?.outputTokens || 0)}`)
+        },
         onFinish: async ({ response }: any) => {
           console.log(`[Chat-V2] Finished with ${response.messages.length} messages`)
           if (isAnthropicModel && response?.providerMetadata?.anthropic) {
             console.log('[Chat-V2] Anthropic metadata:', response.providerMetadata.anthropic)
           }
+          await closeMCPClients()
+        },
+        onAbort: async () => {
+          console.log('[Chat-V2] Stream aborted - cleaning up MCP clients')
           await closeMCPClients()
         }
       })
@@ -10307,9 +10351,19 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
           tools: toolsToUse,
           stopWhen: stepCountIs(maxStepsAllowed),
           abortSignal: controller.signal,
+          experimental_repairToolCall: repairToolCall,
+          experimental_transform: smoothStream({ chunking: 'word' }),
           // No Anthropic provider options for fallback model
+          onStepFinish: ({ toolCalls, usage, finishReason }) => {
+            const toolNames = toolCalls?.map((tc: any) => tc.toolName).join(', ') || 'none'
+            console.log(`[Chat-V2] [Fallback] Step finished: tools=[${toolNames}], reason=${finishReason}, tokens=${(usage?.inputTokens || 0) + (usage?.outputTokens || 0)}`)
+          },
           onFinish: async () => {
             console.log(`[Chat-V2] Fallback model finished`)
+            await closeMCPClients()
+          },
+          onAbort: async () => {
+            console.log('[Chat-V2] Fallback stream aborted - cleaning up MCP clients')
             await closeMCPClients()
           }
         })
@@ -10486,8 +10540,18 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                   tools: toolsToUse,
                   stopWhen: stepCountIs(maxStepsAllowed),
                   abortSignal: controller.signal,
+                  experimental_repairToolCall: repairToolCall,
+                  experimental_transform: smoothStream({ chunking: 'word' }),
+                  onStepFinish: ({ toolCalls, usage, finishReason }) => {
+                    const toolNames = toolCalls?.map((tc: any) => tc.toolName).join(', ') || 'none'
+                    console.log(`[Chat-V2] [Mid-stream Fallback] Step finished: tools=[${toolNames}], reason=${finishReason}, tokens=${(usage?.inputTokens || 0) + (usage?.outputTokens || 0)}`)
+                  },
                   onFinish: async () => {
                     console.log('[Chat-V2] Fallback stream finished')
+                    await closeMCPClients()
+                  },
+                  onAbort: async () => {
+                    console.log('[Chat-V2] Mid-stream fallback aborted - cleaning up MCP clients')
                     await closeMCPClients()
                   }
                 })
