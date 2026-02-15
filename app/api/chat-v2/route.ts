@@ -1,4 +1,4 @@
-import { streamText, tool, stepCountIs } from 'ai'
+import { streamText, tool, stepCountIs, extractReasoningMiddleware, wrapLanguageModel } from 'ai'
 import { experimental_createMCPClient as createMCPClient } from '@ai-sdk/mcp'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
@@ -10174,7 +10174,19 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
     });
 
     // Get AI model - use Mistral provider for Devstral with images
-    const model = useDevstralVision ? getDevstralVisionModel(modelId) : getAIModel(modelId);
+    // For Qwen thinking models, wrap with extractReasoningMiddleware to parse <think> tags
+    // and cap reasoning output to 800 tokens via maxTokens on the wrapped model
+    const isQwenThinking = modelId === 'alibaba/qwen3-vl-thinking'
+    const baseModel = useDevstralVision ? getDevstralVisionModel(modelId) : getAIModel(modelId);
+    const model = isQwenThinking
+      ? wrapLanguageModel({
+          model: baseModel,
+          middleware: extractReasoningMiddleware({
+            tagName: 'think',
+            startWithReasoning: true,
+          }),
+        })
+      : baseModel;
 
     // Determine if we're using Anthropic provider (only for true Anthropic models)
     const usingAnthropicProvider = isAnthropicModel;
@@ -10200,6 +10212,14 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
       },
       ...preprocessedMessages
     ];
+
+    // Prepare provider options for Qwen thinking models (via OpenAI-compatible gateway)
+    // Caps reasoning tokens to 800 so the model doesn't burn output on long chains of thought
+    const qwenThinkingProviderOptions = isQwenThinking ? {
+      'openai-compatible': {
+        reasoningEffort: 'low',
+      }
+    } as any : undefined
 
     // Prepare provider options for true Anthropic models only (reasoning + context management)
     // Note: Devstral via Anthropic provider doesn't support reasoning, so only apply to actual Claude models
@@ -10245,6 +10265,13 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
     let originalError: Error | null = null
 
     try {
+      // Build provider options: Anthropic reasoning/context OR Qwen reasoning cap
+      const providerOptions = isAnthropicModel && anthropicProviderOptions
+        ? anthropicProviderOptions
+        : isQwenThinking && qwenThinkingProviderOptions
+          ? qwenThinkingProviderOptions
+          : undefined
+
       result = await streamText({
         model,
         temperature: 0.7,
@@ -10252,7 +10279,9 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
         tools: toolsToUse,
         stopWhen: stepCountIs(maxStepsAllowed),
         abortSignal: controller.signal,
-        ...(isAnthropicModel && anthropicProviderOptions ? { providerOptions: anthropicProviderOptions } : {}),
+        ...(providerOptions ? { providerOptions } : {}),
+        // Cap Qwen thinking model output to 800 reasoning + response tokens
+        ...(isQwenThinking ? { maxTokens: 800 } : {}),
         onFinish: async ({ response }: any) => {
           console.log(`[Chat-V2] Finished with ${response.messages.length} messages`)
           if (isAnthropicModel && response?.providerMetadata?.anthropic) {
