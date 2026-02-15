@@ -20,6 +20,8 @@ const shortNameMap = new Map<string, string>([
   ['mistral/devstral-2', 'Devstral 2'],
   ['mistral/devstral-small-2', 'Devstral S2'],
   ['xai/grok-code-fast-1', 'Grok Fast'],
+  ['xai/grok-4.1-fast-reasoning', 'Grok 4.1 R'],
+  ['xai/grok-4.1-fast-non-reasoning', 'Grok 4.1 NR'],
   ['moonshotai/kimi-k2-thinking', 'Kimi K2'],
   ['google/gemini-2.5-flash', 'Gemini Flash'],
   ['google/gemini-2.5-pro', 'Gemini Pro'],
@@ -27,6 +29,7 @@ const shortNameMap = new Map<string, string>([
   ['zai/glm-4.7-flash', 'GLM Flash'],
   ['minimax/minimax-m2.1', 'MiniMax M2'],
   ['alibaba/qwen3-max', 'Qwen3 Max'],
+  ['alibaba/qwen3-vl-thinking', 'Qwen3 VL'],
   ['anthropic/claude-haiku-4.5', 'Haiku 4.5'],
   ['anthropic/claude-sonnet-4.5', 'Sonnet 4.5'],
   ['anthropic/claude-opus-4.5', 'Opus 4.5'],
@@ -41,6 +44,8 @@ const descriptionMap = new Map<string, string>([
   ['mistral/devstral-2', 'Fast code generation'],
   ['mistral/devstral-small-2', 'Lightweight and efficient'],
   ['xai/grok-code-fast-1', 'Fast code with xAI'],
+  ['xai/grok-4.1-fast-reasoning', 'Fast reasoning by xAI'],
+  ['xai/grok-4.1-fast-non-reasoning', 'Fast non-reasoning by xAI'],
   ['moonshotai/kimi-k2-thinking', 'Deep reasoning model'],
   ['google/gemini-2.5-flash', 'Fast multimodal by Google'],
   ['google/gemini-2.5-pro', 'Most capable Google model'],
@@ -48,6 +53,7 @@ const descriptionMap = new Map<string, string>([
   ['zai/glm-4.7-flash', 'Fast general language model'],
   ['minimax/minimax-m2.1', 'Efficient code generation'],
   ['alibaba/qwen3-max', 'Most capable Qwen model'],
+  ['alibaba/qwen3-vl-thinking', 'Vision-language with reasoning'],
   ['anthropic/claude-haiku-4.5', 'Fast and lightweight'],
   ['anthropic/claude-sonnet-4.5', 'Best balance of speed and quality'],
   ['anthropic/claude-opus-4.5', 'Most capable for ambitious work'],
@@ -82,8 +88,10 @@ export function ModelSelector({
   } else if (isPremium && effectiveStatus === 'active') {
     allowedModels = [
       'auto', 'mistral/devstral-2', 'mistral/devstral-small-2', 'xai/grok-code-fast-1',
+      'xai/grok-4.1-fast-reasoning', 'xai/grok-4.1-fast-non-reasoning',
       'google/gemini-2.5-flash', 'zai/glm-4.7-flash', 'moonshotai/kimi-k2-thinking',
       'google/gemini-2.5-pro', 'xai/glm-4.7', 'minimax/minimax-m2.1', 'alibaba/qwen3-max',
+      'alibaba/qwen3-vl-thinking',
       'anthropic/claude-haiku-4.5', 'anthropic/claude-sonnet-4.5', 'anthropic/claude-opus-4.5',
       'openai/gpt-5.1-thinking', 'openai/gpt-5.2-codex', 'openai/o3'
     ]
@@ -124,8 +132,9 @@ export function ModelSelector({
     'openai/gpt-5.1-thinking', 'openai/gpt-5.2-codex', 'openai/o3',
     'google/gemini-2.5-pro', 'google/gemini-2.5-flash',
     'mistral/devstral-2', 'mistral/devstral-small-2',
-    'xai/grok-code-fast-1', 'xai/glm-4.7', 'zai/glm-4.7-flash',
-    'moonshotai/kimi-k2-thinking', 'minimax/minimax-m2.1', 'alibaba/qwen3-max',
+    'xai/grok-code-fast-1', 'xai/grok-4.1-fast-reasoning', 'xai/grok-4.1-fast-non-reasoning',
+    'xai/glm-4.7', 'zai/glm-4.7-flash',
+    'moonshotai/kimi-k2-thinking', 'minimax/minimax-m2.1', 'alibaba/qwen3-max', 'alibaba/qwen3-vl-thinking',
     'auto',
   ]
   const orderedModels = modelOrder.filter(id => shortNameMap.has(id))
