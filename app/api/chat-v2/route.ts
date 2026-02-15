@@ -12,7 +12,7 @@ import lz4 from 'lz4js'
 import unzipper from 'unzipper'
 import { Readable } from 'stream'
 import { authenticateUser, processRequestBilling } from '@/lib/billing/auth-middleware'
-import { deductCreditsFromUsage, checkRequestLimits, checkMonthlyRequestLimit, MAX_STEPS_PER_REQUEST, MAX_STEPS_PER_PLAN, getMaxStepsForRequest, getAffordableSteps, estimateCreditsPerStep, getModelPricing } from '@/lib/billing/credit-manager'
+import { deductCreditsFromUsage, calculateCreditsFromTokens, checkRequestLimits, checkMonthlyRequestLimit, MAX_STEPS_PER_REQUEST, MAX_STEPS_PER_PLAN, getMaxStepsForRequest, getAffordableSteps, estimateCreditsPerStep, getModelPricing } from '@/lib/billing/credit-manager'
 import { downloadLargePayload, cleanupLargePayload } from '@/lib/cloud-sync'
 
 // Disable Next.js body parser for binary data handling
@@ -10458,6 +10458,13 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
           let accumulatedSteps = 0
           let currentStepTools: string[] = []
 
+          // Per-step billing: deduct credits after each step using real token usage
+          let perStepBillingActive = false
+          let totalCreditsDeducted = 0
+          let currentBalance = userCredits
+          let billingSupabase: any = null
+          const activeModelId = modelId || DEFAULT_CHAT_MODEL
+
           try {
             // Check if client already disconnected before we start streaming
             if (clientAborted) {
@@ -10520,7 +10527,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
               } else if (part.type === 'tool-result') {
                 toolResults.push(part);
               } else if (part.type === 'step-finish' && (part as any).usage) {
-                // Capture per-step usage for fallback billing when stream errors
+                // Capture per-step usage
                 const stepUsage = (part as any).usage
                 const stepInput = stepUsage.inputTokens || stepUsage.promptTokens || 0
                 const stepOutput = stepUsage.outputTokens || stepUsage.completionTokens || 0
@@ -10534,7 +10541,36 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                   ? progressActions.join(', ')
                   : 'Thinking'
 
-                // Emit step_progress event to frontend for live progress indicators + billing
+                // --- Per-step credit deduction ---
+                let stepCreditsDeducted = 0
+                if (authContext?.userId && (stepInput > 0 || stepOutput > 0)) {
+                  try {
+                    if (!billingSupabase) billingSupabase = await createClient()
+                    stepCreditsDeducted = calculateCreditsFromTokens(stepInput, stepOutput, activeModelId)
+                    const billingResult = await deductCreditsFromUsage(
+                      authContext.userId,
+                      { promptTokens: stepInput, completionTokens: stepOutput },
+                      {
+                        model: activeModelId,
+                        requestType: 'chat-step',
+                        endpoint: '/api/chat-v2',
+                        steps: 1,
+                        status: 'success'
+                      },
+                      billingSupabase
+                    )
+                    if (billingResult.success) {
+                      perStepBillingActive = true
+                      totalCreditsDeducted += billingResult.creditsUsed
+                      currentBalance = billingResult.newBalance
+                      console.log(`[Chat-V2] 💰 Step ${accumulatedSteps}: deducted ${billingResult.creditsUsed} credits (balance: ${currentBalance})`)
+                    }
+                  } catch (billingErr) {
+                    console.warn(`[Chat-V2] Step billing failed (will retry in finally):`, billingErr)
+                  }
+                }
+
+                // Emit step_progress event to frontend with real billing data
                 controller.enqueue(encoder.encode(JSON.stringify({
                   type: 'step_progress',
                   step: accumulatedSteps,
@@ -10543,9 +10579,22 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                   progressMessage,
                   stepTokens: { input: stepInput, output: stepOutput },
                   totalTokens: { input: accumulatedUsage.inputTokens, output: accumulatedUsage.outputTokens },
-                  estimatedStepCredits: estimatedCostPerStep,
-                  estimatedTotalCredits: accumulatedSteps * estimatedCostPerStep,
+                  creditsDeducted: stepCreditsDeducted,
+                  totalCreditsDeducted,
+                  remainingBalance: currentBalance,
                 }) + '\n'))
+
+                // Credit exhaustion guard: stop the agent if balance is depleted
+                if (perStepBillingActive && currentBalance <= 0) {
+                  console.log(`[Chat-V2] 🛑 Credits exhausted after step ${accumulatedSteps} - stopping agent`)
+                  controller.enqueue(encoder.encode(JSON.stringify({
+                    type: 'credits_exhausted',
+                    step: accumulatedSteps,
+                    message: 'Your credits have been used up. The agent has been stopped to prevent further charges.',
+                    totalCreditsDeducted,
+                  }) + '\n'))
+                  break
+                }
 
                 // Reset for next step
                 currentStepTools = []
@@ -10655,6 +10704,35 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                       ? progressActions.join(', ')
                       : 'Thinking'
 
+                    // --- Per-step credit deduction (fallback stream) ---
+                    let stepCreditsDeducted = 0
+                    if (authContext?.userId && (stepInput > 0 || stepOutput > 0)) {
+                      try {
+                        if (!billingSupabase) billingSupabase = await createClient()
+                        stepCreditsDeducted = calculateCreditsFromTokens(stepInput, stepOutput, activeModelId)
+                        const billingResult = await deductCreditsFromUsage(
+                          authContext.userId,
+                          { promptTokens: stepInput, completionTokens: stepOutput },
+                          {
+                            model: activeModelId,
+                            requestType: 'chat-step',
+                            endpoint: '/api/chat-v2',
+                            steps: 1,
+                            status: 'success'
+                          },
+                          billingSupabase
+                        )
+                        if (billingResult.success) {
+                          perStepBillingActive = true
+                          totalCreditsDeducted += billingResult.creditsUsed
+                          currentBalance = billingResult.newBalance
+                          console.log(`[Chat-V2] 💰 [Fallback] Step ${accumulatedSteps}: deducted ${billingResult.creditsUsed} credits (balance: ${currentBalance})`)
+                        }
+                      } catch (billingErr) {
+                        console.warn(`[Chat-V2] [Fallback] Step billing failed:`, billingErr)
+                      }
+                    }
+
                     controller.enqueue(encoder.encode(JSON.stringify({
                       type: 'step_progress',
                       step: accumulatedSteps,
@@ -10663,9 +10741,21 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                       progressMessage,
                       stepTokens: { input: stepInput, output: stepOutput },
                       totalTokens: { input: accumulatedUsage.inputTokens, output: accumulatedUsage.outputTokens },
-                      estimatedStepCredits: estimatedCostPerStep,
-                      estimatedTotalCredits: accumulatedSteps * estimatedCostPerStep,
+                      creditsDeducted: stepCreditsDeducted,
+                      totalCreditsDeducted,
+                      remainingBalance: currentBalance,
                     }) + '\n'))
+
+                    if (perStepBillingActive && currentBalance <= 0) {
+                      console.log(`[Chat-V2] 🛑 [Fallback] Credits exhausted after step ${accumulatedSteps} - stopping agent`)
+                      controller.enqueue(encoder.encode(JSON.stringify({
+                        type: 'credits_exhausted',
+                        step: accumulatedSteps,
+                        message: 'Your credits have been used up. The agent has been stopped to prevent further charges.',
+                        totalCreditsDeducted,
+                      }) + '\n'))
+                      break
+                    }
 
                     currentStepTools = []
                   }
@@ -10716,7 +10806,15 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
             // ============================================================================
             // ABE BILLING - Token-based credit deduction with AI SDK usage
             // ============================================================================
-            console.log(`[Chat-V2] 🔍 FINALLY BLOCK: Starting token-based billing...${clientAborted ? ' (client aborted)' : ''}${streamErrored ? ' (stream errored)' : ''}`)
+            console.log(`[Chat-V2] 🔍 FINALLY BLOCK: Starting token-based billing...${clientAborted ? ' (client aborted)' : ''}${streamErrored ? ' (stream errored)' : ''}${perStepBillingActive ? ` (per-step already deducted ${totalCreditsDeducted} credits)` : ''}`)
+
+            // If per-step billing successfully deducted credits during streaming,
+            // skip the end-of-stream bulk deduction to avoid double-billing.
+            if (perStepBillingActive && totalCreditsDeducted > 0) {
+              console.log(`[Chat-V2] ✅ Per-step billing handled ${totalCreditsDeducted} credits across ${accumulatedSteps} steps - skipping end-of-stream billing`)
+              controller.close()
+              return
+            }
 
             const responseTime = Date.now() - startTime
             const VERCEL_HARD_LIMIT_MS = 300000 // Vercel's absolute 300s limit
