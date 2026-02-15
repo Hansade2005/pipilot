@@ -2674,17 +2674,18 @@ class IndexedDBStorage implements StorageInterface {
     if (!this.db) throw new Error('Database not initialized')
 
     // Get all data from all tables
-    const [workspaces, files, chatSessions, messages, deployments, environmentVariables, tokens] = await Promise.all([
+    const [workspaces, files, chatSessions, messages, deployments, environmentVariables, tokens, checkpoints] = await Promise.all([
       this.getAllEntries('workspaces'),
       this.getAllEntries('files'),
       this.getAllEntries('chatSessions'),
       this.getAllEntries('messages'),
       this.getDeployments(), // This already gets all deployments when no workspaceId is provided
       this.getEnvironmentVariables(), // This already gets all environment variables when no workspaceId is provided
-      this.getAllTokens()
+      this.getAllTokens(),
+      this.getAllEntries('checkpoints')
     ])
 
-    return { workspaces, files, chatSessions, messages, deployments, environmentVariables, tokens }
+    return { workspaces, files, chatSessions, messages, deployments, environmentVariables, tokens, checkpoints }
   }
 
   private generateId(): string {

@@ -41,6 +41,12 @@ function filterDataToTopProjects(data: any, maxProjects: number = MAX_BACKUP_PRO
   const filterByWorkspace = (arr: any[]) =>
     Array.isArray(arr) ? arr.filter((item: any) => topWorkspaceIds.has(item.workspaceId)) : []
 
+  // Filter checkpoints to only those belonging to top workspaces
+  const allCheckpoints: any[] = Array.isArray(data.checkpoints) ? data.checkpoints : []
+  const filteredCheckpoints = allCheckpoints.filter(
+    (cp: any) => cp.workspaceId && topWorkspaceIds.has(cp.workspaceId)
+  )
+
   return {
     ...data,
     workspaces: topWorkspaces,
@@ -49,6 +55,7 @@ function filterDataToTopProjects(data: any, maxProjects: number = MAX_BACKUP_PRO
     messages: filteredMessages,
     deployments: filterByWorkspace(data.deployments),
     environmentVariables: filterByWorkspace(data.environmentVariables),
+    checkpoints: filteredCheckpoints,
   }
 }
 
@@ -330,6 +337,7 @@ export async function restoreBackupFromCloud(userId: string): Promise<boolean> {
     const localMessages: any[] = Array.isArray(localData.messages) ? localData.messages : []
     const localDeployments: any[] = Array.isArray(localData.deployments) ? localData.deployments : []
     const localEnvVars: any[] = Array.isArray(localData.environmentVariables) ? localData.environmentVariables : []
+    const localCheckpoints: any[] = Array.isArray(localData.checkpoints) ? localData.checkpoints : []
 
     // Collect local chatSession IDs that belong to cloud workspaces (these will be replaced)
     const localChatSessionIdsToReplace = new Set(
@@ -378,6 +386,13 @@ export async function restoreBackupFromCloud(userId: string): Promise<boolean> {
       ...cloudEnvVars
     ]
 
+    // Checkpoints: keep local ones from non-cloud workspaces, use cloud checkpoints for cloud workspaces
+    const cloudCheckpoints: any[] = Array.isArray(backupData.checkpoints) ? backupData.checkpoints : []
+    const mergedCheckpoints = [
+      ...localCheckpoints.filter((cp: any) => !cloudWorkspaceIds.has(cp.workspaceId)),
+      ...cloudCheckpoints
+    ]
+
     // --- Clear and re-import all data ---
     await storageManager.clearAll()
 
@@ -389,6 +404,7 @@ export async function restoreBackupFromCloud(userId: string): Promise<boolean> {
       messages: mergedMessages,
       deployments: mergedDeployments,
       environmentVariables: mergedEnvVars,
+      checkpoints: mergedCheckpoints,
     }
 
     for (const [tableName, tableData] of Object.entries(tablesToImport)) {
@@ -404,7 +420,7 @@ export async function restoreBackupFromCloud(userId: string): Promise<boolean> {
     // Import non-workspace-scoped tables from cloud (tokens, templates, etc.)
     // Only import items that don't conflict with existing local data
     const workspaceScopedTables = new Set([
-      'workspaces', 'files', 'chatSessions', 'messages', 'deployments', 'environmentVariables'
+      'workspaces', 'files', 'chatSessions', 'messages', 'deployments', 'environmentVariables', 'checkpoints'
     ])
 
     for (const [tableName, tableData] of Object.entries(backupData)) {
