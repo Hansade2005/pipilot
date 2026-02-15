@@ -2102,8 +2102,8 @@ export const VERCEL_MODEL_PRICING: Record<string, ModelPricingEntry> = {
     supportsImageInput: false,
     generatesImages: false,
     imageGenCost: 0,
-    latencySeconds: 2.1,
-    throughputTps: 84,
+    latencySeconds: 2.2,
+    throughputTps: 85,
   },
 
   // =============================================================================

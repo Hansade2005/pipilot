@@ -28,6 +28,7 @@ const shortNameMap = new Map<string, string>([
   ['xai/glm-4.7', 'GLM 4.7'],
   ['zai/glm-4.7-flash', 'GLM Flash'],
   ['minimax/minimax-m2.1', 'MiniMax M2'],
+  ['kwaipilot/kat-coder-pro-v1', 'KAT Coder'],
   ['alibaba/qwen3-max', 'Qwen3 Max'],
   ['alibaba/qwen3-vl-thinking', 'Qwen3 VL'],
   ['anthropic/claude-haiku-4.5', 'Haiku 4.5'],
@@ -52,6 +53,7 @@ const descriptionMap = new Map<string, string>([
   ['xai/glm-4.7', 'General language model'],
   ['zai/glm-4.7-flash', 'Fast general language model'],
   ['minimax/minimax-m2.1', 'Efficient code generation'],
+  ['kwaipilot/kat-coder-pro-v1', 'Fast code by KwaiPilot'],
   ['alibaba/qwen3-max', 'Most capable Qwen model'],
   ['alibaba/qwen3-vl-thinking', 'Vision-language with reasoning'],
   ['anthropic/claude-haiku-4.5', 'Fast and lightweight'],
@@ -90,7 +92,8 @@ export function ModelSelector({
       'auto', 'mistral/devstral-2', 'mistral/devstral-small-2', 'xai/grok-code-fast-1',
       'xai/grok-4.1-fast-reasoning', 'xai/grok-4.1-fast-non-reasoning',
       'google/gemini-2.5-flash', 'zai/glm-4.7-flash', 'moonshotai/kimi-k2-thinking',
-      'google/gemini-2.5-pro', 'xai/glm-4.7', 'minimax/minimax-m2.1', 'alibaba/qwen3-max',
+      'google/gemini-2.5-pro', 'xai/glm-4.7', 'minimax/minimax-m2.1',
+      'kwaipilot/kat-coder-pro-v1', 'alibaba/qwen3-max',
       'alibaba/qwen3-vl-thinking',
       'anthropic/claude-haiku-4.5', 'anthropic/claude-sonnet-4.5', 'anthropic/claude-opus-4.5',
       'openai/gpt-5.1-thinking', 'openai/gpt-5.2-codex', 'openai/o3'
@@ -134,7 +137,8 @@ export function ModelSelector({
     'mistral/devstral-2', 'mistral/devstral-small-2',
     'xai/grok-code-fast-1', 'xai/grok-4.1-fast-reasoning', 'xai/grok-4.1-fast-non-reasoning',
     'xai/glm-4.7', 'zai/glm-4.7-flash',
-    'moonshotai/kimi-k2-thinking', 'minimax/minimax-m2.1', 'alibaba/qwen3-max', 'alibaba/qwen3-vl-thinking',
+    'moonshotai/kimi-k2-thinking', 'minimax/minimax-m2.1', 'kwaipilot/kat-coder-pro-v1',
+    'alibaba/qwen3-max', 'alibaba/qwen3-vl-thinking',
     'auto',
   ]
   const orderedModels = modelOrder.filter(id => shortNameMap.has(id))

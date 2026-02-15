@@ -58,6 +58,12 @@ export const chatModels: Array<ChatModel> = [
     supportsVision: true,
   },
   {
+    id: 'kwaipilot/kat-coder-pro-v1',
+    name: 'KwaiPilot KAT Coder Pro',
+    description: 'KwaiPilot KAT Coder Pro V1 via Vercel AI Gateway',
+    provider: 'vercel-gateway',
+  },
+  {
     id: 'xai/grok-code-fast-1',
     name: 'xAI Grok Code Fast 1',
     description: 'xAI Grok Code Fast 1 via Vercel AI Gateway',
