@@ -1,4 +1,4 @@
-import { streamText, tool, stepCountIs, extractReasoningMiddleware, wrapLanguageModel } from 'ai'
+import { streamText, tool, stepCountIs, hasToolCall, smoothStream, extractReasoningMiddleware, wrapLanguageModel } from 'ai'
 import { experimental_createMCPClient as createMCPClient } from '@ai-sdk/mcp'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
@@ -12,7 +12,7 @@ import lz4 from 'lz4js'
 import unzipper from 'unzipper'
 import { Readable } from 'stream'
 import { authenticateUser, processRequestBilling } from '@/lib/billing/auth-middleware'
-import { deductCreditsFromUsage, checkRequestLimits, checkMonthlyRequestLimit, MAX_STEPS_PER_REQUEST, MAX_STEPS_PER_PLAN, getMaxStepsForRequest, getAffordableSteps, estimateCreditsPerStep, getModelPricing } from '@/lib/billing/credit-manager'
+import { deductCreditsFromUsage, calculateCreditsFromTokens, checkRequestLimits, checkMonthlyRequestLimit, MAX_STEPS_PER_REQUEST, MAX_STEPS_PER_PLAN, getMaxStepsForRequest, getAffordableSteps, estimateCreditsPerStep, getModelPricing } from '@/lib/billing/credit-manager'
 import { downloadLargePayload, cleanupLargePayload } from '@/lib/cloud-sync'
 
 // Disable Next.js body parser for binary data handling
@@ -10003,6 +10003,40 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
       }
     }
 
+    // Repair malformed tool calls instead of crashing the agent loop.
+    // When the model hallucinates a tool name or sends invalid JSON input,
+    // this gives it one chance to self-correct before the step fails.
+    const repairToolCall: Parameters<typeof streamText>[0]['experimental_repairToolCall'] = async ({
+      toolCall,
+      tools: availableTools,
+      inputSchema,
+      error,
+    }) => {
+      const toolNames = Object.keys(availableTools)
+      console.warn(`[Chat-V2] Tool call repair triggered for "${toolCall.toolName}": ${error.message}`)
+
+      // If the tool doesn't exist, try to find a close match
+      if (!availableTools[toolCall.toolName]) {
+        const lower = toolCall.toolName.toLowerCase().replace(/[^a-z0-9]/g, '')
+        const match = toolNames.find(n => n.toLowerCase().replace(/[^a-z0-9]/g, '') === lower)
+        if (match) {
+          console.log(`[Chat-V2] Repaired tool name: "${toolCall.toolName}" -> "${match}"`)
+          return { ...toolCall, toolName: match }
+        }
+        // No match found - cannot repair
+        return null
+      }
+
+      // Tool exists but input was invalid - try parsing the args as-is
+      // (handles cases where model sends stringified JSON in args)
+      try {
+        const rawArgs = typeof toolCall.args === 'string' ? JSON.parse(toolCall.args) : toolCall.args
+        return { ...toolCall, args: JSON.stringify(rawArgs) }
+      } catch {
+        return null
+      }
+    }
+
     // Stream with AI SDK native tools
     // Pass messages directly without conversion (same as stream.ts)
     // For proper prompt caching, convert system prompt to a message with cache control
@@ -10259,6 +10293,12 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
     )
     console.log(`[Chat-V2] Max steps: ${maxStepsAllowed} (plan: ${userPlan}, model: ${modelId}, ~${estimatedCostPerStep} credits/step, budget: ~${totalEstimatedCost} credits, balance: ${userCredits})`)
 
+    // Chunk analytics: track chunk type counts for per-request diagnostics
+    const chunkCounts: Record<string, number> = {}
+    const onChunk = ({ chunk }: { chunk: { type: string } }) => {
+      chunkCounts[chunk.type] = (chunkCounts[chunk.type] || 0) + 1
+    }
+
     // Attempt streamText with automatic fallback to Grok Code Fast 1 on provider failure
     let result: any
     let usedFallbackModel = false
@@ -10279,12 +10319,25 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
         tools: toolsToUse,
         stopWhen: stepCountIs(maxStepsAllowed),
         abortSignal: controller.signal,
+        experimental_repairToolCall: repairToolCall,
+        experimental_transform: smoothStream({ chunking: 'word' }),
         ...(providerOptions ? { providerOptions } : {}),
+        onChunk,
+        onStepFinish: ({ toolCalls, usage, finishReason }) => {
+          const toolNames = toolCalls?.map((tc: any) => tc.toolName).join(', ') || 'none'
+          console.log(`[Chat-V2] Step finished: tools=[${toolNames}], reason=${finishReason}, tokens=${(usage?.inputTokens || 0) + (usage?.outputTokens || 0)}`)
+        },
         onFinish: async ({ response }: any) => {
           console.log(`[Chat-V2] Finished with ${response.messages.length} messages`)
+          console.log(`[Chat-V2] Chunk analytics:`, chunkCounts)
           if (isAnthropicModel && response?.providerMetadata?.anthropic) {
             console.log('[Chat-V2] Anthropic metadata:', response.providerMetadata.anthropic)
           }
+          await closeMCPClients()
+        },
+        onAbort: async () => {
+          console.log('[Chat-V2] Stream aborted - cleaning up MCP clients')
+          console.log(`[Chat-V2] Chunk analytics at abort:`, chunkCounts)
           await closeMCPClients()
         }
       })
@@ -10307,9 +10360,21 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
           tools: toolsToUse,
           stopWhen: stepCountIs(maxStepsAllowed),
           abortSignal: controller.signal,
+          experimental_repairToolCall: repairToolCall,
+          experimental_transform: smoothStream({ chunking: 'word' }),
           // No Anthropic provider options for fallback model
+          onChunk,
+          onStepFinish: ({ toolCalls, usage, finishReason }) => {
+            const toolNames = toolCalls?.map((tc: any) => tc.toolName).join(', ') || 'none'
+            console.log(`[Chat-V2] [Fallback] Step finished: tools=[${toolNames}], reason=${finishReason}, tokens=${(usage?.inputTokens || 0) + (usage?.outputTokens || 0)}`)
+          },
           onFinish: async () => {
             console.log(`[Chat-V2] Fallback model finished`)
+            console.log(`[Chat-V2] [Fallback] Chunk analytics:`, chunkCounts)
+            await closeMCPClients()
+          },
+          onAbort: async () => {
+            console.log('[Chat-V2] Fallback stream aborted - cleaning up MCP clients')
             await closeMCPClients()
           }
         })
@@ -10361,6 +10426,22 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
       };
     };
 
+    // Human-readable labels for tool actions (used in step_progress events)
+    const toolProgressLabels: Record<string, string> = {
+      write_file: 'Writing file', read_file: 'Reading file', edit_file: 'Editing file',
+      delete_file: 'Deleting file', delete_folder: 'Deleting folder',
+      client_replace_string_in_file: 'Replacing text in file',
+      grep_search: 'Searching codebase', semantic_code_navigator: 'Navigating code',
+      list_files: 'Listing files', check_dev_errors: 'Checking for errors',
+      web_search: 'Searching the web', web_extract: 'Extracting web content',
+      browse_web: 'Browsing website', generate_image: 'Generating image',
+      remove_package: 'Removing package', node_machine: 'Running code',
+      suggest_next_steps: 'Suggesting next steps', manage_todos: 'Managing tasks',
+      generate_plan: 'Creating plan', code_review: 'Reviewing code',
+      code_quality_analysis: 'Analyzing code quality', auto_documentation: 'Generating docs',
+      continue_backend_implementation: 'Continuing implementation',
+    }
+
     // Stream the response using newline-delimited JSON format (not SSE)
     // This matches the format used in stream.ts and expected by chatparse.tsx
     return new Response(
@@ -10375,6 +10456,14 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
           let streamErrored = false
           let accumulatedUsage = { inputTokens: 0, outputTokens: 0 }
           let accumulatedSteps = 0
+          let currentStepTools: string[] = []
+
+          // Per-step billing: deduct credits after each step using real token usage
+          let perStepBillingActive = false
+          let totalCreditsDeducted = 0
+          let currentBalance = userCredits
+          let billingSupabase: any = null
+          const activeModelId = modelId || DEFAULT_CHAT_MODEL
 
           try {
             // Check if client already disconnected before we start streaming
@@ -10434,14 +10523,81 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                 }
               } else if (part.type === 'tool-call') {
                 toolResults.push(part);
+                currentStepTools.push((part as any).toolName || 'unknown')
               } else if (part.type === 'tool-result') {
                 toolResults.push(part);
               } else if (part.type === 'step-finish' && (part as any).usage) {
-                // Capture per-step usage for fallback billing when stream errors
+                // Capture per-step usage
                 const stepUsage = (part as any).usage
-                accumulatedUsage.inputTokens += stepUsage.inputTokens || stepUsage.promptTokens || 0
-                accumulatedUsage.outputTokens += stepUsage.outputTokens || stepUsage.completionTokens || 0
+                const stepInput = stepUsage.inputTokens || stepUsage.promptTokens || 0
+                const stepOutput = stepUsage.outputTokens || stepUsage.completionTokens || 0
+                accumulatedUsage.inputTokens += stepInput
+                accumulatedUsage.outputTokens += stepOutput
                 accumulatedSteps++
+
+                // Build human-readable progress label from tools used this step
+                const progressActions = currentStepTools.map(t => toolProgressLabels[t] || t)
+                const progressMessage = progressActions.length > 0
+                  ? progressActions.join(', ')
+                  : 'Thinking'
+
+                // --- Per-step credit deduction ---
+                let stepCreditsDeducted = 0
+                if (authContext?.userId && (stepInput > 0 || stepOutput > 0)) {
+                  try {
+                    if (!billingSupabase) billingSupabase = await createClient()
+                    stepCreditsDeducted = calculateCreditsFromTokens(stepInput, stepOutput, activeModelId)
+                    const billingResult = await deductCreditsFromUsage(
+                      authContext.userId,
+                      { promptTokens: stepInput, completionTokens: stepOutput },
+                      {
+                        model: activeModelId,
+                        requestType: 'chat-step',
+                        endpoint: '/api/chat-v2',
+                        steps: 1,
+                        status: 'success'
+                      },
+                      billingSupabase
+                    )
+                    if (billingResult.success) {
+                      perStepBillingActive = true
+                      totalCreditsDeducted += billingResult.creditsUsed
+                      currentBalance = billingResult.newBalance
+                      console.log(`[Chat-V2] 💰 Step ${accumulatedSteps}: deducted ${billingResult.creditsUsed} credits (balance: ${currentBalance})`)
+                    }
+                  } catch (billingErr) {
+                    console.warn(`[Chat-V2] Step billing failed (will retry in finally):`, billingErr)
+                  }
+                }
+
+                // Emit step_progress event to frontend with real billing data
+                controller.enqueue(encoder.encode(JSON.stringify({
+                  type: 'step_progress',
+                  step: accumulatedSteps,
+                  maxSteps: maxStepsAllowed,
+                  toolsUsed: currentStepTools,
+                  progressMessage,
+                  stepTokens: { input: stepInput, output: stepOutput },
+                  totalTokens: { input: accumulatedUsage.inputTokens, output: accumulatedUsage.outputTokens },
+                  creditsDeducted: stepCreditsDeducted,
+                  totalCreditsDeducted,
+                  remainingBalance: currentBalance,
+                }) + '\n'))
+
+                // Credit exhaustion guard: stop the agent if balance is depleted
+                if (perStepBillingActive && currentBalance <= 0) {
+                  console.log(`[Chat-V2] 🛑 Credits exhausted after step ${accumulatedSteps} - stopping agent`)
+                  controller.enqueue(encoder.encode(JSON.stringify({
+                    type: 'credits_exhausted',
+                    step: accumulatedSteps,
+                    message: 'Your credits have been used up. The agent has been stopped to prevent further charges.',
+                    totalCreditsDeducted,
+                  }) + '\n'))
+                  break
+                }
+
+                // Reset for next step
+                currentStepTools = []
               }
 
               // Send each part as newline-delimited JSON (no SSE "data:" prefix)
@@ -10486,8 +10642,20 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                   tools: toolsToUse,
                   stopWhen: stepCountIs(maxStepsAllowed),
                   abortSignal: controller.signal,
+                  experimental_repairToolCall: repairToolCall,
+                  experimental_transform: smoothStream({ chunking: 'word' }),
+                  onChunk,
+                  onStepFinish: ({ toolCalls, usage, finishReason }) => {
+                    const toolNames = toolCalls?.map((tc: any) => tc.toolName).join(', ') || 'none'
+                    console.log(`[Chat-V2] [Mid-stream Fallback] Step finished: tools=[${toolNames}], reason=${finishReason}, tokens=${(usage?.inputTokens || 0) + (usage?.outputTokens || 0)}`)
+                  },
                   onFinish: async () => {
                     console.log('[Chat-V2] Fallback stream finished')
+                    console.log(`[Chat-V2] [Mid-stream Fallback] Chunk analytics:`, chunkCounts)
+                    await closeMCPClients()
+                  },
+                  onAbort: async () => {
+                    console.log('[Chat-V2] Mid-stream fallback aborted - cleaning up MCP clients')
                     await closeMCPClients()
                   }
                 })
@@ -10520,13 +10688,76 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                     accumulatedReasoning += part.text
                   } else if (part.type === 'tool-call') {
                     toolResults.push(part)
+                    currentStepTools.push((part as any).toolName || 'unknown')
                   } else if (part.type === 'tool-result') {
                     toolResults.push(part)
                   } else if (part.type === 'step-finish' && (part as any).usage) {
                     const stepUsage = (part as any).usage
-                    accumulatedUsage.inputTokens += stepUsage.inputTokens || stepUsage.promptTokens || 0
-                    accumulatedUsage.outputTokens += stepUsage.outputTokens || stepUsage.completionTokens || 0
+                    const stepInput = stepUsage.inputTokens || stepUsage.promptTokens || 0
+                    const stepOutput = stepUsage.outputTokens || stepUsage.completionTokens || 0
+                    accumulatedUsage.inputTokens += stepInput
+                    accumulatedUsage.outputTokens += stepOutput
                     accumulatedSteps++
+
+                    const progressActions = currentStepTools.map(t => toolProgressLabels[t] || t)
+                    const progressMessage = progressActions.length > 0
+                      ? progressActions.join(', ')
+                      : 'Thinking'
+
+                    // --- Per-step credit deduction (fallback stream) ---
+                    let stepCreditsDeducted = 0
+                    if (authContext?.userId && (stepInput > 0 || stepOutput > 0)) {
+                      try {
+                        if (!billingSupabase) billingSupabase = await createClient()
+                        stepCreditsDeducted = calculateCreditsFromTokens(stepInput, stepOutput, activeModelId)
+                        const billingResult = await deductCreditsFromUsage(
+                          authContext.userId,
+                          { promptTokens: stepInput, completionTokens: stepOutput },
+                          {
+                            model: activeModelId,
+                            requestType: 'chat-step',
+                            endpoint: '/api/chat-v2',
+                            steps: 1,
+                            status: 'success'
+                          },
+                          billingSupabase
+                        )
+                        if (billingResult.success) {
+                          perStepBillingActive = true
+                          totalCreditsDeducted += billingResult.creditsUsed
+                          currentBalance = billingResult.newBalance
+                          console.log(`[Chat-V2] 💰 [Fallback] Step ${accumulatedSteps}: deducted ${billingResult.creditsUsed} credits (balance: ${currentBalance})`)
+                        }
+                      } catch (billingErr) {
+                        console.warn(`[Chat-V2] [Fallback] Step billing failed:`, billingErr)
+                      }
+                    }
+
+                    controller.enqueue(encoder.encode(JSON.stringify({
+                      type: 'step_progress',
+                      step: accumulatedSteps,
+                      maxSteps: maxStepsAllowed,
+                      toolsUsed: currentStepTools,
+                      progressMessage,
+                      stepTokens: { input: stepInput, output: stepOutput },
+                      totalTokens: { input: accumulatedUsage.inputTokens, output: accumulatedUsage.outputTokens },
+                      creditsDeducted: stepCreditsDeducted,
+                      totalCreditsDeducted,
+                      remainingBalance: currentBalance,
+                    }) + '\n'))
+
+                    if (perStepBillingActive && currentBalance <= 0) {
+                      console.log(`[Chat-V2] 🛑 [Fallback] Credits exhausted after step ${accumulatedSteps} - stopping agent`)
+                      controller.enqueue(encoder.encode(JSON.stringify({
+                        type: 'credits_exhausted',
+                        step: accumulatedSteps,
+                        message: 'Your credits have been used up. The agent has been stopped to prevent further charges.',
+                        totalCreditsDeducted,
+                      }) + '\n'))
+                      break
+                    }
+
+                    currentStepTools = []
                   }
 
                   controller.enqueue(encoder.encode(JSON.stringify(part) + '\n'))
@@ -10575,7 +10806,15 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
             // ============================================================================
             // ABE BILLING - Token-based credit deduction with AI SDK usage
             // ============================================================================
-            console.log(`[Chat-V2] 🔍 FINALLY BLOCK: Starting token-based billing...${clientAborted ? ' (client aborted)' : ''}${streamErrored ? ' (stream errored)' : ''}`)
+            console.log(`[Chat-V2] 🔍 FINALLY BLOCK: Starting token-based billing...${clientAborted ? ' (client aborted)' : ''}${streamErrored ? ' (stream errored)' : ''}${perStepBillingActive ? ` (per-step already deducted ${totalCreditsDeducted} credits)` : ''}`)
+
+            // If per-step billing successfully deducted credits during streaming,
+            // skip the end-of-stream bulk deduction to avoid double-billing.
+            if (perStepBillingActive && totalCreditsDeducted > 0) {
+              console.log(`[Chat-V2] ✅ Per-step billing handled ${totalCreditsDeducted} credits across ${accumulatedSteps} steps - skipping end-of-stream billing`)
+              controller.close()
+              return
+            }
 
             const responseTime = Date.now() - startTime
             const VERCEL_HARD_LIMIT_MS = 300000 // Vercel's absolute 300s limit

@@ -1,4 +1,4 @@
-import { streamText, tool } from 'ai'
+import { streamText, tool, stepCountIs } from 'ai'
 import { experimental_createMCPClient as createMCPClient } from '@ai-sdk/mcp'
 import { z } from 'zod'
 
@@ -121,7 +121,7 @@ Use the available tools when they would help answer the user's question. Always 
       system: systemPrompt,
       messages,
       tools: allTools,
-      maxSteps: 5,
+      stopWhen: stepCountIs(5),
       onFinish: async () => {
         // Close all MCP clients
         for (const { client } of mcpClients) {
