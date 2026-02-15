@@ -10293,6 +10293,12 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
     )
     console.log(`[Chat-V2] Max steps: ${maxStepsAllowed} (plan: ${userPlan}, model: ${modelId}, ~${estimatedCostPerStep} credits/step, budget: ~${totalEstimatedCost} credits, balance: ${userCredits})`)
 
+    // Chunk analytics: track chunk type counts for per-request diagnostics
+    const chunkCounts: Record<string, number> = {}
+    const onChunk = ({ chunk }: { chunk: { type: string } }) => {
+      chunkCounts[chunk.type] = (chunkCounts[chunk.type] || 0) + 1
+    }
+
     // Attempt streamText with automatic fallback to Grok Code Fast 1 on provider failure
     let result: any
     let usedFallbackModel = false
@@ -10316,12 +10322,14 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
         experimental_repairToolCall: repairToolCall,
         experimental_transform: smoothStream({ chunking: 'word' }),
         ...(providerOptions ? { providerOptions } : {}),
+        onChunk,
         onStepFinish: ({ toolCalls, usage, finishReason }) => {
           const toolNames = toolCalls?.map((tc: any) => tc.toolName).join(', ') || 'none'
           console.log(`[Chat-V2] Step finished: tools=[${toolNames}], reason=${finishReason}, tokens=${(usage?.inputTokens || 0) + (usage?.outputTokens || 0)}`)
         },
         onFinish: async ({ response }: any) => {
           console.log(`[Chat-V2] Finished with ${response.messages.length} messages`)
+          console.log(`[Chat-V2] Chunk analytics:`, chunkCounts)
           if (isAnthropicModel && response?.providerMetadata?.anthropic) {
             console.log('[Chat-V2] Anthropic metadata:', response.providerMetadata.anthropic)
           }
@@ -10329,6 +10337,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
         },
         onAbort: async () => {
           console.log('[Chat-V2] Stream aborted - cleaning up MCP clients')
+          console.log(`[Chat-V2] Chunk analytics at abort:`, chunkCounts)
           await closeMCPClients()
         }
       })
@@ -10354,12 +10363,14 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
           experimental_repairToolCall: repairToolCall,
           experimental_transform: smoothStream({ chunking: 'word' }),
           // No Anthropic provider options for fallback model
+          onChunk,
           onStepFinish: ({ toolCalls, usage, finishReason }) => {
             const toolNames = toolCalls?.map((tc: any) => tc.toolName).join(', ') || 'none'
             console.log(`[Chat-V2] [Fallback] Step finished: tools=[${toolNames}], reason=${finishReason}, tokens=${(usage?.inputTokens || 0) + (usage?.outputTokens || 0)}`)
           },
           onFinish: async () => {
             console.log(`[Chat-V2] Fallback model finished`)
+            console.log(`[Chat-V2] [Fallback] Chunk analytics:`, chunkCounts)
             await closeMCPClients()
           },
           onAbort: async () => {
@@ -10415,6 +10426,22 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
       };
     };
 
+    // Human-readable labels for tool actions (used in step_progress events)
+    const toolProgressLabels: Record<string, string> = {
+      write_file: 'Writing file', read_file: 'Reading file', edit_file: 'Editing file',
+      delete_file: 'Deleting file', delete_folder: 'Deleting folder',
+      client_replace_string_in_file: 'Replacing text in file',
+      grep_search: 'Searching codebase', semantic_code_navigator: 'Navigating code',
+      list_files: 'Listing files', check_dev_errors: 'Checking for errors',
+      web_search: 'Searching the web', web_extract: 'Extracting web content',
+      browse_web: 'Browsing website', generate_image: 'Generating image',
+      remove_package: 'Removing package', node_machine: 'Running code',
+      suggest_next_steps: 'Suggesting next steps', manage_todos: 'Managing tasks',
+      generate_plan: 'Creating plan', code_review: 'Reviewing code',
+      code_quality_analysis: 'Analyzing code quality', auto_documentation: 'Generating docs',
+      continue_backend_implementation: 'Continuing implementation',
+    }
+
     // Stream the response using newline-delimited JSON format (not SSE)
     // This matches the format used in stream.ts and expected by chatparse.tsx
     return new Response(
@@ -10429,6 +10456,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
           let streamErrored = false
           let accumulatedUsage = { inputTokens: 0, outputTokens: 0 }
           let accumulatedSteps = 0
+          let currentStepTools: string[] = []
 
           try {
             // Check if client already disconnected before we start streaming
@@ -10488,14 +10516,39 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                 }
               } else if (part.type === 'tool-call') {
                 toolResults.push(part);
+                currentStepTools.push((part as any).toolName || 'unknown')
               } else if (part.type === 'tool-result') {
                 toolResults.push(part);
               } else if (part.type === 'step-finish' && (part as any).usage) {
                 // Capture per-step usage for fallback billing when stream errors
                 const stepUsage = (part as any).usage
-                accumulatedUsage.inputTokens += stepUsage.inputTokens || stepUsage.promptTokens || 0
-                accumulatedUsage.outputTokens += stepUsage.outputTokens || stepUsage.completionTokens || 0
+                const stepInput = stepUsage.inputTokens || stepUsage.promptTokens || 0
+                const stepOutput = stepUsage.outputTokens || stepUsage.completionTokens || 0
+                accumulatedUsage.inputTokens += stepInput
+                accumulatedUsage.outputTokens += stepOutput
                 accumulatedSteps++
+
+                // Build human-readable progress label from tools used this step
+                const progressActions = currentStepTools.map(t => toolProgressLabels[t] || t)
+                const progressMessage = progressActions.length > 0
+                  ? progressActions.join(', ')
+                  : 'Thinking'
+
+                // Emit step_progress event to frontend for live progress indicators + billing
+                controller.enqueue(encoder.encode(JSON.stringify({
+                  type: 'step_progress',
+                  step: accumulatedSteps,
+                  maxSteps: maxStepsAllowed,
+                  toolsUsed: currentStepTools,
+                  progressMessage,
+                  stepTokens: { input: stepInput, output: stepOutput },
+                  totalTokens: { input: accumulatedUsage.inputTokens, output: accumulatedUsage.outputTokens },
+                  estimatedStepCredits: estimatedCostPerStep,
+                  estimatedTotalCredits: accumulatedSteps * estimatedCostPerStep,
+                }) + '\n'))
+
+                // Reset for next step
+                currentStepTools = []
               }
 
               // Send each part as newline-delimited JSON (no SSE "data:" prefix)
@@ -10542,12 +10595,14 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                   abortSignal: controller.signal,
                   experimental_repairToolCall: repairToolCall,
                   experimental_transform: smoothStream({ chunking: 'word' }),
+                  onChunk,
                   onStepFinish: ({ toolCalls, usage, finishReason }) => {
                     const toolNames = toolCalls?.map((tc: any) => tc.toolName).join(', ') || 'none'
                     console.log(`[Chat-V2] [Mid-stream Fallback] Step finished: tools=[${toolNames}], reason=${finishReason}, tokens=${(usage?.inputTokens || 0) + (usage?.outputTokens || 0)}`)
                   },
                   onFinish: async () => {
                     console.log('[Chat-V2] Fallback stream finished')
+                    console.log(`[Chat-V2] [Mid-stream Fallback] Chunk analytics:`, chunkCounts)
                     await closeMCPClients()
                   },
                   onAbort: async () => {
@@ -10584,13 +10639,35 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                     accumulatedReasoning += part.text
                   } else if (part.type === 'tool-call') {
                     toolResults.push(part)
+                    currentStepTools.push((part as any).toolName || 'unknown')
                   } else if (part.type === 'tool-result') {
                     toolResults.push(part)
                   } else if (part.type === 'step-finish' && (part as any).usage) {
                     const stepUsage = (part as any).usage
-                    accumulatedUsage.inputTokens += stepUsage.inputTokens || stepUsage.promptTokens || 0
-                    accumulatedUsage.outputTokens += stepUsage.outputTokens || stepUsage.completionTokens || 0
+                    const stepInput = stepUsage.inputTokens || stepUsage.promptTokens || 0
+                    const stepOutput = stepUsage.outputTokens || stepUsage.completionTokens || 0
+                    accumulatedUsage.inputTokens += stepInput
+                    accumulatedUsage.outputTokens += stepOutput
                     accumulatedSteps++
+
+                    const progressActions = currentStepTools.map(t => toolProgressLabels[t] || t)
+                    const progressMessage = progressActions.length > 0
+                      ? progressActions.join(', ')
+                      : 'Thinking'
+
+                    controller.enqueue(encoder.encode(JSON.stringify({
+                      type: 'step_progress',
+                      step: accumulatedSteps,
+                      maxSteps: maxStepsAllowed,
+                      toolsUsed: currentStepTools,
+                      progressMessage,
+                      stepTokens: { input: stepInput, output: stepOutput },
+                      totalTokens: { input: accumulatedUsage.inputTokens, output: accumulatedUsage.outputTokens },
+                      estimatedStepCredits: estimatedCostPerStep,
+                      estimatedTotalCredits: accumulatedSteps * estimatedCostPerStep,
+                    }) + '\n'))
+
+                    currentStepTools = []
                   }
 
                   controller.enqueue(encoder.encode(JSON.stringify(part) + '\n'))
