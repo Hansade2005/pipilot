@@ -743,6 +743,28 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     loadProjectFiles()
   }, [selectedProject])
 
+  // Refresh projectFiles when AI tools write/edit files (same source of truth as chat panel)
+  useEffect(() => {
+    if (!selectedProject) return
+
+    const handleFilesChanged = async (e: CustomEvent) => {
+      const detail = e.detail as { projectId: string; forceRefresh?: boolean }
+      if (detail.projectId === selectedProject.id) {
+        try {
+          const { storageManager } = await import('@/lib/storage-manager')
+          await storageManager.init()
+          const files = await storageManager.getFiles(selectedProject.id)
+          setProjectFiles(files || [])
+        } catch (error) {
+          console.error('[PCWorkspaceLayout] Error refreshing files after change:', error)
+        }
+      }
+    }
+
+    window.addEventListener('files-changed', handleFilesChanged as EventListener)
+    return () => window.removeEventListener('files-changed', handleFilesChanged as EventListener)
+  }, [selectedProject])
+
   // Handle modal close - reset form fields
   const handleModalClose = (open: boolean) => {
     setIsCreateDialogOpen(open)
@@ -1705,16 +1727,17 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       </div>
                     ) : activeTab === "preview" ? (
                       /* Preview Tab: Full-width Preview */
-                      <CodePreviewPanel 
-                        ref={codePreviewRef} 
-                        project={selectedProject} 
-                        activeTab={activeTab} 
-                        onTabChange={setActiveTab} 
+                      <CodePreviewPanel
+                        ref={codePreviewRef}
+                        project={selectedProject}
+                        activeTab={activeTab}
+                        onTabChange={setActiveTab}
                         previewViewMode={previewViewMode}
                         syncedUrl={syncedPreview.url || customUrl}
                         onUrlChange={setCustomUrl}
                         onVisualEditorSave={handleVisualEditorSave}
                         onApplyTheme={handleVisualEditorThemeSave}
+                        projectFiles={projectFiles}
                       />
                     ) : activeTab === "cloud" ? (
                       /* Cloud Tab */
@@ -2106,6 +2129,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       previewViewMode={previewViewMode}
                       syncedUrl={syncedPreview.url || customUrl}
                       onUrlChange={setCustomUrl}
+                      projectFiles={projectFiles}
                     />
                   </div>
                 </TabsContent>

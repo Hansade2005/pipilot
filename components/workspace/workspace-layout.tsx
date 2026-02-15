@@ -819,6 +819,28 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     loadProjectFiles()
   }, [selectedProject])
 
+  // Refresh projectFiles when AI tools write/edit files (same source of truth as chat panel)
+  useEffect(() => {
+    if (!selectedProject) return
+
+    const handleFilesChanged = async (e: CustomEvent) => {
+      const detail = e.detail as { projectId: string; forceRefresh?: boolean }
+      if (detail.projectId === selectedProject.id) {
+        try {
+          const { storageManager } = await import('@/lib/storage-manager')
+          await storageManager.init()
+          const files = await storageManager.getFiles(selectedProject.id)
+          setProjectFiles(files || [])
+        } catch (error) {
+          console.error('[WorkspaceLayout] Error refreshing files after change:', error)
+        }
+      }
+    }
+
+    window.addEventListener('files-changed', handleFilesChanged as EventListener)
+    return () => window.removeEventListener('files-changed', handleFilesChanged as EventListener)
+  }, [selectedProject])
+
   // Handle modal close - reset form fields
   const handleModalClose = (open: boolean) => {
     setIsCreateDialogOpen(open)
@@ -1620,6 +1642,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                           codePreviewRef.current?.createPreview()
                         }}
                         isAIStreaming={isAIStreaming}
+                        projectFiles={projectFiles}
                         selectedModel={selectedModel}
                         onModelChange={setSelectedModel}
                         userPlan={userPlan}
@@ -2131,6 +2154,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       onVisualEditorSave={handleVisualEditorSave}
                       onApplyTheme={handleVisualEditorThemeSave}
                       isAIStreaming={isAIStreaming}
+                      projectFiles={projectFiles}
                       selectedModel={selectedModel}
                       onModelChange={setSelectedModel}
                       userPlan={userPlan}

@@ -132,6 +132,8 @@ interface CodePreviewPanelProps {
   onTagToChat?: (component: { id: string; tagName: string; sourceFile?: string; sourceLine?: number; className: string; textContent?: string }) => void;
   onPublish?: () => void;
   isAIStreaming?: boolean;
+  // Project files from parent - same source of truth as chat panel
+  projectFiles?: any[];
   // Model selector props
   selectedModel?: string;
   onModelChange?: (model: string) => void;
@@ -871,7 +873,7 @@ function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
 }
 
 export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanelProps>(
-  ({ project, activeTab, onTabChange, previewViewMode = "desktop", syncedUrl, onUrlChange, onVisualEditorSave, onApplyTheme, onTagToChat, onPublish, isAIStreaming = false, selectedModel, onModelChange, userPlan, subscriptionStatus, userId, currentSessionId, onSessionChange, onNewSession }, ref) => {
+  ({ project, activeTab, onTabChange, previewViewMode = "desktop", syncedUrl, onUrlChange, onVisualEditorSave, onApplyTheme, onTagToChat, onPublish, isAIStreaming = false, projectFiles: parentProjectFiles, selectedModel, onModelChange, userPlan, subscriptionStatus, userId, currentSessionId, onSessionChange, onNewSession }, ref) => {
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const [preview, setPreview] = useState<PreviewState>({
@@ -1463,14 +1465,21 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
 
       const authUserId = user.id
       const authUsername = user.user_metadata?.full_name || user.email?.split('@')[0] || 'anonymous'
-      // Fetch latest files from IndexedDB client-side
-      // Re-init storage manager to ensure we get the freshest data after streaming
-      const { storageManager } = await import('@/lib/storage-manager')
-      await storageManager.init()
-      // Small yield to allow any pending IndexedDB transactions to flush
-      await new Promise(resolve => setTimeout(resolve, 200))
-      const files = await storageManager.getFiles(project.id)
-      
+      // Use parent projectFiles (same source of truth as chat panel) when available,
+      // falling back to storageManager for backward compatibility
+      let files: any[]
+      if (parentProjectFiles && parentProjectFiles.length > 0) {
+        files = parentProjectFiles
+        console.log(`[CodePreviewPanel] Using parent projectFiles: ${files.length} files (same source as chat panel)`)
+      } else {
+        // Fallback: fetch from IndexedDB directly
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+        await new Promise(resolve => setTimeout(resolve, 200))
+        files = await storageManager.getFiles(project.id)
+        console.log(`[CodePreviewPanel] Fallback: loaded ${files?.length || 0} files from storageManager`)
+      }
+
       if (!files || files.length === 0) {
         throw new Error('No files found in project')
       }
@@ -1792,12 +1801,18 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
     try {
       console.log('[CodePreviewPanel] Syncing latest files to preview sandbox:', preview.sandboxId)
 
-      // Fetch latest files from IndexedDB
-      // Re-init and yield to ensure all pending writes are flushed
-      const { storageManager } = await import('@/lib/storage-manager')
-      await storageManager.init()
-      await new Promise(resolve => setTimeout(resolve, 200))
-      const files = await storageManager.getFiles(project.id)
+      // Use parent projectFiles (same source of truth as chat panel) when available
+      let files: any[]
+      if (parentProjectFiles && parentProjectFiles.length > 0) {
+        files = parentProjectFiles
+        console.log(`[CodePreviewPanel] Using parent projectFiles for sync: ${files.length} files`)
+      } else {
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+        await new Promise(resolve => setTimeout(resolve, 200))
+        files = await storageManager.getFiles(project.id)
+        console.log(`[CodePreviewPanel] Fallback: loaded ${files?.length || 0} files from storageManager for sync`)
+      }
 
       if (!files || files.length === 0) {
         console.warn('[CodePreviewPanel] No files found, skipping refresh')
