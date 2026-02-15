@@ -127,9 +127,15 @@ export async function GET(request: NextRequest) {
     }
     
     // Set appropriate cache headers
+    // HTML: always revalidate so new deploys are picked up immediately
+    // Hashed assets (Vite outputs like index-abc123.js): immutable long-cache is safe
+    // Non-hashed assets: short cache so re-deploys are reflected quickly
+    const isHashedAsset = /\.[a-f0-9]{8,}\./i.test(filePath)
     const cacheControl = contentType.includes('html')
       ? 'public, max-age=0, must-revalidate'
-      : 'public, max-age=31536000, immutable';
+      : isHashedAsset
+        ? 'public, max-age=31536000, immutable'
+        : 'public, max-age=60, must-revalidate';
 
     return new NextResponse(Buffer.from(arrayBuffer), {
       headers: { 
