@@ -1733,6 +1733,23 @@ export const VERCEL_MODEL_PRICING: Record<string, ModelPricingEntry> = {
     throughputTps: 51,
   },
 
+  'alibaba/qwen3-vl-thinking': {
+    name: 'Qwen3 VL Thinking',
+    provider: 'alibaba',
+    contextWindow: 262_000,
+    maxOutput: 66_000,
+    inputPerToken: 0.00000013,     // $0.13/M
+    outputPerToken: 0.00000052,    // $0.52/M
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: true,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 2.0,
+    throughputTps: 45,
+  },
+
   'alibaba/qwen-3-235b': {
     name: 'Qwen 3 235B',
     provider: 'alibaba',

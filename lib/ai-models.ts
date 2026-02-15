@@ -64,6 +64,20 @@ export const chatModels: Array<ChatModel> = [
     provider: 'vercel-gateway',
   },
   {
+    id: 'xai/grok-4.1-fast-reasoning',
+    name: 'xAI Grok 4.1 Fast Reasoning',
+    description: 'xAI Grok 4.1 Fast Reasoning via Vercel AI Gateway',
+    provider: 'vercel-gateway',
+    supportsVision: true,
+  },
+  {
+    id: 'xai/grok-4.1-fast-non-reasoning',
+    name: 'xAI Grok 4.1 Fast Non-Reasoning',
+    description: 'xAI Grok 4.1 Fast Non-Reasoning via Vercel AI Gateway',
+    provider: 'vercel-gateway',
+    supportsVision: true,
+  },
+  {
     id: 'moonshotai/kimi-k2-thinking',
     name: 'MoonshotAI Kimi K2 Thinking',
     description: 'MoonshotAI Kimi K2 Thinking via Vercel AI Gateway',
@@ -106,6 +120,13 @@ export const chatModels: Array<ChatModel> = [
     name: 'Alibaba Qwen3 Max',
     description: 'Alibaba Qwen3 Max via Vercel AI Gateway',
     provider: 'vercel-gateway',
+  },
+  {
+    id: 'alibaba/qwen3-vl-thinking',
+    name: 'Alibaba Qwen3 VL Thinking',
+    description: 'Alibaba Qwen3 VL Thinking - Vision-language model with reasoning',
+    provider: 'vercel-gateway',
+    supportsVision: true,
   },
   {
     id: 'anthropic/claude-haiku-4.5',

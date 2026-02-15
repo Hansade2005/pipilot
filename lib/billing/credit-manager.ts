@@ -58,10 +58,10 @@ export const MAX_CREDITS_PER_REQUEST: Record<string, number> = {
 // Token-based billing + MAX_CREDITS_PER_REQUEST are the real cost controls.
 // Steps just cap how many tool-call rounds the AI can make in one request.
 const STEPS_BY_PLAN: Record<string, number> = {
-  free: 30,
-  creator: 50,
-  collaborate: 50,
-  scale: 50,
+  free: 60,
+  creator: 60,
+  collaborate: 60,
+  scale: 60,
 }
 
 /**
@@ -74,7 +74,7 @@ export function getMaxStepsForRequest(plan: string, _model: string): number {
 
 // Legacy exports for backward compatibility
 export const MAX_STEPS_PER_PLAN: Record<string, number> = STEPS_BY_PLAN
-export const MAX_STEPS_PER_REQUEST = 50
+export const MAX_STEPS_PER_REQUEST = 60
 
 /**
  * Estimate the credit cost of one agent step for a given model
