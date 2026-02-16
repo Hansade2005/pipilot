@@ -6121,6 +6121,45 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                     )
                   })()}
 
+                  {/* Plan Card from generate_plan tool - shown BEFORE message text */}
+                  {(() => {
+                    const toolCalls = activeToolCalls.get(message.id)
+                    const planCalls = toolCalls?.filter(tc =>
+                      tc.toolName === 'generate_plan' && (tc.status === 'completed' || tc.status === 'executing')
+                    )
+                    const isMessageStreaming = (isLoading && message.id === messages[messages.length - 1]?.id) || message.id === continuingMessageId
+
+                    if (planCalls && planCalls.length > 0) {
+                      return (
+                        <div className="space-y-4 mb-4">
+                          {planCalls.map((toolCall) => {
+                            const input = toolCall.input || {}
+                            // Determine status: planning (tool executing) → building (tool done, message still streaming) → completed
+                            const planStatus: 'planning' | 'building' | 'completed' =
+                              toolCall.status === 'executing'
+                                ? 'planning'
+                                : isMessageStreaming
+                                  ? 'building'
+                                  : 'completed'
+                            return (
+                              <PlanCard
+                                key={toolCall.toolCallId}
+                                title={input.title || 'Generating plan...'}
+                                description={input.description || ''}
+                                steps={input.steps || []}
+                                techStack={input.techStack}
+                                estimatedFiles={input.estimatedFiles}
+                                isStreaming={toolCall.status === 'executing'}
+                                status={planStatus}
+                              />
+                            )
+                          })}
+                        </div>
+                      )
+                    }
+                    return null
+                  })()}
+
                   {/* Pass inline tool calls with positions to MessageWithTools for inline rendering */}
                   {(() => {
                     const toolCalls = activeToolCalls.get(message.id) || []
@@ -6144,60 +6183,6 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                         inlineToolCalls={inlineToolCalls}
                       />
                     )
-                  })()}
-
-                  {/* Special Rendering: Plan Card from generate_plan tool - shown before Activities */}
-                  {(() => {
-                    const toolCalls = activeToolCalls.get(message.id)
-                    const planCalls = toolCalls?.filter(tc =>
-                      tc.toolName === 'generate_plan' && (tc.status === 'completed' || tc.status === 'executing')
-                    )
-
-                    if (planCalls && planCalls.length > 0) {
-                      return (
-                        <div className="space-y-4 mb-4">
-                          {planCalls.map((toolCall) => {
-                            const input = toolCall.input || {}
-                            return (
-                              <PlanCard
-                                key={toolCall.toolCallId}
-                                title={input.title || 'Generating plan...'}
-                                description={input.description || ''}
-                                steps={input.steps || []}
-                                techStack={input.techStack}
-                                estimatedFiles={input.estimatedFiles}
-                                isStreaming={toolCall.status === 'executing'}
-                                onBuild={() => {
-                                  // Stay in plan mode (plan mode now supports execution in Phase 2)
-                                  // Use the same model that generated the plan for build execution
-                                  planModelOverrideRef.current = 'anthropic/claude-haiku-4.5'
-                                  const planSteps = (input.steps || []).map((s: any, i: number) => `${i + 1}. ${s.title}: ${s.description}`).join('\n')
-                                  const buildPrompt = `Build the following plan now:\n\n**${input.title}**\n${input.description}\n\nSteps:\n${planSteps}\n\nTech Stack: ${(input.techStack || []).join(', ')}\n\nBuild this complete application following the plan above. Start implementing immediately.`
-                                  setInput(buildPrompt)
-                                  // Use sendButtonRef.click() like initial prompt to avoid stale closure issue
-                                  setTimeout(() => {
-                                    if (sendButtonRef.current) {
-                                      sendButtonRef.current.click()
-                                    }
-                                  }, 150)
-                                }}
-                                onRefine={() => {
-                                  // Use the same model that generated the plan for refinement
-                                  planModelOverrideRef.current = 'anthropic/claude-haiku-4.5'
-                                  setInput('Please refine the plan.')
-                                  setTimeout(() => {
-                                    if (sendButtonRef.current) {
-                                      sendButtonRef.current.click()
-                                    }
-                                  }, 150)
-                                }}
-                              />
-                            )
-                          })}
-                        </div>
-                      )
-                    }
-                    return null
                   })()}
 
                   {/* Tool Activity Panel - Always show for summary/tracking purposes */}

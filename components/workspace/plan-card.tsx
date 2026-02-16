@@ -10,7 +10,7 @@ import {
   PlanContent,
   PlanFooter,
 } from '@/components/ai-elements/plan'
-import { FileText, Layers, Hammer, CheckCircle2, ChevronRight, Sparkles } from 'lucide-react'
+import { FileText, Layers, CheckCircle2, ChevronRight, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface PlanStep {
@@ -25,8 +25,7 @@ interface PlanCardProps {
   techStack?: string[]
   estimatedFiles?: number
   isStreaming?: boolean
-  onBuild?: () => void
-  onRefine?: () => void
+  status?: 'planning' | 'building' | 'completed'
 }
 
 export function PlanCard({
@@ -36,8 +35,7 @@ export function PlanCard({
   techStack,
   estimatedFiles,
   isStreaming = false,
-  onBuild,
-  onRefine,
+  status = 'planning',
 }: PlanCardProps) {
   return (
     <Plan defaultOpen={true} isStreaming={isStreaming}>
@@ -97,7 +95,7 @@ export function PlanCard({
                 <div className="mt-0.5 text-xs text-gray-500 leading-relaxed">{step.description}</div>
               </div>
 
-              {/* Step Status Indicator */}
+              {/* Step Arrow */}
               <div className="flex-shrink-0 mt-0.5">
                 <ChevronRight className="size-3.5 text-gray-600" />
               </div>
@@ -106,29 +104,26 @@ export function PlanCard({
         </div>
       </PlanContent>
 
-      <PlanFooter className="justify-between">
-        <button
-          onClick={onRefine}
-          className="text-xs text-gray-500 hover:text-orange-400 transition-colors"
-        >
-          Refine plan
-        </button>
-        <button
-          onClick={onBuild}
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-all",
-            "bg-orange-600 hover:bg-orange-500 text-white",
-            "shadow-lg shadow-orange-500/20",
-            "disabled:opacity-30 disabled:cursor-not-allowed"
-          )}
-          disabled={isStreaming}
-        >
-          <Hammer className="size-3.5" />
-          Build
-          <kbd className="ml-1 rounded bg-orange-700/50 px-1.5 py-0.5 text-[10px] font-mono text-orange-200">
-            Enter
-          </kbd>
-        </button>
+      {/* Status Footer */}
+      <PlanFooter className="justify-center">
+        {status === 'planning' && (
+          <div className="inline-flex items-center gap-2 rounded-lg bg-orange-500/10 px-3 py-1.5 border border-orange-500/20">
+            <Loader2 className="size-3.5 text-orange-400 animate-spin" />
+            <span className="text-xs font-medium text-orange-400">Planning...</span>
+          </div>
+        )}
+        {status === 'building' && (
+          <div className="inline-flex items-center gap-2 rounded-lg bg-orange-500/10 px-3 py-1.5 border border-orange-500/20">
+            <Loader2 className="size-3.5 text-orange-400 animate-spin" />
+            <span className="text-xs font-medium text-orange-400">Building...</span>
+          </div>
+        )}
+        {status === 'completed' && (
+          <div className="inline-flex items-center gap-2 rounded-lg bg-emerald-500/10 px-3 py-1.5 border border-emerald-500/20">
+            <CheckCircle2 className="size-3.5 text-emerald-400" />
+            <span className="text-xs font-medium text-emerald-400">Completed</span>
+          </div>
+        )}
       </PlanFooter>
     </Plan>
   )
