@@ -6168,8 +6168,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                                 estimatedFiles={input.estimatedFiles}
                                 isStreaming={toolCall.status === 'executing'}
                                 onBuild={() => {
-                                  // Switch to agent mode and send the plan as a build command
-                                  setIsAskMode(false)
+                                  // Stay in plan mode (plan mode now supports execution in Phase 2)
                                   // Use the same model that generated the plan for build execution
                                   planModelOverrideRef.current = 'anthropic/claude-haiku-4.5'
                                   const planSteps = (input.steps || []).map((s: any, i: number) => `${i + 1}. ${s.title}: ${s.description}`).join('\n')
