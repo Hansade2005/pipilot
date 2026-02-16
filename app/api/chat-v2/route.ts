@@ -2428,20 +2428,31 @@ export async function POST(req: Request) {
     // Build system prompt based on chat mode
     const isNextJS = true // We're using Next.js
     let systemPrompt = chatMode === 'ask' ? `
-# PiPilot AI: Plan Mode - Strategic Architect
+# PiPilot AI: Plan & Build Mode - Strategic Architect + Executor
 
 ## Role
-You are PiPilot in Plan Mode - a senior software architect who analyzes requirements, researches the codebase, and creates detailed execution plans BEFORE any code is written. You do NOT write code or modify files - you create strategic plans that the user can approve and execute with a single click.
+You are PiPilot in Plan & Build Mode - a senior software architect who analyzes requirements, researches the codebase, creates detailed execution plans, and then builds the solution when the user approves.
 
-## Core Mission
+## Two Phases
+
+### Phase 1: Planning (Initial Request)
 When a user describes what they want to build or change, you MUST:
 1. Analyze their request thoroughly
 2. Research the existing codebase (read files, search code, list structure)
 3. Generate a comprehensive, actionable plan using the \`generate_plan\` tool
 4. Do NOT write any text content - the plan card is your entire response
 
-## MANDATORY: Always Use generate_plan Tool
-For EVERY user request in Plan Mode, you MUST call the \`generate_plan\` tool to create a structured plan. This renders as a beautiful interactive card with a "Build" button the user can click to execute the plan automatically.
+### Phase 2: Execution (After User Approves)
+When the user approves the plan (says "Build", "Build this plan", "Go ahead", "Execute", "Yes", "Do it", or clicks the Build button), you MUST:
+1. Immediately start implementing the plan using all available tools (write_file, edit_file, etc.)
+2. Follow the plan steps in order
+3. Build the COMPLETE implementation - all files, all pages, all features
+4. Do NOT ask for further confirmation - the user already approved
+
+**How to detect Phase 2**: If the conversation history contains a \`generate_plan\` tool call followed by a user message indicating approval, you are in Phase 2. Execute immediately.
+
+## MANDATORY: Always Use generate_plan Tool (Phase 1)
+For the INITIAL user request, you MUST call the \`generate_plan\` tool to create a structured plan. This renders as a beautiful interactive card with a "Build" button the user can click to execute the plan automatically.
 
 The plan should include:
 - **title**: A clear, concise name for what's being built
@@ -2458,30 +2469,21 @@ The plan should include:
 - Mention error handling and edge cases
 - For complex features, break into logical phases
 
-## Available Tools (Read-Only + Research + Planning)
-- **read_file**: Read and analyze existing project files
-- **list_files**: Browse project structure
-- **grep_search**: Search for specific code patterns
-- **web_search**: Research best practices and solutions
-- **web_extract**: Extract content from web pages
-- **generate_plan**: Create a structured execution plan (MANDATORY)
-- **suggest_next_steps**: Suggest follow-up actions
-
-## Plan Mode Restrictions
-- NO file modifications, creation, or deletion
-- NO package installation or removal
-- NO database modifications
-- READ-ONLY analysis + plan generation only
-
-## Response Format
+## Phase 1 Response Format
 1. If needed, use read_file/list_files/grep_search to understand the codebase
 2. Call \`generate_plan\` with a detailed, well-structured plan
 3. Call \`suggest_next_steps\` with options like "Refine the plan", "Add more detail to step X", "Build now"
 
-**CRITICAL: Do NOT generate ANY text content before or after calling generate_plan. No introductions, no summaries, no explanations, no bullet points, no markdown. The plan card IS your entire response. The only tool calls you should make are generate_plan and suggest_next_steps. Any text you write will clutter the UI and duplicate information already in the plan card.**
+**CRITICAL (Phase 1 only): Do NOT generate ANY text content before or after calling generate_plan. No introductions, no summaries, no explanations, no bullet points, no markdown. The plan card IS your entire response. The only tool calls you should make are generate_plan and suggest_next_steps. Any text you write will clutter the UI and duplicate information already in the plan card.**
+
+## Phase 2 Response Format
+1. Give a BRIEF acknowledgment (1 sentence max, e.g. "Building now...")
+2. IMMEDIATELY start using write_file/edit_file tools to implement the plan
+3. Build ALL pages and the COMPLETE app - never stop at just 1-2 files
+4. After building, call \`suggest_next_steps\` with follow-up options
 
 ## Next Step Suggestions (MANDATORY)
-At the END of every response, you MUST call the \`suggest_next_steps\` tool with 3-4 follow-up suggestions. Always include "Build this plan" as the first suggestion. Other suggestions can be about refining the plan, adding features, or changing approach.
+At the END of every response, you MUST call the \`suggest_next_steps\` tool with 3-4 follow-up suggestions. In Phase 1, always include "Build this plan" as the first suggestion. In Phase 2, suggest improvements, testing, or new features.
 ` : `
 # PiPilot AI: Web Architect
 ## Role
@@ -2698,7 +2700,7 @@ At the END of every response, call \`suggest_next_steps\` with 3-4 contextual fo
     if (!databaseId) unavailableServices.push('PiPilot Database (no database created yet - use pipilotdb_create_database first if the user needs one)')
     if (!process.env.E2B_API_KEY) unavailableServices.push('Node Machine / terminal (E2B not configured)')
 
-    if (unavailableServices.length > 0 && chatMode !== 'ask') {
+    if (unavailableServices.length > 0) {
       systemPrompt += `\n\n## Unavailable Integrations
 The following services are NOT currently connected for this project. Do NOT attempt to use their tools or suggest them as if they work. If the user asks for these, explain they need to connect/configure them first in project settings:
 ${unavailableServices.map(s => `- ${s}`).join('\n')}
@@ -10043,8 +10045,7 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
 
     }
 
-    // Filter tools based on chat mode and UI initial prompt detection
-    const readOnlyTools = ['read_file', 'grep_search', 'list_files', 'web_search', 'web_extract', 'generate_image', 'suggest_next_steps', 'manage_todos', 'generate_plan']
+    // Filter tools based on UI initial prompt detection and availability
     const uiInitialPromptTools = [
       'list_files', 'check_dev_errors', 'grep_search', 'semantic_code_navigator',
       'web_search', 'web_extract', 'remove_package',
@@ -10053,12 +10054,7 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
     ]
 
     let toolsToUse
-    if (chatMode === 'ask') {
-      // Ask mode: read-only tools only
-      toolsToUse = Object.fromEntries(
-        Object.entries(allTools).filter(([toolName]) => readOnlyTools.includes(toolName))
-      )
-    } else if (isInitialPrompt && modelId === 'grok-4-1-fast-non-reasoning') {
+    if (isInitialPrompt && modelId === 'grok-4-1-fast-non-reasoning') {
       // UI initial prompt mode: limited toolset for UI prototyping
       toolsToUse = Object.fromEntries(
         Object.entries(allTools).filter(([toolName]) => uiInitialPromptTools.includes(toolName))
@@ -10190,10 +10186,10 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
     const modelPricingInfo = getModelPricing(modelId || 'anthropic/claude-sonnet-4.5')
     const isExpensiveModel = modelPricingInfo.input >= 0.000001 // >= $1/1M input tokens
 
-    if (isExpensiveModel && chatMode !== 'ask') {
+    if (isExpensiveModel) {
       const fullToolCount = Object.keys(toolsToUse).length
       // Keep essential tools + any integration tools the user's message explicitly mentions
-      const userMessage = (preprocessedMessages[preprocessedMessages.length - 1]?.content || '').toString().toLowerCase()
+      const userMessage = (processedMessages[processedMessages.length - 1]?.content || '').toString().toLowerCase()
       const mentionsStripe = userMessage.includes('stripe') || userMessage.includes('payment') || userMessage.includes('subscription')
       const mentionsSupabase = userMessage.includes('supabase') || userMessage.includes('database') || userMessage.includes('sql')
       const mentionsPipilotDB = userMessage.includes('pipilotdb') || userMessage.includes('pipilot db') || userMessage.includes('create database')
