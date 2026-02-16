@@ -1,4 +1,4 @@
-import { streamText, tool, stepCountIs, hasToolCall, smoothStream, extractReasoningMiddleware, wrapLanguageModel } from 'ai'
+import { streamText, tool, stepCountIs, smoothStream, extractReasoningMiddleware, wrapLanguageModel } from 'ai'
 import { experimental_createMCPClient as createMCPClient } from '@ai-sdk/mcp'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
@@ -1580,6 +1580,247 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
       toolCallId
     }
   }
+}
+
+// ============================================================================
+// MODULE-LEVEL UTILITIES
+// These must be declared before the POST handler to avoid TDZ issues in
+// webpack's module concatenation. The POST handler (and its tool closures)
+// reference these at runtime.
+// ============================================================================
+
+// Tavily API configuration with key rotation
+const tavilyConfig = {
+  apiKeys: [
+    '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',
+    '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',
+    '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'
+  ],
+  searchUrl: 'https://api.tavily.com/search',
+  extractUrl: 'https://api.tavily.com/extract',
+  currentKeyIndex: 0
+};
+
+// Clean and format web search results for better AI consumption
+function cleanWebSearchResults(results: any[], query: string): string {
+  if (!results || results.length === 0) {
+    return `No results found for query: "${query}"`
+  }
+
+  let cleanedText = `🔍 **Web Search Results for: "${query}"**\n\n`
+
+  results.forEach((result, index) => {
+    const title = result.title || 'Untitled'
+    const url = result.url || 'No URL'
+    const content = result.content || result.raw_content || 'No content available'
+
+    // Clean and truncate content to 1500 chars total
+    const maxContentPerResult = Math.floor(1500 / results.length)
+    const cleanedContent = content
+      .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+      .replace(/\n+/g, ' ') // Replace multiple newlines with single space
+      .trim()
+      .substring(0, maxContentPerResult)
+
+    cleanedText += `**${index + 1}. ${title}**\n`
+    cleanedText += `🔗 ${url}\n`
+    cleanedText += `${cleanedContent}${cleanedContent.length >= maxContentPerResult ? '...' : ''}\n\n`
+  })
+
+  // Ensure total length doesn't exceed 1500 characters
+  if (cleanedText.length > 1500) {
+    cleanedText = cleanedText.substring(0, 1497) + '...'
+  }
+
+  return cleanedText
+}
+
+// Web search function using Tavily API
+async function searchWeb(query: string) {
+  // Check if API keys are available
+  if (tavilyConfig.apiKeys.length === 0) {
+    throw new Error('No Tavily API keys are configured.');
+  }
+
+  try {
+    console.log('Starting web search for:', query);
+
+    // Rotate through available API keys
+    const apiKey = tavilyConfig.apiKeys[tavilyConfig.currentKeyIndex];
+    tavilyConfig.currentKeyIndex = (tavilyConfig.currentKeyIndex + 1) % tavilyConfig.apiKeys.length;
+
+    const response = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        query: query,
+        search_depth: "basic",
+        include_answer: false,
+        include_raw_content: true,
+        max_results: 5
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Web search failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Clean and format results for AI consumption
+    const cleanedResults = cleanWebSearchResults(data.results || [], query)
+
+    console.log('Web search successful (cleaned and formatted):', {
+      query,
+      resultCount: data.results?.length || 0,
+      cleanedLength: cleanedResults.length
+    })
+
+    return {
+      rawData: data,
+      cleanedResults: cleanedResults,
+      query: query,
+      resultCount: data.results?.length || 0
+    }
+  } catch (error) {
+    console.error('Web search error:', error);
+    throw error;
+  }
+}
+
+// Clean and format extracted content for better AI consumption
+function cleanExtractedContent(content: any[], urls: string[]): string {
+  if (!content || content.length === 0) {
+    return `No content extracted from URLs: ${urls.join(', ')}`
+  }
+
+  let cleanedText = `📄 **Content Extraction Results**\n\n`
+
+  content.forEach((item, index) => {
+    const url = item.url || urls[index] || 'Unknown URL'
+    const title = item.title || 'Untitled'
+    const text = item.text || item.raw_content || 'No content available'
+
+    // Clean and truncate content to fit within 1500 chars total
+    const maxContentPerItem = Math.floor(1500 / content.length)
+    const cleanedItemText = text
+      .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+      .replace(/\n+/g, ' ') // Replace multiple newlines with single space
+      .trim()
+      .substring(0, maxContentPerItem)
+
+    cleanedText += `**${index + 1}. ${title}**\n`
+    cleanedText += `🔗 ${url}\n`
+    cleanedText += `${cleanedItemText}${cleanedItemText.length >= maxContentPerItem ? '...' : ''}\n\n`
+  })
+
+  // Ensure total length doesn't exceed 1500 characters
+  if (cleanedText.length > 1500) {
+    cleanedText = cleanedText.substring(0, 1497) + '...'
+  }
+
+  return cleanedText
+}
+
+// Content extraction function using Tavily API
+async function extractContent(urls: string | string[]) {
+  // Check if API keys are available
+  if (tavilyConfig.apiKeys.length === 0) {
+    throw new Error('No Tavily API keys are configured.');
+  }
+
+  try {
+    // Ensure urls is always an array
+    const urlArray = Array.isArray(urls) ? urls : [urls];
+
+    // Rotate through available API keys
+    const apiKey = tavilyConfig.apiKeys[tavilyConfig.currentKeyIndex];
+    tavilyConfig.currentKeyIndex = (tavilyConfig.currentKeyIndex + 1) % tavilyConfig.apiKeys.length;
+
+    console.log('Starting content extraction for:', urlArray);
+    const response = await fetch('https://api.tavily.com/extract', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        urls: urlArray,
+        include_images: false,
+        extract_depth: "basic"
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Content extraction failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Clean and format extracted content for AI consumption
+    const cleanedContent = cleanExtractedContent(data.content || [], urlArray)
+
+    console.log('Content extraction successful (cleaned and formatted):', {
+      urlCount: urlArray.length,
+      contentCount: data.content?.length || 0,
+      cleanedLength: cleanedContent.length
+    })
+
+    return {
+      rawData: data,
+      cleanedContent: cleanedContent,
+      urls: urlArray,
+      contentCount: data.content?.length || 0
+    }
+  } catch (error) {
+    console.error('Content extraction error:', error);
+    throw error;
+  }
+}
+
+// Parse a single search/replace block
+function parseSearchReplaceBlock(blockText: string) {
+  const SEARCH_START = "<<<<<<< SEARCH";
+  const DIVIDER = "=======";
+  const REPLACE_END = ">>>>>>> REPLACE";
+
+  const lines = blockText.split('\n');
+  let searchLines = [];
+  let replaceLines = [];
+  let mode = 'none'; // 'search' | 'replace'
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (line.trim() === SEARCH_START) {
+      mode = 'search';
+    } else if (line.trim() === DIVIDER && mode === 'search') {
+      mode = 'replace';
+    } else if (line.trim() === REPLACE_END && mode === 'replace') {
+      break; // End of block
+    } else if (mode === 'search') {
+      searchLines.push(line);
+    } else if (mode === 'replace') {
+      replaceLines.push(line);
+    }
+  }
+
+  // Don't trim empty lines to preserve exact whitespace for matching
+  // Only check if we have any content at all
+  const hasSearchContent = searchLines.some(line => line.trim() !== '');
+  const hasReplaceContent = replaceLines.some(line => line.trim() !== '');
+
+  if (!hasSearchContent && !hasReplaceContent) {
+    return null; // Completely empty block
+  }
+
+  return {
+    search: searchLines.join('\n'),
+    replace: replaceLines.join('\n')
+  };
 }
 
 export async function POST(req: Request) {
@@ -10989,238 +11230,4 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
       { status: 500 }
     )
   }
-}
-
-// Add Tavily API configuration with environment variable support
-const tavilyConfig = {
-  apiKeys: [
-    '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',
-    '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',
-    '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'
-  ],
-  searchUrl: 'https://api.tavily.com/search',
-  extractUrl: 'https://api.tavily.com/extract',
-  currentKeyIndex: 0
-};
-
-// Clean and format web search results for better AI consumption
-function cleanWebSearchResults(results: any[], query: string): string {
-  if (!results || results.length === 0) {
-    return `No results found for query: "${query}"`
-  }
-
-  let cleanedText = `🔍 **Web Search Results for: "${query}"**\n\n`
-
-  results.forEach((result, index) => {
-    const title = result.title || 'Untitled'
-    const url = result.url || 'No URL'
-    const content = result.content || result.raw_content || 'No content available'
-
-    // Clean and truncate content to 1500 chars total
-    const maxContentPerResult = Math.floor(1500 / results.length)
-    const cleanedContent = content
-      .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-      .replace(/\n+/g, ' ') // Replace multiple newlines with single space
-      .trim()
-      .substring(0, maxContentPerResult)
-
-    cleanedText += `**${index + 1}. ${title}**\n`
-    cleanedText += `🔗 ${url}\n`
-    cleanedText += `${cleanedContent}${cleanedContent.length >= maxContentPerResult ? '...' : ''}\n\n`
-  })
-
-  // Ensure total length doesn't exceed 1500 characters
-  if (cleanedText.length > 1500) {
-    cleanedText = cleanedText.substring(0, 1497) + '...'
-  }
-
-  return cleanedText
-}
-
-// Web search function using Tavily API
-async function searchWeb(query: string) {
-  // Check if API keys are available
-  if (tavilyConfig.apiKeys.length === 0) {
-    throw new Error('No Tavily API keys are configured.');
-  }
-
-  try {
-    console.log('Starting web search for:', query);
-
-    // Rotate through available API keys
-    const apiKey = tavilyConfig.apiKeys[tavilyConfig.currentKeyIndex];
-    tavilyConfig.currentKeyIndex = (tavilyConfig.currentKeyIndex + 1) % tavilyConfig.apiKeys.length;
-
-    const response = await fetch('https://api.tavily.com/search', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        query: query,
-        search_depth: "basic",
-        include_answer: false,
-        include_raw_content: true,
-        max_results: 5
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Web search failed with status ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    // Clean and format results for AI consumption
-    const cleanedResults = cleanWebSearchResults(data.results || [], query)
-
-    console.log('Web search successful (cleaned and formatted):', {
-      query,
-      resultCount: data.results?.length || 0,
-      cleanedLength: cleanedResults.length
-    })
-
-    return {
-      rawData: data,
-      cleanedResults: cleanedResults,
-      query: query,
-      resultCount: data.results?.length || 0
-    }
-  } catch (error) {
-    console.error('Web search error:', error);
-    throw error;
-  }
-}
-
-// Clean and format extracted content for better AI consumption
-function cleanExtractedContent(content: any[], urls: string[]): string {
-  if (!content || content.length === 0) {
-    return `No content extracted from URLs: ${urls.join(', ')}`
-  }
-
-  let cleanedText = `📄 **Content Extraction Results**\n\n`
-
-  content.forEach((item, index) => {
-    const url = item.url || urls[index] || 'Unknown URL'
-    const title = item.title || 'Untitled'
-    const text = item.text || item.raw_content || 'No content available'
-
-    // Clean and truncate content to fit within 1500 chars total
-    const maxContentPerItem = Math.floor(1500 / content.length)
-    const cleanedItemText = text
-      .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-      .replace(/\n+/g, ' ') // Replace multiple newlines with single space
-      .trim()
-      .substring(0, maxContentPerItem)
-
-    cleanedText += `**${index + 1}. ${title}**\n`
-    cleanedText += `🔗 ${url}\n`
-    cleanedText += `${cleanedItemText}${cleanedItemText.length >= maxContentPerItem ? '...' : ''}\n\n`
-  })
-
-  // Ensure total length doesn't exceed 1500 characters
-  if (cleanedText.length > 1500) {
-    cleanedText = cleanedText.substring(0, 1497) + '...'
-  }
-
-  return cleanedText
-}
-
-// Content extraction function using Tavily API
-async function extractContent(urls: string | string[]) {
-  // Check if API keys are available
-  if (tavilyConfig.apiKeys.length === 0) {
-    throw new Error('No Tavily API keys are configured.');
-  }
-
-  try {
-    // Ensure urls is always an array
-    const urlArray = Array.isArray(urls) ? urls : [urls];
-
-    // Rotate through available API keys
-    const apiKey = tavilyConfig.apiKeys[tavilyConfig.currentKeyIndex];
-    tavilyConfig.currentKeyIndex = (tavilyConfig.currentKeyIndex + 1) % tavilyConfig.apiKeys.length;
-
-    console.log('Starting content extraction for:', urlArray);
-    const response = await fetch('https://api.tavily.com/extract', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        urls: urlArray,
-        include_images: false,
-        extract_depth: "basic"
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Content extraction failed with status ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    // Clean and format extracted content for AI consumption
-    const cleanedContent = cleanExtractedContent(data.content || [], urlArray)
-
-    console.log('Content extraction successful (cleaned and formatted):', {
-      urlCount: urlArray.length,
-      contentCount: data.content?.length || 0,
-      cleanedLength: cleanedContent.length
-    })
-
-    return {
-      rawData: data,
-      cleanedContent: cleanedContent,
-      urls: urlArray,
-      contentCount: data.content?.length || 0
-    }
-  } catch (error) {
-    console.error('Content extraction error:', error);
-    throw error;
-  }
-}
-
-// Parse a single search/replace block
-function parseSearchReplaceBlock(blockText: string) {
-  const SEARCH_START = "<<<<<<< SEARCH";
-  const DIVIDER = "=======";
-  const REPLACE_END = ">>>>>>> REPLACE";
-
-  const lines = blockText.split('\n');
-  let searchLines = [];
-  let replaceLines = [];
-  let mode = 'none'; // 'search' | 'replace'
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    if (line.trim() === SEARCH_START) {
-      mode = 'search';
-    } else if (line.trim() === DIVIDER && mode === 'search') {
-      mode = 'replace';
-    } else if (line.trim() === REPLACE_END && mode === 'replace') {
-      break; // End of block
-    } else if (mode === 'search') {
-      searchLines.push(line);
-    } else if (mode === 'replace') {
-      replaceLines.push(line);
-    }
-  }
-
-  // Don't trim empty lines to preserve exact whitespace for matching
-  // Only check if we have any content at all
-  const hasSearchContent = searchLines.some(line => line.trim() !== '');
-  const hasReplaceContent = replaceLines.some(line => line.trim() !== '');
-
-  if (!hasSearchContent && !hasReplaceContent) {
-    return null; // Completely empty block
-  }
-
-  return {
-    search: searchLines.join('\n'),
-    replace: replaceLines.join('\n')
-  };
 }

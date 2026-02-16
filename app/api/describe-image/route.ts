@@ -267,7 +267,7 @@ export async function POST(request: NextRequest) {
 
     // Use Mistral vision model via Vercel AI Gateway to avoid rate limits
     const result = await generateText({
-      model: vercelGateway('mistral/devstral-small-2'),
+      model: vercelGateway()('mistral/devstral-small-2'),
       messages: [
         {
           role: 'user',
