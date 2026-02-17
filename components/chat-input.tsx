@@ -136,6 +136,8 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   const [selectedTemplate, setSelectedTemplate] = useState<'vite-react' | 'nextjs' | 'expo' | 'html'>('vite-react')
   const [showTemplateDropdown, setShowTemplateDropdown] = useState(false)
   const templateDropdownRef = useRef<HTMLDivElement>(null)
+  const templateTriggerRef = useRef<HTMLButtonElement>(null)
+  const [templateDropdownStyle, setTemplateDropdownStyle] = useState<React.CSSProperties>({})
 
   // URL attachment state
   const [attachedUrl, setAttachedUrl] = useState("")
@@ -212,6 +214,20 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   useEffect(() => {
     setSuggestions(getRandomSuggestions(15))
   }, [])
+
+  // Calculate fixed position when template dropdown opens
+  useEffect(() => {
+    if (showTemplateDropdown && templateTriggerRef.current) {
+      const rect = templateTriggerRef.current.getBoundingClientRect()
+      setTemplateDropdownStyle({
+        position: 'fixed' as const,
+        bottom: window.innerHeight - rect.top + 4,
+        left: rect.left,
+        width: 180,
+        zIndex: 100,
+      })
+    }
+  }, [showTemplateDropdown])
 
   // Close template dropdown on outside click
   useEffect(() => {
@@ -1307,6 +1323,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                 {/* Template Selector - clean text + chevron like model selector */}
                 <div className="relative" ref={templateDropdownRef}>
                   <button
+                    ref={templateTriggerRef}
                     type="button"
                     className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-200 transition-colors disabled:opacity-30"
                     onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
@@ -1319,7 +1336,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                   </button>
 
                   {showTemplateDropdown && (
-                    <div className="absolute bottom-8 left-0 w-[180px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[100] overflow-hidden py-1">
+                    <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl overflow-hidden py-1" style={templateDropdownStyle}>
                       {([
                         { id: 'vite-react' as const, name: 'Vite', desc: 'Frontend sites' },
                         { id: 'nextjs' as const, name: 'Next.js', desc: 'Fullstack apps with SSR' },
