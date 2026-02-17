@@ -6112,6 +6112,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                                 estimatedFiles={input.estimatedFiles}
                                 isStreaming={toolCall.status === 'executing'}
                                 status={planStatus}
+                                projectId={project?.id}
                               />
                             )
                           })}
