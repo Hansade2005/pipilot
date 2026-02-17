@@ -150,6 +150,9 @@ const getToolLabel = (toolName: string, args?: Record<string, any>): string => {
     query_database: "Querying database",
     manipulate_table_data: "Updating data",
     manage_api_keys: "Managing API keys",
+    browse_web: "Using the Browser",
+    update_plan_progress: "Updating plan progress",
+    update_project_context: "Documenting project",
   }
   return labelMap[toolName] || toolName
 }

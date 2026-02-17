@@ -128,6 +128,9 @@ const InlineToolPill = ({ toolName, input, status = 'pending', onOpenFile }: {
       case 'delete_file': return `Deleting ${args?.path ? args.path.split('/').pop() : 'file'}`
       case 'delete_folder': return `Deleting folder ${args?.path ? args.path.split('/').pop() : 'folder'}`
       case 'grep_search': return `Searching "${args?.pattern || 'pattern'}"`
+      case 'browse_web': return 'Using the Browser'
+      case 'update_plan_progress': return 'Updating plan progress'
+      case 'update_project_context': return 'Documenting project'
       default: return tool
     }
   }

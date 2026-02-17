@@ -201,7 +201,9 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
       case 'semantic_code_navigator': return `Search codebase for "${args?.query || 'query'}"`
       case 'web_search': return `Searching: ${args?.query || 'query'}`
       case 'web_extract': return 'Extracting web content'
-      case 'browse_web': return 'Running browser test'
+      case 'browse_web': return 'Using the Browser'
+      case 'update_plan_progress': return 'Updating plan progress'
+      case 'update_project_context': return 'Documenting project'
       case 'check_dev_errors': return 'Checking for errors'
       case 'generate_report': return 'Generating report'
       default: return tool
@@ -504,7 +506,11 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
       case 'web_extract':
         return 'Extracting web content'
       case 'browse_web':
-        return 'Running browser test'
+        return 'Using the Browser'
+      case 'update_plan_progress':
+        return 'Updating plan progress'
+      case 'update_project_context':
+        return 'Documenting project'
       case 'check_dev_errors':
         return 'Checking for errors'
       default:

@@ -1071,6 +1071,148 @@ export async function handleClientFileOperation(
         break;
       }
 
+      case 'update_plan_progress': {
+        const { stepNumber, notes } = toolCall.args;
+        console.log(`[ClientFileTool] update_plan_progress: step ${stepNumber}`);
+
+        try {
+          // Read the current plan.md
+          const planFile = await storageManager.getFile(projectId, '.pipilot/plan.md');
+          if (!planFile || !planFile.content) {
+            addToolResult({
+              tool: 'update_plan_progress',
+              toolCallId: toolCall.toolCallId,
+              state: 'output-error',
+              errorText: 'Could not read .pipilot/plan.md - file not found'
+            });
+            return;
+          }
+
+          let planContent = planFile.content;
+
+          // Replace the status for the given step: [ ] Pending -> [x] Completed
+          const stepPattern = new RegExp(
+            `(### Step ${stepNumber}:[^\\n]*\\n- \\*\\*Status:\\*\\* )\\[ \\] Pending`,
+            's'
+          );
+          const replacement = `$1[x] Completed${notes ? ' - ' + notes : ''}`;
+          planContent = planContent.replace(stepPattern, replacement);
+
+          // Update the "Last Updated" timestamp
+          planContent = planContent.replace(
+            /\*Last Updated:.*\*/,
+            `*Last Updated: ${new Date().toISOString()}*`
+          );
+
+          // Write the updated plan back
+          await storageManager.updateFile(projectId, '.pipilot/plan.md', { content: planContent });
+          console.log(`[ClientFileTool] Marked step ${stepNumber} as completed in plan.md`);
+
+          addToolResult({
+            tool: 'update_plan_progress',
+            toolCallId: toolCall.toolCallId,
+            output: {
+              success: true,
+              message: `Step ${stepNumber} marked as completed`,
+              stepNumber,
+              status: 'completed',
+              notes
+            }
+          });
+
+          window.dispatchEvent(new CustomEvent('files-changed', {
+            detail: { projectId, forceRefresh: true }
+          }));
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          addToolResult({
+            tool: 'update_plan_progress',
+            toolCallId: toolCall.toolCallId,
+            state: 'output-error',
+            errorText: `Failed to update plan progress: ${errorMessage}`
+          });
+        }
+        break;
+      }
+
+      case 'update_project_context': {
+        const { projectName, summary, features, techStack, keyFiles, roadmap, designNotes } = toolCall.args;
+        console.log(`[ClientFileTool] update_project_context: ${projectName}`);
+
+        try {
+          const projectMd = `# ${projectName}
+
+## Summary
+${summary}
+
+## Features
+${features.map((f: string) => `- ${f}`).join('\n')}
+
+## Tech Stack
+${techStack.map((t: string) => `- ${t}`).join('\n')}
+${keyFiles && keyFiles.length > 0 ? `
+## Key Files
+| File | Purpose |
+|------|---------|
+${keyFiles.map((f: any) => `| \`${f.path}\` | ${f.purpose} |`).join('\n')}
+` : ''}
+${designNotes ? `
+## Design System
+${designNotes}
+` : ''}
+${roadmap && roadmap.length > 0 ? `
+## Roadmap
+${roadmap.map((r: string) => `- [ ] ${r}`).join('\n')}
+` : ''}
+---
+*Last Updated: ${new Date().toISOString()}*
+`;
+
+          // Check if file exists
+          const existingFile = await storageManager.getFile(projectId, '.pipilot/project.md');
+          if (existingFile) {
+            await storageManager.updateFile(projectId, '.pipilot/project.md', { content: projectMd });
+          } else {
+            await storageManager.createFile({
+              workspaceId: projectId,
+              name: 'project.md',
+              path: '.pipilot/project.md',
+              content: projectMd,
+              fileType: 'md',
+              type: 'md',
+              size: projectMd.length,
+              isDirectory: false,
+              metadata: { createdBy: 'ai' }
+            });
+          }
+
+          console.log(`[ClientFileTool] Persisted project context to .pipilot/project.md`);
+
+          addToolResult({
+            tool: 'update_project_context',
+            toolCallId: toolCall.toolCallId,
+            output: {
+              success: true,
+              message: `Project context saved to .pipilot/project.md`,
+              path: '.pipilot/project.md'
+            }
+          });
+
+          window.dispatchEvent(new CustomEvent('files-changed', {
+            detail: { projectId, forceRefresh: true }
+          }));
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          addToolResult({
+            tool: 'update_project_context',
+            toolCallId: toolCall.toolCallId,
+            state: 'output-error',
+            errorText: `Failed to update project context: ${errorMessage}`
+          });
+        }
+        break;
+      }
+
       case 'request_supabase_connection': {
         const { title, description, labels } = toolCall.args;
         console.log(`[ClientFileTool] request_supabase_connection`);
