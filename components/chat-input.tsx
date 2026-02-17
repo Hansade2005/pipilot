@@ -22,6 +22,9 @@ import { filterUnwantedFiles } from "@/lib/utils"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Suggestions, Suggestion } from "@/components/ai-elements/suggestion"
 import { getRandomSuggestions } from "@/lib/project-suggestions"
+import { ModelSelector } from "@/components/ui/model-selector"
+import { DEFAULT_CHAT_MODEL } from "@/lib/ai-models"
+import { useSubscriptionCache } from "@/hooks/use-subscription-cache"
 
 // Load JSZip from CDN (same as file explorer)
 if (typeof window !== 'undefined' && !window.JSZip) {
@@ -155,6 +158,9 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   // Plan mode state - true for Plan mode (default), false for Agent mode
   const [isPlanMode, setIsPlanMode] = useState(true)
 
+  // Model selection state
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_CHAT_MODEL)
+
   // Fetch user on mount
   useEffect(() => {
     const checkUser = async () => {
@@ -168,6 +174,9 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     }
     checkUser()
   }, [supabase.auth])
+
+  // Get user subscription for model availability
+  const { plan: userPlan, status: subscriptionStatus } = useSubscriptionCache(user?.id)
 
   // Save prompt to localStorage whenever it changes
   useEffect(() => {
@@ -1034,6 +1043,9 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
           // Store plan mode preference so workspace chat panel picks it up
           sessionStorage.setItem(`initial-chat-mode-${workspace.id}`, isPlanMode ? 'plan' : 'agent')
 
+          // Store selected model so workspace starts with the same model
+          sessionStorage.setItem(`initial-model-${workspace.id}`, selectedModel)
+
           // CRITICAL FIX: Clear any cached project/file state to prevent contamination
           // This ensures the workspace loads with a clean slate
           sessionStorage.removeItem('lastSelectedProject')
@@ -1273,6 +1285,15 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                     </svg>
                   )}
                 </button>
+
+                {/* Model Selector */}
+                <ModelSelector
+                  selectedModel={selectedModel}
+                  onModelChange={setSelectedModel}
+                  userPlan={userPlan}
+                  subscriptionStatus={subscriptionStatus}
+                  compact={true}
+                />
 
                 {/* Template Selector - clean text + chevron like model selector */}
                 <div className="relative" ref={templateDropdownRef}>
