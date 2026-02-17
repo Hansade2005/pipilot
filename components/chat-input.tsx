@@ -1302,6 +1302,8 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                   userPlan={userPlan}
                   subscriptionStatus={subscriptionStatus}
                   compact={true}
+                  dropdownAlign="left"
+                  dropdownClassName="z-[9999]"
                 />
 
                 {/* Template Selector - clean text + chevron like model selector */}
@@ -1319,7 +1321,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                   </button>
 
                   {showTemplateDropdown && (
-                    <div className="absolute bottom-8 left-0 w-[180px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[100] overflow-hidden py-1">
+                    <div className="absolute bottom-8 left-0 w-[180px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[9999] overflow-hidden py-1">
                       {([
                         { id: 'vite-react' as const, name: 'Vite', desc: 'Frontend sites' },
                         { id: 'nextjs' as const, name: 'Next.js', desc: 'Fullstack apps with SSR' },

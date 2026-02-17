@@ -12,6 +12,8 @@ interface ModelSelectorProps {
   subscriptionStatus?: string
   className?: string
   compact?: boolean
+  dropdownAlign?: 'left' | 'right'
+  dropdownClassName?: string
 }
 
 // Short, clean display names (like Anthropic's "Opus 4.6", "Sonnet 4.5")
@@ -70,7 +72,9 @@ export function ModelSelector({
   userPlan = 'free',
   subscriptionStatus,
   className = '',
-  compact = true
+  compact = true,
+  dropdownAlign = 'right',
+  dropdownClassName = '',
 }: ModelSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -157,7 +161,7 @@ export function ModelSelector({
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute bottom-8 right-0 w-[240px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[100] overflow-hidden">
+        <div className={`absolute bottom-8 ${dropdownAlign === 'left' ? 'left-0' : 'right-0'} w-[240px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[100] overflow-hidden ${dropdownClassName}`}>
           <div className="max-h-[320px] overflow-y-auto py-1">
             {orderedModels.map((modelId) => {
               const allowed = isModelAllowed(modelId)
