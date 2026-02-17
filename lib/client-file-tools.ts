@@ -1071,6 +1071,84 @@ export async function handleClientFileOperation(
         break;
       }
 
+      case 'generate_plan': {
+        const { title, description, steps, techStack, estimatedFiles } = toolCall.args;
+        console.log(`[ClientFileTool] generate_plan: ${title}`);
+
+        try {
+          // Build plan.md content (same format as server-side)
+          const planMd = `# Plan: ${title}
+
+> ${description}
+
+## Tech Stack
+${(techStack || []).map((t: string) => `- ${t}`).join('\n') || '- N/A'}
+
+## Estimated Files
+~${estimatedFiles || '?'} files
+
+## Steps
+
+${steps.map((s: any, i: number) => `### Step ${i + 1}: ${s.title}
+- **Status:** [ ] Pending
+- **Description:** ${s.description}
+`).join('\n')}
+
+---
+*Generated: ${new Date().toISOString()}*
+*Last Updated: ${new Date().toISOString()}*
+`;
+
+          // Write plan.md to IndexedDB
+          const existingPlan = await storageManager.getFile(projectId, '.pipilot/plan.md');
+          if (existingPlan) {
+            await storageManager.updateFile(projectId, '.pipilot/plan.md', { content: planMd });
+          } else {
+            await storageManager.createFile({
+              workspaceId: projectId,
+              name: 'plan.md',
+              path: '.pipilot/plan.md',
+              content: planMd,
+              fileType: 'md',
+              type: 'md',
+              size: planMd.length,
+              isDirectory: false,
+              metadata: { createdBy: 'ai' }
+            });
+          }
+
+          console.log(`[ClientFileTool] Persisted plan to .pipilot/plan.md`);
+
+          addToolResult({
+            tool: 'generate_plan',
+            toolCallId: toolCall.toolCallId,
+            output: {
+              success: true,
+              title,
+              description,
+              steps,
+              techStack,
+              estimatedFiles,
+              toolCallId: toolCall.toolCallId
+            }
+          });
+
+          window.dispatchEvent(new CustomEvent('files-changed', {
+            detail: { projectId, forceRefresh: true }
+          }));
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          console.error(`[ClientFileTool] generate_plan error:`, error);
+          addToolResult({
+            tool: 'generate_plan',
+            toolCallId: toolCall.toolCallId,
+            state: 'output-error',
+            errorText: `Failed to generate plan: ${errorMessage}`
+          });
+        }
+        break;
+      }
+
       case 'update_plan_progress': {
         const { stepNumber, notes } = toolCall.args;
         console.log(`[ClientFileTool] update_plan_progress: step ${stepNumber}`);
