@@ -1303,6 +1303,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                   subscriptionStatus={subscriptionStatus}
                   compact={true}
                   dropdownAlign="left"
+                  dropdownDirection="down"
                   dropdownClassName="z-[9999]"
                 />
 
