@@ -721,6 +721,11 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               setInitialChatMode(storedMode)
               sessionStorage.removeItem(`initial-chat-mode-${projectId}`)
             }
+            const storedModel = sessionStorage.getItem(`initial-model-${projectId}`)
+            if (storedModel) {
+              setSelectedModel(storedModel)
+              sessionStorage.removeItem(`initial-model-${projectId}`)
+            }
           }
           
           // Legacy: Also check URL param for backward compatibility
