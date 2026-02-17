@@ -23,7 +23,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Suggestions, Suggestion } from "@/components/ai-elements/suggestion"
 import { getRandomSuggestions } from "@/lib/project-suggestions"
 import { ModelSelector } from "@/components/ui/model-selector"
-import { DEFAULT_CHAT_MODEL } from "@/lib/ai-models"
 import { useSubscriptionCache } from "@/hooks/use-subscription-cache"
 
 // Load JSZip from CDN (same as file explorer)
@@ -158,8 +157,8 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   // Plan mode state - true for Plan mode (default), false for Agent mode
   const [isPlanMode, setIsPlanMode] = useState(true)
 
-  // Model selection state
-  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_CHAT_MODEL)
+  // Model selection state (default Grok Fast for free, updated to Haiku for premium via useEffect)
+  const [selectedModel, setSelectedModel] = useState<string>('xai/grok-code-fast-1')
 
   // Fetch user on mount
   useEffect(() => {
@@ -177,6 +176,16 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
 
   // Get user subscription for model availability
   const { plan: userPlan, status: subscriptionStatus } = useSubscriptionCache(user?.id)
+
+  // Set default model based on user plan: Haiku 4.5 for premium, Grok Fast for free
+  useEffect(() => {
+    const isPremium = ['pro', 'creator', 'teams', 'collaborate', 'enterprise', 'scale'].includes(userPlan)
+    if (isPremium) {
+      setSelectedModel('anthropic/claude-haiku-4.5')
+    } else {
+      setSelectedModel('xai/grok-code-fast-1')
+    }
+  }, [userPlan])
 
   // Save prompt to localStorage whenever it changes
   useEffect(() => {
