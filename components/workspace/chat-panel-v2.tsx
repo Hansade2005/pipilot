@@ -2960,80 +2960,23 @@ export function ChatPanelV2({
     }
   }, [project?.id])
 
-  // Check for interrupted streams on mount and auto-recover
-  useEffect(() => {
-    if (!project?.id || !currentChatSessionId) return
-
-    const checkAndAutoRecoverStreams = async () => {
-      try {
-        await streamRecoveryManager.init()
-        // Also clean up old streams while we're at it
-        await streamRecoveryManager.cleanupOldStreams()
-
-        const interruptedStreams = await streamRecoveryManager.getInterruptedStreams(project.id)
-        console.log('[StreamRecovery] Found interrupted streams:', interruptedStreams.length)
-
-        if (interruptedStreams.length > 0) {
-          // Get the most recent one for this chat session
-          const relevantStream = interruptedStreams.find(s => s.chatSessionId === currentChatSessionId)
-          if (relevantStream) {
-            console.log('[StreamRecovery] 🔄 Auto-recovering interrupted stream:', relevantStream.id)
-            // Small delay to let the UI settle before starting recovery
-            setTimeout(() => {
-              handleRecoverStream(relevantStream)
-            }, 500)
-          }
-        }
-      } catch (error) {
-        console.error('[StreamRecovery] Error checking for interrupted streams:', error)
-      }
-    }
-
-    checkAndAutoRecoverStreams()
-  }, [project?.id, currentChatSessionId])
-
-  // Handle visibility change and beforeunload for stream interruption
+  // Warn user before closing tab during active streaming
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    const handleVisibilityChange = async () => {
-      if (document.hidden && currentStreamIdRef.current && isLoading) {
-        console.log('[StreamRecovery] Tab hidden during streaming, marking as interrupted')
-        // Flush any pending updates immediately
-        await streamRecoveryManager.flushPendingUpdate()
-        await streamRecoveryManager.markInterrupted(currentStreamIdRef.current, 'tab_hidden')
-      }
-    }
-
-    const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (currentStreamIdRef.current && isLoading) {
-        console.log('[StreamRecovery] Page unloading during streaming, marking as interrupted')
-        // Use sendBeacon pattern for reliable save before unload
-        await streamRecoveryManager.flushPendingUpdate()
-        await streamRecoveryManager.markInterrupted(currentStreamIdRef.current, 'page_unload')
-        // Show browser confirmation dialog
+        // Show browser confirmation dialog when closing tab during streaming
         e.preventDefault()
         e.returnValue = 'AI is still generating a response. Are you sure you want to leave?'
         return e.returnValue
       }
     }
 
-    const handlePageHide = async () => {
-      if (currentStreamIdRef.current && isLoading) {
-        console.log('[StreamRecovery] Page hiding during streaming, marking as interrupted')
-        await streamRecoveryManager.flushPendingUpdate()
-        await streamRecoveryManager.markInterrupted(currentStreamIdRef.current, 'page_unload')
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
     window.addEventListener('beforeunload', handleBeforeUnload)
-    window.addEventListener('pagehide', handlePageHide)
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.removeEventListener('beforeunload', handleBeforeUnload)
-      window.removeEventListener('pagehide', handlePageHide)
     }
   }, [isLoading])
 
