@@ -10248,7 +10248,7 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
       const mentionsStripe = userMessage.includes('stripe') || userMessage.includes('payment') || userMessage.includes('subscription')
       const mentionsSupabase = userMessage.includes('supabase') || userMessage.includes('database') || userMessage.includes('sql')
       const mentionsPipilotDB = userMessage.includes('pipilotdb') || userMessage.includes('pipilot db') || userMessage.includes('create database')
-      const mentionsBrowse = userMessage.includes('browse') || userMessage.includes('screenshot') || userMessage.includes('playwright')
+      const mentionsBrowse = userMessage.includes('browse') || userMessage.includes('screenshot') || userMessage.includes('playwright') || userMessage.includes('clone') || userMessage.includes('replicate') || userMessage.includes('recreate') || userMessage.includes('copy this') || userMessage.includes('copy the') || userMessage.includes('build something like') || userMessage.includes('make it look like') || /https?:\/\//.test(userMessage) || /\.\w{2,6}\//.test(userMessage)
       const mentionsDocs = userMessage.includes('documentation') || userMessage.includes('report') || userMessage.includes('code review')
 
       // Build the allowed tool set: always include core tools
