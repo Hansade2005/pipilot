@@ -13,6 +13,7 @@ interface ModelSelectorProps {
   className?: string
   compact?: boolean
   dropdownAlign?: 'left' | 'right'
+  dropdownDirection?: 'up' | 'down'
   dropdownClassName?: string
 }
 
@@ -74,6 +75,7 @@ export function ModelSelector({
   className = '',
   compact = true,
   dropdownAlign = 'right',
+  dropdownDirection = 'up',
   dropdownClassName = '',
 }: ModelSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
@@ -161,7 +163,7 @@ export function ModelSelector({
 
       {/* Dropdown */}
       {isOpen && (
-        <div className={`absolute bottom-8 ${dropdownAlign === 'left' ? 'left-0' : 'right-0'} w-[240px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[100] overflow-hidden ${dropdownClassName}`}>
+        <div className={`absolute ${dropdownDirection === 'down' ? 'top-8' : 'bottom-8'} ${dropdownAlign === 'left' ? 'left-0' : 'right-0'} w-[240px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[100] overflow-hidden ${dropdownClassName}`}>
           <div className="max-h-[320px] overflow-y-auto py-1">
             {orderedModels.map((modelId) => {
               const allowed = isModelAllowed(modelId)
