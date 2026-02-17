@@ -2774,6 +2774,7 @@ export function ChatPanelV2({
                 'create_database',
                 'pipilotdb_create_database',
                 'request_supabase_connection',
+                'generate_plan',
                 'update_plan_progress',
                 'update_project_context'
               ]
@@ -3519,6 +3520,7 @@ export function ChatPanelV2({
                 'create_database',
                 'pipilotdb_create_database',
                 'request_supabase_connection',
+                'generate_plan',
                 'update_plan_progress',
                 'update_project_context'
               ]
@@ -3984,7 +3986,7 @@ export function ChatPanelV2({
                   'delete_file', 'delete_folder', 'remove_package',
                   'read_file', 'list_files', 'grep_search', 'semantic_code_navigator',
                   'create_database', 'pipilotdb_create_database', 'request_supabase_connection',
-                  'update_plan_progress', 'update_project_context'
+                  'generate_plan', 'update_plan_progress', 'update_project_context'
                 ]
 
                 if (clientSideTools.includes(parsed.toolName)) {
@@ -5171,6 +5173,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 'create_database',
                 'pipilotdb_create_database',
                 'request_supabase_connection',
+                'generate_plan',
                 'update_plan_progress',
                 'update_project_context'
               ]
