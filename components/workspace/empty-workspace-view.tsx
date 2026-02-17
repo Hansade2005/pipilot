@@ -134,10 +134,10 @@ export function EmptyWorkspaceView({
   const filteredProjects = getFilteredAndSortedProjects()
 
   return (
-    <div className="h-full overflow-y-auto">
-      {/* Hero Section with Gradient */}
+    <div className="h-full flex flex-col">
+      {/* Hero Section with Gradient - outside scroll container so dropdowns aren't clipped */}
       <div
-        className={`relative bg-gradient-to-br from-orange-950 via-gray-950 to-gray-900 pt-8 lg:pt-0 flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 pb-4 sm:pb-6 transition-all duration-1000 ${
+        className={`relative z-50 bg-gradient-to-br from-orange-950 via-gray-950 to-gray-900 pt-8 lg:pt-0 flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 pb-4 sm:pb-6 transition-all duration-1000 ${
           isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
         }`}
       >
@@ -165,7 +165,8 @@ export function EmptyWorkspaceView({
         </div>
       </div>
 
-      {/* Projects Section */}
+      {/* Projects Section - scrollable independently */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
       <div className="bg-gray-950 px-4 sm:px-6 py-1 sm:py-2 flex-shrink-0">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-row items-center justify-between mb-2 sm:mb-3 gap-4">
@@ -217,6 +218,7 @@ export function EmptyWorkspaceView({
             userProfile={userProfile}
           />
         </div>
+      </div>
       </div>
     </div>
   )
