@@ -10888,7 +10888,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
       grep_search: 'Searching codebase', semantic_code_navigator: 'Navigating code',
       list_files: 'Listing files', check_dev_errors: 'Checking for errors',
       web_search: 'Searching the web', web_extract: 'Extracting web content',
-      browse_web: 'Browsing website', generate_image: 'Generating image',
+      browse_web: 'Using the Browser', generate_image: 'Generating image',
       remove_package: 'Removing package', node_machine: 'Running code',
       suggest_next_steps: 'Suggesting next steps', manage_todos: 'Managing tasks',
       update_plan_progress: 'Updating plan progress', update_project_context: 'Documenting project',

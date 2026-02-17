@@ -601,11 +601,15 @@ const ToolActivityPanel = ({
       case 'web_extract':
         return 'Extracting web content'
       case 'browse_web':
-        return 'Running browser test'
+        return 'Using the Browser'
       case 'check_dev_errors':
         return 'Checking for errors'
       case 'generate_report':
         return 'Generating data visualization report'
+      case 'update_plan_progress':
+        return 'Updating plan progress'
+      case 'update_project_context':
+        return 'Documenting project'
       default:
         return t
     }
@@ -930,11 +934,15 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
       case 'web_extract':
         return 'Extracting web content'
       case 'browse_web':
-        return 'Running browser test'
+        return 'Using the Browser'
       case 'check_dev_errors':
         return 'Checking for errors'
       case 'generate_report':
         return 'Generating data visualization report'
+      case 'update_plan_progress':
+        return 'Updating plan progress'
+      case 'update_project_context':
+        return 'Documenting project'
       default:
         return tool
     }
@@ -2765,7 +2773,9 @@ export function ChatPanelV2({
                 'semantic_code_navigator',
                 'create_database',
                 'pipilotdb_create_database',
-                'request_supabase_connection'
+                'request_supabase_connection',
+                'update_plan_progress',
+                'update_project_context'
               ]
 
               if (clientSideTools.includes(toolCall.toolName)) {
@@ -3565,7 +3575,9 @@ export function ChatPanelV2({
                 'semantic_code_navigator',
                 'create_database',
                 'pipilotdb_create_database',
-                'request_supabase_connection'
+                'request_supabase_connection',
+                'update_plan_progress',
+                'update_project_context'
               ]
 
               if (clientSideTools.includes(toolCall.toolName)) {
@@ -4028,7 +4040,8 @@ export function ChatPanelV2({
                   'write_file', 'edit_file', 'client_replace_string_in_file',
                   'delete_file', 'delete_folder', 'remove_package',
                   'read_file', 'list_files', 'grep_search', 'semantic_code_navigator',
-                  'create_database', 'pipilotdb_create_database', 'request_supabase_connection'
+                  'create_database', 'pipilotdb_create_database', 'request_supabase_connection',
+                  'update_plan_progress', 'update_project_context'
                 ]
 
                 if (clientSideTools.includes(parsed.toolName)) {
@@ -5214,7 +5227,9 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 'semantic_code_navigator',
                 'create_database',
                 'pipilotdb_create_database',
-                'request_supabase_connection'
+                'request_supabase_connection',
+                'update_plan_progress',
+                'update_project_context'
               ]
 
               if (clientSideTools.includes(toolCall.toolName)) {
