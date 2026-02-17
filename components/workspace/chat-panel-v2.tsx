@@ -38,16 +38,13 @@ import {
   QueueItemAction,
   QueueItemActions,
   QueueItemContent,
-  QueueItemDescription,
   QueueItemIndicator,
   QueueList,
   QueueSection,
   QueueSectionContent,
   QueueSectionLabel,
   QueueSectionTrigger,
-  type QueueTodo,
 } from '@/components/ai-elements/queue'
-import { ListTodo } from 'lucide-react'
 import { FileAttachmentDropdown } from "@/components/ui/file-attachment-dropdown"
 import { FileAttachmentBadge } from "@/components/ui/file-attachment-badge"
 import { FileSearchResult, FileLookupService } from "@/lib/file-lookup-service"
@@ -1464,8 +1461,7 @@ export function ChatPanelV2({
   promptQueueRef.current = promptQueue
   const isProcessingQueueRef = useRef(false)
 
-  // AI-managed todos - populated via manage_todos tool calls from the AI agent
-  const [aiTodos, setAiTodos] = useState<QueueTodo[]>([])
+
 
   // Persist prompt queue to localStorage
   useEffect(() => {
@@ -1641,29 +1637,6 @@ export function ChatPanelV2({
     setPromptQueue([])
   }, [])
 
-  // Extract AI todos from manage_todos tool calls (uses latest tool call data)
-  const extractAiTodosFromToolCalls = useCallback((toolCalls: Array<{ toolName: string; input?: any; status: string }> | undefined) => {
-    if (!toolCalls || toolCalls.length === 0) return
-    // Find the most recent manage_todos call
-    const todoCalls = toolCalls.filter(tc => tc.toolName === 'manage_todos' && tc.input?.todos)
-    if (todoCalls.length === 0) return
-    const latestCall = todoCalls[todoCalls.length - 1]
-    const todos: QueueTodo[] = latestCall.input.todos.map((t: any) => ({
-      id: t.id || `todo-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      title: t.title,
-      description: t.description || undefined,
-      status: t.status || 'pending',
-    }))
-    setAiTodos(todos)
-  }, [])
-
-  const removeAiTodo = useCallback((id: string) => {
-    setAiTodos(prev => prev.filter(t => t.id !== id))
-  }, [])
-
-  const clearAiTodos = useCallback(() => {
-    setAiTodos([])
-  }, [])
 
   // Supabase token management - automatic refresh
   const { token: supabaseToken, isLoading: tokenLoading, isExpired: tokenExpired, error: tokenError } = useSupabaseToken()
@@ -2749,16 +2722,6 @@ export function ChatPanelV2({
                 return newMap
               })
 
-              // Handle manage_todos tool in continuation
-              if (toolCall.toolName === 'manage_todos' && toolCall.args?.todos) {
-                const todos: QueueTodo[] = toolCall.args.todos.map((t: any) => ({
-                  id: t.id || `todo-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-                  title: t.title,
-                  description: t.description || undefined,
-                  status: t.status || 'pending',
-                }))
-                setAiTodos(todos)
-              }
 
               const clientSideTools = [
                 'write_file',
@@ -3238,27 +3201,9 @@ export function ChatPanelV2({
         })
 
         setActiveToolCalls(toolCallsMap)
-
-        // Restore AI todos from the most recent manage_todos tool call in history
-        const allToolCalls = Array.from(toolCallsMap.values()).flat()
-        const todoCalls = allToolCalls.filter(tc => tc.toolName === 'manage_todos' && tc.input?.todos)
-        if (todoCalls.length > 0) {
-          const latestTodoCall = todoCalls[todoCalls.length - 1]
-          const restoredTodos: QueueTodo[] = latestTodoCall.input.todos.map((t: any) => ({
-            id: t.id || `todo-${Math.random().toString(36).slice(2, 7)}`,
-            title: t.title,
-            description: t.description || undefined,
-            status: t.status || 'pending',
-          }))
-          // Only restore if there are non-completed todos
-          if (restoredTodos.some((t: QueueTodo) => t.status !== 'completed')) {
-            setAiTodos(restoredTodos)
-          }
-        }
       } else {
         setMessages([])
         setActiveToolCalls(new Map())
-        setAiTodos([])
       }
     } catch (error) {
       console.error(`[ChatPanelV2] Error loading messages for project ${project?.id}:`, error)
@@ -3495,16 +3440,6 @@ export function ChatPanelV2({
 
               console.log('[ChatPanelV2][ClientTool][Continuation] 🔧 Continuation tool call:', toolCall.toolName)
 
-              // Handle manage_todos tool in continuation
-              if (toolCall.toolName === 'manage_todos' && toolCall.args?.todos) {
-                const todos: QueueTodo[] = toolCall.args.todos.map((t: any) => ({
-                  id: t.id || `todo-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-                  title: t.title,
-                  description: t.description || undefined,
-                  status: t.status || 'pending',
-                }))
-                setAiTodos(todos)
-              }
 
               const clientSideTools = [
                 'write_file',
@@ -3968,17 +3903,6 @@ export function ChatPanelV2({
                   newMap.set(stream.id, [...continuationToolCalls])
                   return newMap
                 })
-
-                // Handle manage_todos tool in continuation
-                if (parsed.toolName === 'manage_todos' && parsed.input?.todos) {
-                  const todos: QueueTodo[] = parsed.input.todos.map((t: any) => ({
-                    id: t.id || `todo-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-                    title: t.title,
-                    description: t.description || undefined,
-                    status: t.status || 'pending',
-                  }))
-                  setAiTodos(todos)
-                }
 
                 // Execute client-side tools
                 const clientSideTools = [
@@ -5147,16 +5071,6 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 return newMap
               })
 
-              // Handle manage_todos tool - extract and display todos in the Queue UI
-              if (toolCall.toolName === 'manage_todos' && toolCall.args?.todos) {
-                const todos: QueueTodo[] = toolCall.args.todos.map((t: any) => ({
-                  id: t.id || `todo-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-                  title: t.title,
-                  description: t.description || undefined,
-                  status: t.status || 'pending',
-                }))
-                setAiTodos(todos)
-              }
 
               // Check if this is a client-side tool (both read and write operations)
               const clientSideTools = [
@@ -5869,7 +5783,16 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
           </div>
         )}
 
-        {messages.map((message) => (
+        {/* Find the last message that has a generate_plan tool call - only that one renders the card */}
+        {(() => {
+          const lastPlanMessageId = (() => {
+            for (let i = messages.length - 1; i >= 0; i--) {
+              const tc = activeToolCalls.get(messages[i].id)
+              if (tc?.some(t => t.toolName === 'generate_plan')) return messages[i].id
+            }
+            return null
+          })()
+          return messages.map((message) => (
           <div
             key={message.id}
             className={cn(
@@ -6082,8 +6005,9 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                     )
                   })()}
 
-                  {/* Plan Card from generate_plan tool - shown BEFORE message text */}
+                  {/* Plan Card from generate_plan tool - only rendered on the LAST message with a plan */}
                   {(() => {
+                    if (message.id !== lastPlanMessageId) return null
                     const toolCalls = activeToolCalls.get(message.id)
                     const planCalls = toolCalls?.filter(tc =>
                       tc.toolName === 'generate_plan' && (tc.status === 'completed' || tc.status === 'executing')
@@ -6130,7 +6054,6 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                       tc.toolName !== 'request_supabase_connection' &&
                       tc.toolName !== 'continue_backend_implementation' &&
                       tc.toolName !== 'suggest_next_steps' &&
-                      tc.toolName !== 'manage_todos' &&
                       tc.toolName !== 'generate_plan' &&
                       tc.toolName !== 'update_plan_progress' &&
                       tc.toolName !== 'update_project_context'
@@ -6157,7 +6080,6 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                       tc.toolName !== 'request_supabase_connection' &&
                       tc.toolName !== 'continue_backend_implementation' &&
                       tc.toolName !== 'suggest_next_steps' &&
-                      tc.toolName !== 'manage_todos' &&
                       tc.toolName !== 'generate_plan' &&
                       tc.toolName !== 'update_plan_progress' &&
                       tc.toolName !== 'update_project_context'
@@ -6216,7 +6138,8 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
               </div>
             )}
           </div>
-        ))}
+        ))
+        })()}
 
         {/* Don't show separate loading spinner - MessageWithTools handles it */}
 
@@ -6241,8 +6164,8 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
         : ''
         }`} style={{ backgroundColor: 'rgba(17, 24, 39, 0.8)' }}>
 
-        {/* Queue Panel - Prompt Queue + AI Todos using Queue component */}
-        {(promptQueue.length > 0 || aiTodos.length > 0) && (
+        {/* Queue Panel - Prompt Queue */}
+        {promptQueue.length > 0 && (
           <Queue className="mb-2">
             {/* Queued Messages Section */}
             {promptQueue.length > 0 && (
@@ -6302,60 +6225,6 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
               </QueueSection>
             )}
 
-            {/* AI-Managed Todos Section */}
-            {aiTodos.length > 0 && (
-              <QueueSection>
-                <QueueSectionTrigger>
-                  <QueueSectionLabel
-                    count={aiTodos.filter(t => t.status !== 'completed').length}
-                    label="Todo"
-                    icon={<ListTodo size={13} className="text-orange-400" />}
-                  />
-                  {aiTodos.every(t => t.status === 'completed') && (
-                    <button
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); clearAiTodos() }}
-                      className="text-[11px] text-gray-500 hover:text-red-400 transition-colors"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </QueueSectionTrigger>
-                <QueueSectionContent>
-                  <QueueList>
-                    {aiTodos.map((todo) => (
-                      <QueueItem key={todo.id}>
-                        <div className="flex items-center gap-2">
-                          <QueueItemIndicator
-                            completed={todo.status === 'completed'}
-                            inProgress={todo.status === 'in_progress'}
-                          />
-                          <QueueItemContent completed={todo.status === 'completed'}>
-                            {todo.title}
-                          </QueueItemContent>
-                          <QueueItemActions>
-                            <QueueItemAction
-                              aria-label="Remove todo"
-                              onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                removeAiTodo(todo.id)
-                              }}
-                            >
-                              <X size={12} />
-                            </QueueItemAction>
-                          </QueueItemActions>
-                        </div>
-                        {todo.description && (
-                          <QueueItemDescription completed={todo.status === 'completed'}>
-                            {todo.description}
-                          </QueueItemDescription>
-                        )}
-                      </QueueItem>
-                    ))}
-                  </QueueList>
-                </QueueSectionContent>
-              </QueueSection>
-            )}
           </Queue>
         )}
 

@@ -2755,9 +2755,6 @@ Use proactively in \`<img src=...>\` tags when building anything that needs imag
 4. Fix with UX enhancements
 5. Verify with \`browse_web\`
 
-## Task Management (manage_todos)
-For complex tasks (3+ steps), use \`manage_todos\` to create a visible todo list. Keep one "in_progress" at a time.
-
 ## Next Step Suggestions (MANDATORY)
 At the END of every response, call \`suggest_next_steps\` with 3-4 contextual follow-up suggestions. Make them relevant, actionable, progressive, and varied. Labels: 3-8 words. ALWAYS call as your FINAL action.
 
@@ -10095,40 +10092,6 @@ ${roadmap.map(r => `- [ ] ${r}`).join('\n')}
         }
       }),
 
-      // TODO MANAGEMENT - AI creates and manages a task list displayed in the Queue UI above the chat input
-      manage_todos: tool({
-        description: `Create and manage a structured todo/task list to track progress on multi-step tasks. The todo list is displayed in a collapsible panel above the chat input so the user can see your progress in real-time.
-
-USE THIS TOOL WHEN:
-- A task requires 3 or more distinct steps
-- The user provides multiple tasks to complete
-- Working on complex, multi-step implementations
-- You want to show the user clear progress on what you're doing
-
-RULES:
-- Send the FULL updated todo list each time (not just changes)
-- Only ONE todo should be "in_progress" at a time
-- Mark todos as "completed" immediately when done
-- Keep titles short and actionable (e.g. "Add authentication middleware")
-- Use descriptions for extra context when helpful
-- Each todo must have a unique id (use short descriptive slugs like "add-auth", "fix-nav-bug")`,
-        inputSchema: z.object({
-          todos: z.array(z.object({
-            id: z.string().describe('Unique identifier for the todo (e.g. "setup-db", "add-auth")'),
-            title: z.string().describe('Short, actionable title (e.g. "Set up database schema")'),
-            description: z.string().optional().describe('Optional extra context or details'),
-            status: z.enum(['pending', 'in_progress', 'completed']).describe('Current status of the todo')
-          })).min(1).max(15).describe('The complete, updated list of todos')
-        }),
-        execute: async ({ todos }, { toolCallId }) => {
-          // The frontend reads the tool input directly to display todos in the Queue UI
-          return {
-            success: true,
-            todos,
-            toolCallId
-          }
-        }
-      }),
 
       code_quality_analysis: tool({
         description: 'Create or update code quality analysis documentation with detailed metrics, complexity scores, maintainability analysis, and improvement recommendations in markdown format.',
@@ -10265,7 +10228,7 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
       'list_files', 'check_dev_errors', 'grep_search', 'semantic_code_navigator',
       'web_search', 'web_extract', 'remove_package',
       'client_replace_string_in_file', 'edit_file', 'delete_folder','continue_backend_implementation',
-      'delete_file', 'read_file', 'write_file', 'suggest_next_steps', 'manage_todos'
+      'delete_file', 'read_file', 'write_file', 'suggest_next_steps'
     ]
 
     let toolsToUse
@@ -10390,7 +10353,7 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
       // Web (frequently needed)
       'web_search', 'web_extract',
       // UX helpers
-      'suggest_next_steps', 'manage_todos', 'generate_plan',
+      'suggest_next_steps', 'generate_plan',
       // Plan & project persistence
       'update_plan_progress', 'update_project_context',
       // Continue backend (for multi-part tasks)
@@ -10890,7 +10853,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
       web_search: 'Searching the web', web_extract: 'Extracting web content',
       browse_web: 'Using the Browser', generate_image: 'Generating image',
       remove_package: 'Removing package', node_machine: 'Running code',
-      suggest_next_steps: 'Suggesting next steps', manage_todos: 'Managing tasks',
+      suggest_next_steps: 'Suggesting next steps',
       update_plan_progress: 'Updating plan progress', update_project_context: 'Documenting project',
       generate_plan: 'Creating plan', code_review: 'Reviewing code',
       code_quality_analysis: 'Analyzing code quality', auto_documentation: 'Generating docs',
