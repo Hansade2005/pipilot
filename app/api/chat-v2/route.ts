@@ -10020,52 +10020,190 @@ ${steps.map((s, i) => `### Step ${i + 1}: ${s.title}
       }),
 
       // PROJECT CONTEXT - AI documents the project state in .pipilot/project.md
+      // Smart merge: reads existing file first, merges new data with existing data so nothing is lost
       update_project_context: tool({
-        description: 'Create or update .pipilot/project.md with the current project context. Call this at the END of a build session (after all plan steps are completed) to document what was built, key features, file structure, and roadmap. This file persists across sessions so future AI agents understand the full project.',
+        description: 'Create or update .pipilot/project.md with the current project context. Call this at the END of a build session (after all plan steps are completed) to document what was built, key features, file structure, and roadmap. This file persists across sessions so future AI agents understand the full project. SMART MERGE: Only provide fields you want to add or change - existing data in other sections is preserved. New features and key files are merged (not replaced). To update summary or design notes, provide the new value.',
         inputSchema: z.object({
           projectName: z.string().describe('Name of the project'),
-          summary: z.string().describe('2-4 sentence summary of what the project is and does'),
-          features: z.array(z.string()).describe('List of implemented features (e.g. ["User authentication with Supabase", "Dashboard with charts"])'),
-          techStack: z.array(z.string()).describe('Technologies used (e.g. ["Next.js", "Tailwind CSS", "Supabase"])'),
+          summary: z.string().optional().describe('2-4 sentence summary of what the project is and does. Only provide if changed.'),
+          features: z.array(z.string()).optional().describe('List of NEW or updated features to add (e.g. ["User authentication with Supabase"]). These are merged with existing features.'),
+          techStack: z.array(z.string()).optional().describe('Technologies used (e.g. ["Next.js", "Tailwind CSS"]). Merged with existing tech stack.'),
           keyFiles: z.array(z.object({
             path: z.string().describe('File path'),
             purpose: z.string().describe('What this file does')
-          })).optional().describe('Important files and their purpose'),
-          roadmap: z.array(z.string()).optional().describe('Future improvements or features that could be added'),
-          designNotes: z.string().optional().describe('Color palette, typography, and design system notes')
+          })).optional().describe('Important files and their purpose. Merged with existing key files (updates purpose if path already exists).'),
+          roadmap: z.array(z.string()).optional().describe('Future improvements or features that could be added. Merged with existing roadmap.'),
+          designNotes: z.string().optional().describe('Color palette, typography, and design system notes. Only provide if changed.'),
+          completedRoadmapItems: z.array(z.string()).optional().describe('Roadmap items that have been completed - these will be marked as done.')
         }),
-        execute: async ({ projectName, summary, features, techStack, keyFiles, roadmap, designNotes }, { toolCallId }) => {
-          const projectMd = `# ${projectName}
+        execute: async ({ projectName, summary, features, techStack, keyFiles, roadmap, designNotes, completedRoadmapItems }, { toolCallId }) => {
+          try {
+            // --- Smart merge: read existing project.md first ---
+            let existingSummary = ''
+            let existingFeatures: string[] = []
+            let existingTechStack: string[] = []
+            let existingKeyFiles: { path: string; purpose: string }[] = []
+            let existingRoadmap: string[] = [] // raw lines like "- [ ] item" or "- [x] item"
+            let existingDesignNotes = ''
+
+            try {
+              const readResult = await constructToolResult('read_file', { path: '.pipilot/project.md' }, projectId, toolCallId + '-read')
+              if (readResult.success && readResult.content) {
+                const content = readResult.content as string
+
+                // Parse existing summary
+                const summaryMatch = content.match(/## Summary\n([\s\S]*?)(?=\n## |\n---)/);
+                if (summaryMatch) existingSummary = summaryMatch[1].trim()
+
+                // Parse existing features
+                const featuresMatch = content.match(/## Features\n([\s\S]*?)(?=\n## |\n---)/);
+                if (featuresMatch) {
+                  existingFeatures = featuresMatch[1].split('\n')
+                    .map(l => l.replace(/^- /, '').trim())
+                    .filter(Boolean)
+                }
+
+                // Parse existing tech stack
+                const techMatch = content.match(/## Tech Stack\n([\s\S]*?)(?=\n## |\n---)/);
+                if (techMatch) {
+                  existingTechStack = techMatch[1].split('\n')
+                    .map(l => l.replace(/^- /, '').trim())
+                    .filter(Boolean)
+                }
+
+                // Parse existing key files
+                const keyFilesMatch = content.match(/## Key Files\n\| File \| Purpose \|\n\|------\|---------\|\n([\s\S]*?)(?=\n## |\n---)/);
+                if (keyFilesMatch) {
+                  existingKeyFiles = keyFilesMatch[1].split('\n')
+                    .filter(l => l.startsWith('|'))
+                    .map(l => {
+                      const cols = l.split('|').map(c => c.trim()).filter(Boolean)
+                      return { path: cols[0]?.replace(/`/g, '') || '', purpose: cols[1] || '' }
+                    })
+                    .filter(f => f.path)
+                }
+
+                // Parse existing roadmap (preserve checked/unchecked state)
+                const roadmapMatch = content.match(/## Roadmap\n([\s\S]*?)(?=\n## |\n---)/);
+                if (roadmapMatch) {
+                  existingRoadmap = roadmapMatch[1].split('\n')
+                    .map(l => l.trim())
+                    .filter(l => l.startsWith('- ['))
+                }
+
+                // Parse existing design notes
+                const designMatch = content.match(/## Design System\n([\s\S]*?)(?=\n## |\n---)/);
+                if (designMatch) existingDesignNotes = designMatch[1].trim()
+
+                console.log('[update_project_context] Read existing project.md for smart merge')
+              }
+            } catch (_readErr) {
+              // No existing file - that's fine, we'll create fresh
+              console.log('[update_project_context] No existing project.md found, creating new')
+            }
+
+            // --- Merge logic ---
+
+            // Summary: use new if provided, otherwise keep existing
+            const mergedSummary = summary || existingSummary || 'No summary provided.'
+
+            // Features: merge (deduplicate by lowercase comparison)
+            const mergedFeatures = [...existingFeatures]
+            if (features) {
+              for (const f of features) {
+                const fLower = f.toLowerCase().trim()
+                if (!mergedFeatures.some(existing => existing.toLowerCase().trim() === fLower)) {
+                  mergedFeatures.push(f)
+                }
+              }
+            }
+
+            // Tech stack: merge (deduplicate by lowercase comparison)
+            const mergedTechStack = [...existingTechStack]
+            if (techStack) {
+              for (const t of techStack) {
+                const tLower = t.toLowerCase().trim()
+                if (!mergedTechStack.some(existing => existing.toLowerCase().trim() === tLower)) {
+                  mergedTechStack.push(t)
+                }
+              }
+            }
+
+            // Key files: merge (update purpose if path exists, add new otherwise)
+            const mergedKeyFiles = [...existingKeyFiles]
+            if (keyFiles) {
+              for (const newFile of keyFiles) {
+                const existingIdx = mergedKeyFiles.findIndex(f => f.path === newFile.path)
+                if (existingIdx >= 0) {
+                  mergedKeyFiles[existingIdx].purpose = newFile.purpose
+                } else {
+                  mergedKeyFiles.push(newFile)
+                }
+              }
+            }
+
+            // Roadmap: merge new items, mark completed items
+            const mergedRoadmapLines = [...existingRoadmap]
+            // Mark completed items
+            if (completedRoadmapItems) {
+              for (const completed of completedRoadmapItems) {
+                const completedLower = completed.toLowerCase().trim()
+                for (let i = 0; i < mergedRoadmapLines.length; i++) {
+                  const itemText = mergedRoadmapLines[i].replace(/^- \[.\] /, '').toLowerCase().trim()
+                  if (itemText === completedLower) {
+                    mergedRoadmapLines[i] = `- [x] ${mergedRoadmapLines[i].replace(/^- \[.\] /, '')}`
+                  }
+                }
+              }
+            }
+            // Add new roadmap items (deduplicate)
+            if (roadmap) {
+              for (const r of roadmap) {
+                const rLower = r.toLowerCase().trim()
+                const alreadyExists = mergedRoadmapLines.some(line => {
+                  const lineText = line.replace(/^- \[.\] /, '').toLowerCase().trim()
+                  return lineText === rLower
+                })
+                if (!alreadyExists) {
+                  mergedRoadmapLines.push(`- [ ] ${r}`)
+                }
+              }
+            }
+
+            // Design notes: use new if provided, otherwise keep existing
+            const mergedDesignNotes = designNotes || existingDesignNotes
+
+            // --- Build the merged markdown ---
+            const projectMd = `# ${projectName}
 
 ## Summary
-${summary}
+${mergedSummary}
 
 ## Features
-${features.map(f => `- ${f}`).join('\n')}
+${mergedFeatures.map(f => `- ${f}`).join('\n')}
 
 ## Tech Stack
-${techStack.map(t => `- ${t}`).join('\n')}
-${keyFiles && keyFiles.length > 0 ? `
+${mergedTechStack.map(t => `- ${t}`).join('\n')}
+${mergedKeyFiles.length > 0 ? `
 ## Key Files
 | File | Purpose |
 |------|---------|
-${keyFiles.map(f => `| \`${f.path}\` | ${f.purpose} |`).join('\n')}
+${mergedKeyFiles.map(f => `| \`${f.path}\` | ${f.purpose} |`).join('\n')}
 ` : ''}
-${designNotes ? `
+${mergedDesignNotes ? `
 ## Design System
-${designNotes}
+${mergedDesignNotes}
 ` : ''}
-${roadmap && roadmap.length > 0 ? `
+${mergedRoadmapLines.length > 0 ? `
 ## Roadmap
-${roadmap.map(r => `- [ ] ${r}`).join('\n')}
+${mergedRoadmapLines.join('\n')}
 ` : ''}
 ---
 *Last Updated: ${new Date().toISOString()}*
 `
-          try {
             await constructToolResult('write_file', { path: '.pipilot/project.md', content: projectMd }, projectId, toolCallId + '-project')
-            console.log('[update_project_context] Persisted project context to .pipilot/project.md')
-            return { success: true, path: '.pipilot/project.md', toolCallId }
+            console.log('[update_project_context] Smart-merged and persisted project context to .pipilot/project.md')
+            return { success: true, path: '.pipilot/project.md', merged: existingSummary ? true : false, toolCallId }
           } catch (e) {
             console.error('[update_project_context] Failed:', e)
             return { success: false, error: String(e), toolCallId }
