@@ -5,7 +5,7 @@
 
 'use client'
 
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card } from "@/components/ui/card"
@@ -27,7 +27,7 @@ import {
   Search, Globe, Eye, FolderOpen, Settings, Edit3, CheckCircle2, XCircle,
   Square, Database, CornerDownLeft, Table, Key, Code, Server, BarChart3,
   CreditCard, Coins, GitBranch, ChevronRight, ChevronLeft, Wrench,
-  ToggleLeft, ToggleRight, Sparkles, FileUp, Hash, ExternalLink, Monitor
+  ToggleLeft, ToggleRight, Sparkles, FileUp, Hash, ExternalLink, Monitor, ListTodo
 } from 'lucide-react'
 import { ModelSelector } from '@/components/ui/model-selector'
 import { cn, filterUnwantedFiles } from '@/lib/utils'
@@ -38,6 +38,7 @@ import {
   QueueItemAction,
   QueueItemActions,
   QueueItemContent,
+  QueueItemDescription,
   QueueItemIndicator,
   QueueList,
   QueueSection,
@@ -1652,6 +1653,41 @@ export function ChatPanelV2({
     textPosition?: number // Character position in text when tool was called
     reasoningPosition?: number // Character position in reasoning when tool was called
   }>>>(new Map())
+
+  // Derive plan steps as todos from activeToolCalls (generate_plan + update_plan_progress)
+  const planTodos = useMemo(() => {
+    let latestPlanSteps: Array<{ title: string; description: string }> = []
+    const completedStepNums = new Set<number>()
+
+    for (const [, toolCalls] of activeToolCalls) {
+      for (const tc of toolCalls) {
+        if (tc.toolName === 'generate_plan' && tc.input?.steps) {
+          latestPlanSteps = tc.input.steps
+        }
+        if (tc.toolName === 'update_plan_progress' && tc.input?.stepNumber && tc.status === 'completed') {
+          completedStepNums.add(tc.input.stepNumber)
+        }
+      }
+    }
+
+    if (latestPlanSteps.length === 0) return []
+
+    let firstPendingFound = false
+    return latestPlanSteps.map((step, idx) => {
+      const stepNum = idx + 1
+      const isCompleted = completedStepNums.has(stepNum)
+      let status: 'pending' | 'in_progress' | 'completed' = 'pending'
+
+      if (isCompleted) {
+        status = 'completed'
+      } else if (isLoading && !firstPendingFound) {
+        status = 'in_progress'
+        firstPendingFound = true
+      }
+
+      return { title: step.title, description: step.description, status, stepNumber: stepNum }
+    })
+  }, [activeToolCalls, isLoading])
 
   // ABE Credit balance state
   const [creditBalance, setCreditBalance] = useState<number | null>(null)
@@ -6164,9 +6200,47 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
         : ''
         }`} style={{ backgroundColor: 'rgba(17, 24, 39, 0.8)' }}>
 
-        {/* Queue Panel - Prompt Queue */}
-        {promptQueue.length > 0 && (
+        {/* Queue Panel - Prompt Queue + Plan Steps */}
+        {(promptQueue.length > 0 || planTodos.length > 0) && (
           <Queue className="mb-2">
+            {/* Plan Steps Section - extracted from generate_plan tool */}
+            {planTodos.length > 0 && (
+              <QueueSection>
+                <QueueSectionTrigger>
+                  <QueueSectionLabel
+                    count={planTodos.filter(t => t.status !== 'completed').length}
+                    label="Steps"
+                    icon={<ListTodo size={13} className="text-orange-400" />}
+                  />
+                  {planTodos.every(t => t.status === 'completed') && (
+                    <span className="text-[11px] text-emerald-400 font-medium">All done</span>
+                  )}
+                </QueueSectionTrigger>
+                <QueueSectionContent>
+                  <QueueList>
+                    {planTodos.map((todo) => (
+                      <QueueItem key={todo.stepNumber}>
+                        <div className="flex items-center gap-2">
+                          <QueueItemIndicator
+                            completed={todo.status === 'completed'}
+                            inProgress={todo.status === 'in_progress'}
+                          />
+                          <QueueItemContent completed={todo.status === 'completed'}>
+                            {todo.title}
+                          </QueueItemContent>
+                        </div>
+                        {todo.description && (
+                          <QueueItemDescription completed={todo.status === 'completed'}>
+                            {todo.description}
+                          </QueueItemDescription>
+                        )}
+                      </QueueItem>
+                    ))}
+                  </QueueList>
+                </QueueSectionContent>
+              </QueueSection>
+            )}
+
             {/* Queued Messages Section */}
             {promptQueue.length > 0 && (
               <QueueSection>
