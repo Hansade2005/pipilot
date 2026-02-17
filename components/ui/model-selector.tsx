@@ -12,6 +12,8 @@ interface ModelSelectorProps {
   subscriptionStatus?: string
   className?: string
   compact?: boolean
+  dropdownAlign?: 'left' | 'right'
+  dropdownClassName?: string
 }
 
 // Short, clean display names (like Anthropic's "Opus 4.6", "Sonnet 4.5")
@@ -70,12 +72,12 @@ export function ModelSelector({
   userPlan = 'free',
   subscriptionStatus,
   className = '',
-  compact = true
+  compact = true,
+  dropdownAlign = 'right',
+  dropdownClassName = '',
 }: ModelSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
-  const triggerRef = useRef<HTMLButtonElement>(null)
-  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({})
 
   const effectiveStatus = subscriptionStatus || (userPlan === 'free' ? 'active' : 'inactive')
   const isPremium = ['pro', 'creator', 'teams', 'collaborate', 'enterprise', 'scale'].includes(userPlan)
@@ -106,20 +108,6 @@ export function ModelSelector({
   }
 
   const isModelAllowed = (modelId: string) => allowedModels.includes(modelId)
-
-  // Calculate fixed position when dropdown opens
-  useEffect(() => {
-    if (isOpen && triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect()
-      setDropdownStyle({
-        position: 'fixed' as const,
-        bottom: window.innerHeight - rect.top + 4,
-        right: window.innerWidth - rect.right,
-        width: 240,
-        zIndex: 100,
-      })
-    }
-  }, [isOpen])
 
   // Close on outside click
   useEffect(() => {
@@ -163,7 +151,6 @@ export function ModelSelector({
     <div className={`relative ${className}`} ref={dropdownRef}>
       {/* Trigger: clean text + chevron like Anthropic */}
       <button
-        ref={triggerRef}
         type="button"
         className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-200 transition-colors"
         onClick={() => setIsOpen(!isOpen)}
@@ -174,7 +161,7 @@ export function ModelSelector({
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl overflow-hidden" style={dropdownStyle}>
+        <div className={`absolute bottom-8 ${dropdownAlign === 'left' ? 'left-0' : 'right-0'} w-[240px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[100] overflow-hidden ${dropdownClassName}`}>
           <div className="max-h-[320px] overflow-y-auto py-1">
             {orderedModels.map((modelId) => {
               const allowed = isModelAllowed(modelId)
