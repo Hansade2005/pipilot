@@ -2473,12 +2473,36 @@ The plan should include:
 
 ## Response Format
 1. If needed, use read_file/list_files/grep_search to understand the codebase
-2. Call \`generate_plan\` with a detailed, well-structured plan
-3. IMMEDIATELY start using write_file/edit_file tools to implement the plan (NO waiting)
-4. Build ALL pages and the COMPLETE app - never stop at just 1-2 files
-5. After building, call \`suggest_next_steps\` with follow-up options
+2. **IMPORTANT**: Check if \`.pipilot/plan.md\` exists - if it does, read it first to understand what was previously planned and what has been completed
+3. Call \`generate_plan\` with a detailed, well-structured plan (this auto-persists to \`.pipilot/plan.md\`)
+4. IMMEDIATELY start using write_file/edit_file tools to implement the plan (NO waiting)
+5. **After completing EACH plan step**, call \`update_plan_progress\` with the step number to mark it as done in \`.pipilot/plan.md\`
+6. Build ALL pages and the COMPLETE app - never stop at just 1-2 files
+7. **After ALL steps are done**, call \`update_project_context\` to document the project in \`.pipilot/project.md\`
+8. Call \`suggest_next_steps\` with follow-up options
 
 **CRITICAL: Do NOT generate ANY text content before calling generate_plan. The plan card should be the first thing the user sees. After the plan, you may write brief status text as you build, but keep it minimal.**
+
+## Plan & Project Persistence (.pipilot/ folder)
+PiPilot uses two persistent files in the \`.pipilot/\` folder to maintain context across sessions:
+
+### .pipilot/plan.md - Execution Plan
+- **Auto-created** when you call \`generate_plan\` - contains all steps with \`[ ] Pending\` / \`[x] Completed\` status
+- **Update it** by calling \`update_plan_progress\` after completing each step
+- **Read it first** at the start of any session to see what was previously planned/completed
+- If a continuation picks up mid-build, the plan.md tells the agent exactly where it left off
+
+### .pipilot/project.md - Project Context
+- **Created at the end** of a build session by calling \`update_project_context\`
+- Documents: project name, summary, features, tech stack, key files, design system, and roadmap
+- **Read it first** at the start of any session to understand the full project context
+- Update it whenever significant features are added or changed
+
+### Rules
+- ALWAYS read \`.pipilot/plan.md\` and \`.pipilot/project.md\` at the start of a session if they exist
+- ALWAYS call \`update_plan_progress\` after completing each plan step
+- ALWAYS call \`update_project_context\` at the end of a build (after all steps are done)
+- These files are part of the project - they persist across sessions, continuations, and page refreshes
 
 ## Next Step Suggestions (MANDATORY)
 At the END of every response, you MUST call the \`suggest_next_steps\` tool with 3-4 follow-up suggestions. Suggest improvements, testing, or new features.
@@ -2556,6 +2580,11 @@ Your brief intro should cover:
 
 **After your brief intro, IMMEDIATELY start using write_file/edit_file tools. Never stop at just the plan.**
 Never write 1-2 files and declare "your app is ready!" - build ALL pages and the COMPLETE app.
+
+## Project Context Persistence (.pipilot/ folder)
+- **At the START**: Read \`.pipilot/project.md\` (if it exists) to understand the project context, features, and roadmap
+- **At the END** of every build: Call \`update_project_context\` to document what was built (features, tech stack, key files, design system, roadmap)
+- This gives future sessions full context about the project without re-analyzing the codebase
 
 ## DESIGN EXCELLENCE (CRITICAL - THIS IS WHAT MAKES USERS STAY)
 Every website you build must look like it was designed by a top-tier design agency. Users judge PiPilot by the FIRST thing they see.
@@ -2829,11 +2858,15 @@ ${truncatedContent}
 \`\`\`
 ` : ''}
 **Instructions:**
-✅ Continue your response naturally FROM WHERE YOU LEFT OFF
+✅ FIRST: Read \`.pipilot/plan.md\` to see the execution plan and which steps are completed vs pending
+✅ FIRST: Read \`.pipilot/project.md\` (if it exists) to understand the full project context
+✅ Continue your response naturally FROM WHERE YOU LEFT OFF - pick up at the next uncompleted step in plan.md
 ${hasModifiedFiles ? '✅ Re-read modified files first to understand current state' : ''}
 ✅ Reference any completed tool results
 ✅ Maintain the same tone and style
 ✅ Your next output will be APPENDED to the content above
+✅ Call \`update_plan_progress\` as you complete each remaining step
+✅ Call \`update_project_context\` at the end when all steps are done
 ❌ Do NOT repeat any content shown above - the user already saw it
 ❌ Do not apologize for the interruption
 ❌ Do not mention being a "continuation"
@@ -9892,7 +9925,7 @@ ${issues.length > 0 ? issues.map(issue => `- ${issue.suggestion}`).join('\n') : 
 
       // PLAN GENERATION - AI generates a structured execution plan then immediately builds
       generate_plan: tool({
-        description: 'Generate a structured execution plan for building an app or implementing a feature. Use this tool FIRST to show the user what you will build, then IMMEDIATELY start building in the same response. The plan renders as a status card that auto-transitions from Planning to Building to Completed. Do NOT wait for user approval - start coding right after calling this tool.',
+        description: 'Generate a structured execution plan for building an app or implementing a feature. Use this tool FIRST to show the user what you will build, then IMMEDIATELY start building in the same response. The plan renders as a status card that auto-transitions from Planning to Building to Completed. Do NOT wait for user approval - start coding right after calling this tool. The plan is automatically persisted to .pipilot/plan.md so it survives across sessions and continuations.',
         inputSchema: z.object({
           title: z.string().describe('Short, descriptive title for the plan (e.g. "E-commerce Dashboard", "Authentication System")'),
           description: z.string().describe('A 1-3 sentence overview of what will be built and the approach'),
@@ -9904,6 +9937,35 @@ ${issues.length > 0 ? issues.map(issue => `- ${issue.suggestion}`).join('\n') : 
           estimatedFiles: z.number().optional().describe('Approximate number of files that will be created/modified')
         }),
         execute: async ({ title, description, steps, techStack, estimatedFiles }, { toolCallId }) => {
+          // Persist plan to .pipilot/plan.md so it survives across sessions and continuations
+          const planMd = `# Plan: ${title}
+
+> ${description}
+
+## Tech Stack
+${(techStack || []).map(t => `- ${t}`).join('\n') || '- N/A'}
+
+## Estimated Files
+~${estimatedFiles || '?'} files
+
+## Steps
+
+${steps.map((s, i) => `### Step ${i + 1}: ${s.title}
+- **Status:** [ ] Pending
+- **Description:** ${s.description}
+`).join('\n')}
+
+---
+*Generated: ${new Date().toISOString()}*
+*Last Updated: ${new Date().toISOString()}*
+`
+          try {
+            await constructToolResult('write_file', { path: '.pipilot/plan.md', content: planMd }, projectId, toolCallId + '-plan')
+            console.log('[generate_plan] Persisted plan to .pipilot/plan.md')
+          } catch (e) {
+            console.error('[generate_plan] Failed to persist plan.md:', e)
+          }
+
           return {
             success: true,
             title,
@@ -9912,6 +9974,104 @@ ${issues.length > 0 ? issues.map(issue => `- ${issue.suggestion}`).join('\n') : 
             techStack,
             estimatedFiles,
             toolCallId
+          }
+        }
+      }),
+
+      // PLAN PROGRESS - AI updates plan.md as it completes each step during build
+      update_plan_progress: tool({
+        description: 'Update the plan progress in .pipilot/plan.md by marking a step as completed. Call this tool EACH TIME you finish implementing a plan step so the plan file stays in sync. This is critical for continuation agents to know what has been done vs what remains.',
+        inputSchema: z.object({
+          stepNumber: z.number().describe('The step number to mark as completed (1-indexed)'),
+          notes: z.string().optional().describe('Optional short notes about what was done (e.g. "Created 5 components", "Set up routing with 8 pages")')
+        }),
+        execute: async ({ stepNumber, notes }, { toolCallId }) => {
+          try {
+            // Read the current plan.md
+            const readResult = await constructToolResult('read_file', { path: '.pipilot/plan.md' }, projectId, toolCallId + '-read')
+            if (!readResult.success || !readResult.content) {
+              return { success: false, error: 'Could not read .pipilot/plan.md', toolCallId }
+            }
+
+            let planContent = readResult.content as string
+
+            // Find and replace the status for the given step
+            // Pattern: ### Step N: ... \n- **Status:** [ ] Pending
+            const stepPattern = new RegExp(
+              `(### Step ${stepNumber}:[^\\n]*\\n- \\*\\*Status:\\*\\* )\\[ \\] Pending`,
+              's'
+            )
+            const replacement = `$1[x] Completed${notes ? ' - ' + notes : ''}`
+            planContent = planContent.replace(stepPattern, replacement)
+
+            // Update the "Last Updated" timestamp
+            planContent = planContent.replace(
+              /\*Last Updated:.*\*/,
+              `*Last Updated: ${new Date().toISOString()}*`
+            )
+
+            // Write the updated plan back
+            await constructToolResult('write_file', { path: '.pipilot/plan.md', content: planContent }, projectId, toolCallId + '-write')
+            console.log(`[update_plan_progress] Marked step ${stepNumber} as completed`)
+
+            return { success: true, stepNumber, status: 'completed', notes, toolCallId }
+          } catch (e) {
+            console.error('[update_plan_progress] Failed:', e)
+            return { success: false, error: String(e), toolCallId }
+          }
+        }
+      }),
+
+      // PROJECT CONTEXT - AI documents the project state in .pipilot/project.md
+      update_project_context: tool({
+        description: 'Create or update .pipilot/project.md with the current project context. Call this at the END of a build session (after all plan steps are completed) to document what was built, key features, file structure, and roadmap. This file persists across sessions so future AI agents understand the full project.',
+        inputSchema: z.object({
+          projectName: z.string().describe('Name of the project'),
+          summary: z.string().describe('2-4 sentence summary of what the project is and does'),
+          features: z.array(z.string()).describe('List of implemented features (e.g. ["User authentication with Supabase", "Dashboard with charts"])'),
+          techStack: z.array(z.string()).describe('Technologies used (e.g. ["Next.js", "Tailwind CSS", "Supabase"])'),
+          keyFiles: z.array(z.object({
+            path: z.string().describe('File path'),
+            purpose: z.string().describe('What this file does')
+          })).optional().describe('Important files and their purpose'),
+          roadmap: z.array(z.string()).optional().describe('Future improvements or features that could be added'),
+          designNotes: z.string().optional().describe('Color palette, typography, and design system notes')
+        }),
+        execute: async ({ projectName, summary, features, techStack, keyFiles, roadmap, designNotes }, { toolCallId }) => {
+          const projectMd = `# ${projectName}
+
+## Summary
+${summary}
+
+## Features
+${features.map(f => `- ${f}`).join('\n')}
+
+## Tech Stack
+${techStack.map(t => `- ${t}`).join('\n')}
+${keyFiles && keyFiles.length > 0 ? `
+## Key Files
+| File | Purpose |
+|------|---------|
+${keyFiles.map(f => `| \`${f.path}\` | ${f.purpose} |`).join('\n')}
+` : ''}
+${designNotes ? `
+## Design System
+${designNotes}
+` : ''}
+${roadmap && roadmap.length > 0 ? `
+## Roadmap
+${roadmap.map(r => `- [ ] ${r}`).join('\n')}
+` : ''}
+---
+*Last Updated: ${new Date().toISOString()}*
+`
+          try {
+            await constructToolResult('write_file', { path: '.pipilot/project.md', content: projectMd }, projectId, toolCallId + '-project')
+            console.log('[update_project_context] Persisted project context to .pipilot/project.md')
+            return { success: true, path: '.pipilot/project.md', toolCallId }
+          } catch (e) {
+            console.error('[update_project_context] Failed:', e)
+            return { success: false, error: String(e), toolCallId }
           }
         }
       }),
@@ -10231,6 +10391,8 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
       'web_search', 'web_extract',
       // UX helpers
       'suggest_next_steps', 'manage_todos', 'generate_plan',
+      // Plan & project persistence
+      'update_plan_progress', 'update_project_context',
       // Continue backend (for multi-part tasks)
       'continue_backend_implementation',
       // Image generation
@@ -10729,6 +10891,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
       browse_web: 'Browsing website', generate_image: 'Generating image',
       remove_package: 'Removing package', node_machine: 'Running code',
       suggest_next_steps: 'Suggesting next steps', manage_todos: 'Managing tasks',
+      update_plan_progress: 'Updating plan progress', update_project_context: 'Documenting project',
       generate_plan: 'Creating plan', code_review: 'Reviewing code',
       code_quality_analysis: 'Analyzing code quality', auto_documentation: 'Generating docs',
       continue_backend_implementation: 'Continuing implementation',

@@ -6169,7 +6169,9 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                       tc.toolName !== 'continue_backend_implementation' &&
                       tc.toolName !== 'suggest_next_steps' &&
                       tc.toolName !== 'manage_todos' &&
-                      tc.toolName !== 'generate_plan'
+                      tc.toolName !== 'generate_plan' &&
+                      tc.toolName !== 'update_plan_progress' &&
+                      tc.toolName !== 'update_project_context'
                     )
                     // Don't render MessageWithTools if this is a billing error (content is empty)
                     const hasBillingError = (message as any).metadata?.billingError
@@ -6194,7 +6196,9 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                       tc.toolName !== 'continue_backend_implementation' &&
                       tc.toolName !== 'suggest_next_steps' &&
                       tc.toolName !== 'manage_todos' &&
-                      tc.toolName !== 'generate_plan'
+                      tc.toolName !== 'generate_plan' &&
+                      tc.toolName !== 'update_plan_progress' &&
+                      tc.toolName !== 'update_project_context'
                     )
                     return regularToolCalls && regularToolCalls.length > 0 ? (
                       <ToolActivityPanel
