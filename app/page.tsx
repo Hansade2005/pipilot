@@ -512,20 +512,25 @@ export default function LandingPage() {
             <img src="/e2b-badge.svg" alt="Sponsored by E2B for Startups" className="h-8 md:h-10 w-auto rounded" />
           </a>
         </div>
-
-        {/* Social Proof - Powered By Logo Bar */}
-        <div className="mt-16 mb-8 w-full max-w-3xl mx-auto">
-          <p className="text-center text-sm text-gray-500 mb-6 tracking-widest uppercase">Powered by</p>
-          <div className="flex items-center justify-center gap-8 md:gap-12 flex-wrap opacity-50">
-            <img src="/logos/anthropic.svg" alt="Anthropic" className="h-5 md:h-6 w-auto" />
-            <img src="/logos/xai.svg" alt="xAI" className="h-5 md:h-6 w-auto" />
-            <img src="/logos/mistral.svg" alt="Mistral AI" className="h-5 md:h-6 w-auto" />
-            <img src="/logos/vercel.svg" alt="Vercel" className="h-4 md:h-5 w-auto" />
-            <img src="/logos/supabase.svg" alt="Supabase" className="h-4 md:h-5 w-auto" />
-            <img src="/logos/e2b.svg" alt="E2B" className="h-5 md:h-6 w-auto" />
-          </div>
-        </div>
       </main>
+
+      {/* Projects Section - Right after hero so users can quickly access their work */}
+      <div className="relative z-[5] w-full max-w-7xl mx-auto mb-8">
+        <ProjectGrid userProfile={userProfile} />
+      </div>
+
+      {/* Social Proof - Powered By Logo Bar */}
+      <div className="relative z-[5] py-12 w-full max-w-3xl mx-auto px-4">
+        <p className="text-center text-sm text-gray-500 mb-6 tracking-widest uppercase">Powered by</p>
+        <div className="flex items-center justify-center gap-8 md:gap-12 flex-wrap opacity-50">
+          <img src="/logos/anthropic.svg" alt="Anthropic" className="h-5 md:h-6 w-auto" />
+          <img src="/logos/xai.svg" alt="xAI" className="h-5 md:h-6 w-auto" />
+          <img src="/logos/mistral.svg" alt="Mistral AI" className="h-5 md:h-6 w-auto" />
+          <img src="/logos/vercel.svg" alt="Vercel" className="h-4 md:h-5 w-auto" />
+          <img src="/logos/supabase.svg" alt="Supabase" className="h-4 md:h-5 w-auto" />
+          <img src="/logos/e2b.svg" alt="E2B" className="h-5 md:h-6 w-auto" />
+        </div>
+      </div>
 
       {/* How It Works Section */}
       <section className="relative z-[5] py-24 px-4">
@@ -582,11 +587,6 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-
-      {/* Projects Section */}
-      <div className="relative z-[5] w-full max-w-7xl mx-auto mb-16">
-        <ProjectGrid userProfile={userProfile} />
-      </div>
 
       {/* From Pixel Community Section */}
       <section id="template-library" className="relative z-[5] py-24 bg-gray-900/30">
