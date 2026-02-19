@@ -43,6 +43,9 @@ import {
   ListTree,
   Globe,
   Sparkles,
+  ClipboardList,
+  FolderOpen,
+  Key,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -122,7 +125,7 @@ const sectionGroups: SectionGroup[] = [
   },
   {
     label: "Platform Features",
-    items: ["Slash Commands System", "Conversation Branching", "AI Memory System", "Multi-Chat Session Support", "Browser Testing", "Codebase Search & Replace"]
+    items: ["Slash Commands System", "Conversation Branching", "AI Memory System", "Multi-Chat Session Support", "Browser Testing", "Codebase Search & Replace", "Project Plan", "Project Context", "BYOK (Bring Your Own Key)"]
   },
   {
     label: "Support",
@@ -148,6 +151,9 @@ const sectionIcons: Record<string, any> = {
   'Codebase Search & Replace': Search,
   'Browser Testing': Globe,
   'AI Support System': HeadphonesIcon,
+  'Project Plan': ClipboardList,
+  'Project Context': FolderOpen,
+  'BYOK (Bring Your Own Key)': Key,
 }
 
 // Extract headings from markdown content for TOC
