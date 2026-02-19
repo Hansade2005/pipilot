@@ -18,7 +18,8 @@ import {
     Sparkles,
     Coins,
     ArrowUp,
-    ArrowDown
+    ArrowDown,
+    Key
 } from "lucide-react"
 import { toast } from "sonner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -52,6 +53,10 @@ interface UserWallet {
             description: string
             created_at: string
         }>
+    }
+    byok?: {
+        hasUsed: boolean
+        requestCount: number
     }
 }
 
@@ -385,6 +390,11 @@ export default function AdminCreditsPage() {
                                                         <Badge variant="outline" className="border-purple-500/30 text-purple-400">
                                                             {wallet.transactions.total} transactions
                                                         </Badge>
+                                                        {wallet.byok?.hasUsed && (
+                                                            <Badge variant="outline" className="border-orange-500/30 text-orange-400">
+                                                                BYOK ({wallet.byok.requestCount})
+                                                            </Badge>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>

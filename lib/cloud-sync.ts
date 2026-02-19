@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client"
 import { storageManager } from "@/lib/storage-manager"
+import { getByokConfig, saveByokConfig, BYOK_STORAGE_KEYS, type ByokConfig } from "@/lib/storage-manager"
 
 // Initialize Supabase client
 const supabase = createClient()
@@ -101,6 +102,12 @@ export async function uploadBackupToCloud(userId: string): Promise<boolean> {
 
     // Filter to only the top N most recently active projects
     const data = filterDataToTopProjects(fullData, MAX_BACKUP_PROJECTS)
+
+    // Include BYOK config in backup if user opted in
+    const byokConfig = getByokConfig()
+    if (byokConfig.backupToCloud && byokConfig.keys.length > 0) {
+      data.byokConfig = byokConfig
+    }
 
     // Create backup filename with timestamp
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
@@ -417,10 +424,25 @@ export async function restoreBackupFromCloud(userId: string): Promise<boolean> {
       }
     }
 
+    // Restore BYOK config from cloud backup if present
+    if (backupData.byokConfig && typeof backupData.byokConfig === 'object') {
+      try {
+        const cloudByokConfig = backupData.byokConfig as ByokConfig
+        const localByokConfig = getByokConfig()
+        // Only restore if local has no keys configured (don't overwrite existing local keys)
+        if (localByokConfig.keys.length === 0 && cloudByokConfig.keys.length > 0) {
+          saveByokConfig(cloudByokConfig)
+          console.log(`Restored BYOK config with ${cloudByokConfig.keys.length} keys from cloud backup`)
+        }
+      } catch (byokError) {
+        console.error('Error restoring BYOK config:', byokError)
+      }
+    }
+
     // Import non-workspace-scoped tables from cloud (tokens, templates, etc.)
     // Only import items that don't conflict with existing local data
     const workspaceScopedTables = new Set([
-      'workspaces', 'files', 'chatSessions', 'messages', 'deployments', 'environmentVariables', 'checkpoints'
+      'workspaces', 'files', 'chatSessions', 'messages', 'deployments', 'environmentVariables', 'checkpoints', 'byokConfig'
     ])
 
     for (const [tableName, tableData] of Object.entries(backupData)) {

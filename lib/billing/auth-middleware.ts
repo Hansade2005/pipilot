@@ -14,6 +14,7 @@ export interface UserAuthContext {
   creditsBalance: number
   currentPlan: 'free' | 'creator' | 'collaborate' | 'scale'
   canPurchaseCredits: boolean
+  isByok: boolean // True when user is using their own API keys (BYOK mode)
 }
 
 export interface AuthResult {
@@ -27,9 +28,10 @@ export interface AuthResult {
 }
 
 /**
- * Authenticate user from Supabase session
+ * Authenticate user from Supabase session.
+ * When isByok is true, credit checks are skipped (user pays their own provider).
  */
-export async function authenticateUser(request: Request): Promise<AuthResult> {
+export async function authenticateUser(request: Request, isByok: boolean = false): Promise<AuthResult> {
   try {
     const supabase = await createClient()
 
@@ -64,6 +66,22 @@ export async function authenticateUser(request: Request): Promise<AuthResult> {
       }
     }
 
+    // BYOK mode: skip credit checks - user pays their own provider directly
+    if (isByok) {
+      console.log(`[AuthMiddleware] BYOK mode active for user ${user.id} - skipping credit check`)
+      return {
+        success: true,
+        context: {
+          userId: user.id,
+          email: user.email || '',
+          creditsBalance: wallet.creditsBalance,
+          currentPlan: wallet.currentPlan,
+          canPurchaseCredits: wallet.canPurchaseCredits,
+          isByok: true
+        }
+      }
+    }
+
     // Check if user has enough credits (minimum 1 credit required)
     if (wallet.creditsBalance < 1) {
       const message =
@@ -88,7 +106,8 @@ export async function authenticateUser(request: Request): Promise<AuthResult> {
         email: user.email || '',
         creditsBalance: wallet.creditsBalance,
         currentPlan: wallet.currentPlan,
-        canPurchaseCredits: wallet.canPurchaseCredits
+        canPurchaseCredits: wallet.canPurchaseCredits,
+        isByok: false
       }
     }
   } catch (error) {

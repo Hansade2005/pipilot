@@ -72,6 +72,13 @@ export async function GET(request: NextRequest) {
           .order('created_at', { ascending: false })
           .limit(5)
 
+        // Check if user has any BYOK usage (request_type contains 'byok')
+        const { count: byokUsageCount } = await adminSupabase
+          .from('usage_logs')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', wallet.user_id)
+          .like('request_type', '%byok%')
+
         return {
           id: wallet.id,
           user_id: wallet.user_id,
@@ -86,6 +93,10 @@ export async function GET(request: NextRequest) {
           transactions: {
             total: totalTransactions || 0,
             recent: recentTransactions || []
+          },
+          byok: {
+            hasUsed: (byokUsageCount || 0) > 0,
+            requestCount: byokUsageCount || 0
           }
         }
       })

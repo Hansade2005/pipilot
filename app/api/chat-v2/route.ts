@@ -2,7 +2,7 @@ import { streamText, tool, stepCountIs, smoothStream, extractReasoningMiddleware
 import { experimental_createMCPClient as createMCPClient } from '@ai-sdk/mcp'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { getModel, needsMistralVisionProvider, getDevstralVisionModel, getFallbackModel, isProviderError, FALLBACK_MODEL_ID } from '@/lib/ai-providers'
+import { getModel, needsMistralVisionProvider, getDevstralVisionModel, getFallbackModel, isProviderError, FALLBACK_MODEL_ID, parseByokKeysFromHeader, createByokModel, resolveByokProvider } from '@/lib/ai-providers'
 import { DEFAULT_CHAT_MODEL, getModelById, modelSupportsVision } from '@/lib/ai-models'
 import { NextResponse } from 'next/server'
 import { getWorkspaceDatabaseId, workspaceHasDatabase, setWorkspaceDatabase } from '@/lib/get-current-workspace'
@@ -2134,6 +2134,13 @@ export async function POST(req: Request) {
     // ============================================================================
     startTime = Date.now()
     
+    // Detect BYOK (Bring Your Own Key) mode from request header
+    const byokKeys = parseByokKeysFromHeader(req)
+    const isByokMode = !!byokKeys
+    if (isByokMode) {
+      console.log(`[Chat-V2] BYOK mode detected - user providing their own API keys`)
+    }
+
     // Create a Request object for the middleware
     const request = new Request('http://localhost/api/chat-v2', {
       method: 'POST',
@@ -2141,9 +2148,9 @@ export async function POST(req: Request) {
         'content-type': 'application/json'
       }
     })
-    
-    const authResult = await authenticateUser(request)
-    
+
+    const authResult = await authenticateUser(request, isByokMode)
+
     if (!authResult.success || !authResult.context) {
       console.error(`[Chat-V2] ❌ Authentication failed:`, authResult.error)
       return NextResponse.json(
@@ -2160,26 +2167,28 @@ export async function POST(req: Request) {
 
     authContext = authResult.context
     console.log(
-      `[Chat-V2] ✅ Authenticated: User ${authContext.userId}, Plan: ${authContext.currentPlan}, Balance: ${authContext.creditsBalance} credits`
+      `[Chat-V2] ✅ Authenticated: User ${authContext.userId}, Plan: ${authContext.currentPlan}, Balance: ${authContext.creditsBalance} credits${isByokMode ? ' (BYOK - credits not consumed)' : ''}`
     )
 
-    // Check monthly request limit before processing
+    // Check monthly request limit before processing (skip for BYOK users)
     const supabaseForBilling = await createClient()
-    const requestLimitCheck = await checkMonthlyRequestLimit(authContext.userId, supabaseForBilling)
-    if (!requestLimitCheck.allowed) {
-      console.warn(`[Chat-V2] ⚠️ Monthly request limit reached for user ${authContext.userId}: ${requestLimitCheck.requestsUsed}/${requestLimitCheck.requestsLimit}`)
-      return NextResponse.json(
-        {
-          error: {
-            message: requestLimitCheck.reason || 'Monthly request limit reached.',
-            code: 'REQUEST_LIMIT_REACHED',
-            type: 'credit_error',
-            requestsUsed: requestLimitCheck.requestsUsed,
-            requestsLimit: requestLimitCheck.requestsLimit
-          }
-        },
-        { status: 429 }
-      )
+    if (!isByokMode) {
+      const requestLimitCheck = await checkMonthlyRequestLimit(authContext.userId, supabaseForBilling)
+      if (!requestLimitCheck.allowed) {
+        console.warn(`[Chat-V2] ⚠️ Monthly request limit reached for user ${authContext.userId}: ${requestLimitCheck.requestsUsed}/${requestLimitCheck.requestsLimit}`)
+        return NextResponse.json(
+          {
+            error: {
+              message: requestLimitCheck.reason || 'Monthly request limit reached.',
+              code: 'REQUEST_LIMIT_REACHED',
+              type: 'credit_error',
+              requestsUsed: requestLimitCheck.requestsUsed,
+              requestsLimit: requestLimitCheck.requestsLimit
+            }
+          },
+          { status: 429 }
+        )
+      }
     }
 
     // Initialize in-memory project storage for this session
@@ -10762,11 +10771,26 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
       };
     });
 
-    // Get AI model - use Mistral provider for Devstral with images
+    // Get AI model - use BYOK user keys if available, otherwise platform keys
+    // For Devstral with images, use Mistral provider
     // For Qwen thinking models, wrap with extractReasoningMiddleware to parse <think> tags
     // and cap reasoning output to 800 tokens via maxTokens on the wrapped model
     const isQwenThinking = modelId === 'alibaba/qwen3-vl-thinking'
-    const baseModel = useDevstralVision ? getDevstralVisionModel(modelId) : getAIModel(modelId);
+    let baseModel: any
+    if (isByokMode && byokKeys) {
+      // BYOK: create model with user's own API key
+      const byokModel = createByokModel(modelId, byokKeys)
+      if (byokModel) {
+        baseModel = byokModel
+        console.log(`[Chat-V2] BYOK: Using user-provided API key for model ${modelId} (provider: ${resolveByokProvider(modelId, byokKeys)})`)
+      } else {
+        // No matching BYOK key for this model - fall back to platform key
+        console.log(`[Chat-V2] BYOK: No matching key for model ${modelId}, falling back to platform key`)
+        baseModel = useDevstralVision ? getDevstralVisionModel(modelId) : getAIModel(modelId)
+      }
+    } else {
+      baseModel = useDevstralVision ? getDevstralVisionModel(modelId) : getAIModel(modelId)
+    }
     const model = isQwenThinking
       ? wrapLanguageModel({
           model: baseModel,
@@ -11039,6 +11063,15 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
               }) + '\n'))
             }
 
+            // Notify frontend that BYOK mode is active (no credits will be deducted)
+            if (isByokMode) {
+              controller.enqueue(encoder.encode(JSON.stringify({
+                type: 'byok_active',
+                provider: byokKeys ? resolveByokProvider(activeModelId, byokKeys) : null,
+                message: 'Using your own API key - no credits will be deducted.'
+              }) + '\n'))
+            }
+
             // Stream the text and tool calls with continuation monitoring
             for await (const part of result.fullStream) {
               // Check if we should trigger continuation
@@ -11111,15 +11144,18 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                         requestType: 'chat-step',
                         endpoint: '/api/chat-v2',
                         steps: 1,
-                        status: 'success'
+                        status: 'success',
+                        isByok: isByokMode,
                       },
                       billingSupabase
                     )
                     if (billingResult.success) {
                       perStepBillingActive = true
                       totalCreditsDeducted += billingResult.creditsUsed
-                      currentBalance = billingResult.newBalance
-                      console.log(`[Chat-V2] 💰 Step ${accumulatedSteps}: deducted ${billingResult.creditsUsed} credits (balance: ${currentBalance})`)
+                      currentBalance = isByokMode ? -1 : billingResult.newBalance
+                      if (!isByokMode) {
+                        console.log(`[Chat-V2] 💰 Step ${accumulatedSteps}: deducted ${billingResult.creditsUsed} credits (balance: ${currentBalance})`)
+                      }
                     }
                   } catch (billingErr) {
                     console.warn(`[Chat-V2] Step billing failed (will retry in finally):`, billingErr)
@@ -11140,8 +11176,8 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                   remainingBalance: currentBalance,
                 }) + '\n'))
 
-                // Credit exhaustion guard: stop the agent if balance is depleted
-                if (perStepBillingActive && currentBalance <= 0) {
+                // Credit exhaustion guard: stop the agent if balance is depleted (skip for BYOK)
+                if (!isByokMode && perStepBillingActive && currentBalance <= 0) {
                   console.log(`[Chat-V2] 🛑 Credits exhausted after step ${accumulatedSteps} - stopping agent`)
                   controller.enqueue(encoder.encode(JSON.stringify({
                     type: 'credits_exhausted',
@@ -11274,15 +11310,18 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                             requestType: 'chat-step',
                             endpoint: '/api/chat-v2',
                             steps: 1,
-                            status: 'success'
+                            status: 'success',
+                            isByok: isByokMode,
                           },
                           billingSupabase
                         )
                         if (billingResult.success) {
                           perStepBillingActive = true
                           totalCreditsDeducted += billingResult.creditsUsed
-                          currentBalance = billingResult.newBalance
-                          console.log(`[Chat-V2] 💰 [Fallback] Step ${accumulatedSteps}: deducted ${billingResult.creditsUsed} credits (balance: ${currentBalance})`)
+                          currentBalance = isByokMode ? -1 : billingResult.newBalance
+                          if (!isByokMode) {
+                            console.log(`[Chat-V2] 💰 [Fallback] Step ${accumulatedSteps}: deducted ${billingResult.creditsUsed} credits (balance: ${currentBalance})`)
+                          }
                         }
                       } catch (billingErr) {
                         console.warn(`[Chat-V2] [Fallback] Step billing failed:`, billingErr)
@@ -11487,15 +11526,20 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                     endpoint: '/api/chat-v2',
                     steps: stepsCount,
                     responseTimeMs: responseTime,
-                    status: clientAborted ? 'aborted' : streamErrored ? 'error' : 'success'
+                    status: clientAborted ? 'aborted' : streamErrored ? 'error' : 'success',
+                    isByok: isByokMode,
                   },
                   supabase
                 )
 
                 if (billingResult.success) {
-                  console.log(
-                    `[Chat-V2] 💰 Deducted ${billingResult.creditsUsed} credits (${totalUsage.inputTokens + totalUsage.outputTokens} tokens). New balance: ${billingResult.newBalance} credits`
-                  )
+                  if (isByokMode) {
+                    console.log(`[Chat-V2] BYOK: Logged ${totalUsage.inputTokens + totalUsage.outputTokens} tokens usage (no credits deducted)`)
+                  } else {
+                    console.log(
+                      `[Chat-V2] 💰 Deducted ${billingResult.creditsUsed} credits (${totalUsage.inputTokens + totalUsage.outputTokens} tokens). New balance: ${billingResult.newBalance} credits`
+                    )
+                  }
                 } else {
                   console.error(`[Chat-V2] ⚠️ Failed to deduct credits:`, billingResult.error)
                 }

@@ -62,6 +62,7 @@ import { createClient } from '@/lib/supabase/client'
 import { getWalletBalance } from '@/lib/billing/credit-manager'
 import { PRODUCT_CONFIGS } from '@/lib/stripe-config'
 import { uploadLargePayload } from '@/lib/cloud-sync'
+import { getByokConfig, saveByokConfig, maskApiKey, BYOK_PROVIDERS, type ByokConfig, type ByokProviderKey } from '@/lib/storage-manager'
 // Note: modelSupportsVision removed - all images now go through describe-image API for consistent processing
 
 // New feature components
@@ -1220,8 +1221,43 @@ export function ChatPanelV2({
 
   // Command Menu state (rich "+" palette)
   const [showCommandMenu, setShowCommandMenu] = useState(false)
-  const [commandMenuSubmenu, setCommandMenuSubmenu] = useState<'none' | 'mcp' | 'tools' | 'slash'>('none')
+  const [commandMenuSubmenu, setCommandMenuSubmenu] = useState<'none' | 'mcp' | 'tools' | 'slash' | 'byok'>('none')
   const commandMenuRef = useRef<HTMLDivElement>(null)
+
+  // BYOK (Bring Your Own Key) state
+  const [byokConfig, setByokConfig] = useState<ByokConfig>(() => getByokConfig())
+  const [byokSubmenuView, setByokSubmenuView] = useState<'list' | 'add' | 'add-custom'>('list')
+  const [byokEditingProvider, setByokEditingProvider] = useState<string | null>(null)
+  const [byokNewKey, setByokNewKey] = useState('')
+  const [byokNewBaseUrl, setByokNewBaseUrl] = useState('')
+  const [byokNewProviderName, setByokNewProviderName] = useState('')
+  const [byokNewProviderType, setByokNewProviderType] = useState<'openai-compatible' | 'anthropic-compatible'>('openai-compatible')
+  const [byokNewCustomModels, setByokNewCustomModels] = useState('')
+
+  // BYOK helper: save config and update state
+  const updateByokConfig = useCallback((updater: (prev: ByokConfig) => ByokConfig) => {
+    setByokConfig(prev => {
+      const next = updater(prev)
+      saveByokConfig(next)
+      return next
+    })
+  }, [])
+
+  // Build BYOK keys header for API requests
+  const getByokKeysHeader = useCallback((): string | null => {
+    if (!byokConfig.enabled) return null
+    const activeKeys = byokConfig.keys.filter(k => k.enabled && k.apiKey)
+    if (activeKeys.length === 0) return null
+    const keysObj: Record<string, any> = {}
+    for (const k of activeKeys) {
+      if (k.providerType && k.baseUrl) {
+        keysObj[k.providerId] = { apiKey: k.apiKey, baseUrl: k.baseUrl, providerType: k.providerType }
+      } else {
+        keysObj[k.providerId] = k.apiKey
+      }
+    }
+    return btoa(JSON.stringify(keysObj))
+  }, [byokConfig])
 
   // Feature toggles (persisted per-project in localStorage)
   const [webSearchEnabled, setWebSearchEnabled] = useState<boolean>(() => {
@@ -4846,17 +4882,25 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
         console.log(`[ChatPanelV2] 📦 Files uploaded to storage, URL: ${storageUrl}`)
       }
 
+      // Build request headers, including BYOK keys if active
+      const requestHeaders: Record<string, string> = {
+        'Content-Type': contentType,
+        // Send minimal metadata in headers for binary requests
+        'X-Model-Id': modelToUse,
+        'X-Ai-Mode': aiMode,
+        'X-Chat-Mode': isAskMode ? 'ask' : 'agent',
+        'X-Is-Initial-Prompt': isInitialPrompt.toString(),
+        'X-Using-Storage': usingStorage.toString()
+      }
+      // Attach BYOK keys if user has own API keys configured
+      const byokHeader = getByokKeysHeader()
+      if (byokHeader) {
+        requestHeaders['X-Byok-Keys'] = byokHeader
+      }
+
       const response = await fetch('/api/chat-v2', {
         method: 'POST',
-        headers: {
-          'Content-Type': contentType,
-          // Send minimal metadata in headers for binary requests
-          'X-Model-Id': modelToUse,
-          'X-Ai-Mode': aiMode,
-          'X-Chat-Mode': isAskMode ? 'ask' : 'agent',
-          'X-Is-Initial-Prompt': isInitialPrompt.toString(),
-          'X-Using-Storage': usingStorage.toString()
-        },
+        headers: requestHeaders,
         body: requestBody,
         signal: controller.signal
       })
@@ -6835,6 +6879,28 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                           <ChevronRight className="size-4 text-gray-500" />
                         </button>
 
+                        {/* BYOK - Bring Your Own Key */}
+                        <button
+                          className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                          onClick={() => {
+                            setCommandMenuSubmenu('byok')
+                            setByokSubmenuView('list')
+                            setByokEditingProvider(null)
+                            setByokNewKey('')
+                          }}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Key className="size-4 text-gray-400" />
+                            <span>API Keys (BYOK)</span>
+                            {byokConfig.enabled && byokConfig.keys.filter(k => k.enabled && k.apiKey).length > 0 && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-orange-900/40 text-orange-400 rounded-full">
+                                {byokConfig.keys.filter(k => k.enabled && k.apiKey).length}
+                              </span>
+                            )}
+                          </div>
+                          <ChevronRight className="size-4 text-gray-500" />
+                        </button>
+
                         {/* Separator */}
                         <div className="my-1.5 border-t border-gray-700/50" />
 
@@ -7329,6 +7395,374 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                             </button>
                           ))}
                         </div>
+                      </div>
+                    )}
+
+                    {/* BYOK (Bring Your Own Key) Submenu */}
+                    {commandMenuSubmenu === 'byok' && (
+                      <div className="py-1.5">
+                        {/* Header */}
+                        <button
+                          className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors border-b border-gray-700/50"
+                          onClick={() => {
+                            if (byokSubmenuView !== 'list') {
+                              setByokSubmenuView('list')
+                              setByokEditingProvider(null)
+                              setByokNewKey('')
+                              setByokNewBaseUrl('')
+                            } else {
+                              setCommandMenuSubmenu('none')
+                            }
+                          }}
+                        >
+                          <ChevronLeft className="size-4" />
+                          <span className="font-medium">
+                            {byokSubmenuView === 'add' ? 'Add API Key' : byokSubmenuView === 'add-custom' ? 'Custom Provider' : 'API Keys (BYOK)'}
+                          </span>
+                          <span className="ml-auto text-[10px] text-gray-500">
+                            {byokConfig.keys.filter(k => k.apiKey).length} configured
+                          </span>
+                        </button>
+
+                        {/* BYOK List View */}
+                        {byokSubmenuView === 'list' && (
+                          <>
+                            {/* Global BYOK Toggle */}
+                            <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-700/50">
+                              <div className="flex items-center gap-2">
+                                <Key className="size-4 text-orange-400" />
+                                <span className="text-sm text-gray-200 font-medium">Use own API keys</span>
+                              </div>
+                              <Switch
+                                checked={byokConfig.enabled}
+                                onCheckedChange={(checked) => updateByokConfig(prev => ({ ...prev, enabled: checked }))}
+                                className="data-[state=checked]:bg-orange-600"
+                              />
+                            </div>
+
+                            {!byokConfig.enabled && (
+                              <div className="px-4 py-3 text-[11px] text-gray-500">
+                                Enable to use your own API keys instead of PiPilot credits. Your keys are stored locally and never saved on our servers.
+                              </div>
+                            )}
+
+                            {byokConfig.enabled && (
+                              <>
+                                {/* Configured keys */}
+                                <div className="max-h-[240px] overflow-y-auto">
+                                  {BYOK_PROVIDERS.map(provider => {
+                                    const configured = byokConfig.keys.find(k => k.providerId === provider.id)
+                                    return (
+                                      <div key={provider.id} className="flex items-center justify-between px-4 py-2 hover:bg-gray-800/50 transition-colors">
+                                        <button
+                                          className="flex-1 flex items-center gap-3 text-left min-w-0"
+                                          onClick={() => {
+                                            setByokEditingProvider(provider.id)
+                                            setByokNewKey(configured?.apiKey || '')
+                                            setByokNewBaseUrl(configured?.baseUrl || '')
+                                            setByokSubmenuView('add')
+                                          }}
+                                        >
+                                          <div className={`size-2 rounded-full ${configured?.apiKey ? 'bg-green-400' : 'bg-gray-600'}`} />
+                                          <div className="min-w-0">
+                                            <div className="text-sm text-gray-200">{provider.name}</div>
+                                            <div className="text-[10px] text-gray-500 truncate">
+                                              {configured?.apiKey ? maskApiKey(configured.apiKey) : provider.description}
+                                            </div>
+                                          </div>
+                                        </button>
+                                        {configured?.apiKey && (
+                                          <Switch
+                                            checked={configured.enabled}
+                                            onCheckedChange={(checked) => {
+                                              updateByokConfig(prev => ({
+                                                ...prev,
+                                                keys: prev.keys.map(k =>
+                                                  k.providerId === provider.id ? { ...k, enabled: checked } : k
+                                                )
+                                              }))
+                                            }}
+                                            className="ml-2 data-[state=checked]:bg-orange-600"
+                                          />
+                                        )}
+                                      </div>
+                                    )
+                                  })}
+
+                                  {/* Custom providers */}
+                                  {byokConfig.keys.filter(k => !BYOK_PROVIDERS.some(p => p.id === k.providerId)).map(custom => (
+                                    <div key={custom.providerId} className="flex items-center justify-between px-4 py-2 hover:bg-gray-800/50 transition-colors">
+                                      <button
+                                        className="flex-1 flex items-center gap-3 text-left min-w-0"
+                                        onClick={() => {
+                                          setByokEditingProvider(custom.providerId)
+                                          setByokNewKey(custom.apiKey)
+                                          setByokNewBaseUrl(custom.baseUrl || '')
+                                          setByokNewProviderName(custom.label || custom.providerId)
+                                          setByokNewProviderType(custom.providerType || 'openai-compatible')
+                                          setByokNewCustomModels(custom.customModels?.join(', ') || '')
+                                          setByokSubmenuView('add-custom')
+                                        }}
+                                      >
+                                        <div className={`size-2 rounded-full ${custom.apiKey ? 'bg-green-400' : 'bg-gray-600'}`} />
+                                        <div className="min-w-0">
+                                          <div className="text-sm text-gray-200">{custom.label || custom.providerId}</div>
+                                          <div className="text-[10px] text-gray-500 truncate">
+                                            {custom.baseUrl ? custom.baseUrl : 'Custom'} - {maskApiKey(custom.apiKey)}
+                                          </div>
+                                        </div>
+                                      </button>
+                                      <div className="flex items-center gap-1.5">
+                                        <button
+                                          className="p-1 text-gray-500 hover:text-red-400 transition-colors"
+                                          onClick={() => {
+                                            updateByokConfig(prev => ({
+                                              ...prev,
+                                              keys: prev.keys.filter(k => k.providerId !== custom.providerId)
+                                            }))
+                                          }}
+                                        >
+                                          <Trash2 className="size-3.5" />
+                                        </button>
+                                        <Switch
+                                          checked={custom.enabled}
+                                          onCheckedChange={(checked) => {
+                                            updateByokConfig(prev => ({
+                                              ...prev,
+                                              keys: prev.keys.map(k =>
+                                                k.providerId === custom.providerId ? { ...k, enabled: checked } : k
+                                              )
+                                            }))
+                                          }}
+                                          className="data-[state=checked]:bg-orange-600"
+                                        />
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* Actions */}
+                                <div className="border-t border-gray-700/50 pt-1.5 px-2 pb-1">
+                                  <button
+                                    className="w-full flex items-center gap-2 px-2 py-2 text-sm text-orange-400 hover:bg-orange-500/10 rounded-lg transition-colors"
+                                    onClick={() => {
+                                      setByokEditingProvider(null)
+                                      setByokNewKey('')
+                                      setByokNewBaseUrl('')
+                                      setByokNewProviderName('')
+                                      setByokNewCustomModels('')
+                                      setByokSubmenuView('add-custom')
+                                    }}
+                                  >
+                                    <Plus className="size-4" />
+                                    <span>Add custom provider</span>
+                                  </button>
+                                </div>
+
+                                {/* Cloud backup toggle */}
+                                <div className="flex items-center justify-between px-4 py-2 border-t border-gray-700/50">
+                                  <span className="text-[11px] text-gray-500">Include keys in cloud backup</span>
+                                  <Switch
+                                    checked={byokConfig.backupToCloud}
+                                    onCheckedChange={(checked) => updateByokConfig(prev => ({ ...prev, backupToCloud: checked }))}
+                                    className="scale-75 data-[state=checked]:bg-orange-600"
+                                  />
+                                </div>
+                              </>
+                            )}
+                          </>
+                        )}
+
+                        {/* BYOK Add/Edit Built-in Provider */}
+                        {byokSubmenuView === 'add' && byokEditingProvider && (
+                          <div className="px-4 py-3 space-y-3">
+                            <div className="text-sm font-medium text-gray-200">
+                              {BYOK_PROVIDERS.find(p => p.id === byokEditingProvider)?.name || byokEditingProvider}
+                            </div>
+                            <div className="text-[11px] text-gray-500">
+                              {BYOK_PROVIDERS.find(p => p.id === byokEditingProvider)?.description}
+                            </div>
+                            <div>
+                              <label className="text-[11px] text-gray-400 mb-1 block">API Key</label>
+                              <Input
+                                type="password"
+                                value={byokNewKey}
+                                onChange={(e) => setByokNewKey(e.target.value)}
+                                placeholder={BYOK_PROVIDERS.find(p => p.id === byokEditingProvider)?.placeholder || 'Enter API key'}
+                                className="h-8 text-sm bg-gray-800 border-gray-700 focus:ring-orange-500/50 focus:border-orange-500/50"
+                              />
+                            </div>
+                            {byokEditingProvider === 'vercel-gateway' && (
+                              <div>
+                                <label className="text-[11px] text-gray-400 mb-1 block">Gateway URL (optional)</label>
+                                <Input
+                                  value={byokNewBaseUrl}
+                                  onChange={(e) => setByokNewBaseUrl(e.target.value)}
+                                  placeholder="https://ai-gateway.vercel.sh/v1"
+                                  className="h-8 text-sm bg-gray-800 border-gray-700 focus:ring-orange-500/50 focus:border-orange-500/50"
+                                />
+                              </div>
+                            )}
+                            <div className="flex gap-2 pt-1">
+                              <button
+                                className="flex-1 h-8 text-sm rounded-lg border border-gray-700 text-gray-300 hover:bg-gray-800 transition-colors"
+                                onClick={() => {
+                                  // Remove key
+                                  updateByokConfig(prev => ({
+                                    ...prev,
+                                    keys: prev.keys.filter(k => k.providerId !== byokEditingProvider)
+                                  }))
+                                  setByokSubmenuView('list')
+                                }}
+                              >
+                                Remove
+                              </button>
+                              <button
+                                className="flex-1 h-8 text-sm rounded-lg bg-orange-600 hover:bg-orange-500 text-white transition-colors disabled:opacity-30"
+                                disabled={!byokNewKey.trim()}
+                                onClick={() => {
+                                  const existingIndex = byokConfig.keys.findIndex(k => k.providerId === byokEditingProvider)
+                                  const newEntry: ByokProviderKey = {
+                                    providerId: byokEditingProvider,
+                                    apiKey: byokNewKey.trim(),
+                                    enabled: true,
+                                    label: BYOK_PROVIDERS.find(p => p.id === byokEditingProvider)?.name,
+                                    baseUrl: byokNewBaseUrl.trim() || undefined,
+                                    addedAt: new Date().toISOString(),
+                                  }
+                                  updateByokConfig(prev => ({
+                                    ...prev,
+                                    keys: existingIndex >= 0
+                                      ? prev.keys.map((k, i) => i === existingIndex ? { ...k, ...newEntry } : k)
+                                      : [...prev.keys, newEntry]
+                                  }))
+                                  setByokSubmenuView('list')
+                                  setByokNewKey('')
+                                  setByokNewBaseUrl('')
+                                }}
+                              >
+                                Save
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* BYOK Add/Edit Custom Provider */}
+                        {byokSubmenuView === 'add-custom' && (
+                          <div className="px-4 py-3 space-y-3">
+                            <div>
+                              <label className="text-[11px] text-gray-400 mb-1 block">Provider Name</label>
+                              <Input
+                                value={byokNewProviderName}
+                                onChange={(e) => setByokNewProviderName(e.target.value)}
+                                placeholder="My Custom Provider"
+                                className="h-8 text-sm bg-gray-800 border-gray-700 focus:ring-orange-500/50 focus:border-orange-500/50"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[11px] text-gray-400 mb-1 block">Base URL</label>
+                              <Input
+                                value={byokNewBaseUrl}
+                                onChange={(e) => setByokNewBaseUrl(e.target.value)}
+                                placeholder="https://api.example.com/v1"
+                                className="h-8 text-sm bg-gray-800 border-gray-700 focus:ring-orange-500/50 focus:border-orange-500/50"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[11px] text-gray-400 mb-1 block">API Key</label>
+                              <Input
+                                type="password"
+                                value={byokNewKey}
+                                onChange={(e) => setByokNewKey(e.target.value)}
+                                placeholder="Enter API key"
+                                className="h-8 text-sm bg-gray-800 border-gray-700 focus:ring-orange-500/50 focus:border-orange-500/50"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[11px] text-gray-400 mb-1 block">Compatibility</label>
+                              <div className="flex gap-2">
+                                <button
+                                  className={`flex-1 h-8 text-xs rounded-lg border transition-colors ${byokNewProviderType === 'openai-compatible' ? 'border-orange-500 bg-orange-600/15 text-orange-400' : 'border-gray-700 text-gray-400 hover:bg-gray-800'}`}
+                                  onClick={() => setByokNewProviderType('openai-compatible')}
+                                >
+                                  OpenAI Compatible
+                                </button>
+                                <button
+                                  className={`flex-1 h-8 text-xs rounded-lg border transition-colors ${byokNewProviderType === 'anthropic-compatible' ? 'border-orange-500 bg-orange-600/15 text-orange-400' : 'border-gray-700 text-gray-400 hover:bg-gray-800'}`}
+                                  onClick={() => setByokNewProviderType('anthropic-compatible')}
+                                >
+                                  Anthropic Compatible
+                                </button>
+                              </div>
+                            </div>
+                            <div>
+                              <label className="text-[11px] text-gray-400 mb-1 block">Custom Model IDs (comma-separated)</label>
+                              <Input
+                                value={byokNewCustomModels}
+                                onChange={(e) => setByokNewCustomModels(e.target.value)}
+                                placeholder="model-a, model-b"
+                                className="h-8 text-sm bg-gray-800 border-gray-700 focus:ring-orange-500/50 focus:border-orange-500/50"
+                              />
+                            </div>
+                            <div className="flex gap-2 pt-1">
+                              <button
+                                className="flex-1 h-8 text-sm rounded-lg border border-gray-700 text-gray-300 hover:bg-gray-800 transition-colors"
+                                onClick={() => setByokSubmenuView('list')}
+                              >
+                                Cancel
+                              </button>
+                              {byokEditingProvider && (
+                                <button
+                                  className="h-8 px-3 text-sm rounded-lg border border-red-800 text-red-400 hover:bg-red-900/30 transition-colors"
+                                  onClick={() => {
+                                    updateByokConfig(prev => ({
+                                      ...prev,
+                                      keys: prev.keys.filter(k => k.providerId !== byokEditingProvider)
+                                    }))
+                                    setByokSubmenuView('list')
+                                    setByokEditingProvider(null)
+                                  }}
+                                >
+                                  Delete
+                                </button>
+                              )}
+                              <button
+                                className="flex-1 h-8 text-sm rounded-lg bg-orange-600 hover:bg-orange-500 text-white transition-colors disabled:opacity-30"
+                                disabled={!byokNewKey.trim() || !byokNewBaseUrl.trim() || !byokNewProviderName.trim()}
+                                onClick={() => {
+                                  const providerId = byokEditingProvider || `custom-${byokNewProviderName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`
+                                  const newEntry: ByokProviderKey = {
+                                    providerId,
+                                    apiKey: byokNewKey.trim(),
+                                    enabled: true,
+                                    label: byokNewProviderName.trim(),
+                                    baseUrl: byokNewBaseUrl.trim(),
+                                    providerType: byokNewProviderType,
+                                    customModels: byokNewCustomModels.split(',').map(m => m.trim()).filter(Boolean),
+                                    addedAt: new Date().toISOString(),
+                                  }
+                                  updateByokConfig(prev => {
+                                    const existingIndex = prev.keys.findIndex(k => k.providerId === providerId)
+                                    return {
+                                      ...prev,
+                                      keys: existingIndex >= 0
+                                        ? prev.keys.map((k, i) => i === existingIndex ? { ...k, ...newEntry } : k)
+                                        : [...prev.keys, newEntry]
+                                    }
+                                  })
+                                  setByokSubmenuView('list')
+                                  setByokEditingProvider(null)
+                                  setByokNewKey('')
+                                  setByokNewBaseUrl('')
+                                  setByokNewProviderName('')
+                                  setByokNewCustomModels('')
+                                }}
+                              >
+                                {byokEditingProvider ? 'Update' : 'Add'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
