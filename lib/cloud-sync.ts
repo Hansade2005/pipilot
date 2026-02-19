@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client"
 import { storageManager } from "@/lib/storage-manager"
+import { getByokConfig, saveByokConfig, BYOK_STORAGE_KEYS, type ByokConfig } from "@/lib/storage-manager"
 
 // Initialize Supabase client
 const supabase = createClient()
@@ -101,6 +102,47 @@ export async function uploadBackupToCloud(userId: string): Promise<boolean> {
 
     // Filter to only the top N most recently active projects
     const data = filterDataToTopProjects(fullData, MAX_BACKUP_PROJECTS)
+
+    // Include BYOK config in backup if user opted in
+    const byokConfig = getByokConfig()
+    if (byokConfig.backupToCloud && byokConfig.keys.length > 0) {
+      data.byokConfig = byokConfig
+    }
+
+    // Include MCP server configurations from localStorage
+    if (typeof window !== 'undefined') {
+      try {
+        const mcpBackup: { global: any[], projects: Record<string, any[]> } = {
+          global: [],
+          projects: {}
+        }
+
+        // Collect global MCP servers
+        const globalMcp = localStorage.getItem('pipilot-mcp-servers-global')
+        if (globalMcp) {
+          mcpBackup.global = JSON.parse(globalMcp)
+        }
+
+        // Collect project-specific MCP servers for each backed-up workspace
+        const backedUpWorkspaces: any[] = Array.isArray(data.workspaces) ? data.workspaces : []
+        for (const workspace of backedUpWorkspaces) {
+          const projectMcp = localStorage.getItem(`pipilot-mcp-servers-${workspace.id}`)
+          if (projectMcp) {
+            const parsed = JSON.parse(projectMcp)
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              mcpBackup.projects[workspace.id] = parsed
+            }
+          }
+        }
+
+        // Only include if there's actual MCP data
+        if (mcpBackup.global.length > 0 || Object.keys(mcpBackup.projects).length > 0) {
+          data.mcpServers = mcpBackup
+        }
+      } catch (mcpError) {
+        console.error('Error collecting MCP server configs for backup:', mcpError)
+      }
+    }
 
     // Create backup filename with timestamp
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
@@ -417,10 +459,57 @@ export async function restoreBackupFromCloud(userId: string): Promise<boolean> {
       }
     }
 
+    // Restore BYOK config from cloud backup if present
+    if (backupData.byokConfig && typeof backupData.byokConfig === 'object') {
+      try {
+        const cloudByokConfig = backupData.byokConfig as ByokConfig
+        const localByokConfig = getByokConfig()
+        // Only restore if local has no keys configured (don't overwrite existing local keys)
+        if (localByokConfig.keys.length === 0 && cloudByokConfig.keys.length > 0) {
+          saveByokConfig(cloudByokConfig)
+          console.log(`Restored BYOK config with ${cloudByokConfig.keys.length} keys from cloud backup`)
+        }
+      } catch (byokError) {
+        console.error('Error restoring BYOK config:', byokError)
+      }
+    }
+
+    // Restore MCP server configurations to localStorage
+    if (typeof window !== 'undefined' && backupData.mcpServers && typeof backupData.mcpServers === 'object') {
+      try {
+        const mcpBackup = backupData.mcpServers as { global?: any[], projects?: Record<string, any[]> }
+
+        // Restore global MCP servers (only if local has none)
+        if (Array.isArray(mcpBackup.global) && mcpBackup.global.length > 0) {
+          const existingGlobal = localStorage.getItem('pipilot-mcp-servers-global')
+          const hasLocalGlobal = existingGlobal && JSON.parse(existingGlobal).length > 0
+          if (!hasLocalGlobal) {
+            localStorage.setItem('pipilot-mcp-servers-global', JSON.stringify(mcpBackup.global))
+          }
+        }
+
+        // Restore project-specific MCP servers (only if local has none for that project)
+        if (mcpBackup.projects && typeof mcpBackup.projects === 'object') {
+          for (const [projectId, servers] of Object.entries(mcpBackup.projects)) {
+            if (Array.isArray(servers) && servers.length > 0) {
+              const key = `pipilot-mcp-servers-${projectId}`
+              const existingProject = localStorage.getItem(key)
+              const hasLocalProject = existingProject && JSON.parse(existingProject).length > 0
+              if (!hasLocalProject) {
+                localStorage.setItem(key, JSON.stringify(servers))
+              }
+            }
+          }
+        }
+      } catch (mcpError) {
+        console.error('Error restoring MCP server configs:', mcpError)
+      }
+    }
+
     // Import non-workspace-scoped tables from cloud (tokens, templates, etc.)
     // Only import items that don't conflict with existing local data
     const workspaceScopedTables = new Set([
-      'workspaces', 'files', 'chatSessions', 'messages', 'deployments', 'environmentVariables', 'checkpoints'
+      'workspaces', 'files', 'chatSessions', 'messages', 'deployments', 'environmentVariables', 'checkpoints', 'byokConfig', 'mcpServers'
     ])
 
     for (const [tableName, tableData] of Object.entries(backupData)) {

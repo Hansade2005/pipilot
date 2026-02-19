@@ -357,3 +357,177 @@ export function getDevstralVisionModel(modelId: string) {
 
 // Export the vercelGateway getter for describe-image route
 export { getVercelGateway as vercelGateway };
+
+// =============================================================================
+// BYOK (Bring Your Own Key) - Dynamic provider creation with user API keys
+// =============================================================================
+// These functions create fresh provider instances using user-supplied API keys.
+// They are NOT cached because each user has different keys.
+
+export interface ByokKeySet {
+  openai?: string
+  anthropic?: string
+  mistral?: string
+  xai?: string
+  google?: string
+  openrouter?: string
+  'vercel-gateway'?: string
+  // Custom providers: keyed by custom provider ID
+  [key: string]: string | undefined | {
+    apiKey: string
+    baseUrl: string
+    providerType: 'openai-compatible' | 'anthropic-compatible'
+  }
+}
+
+/**
+ * Resolve which BYOK provider to use for a given model ID.
+ * Returns the provider ID (e.g. 'openai', 'anthropic') or null if no match.
+ */
+export function resolveByokProvider(modelId: string, byokKeys: ByokKeySet): string | null {
+  // Check direct provider prefixes
+  if (modelId.startsWith('anthropic/') && byokKeys.anthropic) return 'anthropic'
+  if (modelId.startsWith('openai/') && byokKeys.openai) return 'openai'
+  if (modelId.startsWith('mistral/') && byokKeys.mistral) return 'mistral'
+  if (modelId.startsWith('xai/') && byokKeys.xai) return 'xai'
+  if (modelId.startsWith('google/') && byokKeys.google) return 'google'
+
+  // Direct model names
+  if ((modelId === 'pixtral-12b-2409' || modelId === 'codestral-latest') && byokKeys.mistral) return 'mistral'
+  if (modelId === 'auto' && byokKeys.xai) return 'xai'
+
+  // Check custom providers (objects with apiKey+baseUrl)
+  for (const [key, value] of Object.entries(byokKeys)) {
+    if (value && typeof value === 'object' && 'apiKey' in value) {
+      return key // Custom provider ID
+    }
+  }
+
+  // OpenRouter as universal fallback (can handle any model)
+  if (byokKeys.openrouter) return 'openrouter'
+
+  // Vercel AI Gateway as fallback
+  if (byokKeys['vercel-gateway']) return 'vercel-gateway'
+
+  return null
+}
+
+/**
+ * Create a model instance using BYOK (user-provided) API keys.
+ * Returns null if the model/provider combo isn't supported for BYOK.
+ */
+export function createByokModel(modelId: string, byokKeys: ByokKeySet): any | null {
+  const providerId = resolveByokProvider(modelId, byokKeys)
+  if (!providerId) return null
+
+  const keyValue = byokKeys[providerId]
+
+  // Handle custom provider (object with apiKey + baseUrl)
+  if (keyValue && typeof keyValue === 'object' && 'apiKey' in keyValue) {
+    const custom = keyValue as { apiKey: string; baseUrl: string; providerType: 'openai-compatible' | 'anthropic-compatible' }
+    if (custom.providerType === 'anthropic-compatible') {
+      const provider = createAnthropic({
+        apiKey: custom.apiKey,
+        baseURL: custom.baseUrl,
+      })
+      // Strip provider prefix for the model name sent to the API
+      const bareModel = modelId.includes('/') ? modelId : modelId
+      return provider(bareModel)
+    } else {
+      // Default: openai-compatible
+      const provider = createOpenAICompatible({
+        name: `byok-custom-${providerId}`,
+        baseURL: custom.baseUrl,
+        apiKey: custom.apiKey,
+      })
+      const bareModel = modelId.includes('/') ? modelId.split('/').slice(1).join('/') : modelId
+      return provider(bareModel)
+    }
+  }
+
+  const apiKey = keyValue as string
+  if (!apiKey) return null
+
+  // Extract the model name without provider prefix for direct API calls
+  const stripPrefix = (id: string, prefix: string) =>
+    id.startsWith(prefix) ? id.slice(prefix.length) : id
+
+  switch (providerId) {
+    case 'openai': {
+      const provider = createOpenAI({ apiKey })
+      const bare = stripPrefix(modelId, 'openai/')
+      return provider(bare)
+    }
+    case 'anthropic': {
+      const provider = createAnthropic({ apiKey })
+      // Anthropic API expects model IDs like 'claude-sonnet-4-5-20250514'
+      // but we receive 'anthropic/claude-sonnet-4.5' from the model selector
+      return provider(modelId)
+    }
+    case 'mistral': {
+      const provider = createMistral({ apiKey })
+      const bare = stripPrefix(modelId, 'mistral/')
+      return provider(bare)
+    }
+    case 'xai': {
+      const provider = createXai({ apiKey })
+      const bare = stripPrefix(modelId, 'xai/')
+      return provider(bare)
+    }
+    case 'google': {
+      // Google uses OpenAI-compatible endpoint via Gemini API
+      const provider = createOpenAICompatible({
+        name: 'byok-google',
+        baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai',
+        apiKey,
+      })
+      const bare = stripPrefix(modelId, 'google/')
+      return provider(bare)
+    }
+    case 'openrouter': {
+      const provider = createOpenAICompatible({
+        name: 'byok-openrouter',
+        baseURL: 'https://openrouter.ai/api/v1',
+        apiKey,
+        headers: {
+          'HTTP-Referer': 'https://pipilot.dev',
+          'X-Title': 'PiPilot',
+        },
+      })
+      return provider(modelId)
+    }
+    case 'vercel-gateway': {
+      const provider = createOpenAICompatible({
+        name: 'byok-vercel-gateway',
+        baseURL: 'https://ai-gateway.vercel.sh/v1',
+        apiKey,
+      })
+      return provider(modelId)
+    }
+    default:
+      return null
+  }
+}
+
+/**
+ * Parse BYOK keys from the X-Byok-Keys request header.
+ * Returns null if no BYOK keys are present.
+ */
+export function parseByokKeysFromHeader(request: Request): ByokKeySet | null {
+  const header = request.headers.get('x-byok-keys')
+  if (!header) return null
+  try {
+    const decoded = Buffer.from(header, 'base64').toString('utf-8')
+    const keys = JSON.parse(decoded) as ByokKeySet
+    // Validate at least one key is present
+    const hasKey = Object.values(keys).some(v => {
+      if (typeof v === 'string') return v.length > 0
+      if (v && typeof v === 'object' && 'apiKey' in v) return v.apiKey.length > 0
+      return false
+    })
+    return hasKey ? keys : null
+  } catch {
+    console.warn('[AI Providers] Failed to parse BYOK keys from header')
+    return null
+  }
+}

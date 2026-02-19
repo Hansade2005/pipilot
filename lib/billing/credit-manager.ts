@@ -418,7 +418,9 @@ export async function logUsage(
 /**
  * Deduct credits based on actual token usage from AI SDK
  * Call this AFTER each AI request completes (generateText or streamText)
- * 
+ *
+ * When isByok is true, no credits are deducted but usage is still logged for analytics.
+ *
  * @example
  * const result = await generateText({ model, messages, tools, maxSteps: 15 })
  * await deductCreditsFromUsage(userId, result.usage, { model: 'claude-sonnet-4', requestType: 'chat', steps: result.steps.length }, supabase)
@@ -434,19 +436,54 @@ export async function deductCreditsFromUsage(
     responseTimeMs?: number
     status?: 'success' | 'error' | 'timeout' | 'aborted'
     errorMessage?: string
+    isByok?: boolean  // BYOK mode - log usage but don't deduct credits
   },
   supabase: SupabaseClient
 ): Promise<CreditDeductionResult> {
-  
+
+  // BYOK mode: log usage for analytics but don't deduct any credits
+  if (metadata.isByok) {
+    console.log(`[CreditManager] BYOK mode - logging usage without credit deduction: ${usage.promptTokens} input + ${usage.completionTokens} output tokens (${metadata.model})`)
+
+    // Still log to usage_logs for analytics/tracking
+    await logUsage({
+      userId,
+      model: metadata.model,
+      creditsUsed: 0,
+      requestType: metadata.requestType + '-byok',
+      endpoint: metadata.endpoint || '/api/chat-v2',
+      tokensUsed: usage.promptTokens + usage.completionTokens,
+      promptTokens: usage.promptTokens,
+      completionTokens: usage.completionTokens,
+      stepsCount: metadata.steps || 1,
+      responseTimeMs: metadata.responseTimeMs,
+      status: metadata.status || 'success',
+      errorMessage: metadata.errorMessage,
+      metadata: {
+        byok: true,
+        promptTokens: usage.promptTokens,
+        completionTokens: usage.completionTokens,
+        steps: metadata.steps,
+      }
+    }, supabase)
+
+    // Return success with no deduction
+    return {
+      success: true,
+      newBalance: -1, // Sentinel: BYOK mode, balance not applicable
+      creditsUsed: 0
+    }
+  }
+
   // Calculate actual credits based on token usage with markup
   const creditsToDeduct = calculateCreditsFromTokens(
     usage.promptTokens,
     usage.completionTokens,
     metadata.model
   )
-  
+
   console.log(`[CreditManager] Calculated ${creditsToDeduct} credits from ${usage.promptTokens} input + ${usage.completionTokens} output tokens (${metadata.steps || 1} steps)`)
-  
+
   // Use existing deductCredits function with enhanced metadata
   return deductCredits(
     userId,

@@ -303,6 +303,77 @@ export interface VercelPromotion {
   updatedAt: string
 }
 
+// BYOK (Bring Your Own Key) interfaces for user-provided API keys
+export interface ByokProviderKey {
+  providerId: string // 'openai' | 'anthropic' | 'mistral' | 'xai' | 'google' | 'openrouter' | 'vercel-gateway' | custom ID
+  apiKey: string
+  enabled: boolean
+  label?: string // User-friendly label
+  baseUrl?: string // Custom base URL (for custom providers)
+  providerType?: 'openai-compatible' | 'anthropic-compatible' // For custom providers
+  customModels?: string[] // User-defined model IDs for custom providers
+  addedAt: string
+  lastUsedAt?: string
+}
+
+export interface ByokConfig {
+  enabled: boolean // Global BYOK toggle
+  keys: ByokProviderKey[]
+  backupToCloud: boolean // Whether to include keys in cloud backup
+}
+
+// BYOK localStorage keys
+export const BYOK_STORAGE_KEYS = {
+  CONFIG: 'pipilot-byok-config',
+  KEYS: 'pipilot-byok-keys', // Legacy flat key storage
+} as const
+
+// Helper to get BYOK config from localStorage
+export function getByokConfig(): ByokConfig {
+  if (typeof window === 'undefined') return { enabled: false, keys: [], backupToCloud: false }
+  try {
+    const stored = localStorage.getItem(BYOK_STORAGE_KEYS.CONFIG)
+    if (stored) return JSON.parse(stored)
+  } catch {}
+  return { enabled: false, keys: [], backupToCloud: false }
+}
+
+// Helper to save BYOK config to localStorage
+export function saveByokConfig(config: ByokConfig): void {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(BYOK_STORAGE_KEYS.CONFIG, JSON.stringify(config))
+}
+
+// Helper to get active BYOK keys (enabled global + enabled per-provider)
+export function getActiveByokKeys(): ByokProviderKey[] {
+  const config = getByokConfig()
+  if (!config.enabled) return []
+  return config.keys.filter(k => k.enabled && k.apiKey)
+}
+
+// Helper to get BYOK key for a specific provider
+export function getByokKeyForProvider(providerId: string): ByokProviderKey | null {
+  const activeKeys = getActiveByokKeys()
+  return activeKeys.find(k => k.providerId === providerId) || null
+}
+
+// Mask an API key for display (show last 4 chars)
+export function maskApiKey(key: string): string {
+  if (!key || key.length < 8) return '****'
+  return '****' + key.slice(-4)
+}
+
+// Built-in provider definitions for BYOK
+export const BYOK_PROVIDERS = [
+  { id: 'openai', name: 'OpenAI', placeholder: 'sk-...', description: 'GPT-4o, o1, o3, etc.' },
+  { id: 'anthropic', name: 'Anthropic', placeholder: 'sk-ant-...', description: 'Claude Sonnet, Opus, Haiku' },
+  { id: 'mistral', name: 'Mistral', placeholder: 'your-mistral-key', description: 'Devstral, Pixtral, Codestral' },
+  { id: 'xai', name: 'xAI', placeholder: 'xai-...', description: 'Grok models' },
+  { id: 'google', name: 'Google AI', placeholder: 'AIza...', description: 'Gemini models' },
+  { id: 'openrouter', name: 'OpenRouter', placeholder: 'sk-or-v1-...', description: 'Access 100+ models via proxy' },
+  { id: 'vercel-gateway', name: 'Vercel AI Gateway', placeholder: 'your-gateway-key', description: 'Your own Vercel AI Gateway' },
+] as const
+
 // Tool execution tracking interface for preventing duplicate executions
 export interface ToolExecution {
   id: string
