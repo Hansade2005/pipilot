@@ -7809,6 +7809,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                   subscriptionStatus={subscriptionStatus}
                   compact={true}
                   className=""
+                  byokConfig={byokConfig}
                 />
               )}
 
