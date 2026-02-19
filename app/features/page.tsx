@@ -1,6 +1,6 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
-import { CheckCircle, Zap, Users, Globe, Database, Code, Smartphone, Shield } from 'lucide-react'
+import { CheckCircle, Zap, Users, Globe, Database, Code, Smartphone, Shield, ClipboardList, FolderOpen, Key } from 'lucide-react'
 
 export const metadata: Metadata = {
   title: 'PiPilot Features: AI-Powered App Builder with Advanced Tools | Build Apps with AI',
@@ -61,6 +61,24 @@ export default function FeaturesPage() {
       title: "Advanced Integrations",
       description: "Connect with GitHub, Supabase, Stripe, and more for complete development workflow.",
       details: ["GitHub version control", "Supabase backend", "Stripe payments", "Tavily web search"]
+    },
+    {
+      icon: <ClipboardList className="w-8 h-8 text-orange-500" />,
+      title: "Project Plan",
+      description: "AI generates structured implementation plans and tracks progress step by step as it builds your app.",
+      details: ["Auto-generated build plans", "Real-time step tracking", "Session-persistent progress", "Resume interrupted builds"]
+    },
+    {
+      icon: <FolderOpen className="w-8 h-8 text-amber-500" />,
+      title: "Project Context",
+      description: "Automatic project documentation that helps the AI understand your codebase across sessions.",
+      details: ["Auto-generated project docs", "Tech stack awareness", "Cross-session continuity", "Architecture documentation"]
+    },
+    {
+      icon: <Key className="w-8 h-8 text-cyan-500" />,
+      title: "BYOK (Bring Your Own Key)",
+      description: "Connect your own AI provider API keys to unlock additional models and use your own accounts.",
+      details: ["7+ built-in providers", "100+ models via OpenRouter", "Custom provider support", "Local-only key storage"]
     }
   ]
 

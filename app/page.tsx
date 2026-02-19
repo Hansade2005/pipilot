@@ -32,7 +32,9 @@ import {
   Figma,
   Wand2,
   MousePointer2,
-  Gamepad2
+  Gamepad2,
+  ClipboardList,
+  Key
 } from "lucide-react"
 import Link from "next/link"
 import { ChatInput } from "@/components/chat-input"
@@ -76,7 +78,9 @@ export default function LandingPage() {
     { icon: <Users className="w-4 h-4 text-green-400" />, text: "PiPilot Teams Coming soon 🎉" },
     { icon: <Server className="w-4 h-4 text-orange-400" />, text: "PiPilot DB MCP Server Now Live! 🚀" },
     { icon: <Workflow className="w-4 h-4 text-indigo-400" />, text: "Teams Workspace Coming soon 🎉" },
-    { icon: <Figma className="w-4 h-4 text-pink-400" />, text: "Figma Import Coming soon 🚀" }
+    { icon: <Figma className="w-4 h-4 text-pink-400" />, text: "Figma Import Coming soon 🚀" },
+    { icon: <ClipboardList className="w-4 h-4 text-yellow-400" />, text: "Project Plan & Context Now Live! 🚀" },
+    { icon: <Key className="w-4 h-4 text-cyan-400" />, text: "BYOK: Bring Your Own API Keys! 🔑" }
   ]
 
   const buttonItems = [

@@ -146,6 +146,18 @@ const faqCategories = [
         question: "Can I search and replace across my codebase?",
         answer: "Yes! Use the search feature (Ctrl/Cmd + Shift + F) to search across all files in your project. You can also use the Search & Replace feature to make bulk changes with preview before applying."
       },
+      {
+        question: "What is the Project Plan feature?",
+        answer: "Project Plan automatically generates a structured, step-by-step implementation plan every time you describe something to build. The AI shows a live status card tracking progress as it builds, and saves the plan to .pipilot/plan.md so you can resume interrupted builds across sessions."
+      },
+      {
+        question: "What is Project Context?",
+        answer: "Project Context is an auto-generated document (.pipilot/project.md) that describes your project's architecture, tech stack, features, and structure. The AI reads it at the start of every session so it deeply understands your codebase and generates code that matches your existing patterns."
+      },
+      {
+        question: "What is BYOK (Bring Your Own Key)?",
+        answer: "BYOK lets you connect your own AI provider API keys (OpenAI, Anthropic, Google, Mistral, xAI, OpenRouter, and more) to unlock additional models. Your keys are stored locally in your browser and never sent to PiPilot servers. A single OpenRouter key can unlock 100+ models."
+      },
     ]
   },
   {
