@@ -49,3 +49,12 @@ LICENSE.txt
 PIPILOT_PLATFORM_DOCUMENTATION.md
 PITCH_DECK_QUICK_REFERENCE.md
 PITCH_DECK_READY_TO_PRESENT.md
+
+# Playwright (local tooling, not part of the app)
+playwright.config.ts
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/test-results/
+/screenshots/
+e2e/
