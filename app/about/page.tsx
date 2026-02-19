@@ -45,12 +45,12 @@ export default function AboutPage() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           {/* Hero Section */}
           <div className="text-center mb-16 max-w-4xl mx-auto">
-            <Badge className="mb-4 bg-purple-500/20 text-purple-300 border-purple-500/30">
+            <Badge className="mb-4 bg-orange-500/20 text-orange-300 border-orange-500/30">
               About Us
             </Badge>
             <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
               Building the Future of
-              <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent"> AI-Powered Development</span>
+              <span className="bg-gradient-to-r from-orange-400 to-orange-500 bg-clip-text text-transparent"> AI-Powered Development</span>
             </h1>
             <p className="text-xl text-gray-300 max-w-3xl mx-auto">
               PiPilot is revolutionizing how developers and businesses create web applications
@@ -79,13 +79,13 @@ export default function AboutPage() {
                   to succeed in today's fast-paced digital landscape.
                 </p>
                 <div className="flex flex-wrap gap-3">
-                  <Badge variant="outline" className="text-purple-300 border-purple-500/50">
+                  <Badge variant="outline" className="text-orange-300 border-orange-500/50">
                     <Sparkles className="h-3 w-3 mr-1" /> AI-Powered
                   </Badge>
-                  <Badge variant="outline" className="text-blue-300 border-blue-500/50">
+                  <Badge variant="outline" className="text-orange-300 border-orange-500/50">
                     <Zap className="h-3 w-3 mr-1" /> Lightning Fast
                   </Badge>
-                  <Badge variant="outline" className="text-green-300 border-green-500/50">
+                  <Badge variant="outline" className="text-orange-300 border-orange-500/50">
                     <Globe className="h-3 w-3 mr-1" /> Global Scale
                   </Badge>
                 </div>
@@ -93,28 +93,28 @@ export default function AboutPage() {
               <div className="grid grid-cols-2 gap-4">
                 <Card className="bg-gray-800/50 border-gray-700">
                   <CardContent className="p-6 text-center">
-                    <Code className="h-8 w-8 text-purple-400 mx-auto mb-3" />
+                    <Code className="h-8 w-8 text-orange-400 mx-auto mb-3" />
                     <h3 className="text-white font-semibold mb-1">Smart Coding</h3>
                     <p className="text-gray-400 text-sm">AI-assisted development</p>
                   </CardContent>
                 </Card>
                 <Card className="bg-gray-800/50 border-gray-700">
                   <CardContent className="p-6 text-center">
-                    <Brain className="h-8 w-8 text-pink-400 mx-auto mb-3" />
+                    <Brain className="h-8 w-8 text-orange-400 mx-auto mb-3" />
                     <h3 className="text-white font-semibold mb-1">AI Memory</h3>
                     <p className="text-gray-400 text-sm">Context-aware assistance</p>
                   </CardContent>
                 </Card>
                 <Card className="bg-gray-800/50 border-gray-700">
                   <CardContent className="p-6 text-center">
-                    <Layers className="h-8 w-8 text-blue-400 mx-auto mb-3" />
+                    <Layers className="h-8 w-8 text-orange-400 mx-auto mb-3" />
                     <h3 className="text-white font-semibold mb-1">Full Stack</h3>
                     <p className="text-gray-400 text-sm">Complete solutions</p>
                   </CardContent>
                 </Card>
                 <Card className="bg-gray-800/50 border-gray-700">
                   <CardContent className="p-6 text-center">
-                    <Users className="h-8 w-8 text-green-400 mx-auto mb-3" />
+                    <Users className="h-8 w-8 text-orange-400 mx-auto mb-3" />
                     <h3 className="text-white font-semibold mb-1">Team Ready</h3>
                     <p className="text-gray-400 text-sm">Collaboration built-in</p>
                   </CardContent>
@@ -137,8 +137,8 @@ export default function AboutPage() {
 
             <div className="bg-gradient-to-br from-gray-800/70 to-gray-900/70 backdrop-blur-sm rounded-2xl p-8 md:p-10 border border-gray-700 relative overflow-hidden">
               {/* Decorative elements */}
-              <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl" />
-              <div className="absolute bottom-0 left-0 w-48 h-48 bg-pink-500/10 rounded-full blur-3xl" />
+              <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl" />
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-orange-500/10 rounded-full blur-3xl" />
 
               <div className="relative z-10 space-y-6">
                 <div className="flex items-start gap-4">
@@ -151,7 +151,7 @@ export default function AboutPage() {
                       It was late July 2025, and I found myself staring at my screen for the hundredth time that week,
                       wrestling with the same repetitive tasks. I had tried every AI-powered development tool on the market—
                       <span className="text-white"> Lovable, Bolt, Cursor, Windsurf</span>—you name it, I used it.
-                      But none of them delivered what I truly needed: <span className="text-purple-400 font-medium">complete automation</span>.
+                      But none of them delivered what I truly needed: <span className="text-orange-400 font-medium">complete automation</span>.
                     </p>
                   </div>
                 </div>
@@ -167,15 +167,15 @@ export default function AboutPage() {
                       configuring environments, still copying and pasting code between windows, still babysitting AI
                       that couldn't remember what we discussed five minutes ago. The tools were smart, sure—but they
                       weren't <span className="text-white">intelligent enough</span>. They couldn't think ahead. They
-                      couldn't understand context. They couldn't give me the <span className="text-pink-400 font-medium">true freedom</span>
+                      couldn't understand context. They couldn't give me the <span className="text-orange-400 font-medium">true freedom</span>
                       to just describe what I wanted and watch it come to life.
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center shrink-0">
-                    <Rocket className="h-6 w-6 text-purple-400" />
+                  <div className="w-12 h-12 bg-orange-500/20 rounded-xl flex items-center justify-center shrink-0">
+                    <Rocket className="h-6 w-6 text-orange-400" />
                   </div>
                   <div>
                     <h3 className="text-xl font-semibold text-white mb-2">The Decision</h3>
@@ -199,9 +199,9 @@ export default function AboutPage() {
                       And so PiPilot was born—not in a boardroom, not from a business plan, but from genuine frustration
                       and a relentless drive to solve a problem I lived with every single day. I built PiPilot for
                       developers like me: people who don't want to fight their tools, who want AI that truly
-                      <span className="text-purple-400 font-medium"> understands</span>,
-                      <span className="text-pink-400 font-medium"> remembers</span>, and
-                      <span className="text-blue-400 font-medium"> delivers</span>.
+                      <span className="text-orange-400 font-medium"> understands</span>,
+                      <span className="text-orange-400 font-medium"> remembers</span>, and
+                      <span className="text-orange-400 font-medium"> delivers</span>.
                       Today, PiPilot represents everything I wished existed back then—and everything I'm committed to
                       making even better for developers around the world.
                     </p>
@@ -213,7 +213,7 @@ export default function AboutPage() {
                     "I didn't start PiPilot to compete with other tools. I started it because I needed something
                     they couldn't give me. And if I needed it, I knew others did too."
                   </p>
-                  <p className="text-purple-400 text-center mt-2 font-medium">— Hans Ade, Founder</p>
+                  <p className="text-orange-400 text-center mt-2 font-medium">— Hans Ade, Founder</p>
                 </div>
               </div>
             </div>
@@ -222,7 +222,7 @@ export default function AboutPage() {
           {/* Founder Section */}
           <div className="max-w-6xl mx-auto mb-20">
             <div className="text-center mb-12">
-              <Badge className="mb-4 bg-pink-500/20 text-pink-300 border-pink-500/30">
+              <Badge className="mb-4 bg-orange-500/20 text-orange-300 border-orange-500/30">
                 Meet the Founder
               </Badge>
               <h2 className="text-3xl md:text-4xl font-bold text-white">
@@ -239,21 +239,21 @@ export default function AboutPage() {
                       src="https://www.pixelways.co/team/hans.png"
                       alt="Hans Ade - Founder of PiPilot"
                       fill
-                      className="rounded-full object-cover border-4 border-purple-500/50"
+                      className="rounded-full object-cover border-4 border-orange-500/50"
                     />
-                    <div className="absolute -bottom-2 -right-2 bg-purple-500 rounded-full p-2">
+                    <div className="absolute -bottom-2 -right-2 bg-orange-500 rounded-full p-2">
                       <Award className="h-5 w-5 text-white" />
                     </div>
                   </div>
                   <h3 className="text-2xl font-bold text-white mb-1">Hans Ade</h3>
-                  <p className="text-purple-400 font-medium mb-2">Anye Happiness Ade</p>
+                  <p className="text-orange-400 font-medium mb-2">Anye Happiness Ade</p>
                   <p className="text-gray-400 mb-4">Founder & CEO, PiPilot</p>
 
                   <div className="flex flex-col gap-2">
-                    <Badge variant="outline" className="text-blue-300 border-blue-500/50 justify-center">
+                    <Badge variant="outline" className="text-orange-300 border-orange-500/50 justify-center">
                       Software Engineer
                     </Badge>
-                    <Badge variant="outline" className="text-pink-300 border-pink-500/50 justify-center">
+                    <Badge variant="outline" className="text-orange-300 border-orange-500/50 justify-center">
                       AI Developer
                     </Badge>
                   </div>
@@ -277,22 +277,22 @@ export default function AboutPage() {
                   {/* Education */}
                   <div className="bg-gray-900/50 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <GraduationCap className="h-5 w-5 text-purple-400" />
+                      <GraduationCap className="h-5 w-5 text-orange-400" />
                       <h4 className="text-white font-semibold">Education</h4>
                     </div>
                     <ul className="space-y-3 text-gray-300 text-sm">
                       <li className="flex items-start gap-2">
-                        <span className="text-purple-400 mt-1">•</span>
+                        <span className="text-orange-400 mt-1">•</span>
                         <span><strong className="text-white">Master's in Science and Engineering</strong> - Stanford University Online (2023-present) - Focus on Machine Learning, NLP & Computer Vision</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-purple-400 mt-1">•</span>
+                        <span className="text-orange-400 mt-1">•</span>
                         <div>
                           <span><strong className="text-white">Bachelor's in Software Engineering</strong> - SwissLink Higher Institute of Business and Technology & Atlantic International University</span>
                           <Link
                             href="https://www.aiu.edu/degree-verification/?ID=UB82014SY91231"
                             target="_blank"
-                            className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors mt-1"
+                            className="flex items-center gap-1 text-xs text-orange-400 hover:text-orange-300 transition-colors mt-1"
                           >
                             <ExternalLink className="h-3 w-3" />
                             Verify AIU Degree
@@ -308,7 +308,7 @@ export default function AboutPage() {
                     <Link
                       href="https://pixelways.co"
                       target="_blank"
-                      className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-colors"
+                      className="flex items-center gap-2 text-orange-400 hover:text-orange-300 transition-colors"
                     >
                       <Globe className="h-4 w-4" />
                       Pixelways Solutions Inc, Ontario
@@ -331,10 +331,10 @@ export default function AboutPage() {
             </div>
 
             <div className="grid md:grid-cols-3 gap-6">
-              <Card className="bg-gray-800/50 border-gray-700 hover:border-purple-500/50 transition-colors">
+              <Card className="bg-gray-800/50 border-gray-700 hover:border-orange-500/50 transition-colors">
                 <CardContent className="p-6">
-                  <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center mb-4">
-                    <Code className="h-6 w-6 text-purple-400" />
+                  <div className="w-12 h-12 bg-orange-500/20 rounded-xl flex items-center justify-center mb-4">
+                    <Code className="h-6 w-6 text-orange-400" />
                   </div>
                   <h3 className="text-xl font-semibold text-white mb-2">Software Engineering & AI</h3>
                   <p className="text-gray-400 text-sm">
@@ -344,10 +344,10 @@ export default function AboutPage() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-gray-800/50 border-gray-700 hover:border-pink-500/50 transition-colors">
+              <Card className="bg-gray-800/50 border-gray-700 hover:border-orange-500/50 transition-colors">
                 <CardContent className="p-6">
-                  <div className="w-12 h-12 bg-pink-500/20 rounded-xl flex items-center justify-center mb-4">
-                    <Lightbulb className="h-6 w-6 text-pink-400" />
+                  <div className="w-12 h-12 bg-orange-500/20 rounded-xl flex items-center justify-center mb-4">
+                    <Lightbulb className="h-6 w-6 text-orange-400" />
                   </div>
                   <h3 className="text-xl font-semibold text-white mb-2">Problem-Solving Excellence</h3>
                   <p className="text-gray-400 text-sm">
@@ -357,10 +357,10 @@ export default function AboutPage() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-gray-800/50 border-gray-700 hover:border-blue-500/50 transition-colors">
+              <Card className="bg-gray-800/50 border-gray-700 hover:border-orange-500/50 transition-colors">
                 <CardContent className="p-6">
-                  <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center mb-4">
-                    <Sparkles className="h-6 w-6 text-blue-400" />
+                  <div className="w-12 h-12 bg-orange-500/20 rounded-xl flex items-center justify-center mb-4">
+                    <Sparkles className="h-6 w-6 text-orange-400" />
                   </div>
                   <h3 className="text-xl font-semibold text-white mb-2">Emerging Technologies</h3>
                   <p className="text-gray-400 text-sm">
@@ -374,7 +374,7 @@ export default function AboutPage() {
 
           {/* Recognition Section */}
           <div className="max-w-4xl mx-auto mb-20">
-            <Card className="bg-gradient-to-r from-purple-900/50 to-pink-900/50 border-purple-500/30">
+            <Card className="bg-gradient-to-r from-orange-900/50 to-orange-800/50 border-orange-500/30">
               <CardContent className="p-8 text-center">
                 <Award className="h-12 w-12 text-yellow-400 mx-auto mb-4" />
                 <h2 className="text-2xl font-bold text-white mb-4">Recognized for Excellence</h2>
@@ -398,14 +398,14 @@ export default function AboutPage() {
               <Card className="bg-gray-800/50 border-gray-700">
                 <CardContent className="p-6">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center">
-                      <Mail className="h-6 w-6 text-purple-400" />
+                    <div className="w-12 h-12 bg-orange-500/20 rounded-xl flex items-center justify-center">
+                      <Mail className="h-6 w-6 text-orange-400" />
                     </div>
                     <div>
                       <h3 className="text-white font-semibold">General Inquiries</h3>
                       <a
                         href="mailto:hello@pipilot.dev"
-                        className="text-purple-400 hover:text-purple-300 transition-colors"
+                        className="text-orange-400 hover:text-orange-300 transition-colors"
                       >
                         hello@pipilot.dev
                       </a>
@@ -417,14 +417,14 @@ export default function AboutPage() {
               <Card className="bg-gray-800/50 border-gray-700">
                 <CardContent className="p-6">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-pink-500/20 rounded-xl flex items-center justify-center">
-                      <Mail className="h-6 w-6 text-pink-400" />
+                    <div className="w-12 h-12 bg-orange-500/20 rounded-xl flex items-center justify-center">
+                      <Mail className="h-6 w-6 text-orange-400" />
                     </div>
                     <div>
                       <h3 className="text-white font-semibold">Personal Enquiries (Hans)</h3>
                       <a
                         href="mailto:hanscadx8@gmail.com"
-                        className="text-pink-400 hover:text-pink-300 transition-colors"
+                        className="text-orange-400 hover:text-orange-300 transition-colors"
                       >
                         hanscadx8@gmail.com
                       </a>
@@ -435,7 +435,7 @@ export default function AboutPage() {
             </div>
 
             <div className="text-center mt-8">
-              <Button asChild className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600">
+              <Button asChild className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-500">
                 <Link href="/pricing">
                   Get Started with PiPilot
                 </Link>

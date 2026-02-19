@@ -278,7 +278,7 @@ export default function EnterprisePage() {
             <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight">
               Enterprise-Grade
               <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-orange-500">
                 AI Development
               </span>
             </h1>
@@ -317,7 +317,7 @@ export default function EnterprisePage() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button
                 size="lg"
-                className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 text-lg"
+                className="bg-orange-600 hover:bg-orange-500 text-white px-8 py-4 text-lg"
                 onClick={handleScheduleDemo}
               >
                 <Calendar className="w-5 h-5 mr-2" />
@@ -351,8 +351,8 @@ export default function EnterprisePage() {
                   <Card key={index} className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-colors">
                     <CardHeader>
                       <div className="flex items-start space-x-4">
-                        <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center flex-shrink-0">
-                          <IconComponent className="w-7 h-7 text-purple-400" />
+                        <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-500/20 to-orange-600/20 flex items-center justify-center flex-shrink-0">
+                          <IconComponent className="w-7 h-7 text-orange-400" />
                         </div>
                         <div className="flex-1">
                           <CardTitle className="text-white text-xl mb-3">{feature.title}</CardTitle>
@@ -421,7 +421,7 @@ export default function EnterprisePage() {
                 <Card key={index} className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-colors">
                   <CardHeader>
                     <div className="flex items-center space-x-3 mb-4">
-                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
+                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center text-white font-bold">
                         {study.logo}
                       </div>
                       <div>
@@ -472,11 +472,11 @@ export default function EnterprisePage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {pricingTiers.map((tier, index) => (
                 <Card key={index} className={`relative bg-gray-800/50 border-gray-700/50 backdrop-blur-sm ${
-                  tier.popular ? 'border-purple-500/50 ring-2 ring-purple-500/20' : ''
+                  tier.popular ? 'border-orange-500/50 ring-2 ring-orange-500/20' : ''
                 }`}>
                   {tier.popular && (
                     <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                      <Badge className="bg-purple-600 text-white px-4 py-1">
+                      <Badge className="bg-orange-600 text-white px-4 py-1">
                         <Star className="w-3 h-3 mr-1" />
                         Most Popular
                       </Badge>
@@ -501,7 +501,7 @@ export default function EnterprisePage() {
                     <Button
                       className={`w-full ${
                         tier.popular
-                          ? 'bg-purple-600 hover:bg-purple-700'
+                          ? 'bg-orange-600 hover:bg-orange-500'
                           : 'bg-gray-700 hover:bg-gray-600'
                       } text-white`}
                       size="lg"
@@ -516,7 +516,7 @@ export default function EnterprisePage() {
           </div>
 
           {/* Contact Section */}
-          <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-3xl p-12 backdrop-blur-sm border border-purple-500/20">
+          <div className="bg-gradient-to-r from-orange-500/10 to-orange-600/10 rounded-3xl p-12 backdrop-blur-sm border border-orange-500/20">
             <div className="text-center mb-12">
               <h2 className="text-4xl font-bold text-white mb-4">Ready to Get Started?</h2>
               <p className="text-xl text-gray-300 max-w-3xl mx-auto">
@@ -528,14 +528,14 @@ export default function EnterprisePage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
               <Card className="bg-gray-800/50 border-gray-700/50">
                 <CardContent className="p-6 text-center">
-                  <div className="w-12 h-12 rounded-lg bg-blue-600/20 flex items-center justify-center mx-auto mb-4">
-                    <Calendar className="w-6 h-6 text-blue-400" />
+                  <div className="w-12 h-12 rounded-lg bg-orange-600/20 flex items-center justify-center mx-auto mb-4">
+                    <Calendar className="w-6 h-6 text-orange-400" />
                   </div>
                   <h3 className="text-white font-semibold mb-2">Schedule Demo</h3>
                   <p className="text-gray-300 text-sm mb-4">
                     Book a personalized demonstration tailored to your enterprise needs.
                   </p>
-                  <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={handleScheduleDemo}>
+                  <Button className="w-full bg-orange-600 hover:bg-orange-500" onClick={handleScheduleDemo}>
                     Book Demo
                   </Button>
                 </CardContent>
@@ -543,14 +543,14 @@ export default function EnterprisePage() {
 
               <Card className="bg-gray-800/50 border-gray-700/50">
                 <CardContent className="p-6 text-center">
-                  <div className="w-12 h-12 rounded-lg bg-green-600/20 flex items-center justify-center mx-auto mb-4">
-                    <MessageSquare className="w-6 h-6 text-green-400" />
+                  <div className="w-12 h-12 rounded-lg bg-orange-600/20 flex items-center justify-center mx-auto mb-4">
+                    <MessageSquare className="w-6 h-6 text-orange-400" />
                   </div>
                   <h3 className="text-white font-semibold mb-2">Contact Sales</h3>
                   <p className="text-gray-300 text-sm mb-4">
                     Speak with our enterprise sales team about custom pricing and solutions.
                   </p>
-                  <Button className="w-full bg-green-600 hover:bg-green-700" onClick={handleContactSales}>
+                  <Button className="w-full bg-orange-600 hover:bg-orange-500" onClick={handleContactSales}>
                     Contact Sales
                   </Button>
                 </CardContent>
@@ -558,14 +558,14 @@ export default function EnterprisePage() {
 
               <Card className="bg-gray-800/50 border-gray-700/50">
                 <CardContent className="p-6 text-center">
-                  <div className="w-12 h-12 rounded-lg bg-purple-600/20 flex items-center justify-center mx-auto mb-4">
-                    <FileText className="w-6 h-6 text-purple-400" />
+                  <div className="w-12 h-12 rounded-lg bg-orange-600/20 flex items-center justify-center mx-auto mb-4">
+                    <FileText className="w-6 h-6 text-orange-400" />
                   </div>
                   <h3 className="text-white font-semibold mb-2">Request Proposal</h3>
                   <p className="text-gray-300 text-sm mb-4">
                     Get a customized proposal with pricing, timeline, and implementation plan.
                   </p>
-                  <Button className="w-full bg-purple-600 hover:bg-purple-700" onClick={handleRequestProposal}>
+                  <Button className="w-full bg-orange-600 hover:bg-orange-500" onClick={handleRequestProposal}>
                     Get Proposal
                   </Button>
                 </CardContent>
@@ -695,7 +695,7 @@ export default function EnterprisePage() {
                   </Button>
                   <Button
                     type="submit"
-                    className="flex-1 bg-purple-600 hover:bg-purple-700"
+                    className="flex-1 bg-orange-600 hover:bg-orange-500"
                   >
                     Schedule Demo
                   </Button>
@@ -792,7 +792,7 @@ export default function EnterprisePage() {
                   </Button>
                   <Button
                     type="submit"
-                    className="flex-1 bg-green-600 hover:bg-green-700"
+                    className="flex-1 bg-orange-600 hover:bg-orange-500"
                   >
                     Contact Sales
                   </Button>
@@ -908,7 +908,7 @@ export default function EnterprisePage() {
                   </Button>
                   <Button
                     type="submit"
-                    className="flex-1 bg-purple-600 hover:bg-purple-700"
+                    className="flex-1 bg-orange-600 hover:bg-orange-500"
                   >
                     Request Proposal
                   </Button>

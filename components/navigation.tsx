@@ -219,7 +219,7 @@ export function Navigation() {
               {/* Products Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="text-white hover:text-gray-300 transition-colors flex items-center gap-1">
+                  <button className="text-white hover:text-orange-400 transition-colors flex items-center gap-1">
                     Products
                     <ChevronDown className="w-4 h-4" />
                   </button>
@@ -255,19 +255,19 @@ export function Navigation() {
                 </DropdownMenuContent>
               </DropdownMenu>
               
-              <Link href="/community" className="text-white hover:text-gray-300 transition-colors">
+              <Link href="/community" className="text-white hover:text-orange-400 transition-colors">
                 Community
               </Link>
-              <Link href="/enterprise" className="text-white hover:text-gray-300 transition-colors">
+              <Link href="/enterprise" className="text-white hover:text-orange-400 transition-colors">
                 Business
               </Link>
-              <Link href="/pricing" className="text-white hover:text-gray-300 transition-colors">
+              <Link href="/pricing" className="text-white hover:text-orange-400 transition-colors">
                 Plans
               </Link>
-              <Link href="/docs" className="text-white hover:text-gray-300 transition-colors">
+              <Link href="/docs" className="text-white hover:text-orange-400 transition-colors">
                 Docs
               </Link>
-              <Link href="/support" className="text-white hover:text-gray-300 transition-colors">
+              <Link href="/support" className="text-white hover:text-orange-400 transition-colors">
                 Support
               </Link>
             </div>
@@ -282,7 +282,7 @@ export function Navigation() {
                   {/* Subscription Status */}
                   {!subscriptionLoading && subscription && (
                     <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
-                      <Crown className="w-4 h-4 text-purple-400" />
+                      <Crown className="w-4 h-4 text-orange-400" />
                       <span className="text-sm font-medium text-white">
                         {(subscription.plan === 'pro' || subscription.plan === 'creator') ? 'Creator' :
                          (subscription.plan === 'teams' || subscription.plan === 'collaborate') ? 'Collaborate' :
@@ -316,7 +316,7 @@ export function Navigation() {
                     <DropdownMenu open={isUserDropdownOpen} onOpenChange={setIsUserDropdownOpen}>
                       <DropdownMenuTrigger asChild>
                         <button className="flex items-center space-x-3 text-white hover:text-gray-300 transition-colors">
-                          <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center">
+                          <div className="w-8 h-8 rounded-full bg-orange-600 flex items-center justify-center">
                             <span className="text-white text-sm font-medium">
                               {user.email?.charAt(0).toUpperCase() || 'U'}
                             </span>
@@ -411,7 +411,7 @@ export function Navigation() {
                         </Button>
                       </Link>
                       <Link href="/auth/signup">
-                        <Button className="bg-transparent backdrop-blur-[32px] text-white border border-white/20 px-6 py-3  font-semibold rounded-full shadow-lg relative overflow-hidden hover:bg-white/10 transition-all duration-300 cursor-pointer">
+                        <Button className="bg-orange-600 hover:bg-orange-500 text-white px-6 py-3 font-semibold rounded-full shadow-lg shadow-orange-500/20 transition-all duration-300 cursor-pointer">
                           Get started
                         </Button>
                       </Link>
@@ -445,7 +445,7 @@ export function Navigation() {
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button className="text-white hover:text-gray-300 transition-colors p-2">
-                            <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center">
+                            <div className="w-8 h-8 rounded-full bg-orange-600 flex items-center justify-center">
                               <span className="text-white text-sm font-medium">
                                 {user.email?.charAt(0).toUpperCase() || 'U'}
                               </span>
@@ -458,7 +458,7 @@ export function Navigation() {
                             <div className="px-3 py-3 border-b border-gray-700">
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center space-x-2">
-                                  <Crown className="w-4 h-4 text-purple-400" />
+                                  <Crown className="w-4 h-4 text-orange-400" />
                                   <span className="text-sm font-medium text-white">
                                     {(subscription.plan === 'pro' || subscription.plan === 'creator') ? 'Creator Plan' :
                                      (subscription.plan === 'teams' || subscription.plan === 'collaborate') ? 'Collaborate Plan' :
@@ -557,7 +557,7 @@ export function Navigation() {
                         </Button>
                       </Link>
                       <Link href="/auth/signup">
-                        <Button className="bg-transparent backdrop-blur-[32px] text-white border border-white/20 px-6 py-3  font-semibold rounded-full shadow-lg relative overflow-hidden hover:bg-white/10 transition-all duration-300 cursor-pointer">
+                        <Button className="bg-orange-600 hover:bg-orange-500 text-white px-6 py-3 font-semibold rounded-full shadow-lg shadow-orange-500/20 transition-all duration-300 cursor-pointer">
                           Get started
                         </Button>
                       </Link>
@@ -616,7 +616,7 @@ export function Navigation() {
             <Button
               onClick={handleTopUp}
               disabled={processingTopUp}
-              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500"
+              className="bg-orange-600 hover:bg-orange-500"
             >
               {processingTopUp ? (
                 <>

@@ -520,8 +520,8 @@ export default function LandingPage() {
           {/* Section Header */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-12">
             <div className="flex items-center space-x-3 mb-6 md:mb-0">
-              <div className="w-8 h-8 rounded-full bg-purple-600/20 flex items-center justify-center">
-                <Users className="w-4 h-4 text-purple-400" />
+              <div className="w-8 h-8 rounded-full bg-orange-600/20 flex items-center justify-center">
+                <Users className="w-4 h-4 text-orange-400" />
               </div>
               <h2 className="text-3xl md:text-4xl font-bold text-white">
                Template Library
