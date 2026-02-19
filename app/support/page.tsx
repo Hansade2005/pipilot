@@ -100,7 +100,7 @@ const faqCategories = [
     id: "getting-started",
     title: "Getting Started",
     icon: Rocket,
-    color: "text-green-400",
+    color: "text-orange-400",
     faqs: [
       {
         question: "What is PiPilot?",
@@ -124,7 +124,7 @@ const faqCategories = [
     id: "features",
     title: "Features & Capabilities",
     icon: Sparkles,
-    color: "text-purple-400",
+    color: "text-orange-400",
     faqs: [
       {
         question: "What AI models does PiPilot use?",
@@ -164,7 +164,7 @@ const faqCategories = [
     id: "billing",
     title: "Billing & Pricing",
     icon: CreditCard,
-    color: "text-blue-400",
+    color: "text-orange-400",
     faqs: [
       {
         question: "Is PiPilot free to use?",
@@ -216,7 +216,7 @@ const faqCategories = [
     id: "account",
     title: "Account & Privacy",
     icon: Shield,
-    color: "text-cyan-400",
+    color: "text-orange-400",
     faqs: [
       {
         question: "How do I reset my password?",
@@ -245,28 +245,28 @@ const quickHelp = [
     description: "Learn the basics in 5 minutes",
     icon: Rocket,
     href: "/docs/quickstart",
-    color: "from-green-500 to-emerald-600"
+    color: "from-orange-500 to-orange-600"
   },
   {
     title: "Video Tutorials",
     description: "Watch step-by-step guides",
     icon: BookOpen,
     href: "/docs/tutorials",
-    color: "from-purple-500 to-pink-600"
+    color: "from-orange-500 to-orange-600"
   },
   {
     title: "API Documentation",
     description: "For developers and integrations",
     icon: Code,
     href: "/docs/api",
-    color: "from-blue-500 to-cyan-600"
+    color: "from-orange-500 to-orange-600"
   },
   {
     title: "Community Discord",
     description: "Join our community",
     icon: Users,
     href: "https://discord.gg/pipilot",
-    color: "from-indigo-500 to-purple-600"
+    color: "from-orange-500 to-orange-600"
   },
 ]
 
@@ -712,13 +712,13 @@ export default function SupportPage() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           {/* Hero Section */}
           <div className="text-center mb-12 max-w-4xl mx-auto">
-            <Badge className="mb-4 bg-blue-500/20 text-blue-300 border-blue-500/30">
+            <Badge className="mb-4 bg-orange-500/20 text-orange-300 border-orange-500/30">
               <HelpCircle className="h-3 w-3 mr-1" />
               Support Center
             </Badge>
             <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
               How Can We
-              <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent"> Help You?</span>
+              <span className="bg-gradient-to-r from-orange-400 to-orange-500 bg-clip-text text-transparent"> Help You?</span>
             </h1>
             <p className="text-xl text-gray-300 max-w-2xl mx-auto mb-8">
               Find answers to common questions, get help from our AI assistant, or reach out to our support team.
@@ -732,7 +732,7 @@ export default function SupportPage() {
                 placeholder="Search for answers..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-12 pr-32 py-6 text-lg bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-400 rounded-xl focus:ring-2 focus:ring-blue-500"
+                className="pl-12 pr-32 py-6 text-lg bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-400 rounded-xl focus:ring-2 focus:ring-orange-500"
               />
               <Button
                 onClick={() => {
@@ -743,7 +743,7 @@ export default function SupportPage() {
                     setChatMinimized(false)
                   }
                 }}
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-lg"
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-orange-600 hover:bg-orange-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-lg"
               >
                 <Sparkles className="h-4 w-4" />
                 <span className="hidden sm:inline">Ask AI</span>
@@ -791,7 +791,7 @@ export default function SupportPage() {
                     </Button>
                     <Button
                       onClick={() => openChatWithQuestion(searchQuery)}
-                      className="bg-purple-600 hover:bg-purple-700"
+                      className="bg-orange-600 hover:bg-orange-500"
                     >
                       <Sparkles className="h-4 w-4 mr-2" />
                       Ask AI Instead
@@ -816,7 +816,7 @@ export default function SupportPage() {
                       <Accordion type="single" collapsible className="w-full">
                         {category.faqs.map((faq, idx) => (
                           <AccordionItem key={idx} value={`${category.id}-${idx}`} className="border-gray-700">
-                            <AccordionTrigger className="text-white hover:text-purple-400 text-left">
+                            <AccordionTrigger className="text-white hover:text-orange-400 text-left">
                               {faq.question}
                             </AccordionTrigger>
                             <AccordionContent className="text-gray-300 leading-relaxed">
@@ -849,29 +849,29 @@ export default function SupportPage() {
                       setChatMinimized(false)
                     }}
                   >
-                    <div className="w-14 h-14 rounded-full bg-purple-500/20 flex items-center justify-center mx-auto mb-4">
-                      <Bot className="h-7 w-7 text-purple-400" />
+                    <div className="w-14 h-14 rounded-full bg-orange-500/20 flex items-center justify-center mx-auto mb-4">
+                      <Bot className="h-7 w-7 text-orange-400" />
                     </div>
                     <h3 className="text-white font-semibold mb-2">AI Assistant</h3>
                     <p className="text-gray-400 text-sm mb-4">
                       Chat with our AI assistant for instant answers powered by Claude Opus 4.5
                     </p>
-                    <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">
+                    <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30">
                       <Sparkles className="h-3 w-3 mr-1" />
                       Powered by AI
                     </Badge>
                   </div>
 
                   <div className="text-center p-6 bg-gray-800/50 rounded-xl">
-                    <div className="w-14 h-14 rounded-full bg-blue-500/20 flex items-center justify-center mx-auto mb-4">
-                      <Mail className="h-7 w-7 text-blue-400" />
+                    <div className="w-14 h-14 rounded-full bg-orange-500/20 flex items-center justify-center mx-auto mb-4">
+                      <Mail className="h-7 w-7 text-orange-400" />
                     </div>
                     <h3 className="text-white font-semibold mb-2">Email Support</h3>
                     <p className="text-gray-400 text-sm mb-4">
                       Send us an email and we'll respond within 24 hours
                     </p>
                     <Link href="mailto:hello@pipilot.dev">
-                      <Button variant="outline" className="text-blue-400 border-blue-500/50 hover:bg-blue-500/10">
+                      <Button variant="outline" className="text-orange-400 border-orange-500/50 hover:bg-orange-500/10">
                         <Mail className="h-4 w-4 mr-2" />
                         hello@pipilot.dev
                       </Button>
@@ -894,7 +894,7 @@ export default function SupportPage() {
             setChatOpen(true)
             setChatMinimized(false)
           }}
-          className="fixed bottom-6 right-6 z-50 w-16 h-16 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-all duration-300 group"
+          className="fixed bottom-6 right-6 z-50 w-16 h-16 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-all duration-300 group"
           aria-label="Open AI Chat"
         >
           <Bot className="h-8 w-8 text-white" />
@@ -918,7 +918,7 @@ export default function SupportPage() {
             chatMinimized ? 'h-auto' : 'h-[650px] max-h-[calc(100vh-100px)]'
           }`}>
             {/* Chat Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-4 flex items-center justify-between">
+            <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
                   <Bot className="h-6 w-6 text-white" />
@@ -959,8 +959,8 @@ export default function SupportPage() {
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
                   {messages.length === 0 && (
                     <div className="text-center py-8">
-                      <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Bot className="h-8 w-8 text-purple-400" />
+                      <div className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Bot className="h-8 w-8 text-orange-400" />
                       </div>
                       <h4 className="text-white font-medium mb-2">Hi! I'm PiPilot AI</h4>
                       <p className="text-gray-400 text-sm mb-4">
@@ -974,7 +974,7 @@ export default function SupportPage() {
                               setChatInput(q)
                               setTimeout(() => handleSendMessage(), 100)
                             }}
-                            className="text-xs bg-gray-800 text-purple-400 px-3 py-1.5 rounded-full hover:bg-gray-700 transition-colors"
+                            className="text-xs bg-gray-800 text-orange-400 px-3 py-1.5 rounded-full hover:bg-gray-700 transition-colors"
                           >
                             {q}
                           </button>
@@ -987,13 +987,13 @@ export default function SupportPage() {
                     <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[85%] ${msg.role === 'user' ? '' : 'flex gap-2'}`}>
                         {msg.role === 'assistant' && (
-                          <div className="w-7 h-7 bg-purple-500/20 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5">
-                            <Bot className="h-4 w-4 text-purple-400" />
+                          <div className="w-7 h-7 bg-orange-500/20 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5">
+                            <Bot className="h-4 w-4 text-orange-400" />
                           </div>
                         )}
                         <div className={`p-3 rounded-2xl ${
                           msg.role === 'user'
-                            ? 'bg-purple-600 text-white rounded-br-md'
+                            ? 'bg-orange-600 text-white rounded-br-md'
                             : 'bg-gray-800 text-gray-200 rounded-bl-md'
                         }`}>
                           {/* Display images if any */}
@@ -1010,7 +1010,7 @@ export default function SupportPage() {
                             </div>
                           )}
                           {msg.role === 'assistant' ? (
-                            <Response className="text-sm text-gray-200 prose prose-sm prose-invert max-w-none overflow-hidden break-words [word-break:break-word] [&>p]:text-gray-200 [&>ul]:text-gray-200 [&>ol]:text-gray-200 [&>li]:text-gray-200 [&>h1]:text-gray-100 [&>h2]:text-gray-100 [&>h3]:text-gray-100 [&>h4]:text-gray-100 [&>a]:text-purple-400 [&>a]:hover:text-purple-300 [&>a]:break-all [&>code]:bg-gray-700 [&>code]:px-1 [&>code]:py-0.5 [&>code]:rounded [&>code]:break-all [&>pre]:bg-gray-900 [&>pre]:p-3 [&>pre]:rounded-lg [&>pre]:overflow-x-auto [&>pre]:max-w-full [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:whitespace-pre-wrap [&_pre_code]:break-all [&>blockquote]:border-purple-500">
+                            <Response className="text-sm text-gray-200 prose prose-sm prose-invert max-w-none overflow-hidden break-words [word-break:break-word] [&>p]:text-gray-200 [&>ul]:text-gray-200 [&>ol]:text-gray-200 [&>li]:text-gray-200 [&>h1]:text-gray-100 [&>h2]:text-gray-100 [&>h3]:text-gray-100 [&>h4]:text-gray-100 [&>a]:text-orange-400 [&>a]:hover:text-orange-300 [&>a]:break-all [&>code]:bg-gray-700 [&>code]:px-1 [&>code]:py-0.5 [&>code]:rounded [&>code]:break-all [&>pre]:bg-gray-900 [&>pre]:p-3 [&>pre]:rounded-lg [&>pre]:overflow-x-auto [&>pre]:max-w-full [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:whitespace-pre-wrap [&_pre_code]:break-all [&>blockquote]:border-orange-500">
                               {getMessageText(msg.content)}
                             </Response>
                           ) : (
@@ -1026,17 +1026,17 @@ export default function SupportPage() {
                   {isLoading && messages[messages.length - 1]?.role === 'user' && (
                     <div className="flex justify-start">
                       <div className="flex gap-2">
-                        <div className="w-7 h-7 bg-purple-500/20 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5">
-                          <Bot className="h-4 w-4 text-purple-400" />
+                        <div className="w-7 h-7 bg-orange-500/20 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5">
+                          <Bot className="h-4 w-4 text-orange-400" />
                         </div>
                         <div className="bg-gray-800 p-3 rounded-2xl rounded-bl-md">
                           {toolStatus ? (
-                            <div className="flex items-center gap-2 text-blue-400">
+                            <div className="flex items-center gap-2 text-orange-400">
                               <Search className="h-4 w-4 animate-pulse" />
                               <span className="text-sm">{toolStatus}</span>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-2 text-purple-400">
+                            <div className="flex items-center gap-2 text-orange-400">
                               <Loader2 className="h-4 w-4 animate-spin" />
                               <span className="text-sm">Thinking...</span>
                             </div>
@@ -1086,7 +1086,7 @@ export default function SupportPage() {
                   <div className="flex items-center gap-2 mb-2">
                     <button
                       onClick={() => fileInputRef.current?.click()}
-                      className="flex items-center gap-1 text-xs text-gray-400 hover:text-purple-400 bg-gray-800 hover:bg-gray-700 px-2 py-1.5 rounded-lg transition-colors"
+                      className="flex items-center gap-1 text-xs text-gray-400 hover:text-orange-400 bg-gray-800 hover:bg-gray-700 px-2 py-1.5 rounded-lg transition-colors"
                       title="Upload image"
                     >
                       <ImageIcon className="h-3.5 w-3.5" />
@@ -1094,7 +1094,7 @@ export default function SupportPage() {
                     </button>
                     <button
                       onClick={() => docInputRef.current?.click()}
-                      className="flex items-center gap-1 text-xs text-gray-400 hover:text-purple-400 bg-gray-800 hover:bg-gray-700 px-2 py-1.5 rounded-lg transition-colors"
+                      className="flex items-center gap-1 text-xs text-gray-400 hover:text-orange-400 bg-gray-800 hover:bg-gray-700 px-2 py-1.5 rounded-lg transition-colors"
                       title="Attach document"
                     >
                       <Paperclip className="h-3.5 w-3.5" />
@@ -1106,7 +1106,7 @@ export default function SupportPage() {
                       className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${
                         isScreenSharing
                           ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
-                          : 'text-gray-400 hover:text-purple-400 bg-gray-800 hover:bg-gray-700'
+                          : 'text-gray-400 hover:text-orange-400 bg-gray-800 hover:bg-gray-700'
                       }`}
                       title={isScreenSharing ? "Stop screen sharing" : "Start screen sharing"}
                     >
@@ -1142,7 +1142,7 @@ export default function SupportPage() {
                     <Button
                       onClick={handleSendMessage}
                       disabled={isLoading || (!chatInput.trim() && attachments.length === 0)}
-                      className="bg-purple-600 hover:bg-purple-700 rounded-xl px-4"
+                      className="bg-orange-600 hover:bg-orange-500 rounded-xl px-4"
                     >
                       {isLoading ? (
                         <Loader2 className="h-4 w-4 animate-spin" />

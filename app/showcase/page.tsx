@@ -70,7 +70,7 @@ export default function ShowcasePage() {
       author: "Sarah Chen",
       avatar: "SC",
       tech: ["React", "React Router", "Lucide Icons", "Tailwind"],
-      image: "bg-gradient-to-br from-blue-500 to-purple-600",
+      image: "bg-gradient-to-br from-orange-500 to-orange-600",
       featured: true,
       templateId: "ecommerce-platform" // Now using dedicated e-commerce template
     },
@@ -81,7 +81,7 @@ export default function ShowcasePage() {
       author: "Mike Johnson",
       avatar: "MJ",
       tech: ["React", "React Router", "Lucide Icons", "Tailwind"],
-      image: "bg-gradient-to-br from-green-500 to-blue-600",
+      image: "bg-gradient-to-br from-orange-500 to-orange-600",
       featured: true,
       templateId: "chat-application"
     },
@@ -92,7 +92,7 @@ export default function ShowcasePage() {
       author: "Alex Rodriguez",
       avatar: "AR",
       tech: ["Vue.js", "Firebase", "Chart.js", "Material-UI"],
-      image: "bg-gradient-to-br from-purple-500 to-pink-600",
+      image: "bg-gradient-to-br from-orange-500 to-orange-600",
       featured: true,
       templateId: "cortex-second-brain"
     }
@@ -105,7 +105,7 @@ export default function ShowcasePage() {
       author: "Emma Davis",
       avatar: "ED",
       tech: ["React", "OpenWeather API", "AI"],
-      image: "bg-gradient-to-br from-cyan-500 to-blue-600",
+      image: "bg-gradient-to-br from-orange-500 to-orange-600",
       templateId: "characterforge-imagix"
     },
     {
@@ -115,7 +115,7 @@ export default function ShowcasePage() {
       author: "David Wilson",
       avatar: "DW",
       tech: ["React", "React Router", "Lucide Icons", "Tailwind"],
-      image: "bg-gradient-to-br from-emerald-500 to-teal-600",
+      image: "bg-gradient-to-br from-orange-500 to-orange-600",
       templateId: "finance-tracker"
     },
     {
@@ -125,7 +125,7 @@ export default function ShowcasePage() {
       author: "Lisa Brown",
       avatar: "LB",
       tech: ["React", "Express", "MongoDB"],
-      image: "bg-gradient-to-br from-orange-500 to-red-600",
+      image: "bg-gradient-to-br from-orange-500 to-orange-600",
       templateId: "saas-template"
     },
     {
@@ -135,7 +135,7 @@ export default function ShowcasePage() {
       author: "Tom Anderson",
       avatar: "TA",
       tech: ["React Native", "Firebase", "AI"],
-      image: "bg-gradient-to-br from-pink-500 to-rose-600",
+      image: "bg-gradient-to-br from-orange-500 to-orange-600",
       templateId: "saas-template"
     }
   ]
@@ -177,7 +177,7 @@ export default function ShowcasePage() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button
                 size="lg"
-                className="bg-purple-600 hover:bg-purple-700 text-white"
+                className="bg-orange-600 hover:bg-orange-500 text-white"
                 onClick={() => toast.info("Coming soon!")}
               >
                 Share Your Project
@@ -218,7 +218,7 @@ export default function ShowcasePage() {
                       onClick={() => setSortBy(option.key)}
                       className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                         sortBy === option.key
-                          ? 'bg-purple-600 text-white'
+                          ? 'bg-orange-600 text-white'
                           : 'text-gray-300 hover:text-white hover:bg-gray-700/50'
                       }`}
                     >
@@ -245,7 +245,7 @@ export default function ShowcasePage() {
                       onClick={() => setFilterBy(option.key)}
                       className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                         filterBy === option.key
-                          ? 'bg-purple-600 text-white'
+                          ? 'bg-orange-600 text-white'
                           : 'text-gray-300 hover:text-white hover:bg-gray-700/50'
                       }`}
                     >
@@ -262,8 +262,8 @@ export default function ShowcasePage() {
             {stats.map((stat, index) => (
               <Card key={index} className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm">
                 <CardContent className="p-6 text-center">
-                  <div className="w-12 h-12 rounded-lg bg-purple-600/20 flex items-center justify-center mx-auto mb-4">
-                    <stat.icon className="w-6 h-6 text-purple-400" />
+                  <div className="w-12 h-12 rounded-lg bg-orange-600/20 flex items-center justify-center mx-auto mb-4">
+                    <stat.icon className="w-6 h-6 text-orange-400" />
                   </div>
                   <div className="text-3xl font-bold text-white mb-2">{stat.value}</div>
                   <div className="text-gray-300">{stat.label}</div>
@@ -367,7 +367,7 @@ export default function ShowcasePage() {
                       </Button>
                       <Button
                         size="sm"
-                        className="flex-1 bg-purple-600 hover:bg-purple-700"
+                        className="flex-1 bg-orange-600 hover:bg-orange-500"
                         onClick={() => handleDownloadTemplate(project.templateId)}
                       >
                         <Download className="w-3 h-3 mr-2" />
@@ -459,7 +459,7 @@ export default function ShowcasePage() {
                           </Button>
                           <Button
                             size="sm"
-                            className="flex-1 bg-purple-600 hover:bg-purple-700"
+                            className="flex-1 bg-orange-600 hover:bg-orange-500"
                             onClick={() => handleDownloadTemplate(project.templateId)}
                           >
                             <Download className="w-3 h-3 mr-2" />
@@ -486,8 +486,8 @@ export default function ShowcasePage() {
               ].map((category, index) => (
                 <Card key={index} className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-colors cursor-pointer">
                   <CardContent className="p-6 text-center">
-                    <div className="w-12 h-12 rounded-lg bg-purple-600/20 flex items-center justify-center mx-auto mb-4">
-                      <category.icon className="w-6 h-6 text-purple-400" />
+                    <div className="w-12 h-12 rounded-lg bg-orange-600/20 flex items-center justify-center mx-auto mb-4">
+                      <category.icon className="w-6 h-6 text-orange-400" />
                     </div>
                     <h3 className="text-white font-semibold mb-2">{category.name}</h3>
                     <p className="text-gray-400 text-sm">Coming Soon</p>
@@ -500,8 +500,8 @@ export default function ShowcasePage() {
           {/* CTA Section */}
           <div className="bg-gray-800/50 rounded-xl p-8 backdrop-blur-sm text-center">
             <div className="flex items-center justify-center mb-4">
-              <div className="w-12 h-12 rounded-lg bg-green-600/20 flex items-center justify-center">
-                <Code className="w-6 h-6 text-green-400" />
+              <div className="w-12 h-12 rounded-lg bg-orange-600/20 flex items-center justify-center">
+                <Code className="w-6 h-6 text-orange-400" />
               </div>
             </div>
             <h2 className="text-3xl font-bold text-white mb-4">Ready to Share Your Project?</h2>
@@ -509,7 +509,7 @@ export default function ShowcasePage() {
               Join thousands of developers sharing their AI-powered creations. Showcase your work and inspire others in the community.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white">
+              <Button size="lg" className="bg-orange-600 hover:bg-orange-500 text-white">
                 Submit Your Project
               </Button>
               <Button size="lg" variant="outline" className="border-gray-600 text-white hover:bg-gray-700">

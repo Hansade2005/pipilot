@@ -17,10 +17,10 @@ export function Footer() {
           <div>
             <h3 className="text-white font-semibold mb-4">Product</h3>
             <ul className="space-y-2 text-sm">
-              <li><Link href="/pricing" className="text-gray-400 hover:text-white transition-colors">Plans</Link></li>
-              <li><Link href="/enterprise" className="text-gray-400 hover:text-white transition-colors">Business</Link></li>
-              <li><Link href="/showcase" className="text-gray-400 hover:text-white transition-colors">Showcase</Link></li>
-              <li><Link href="/features/integrations" className="text-gray-400 hover:text-white transition-colors">Integrations</Link></li>
+              <li><Link href="/pricing" className="text-gray-400 hover:text-orange-400 transition-colors">Plans</Link></li>
+              <li><Link href="/enterprise" className="text-gray-400 hover:text-orange-400 transition-colors">Business</Link></li>
+              <li><Link href="/showcase" className="text-gray-400 hover:text-orange-400 transition-colors">Showcase</Link></li>
+              <li><Link href="/features/integrations" className="text-gray-400 hover:text-orange-400 transition-colors">Integrations</Link></li>
               {/* <li><Link href="#" className="text-gray-400 hover:text-white transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); toast.info("Coming soon!") }}>Student discount</Link></li> */}
               {/* <li><Link href="#" className="text-gray-400 hover:text-white transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); toast.info("Coming soon!") }}>Solutions</Link></li> */}
               {/* <li><Link href="#" className="text-gray-400 hover:text-white transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); toast.info("Coming soon!") }}>Changelog</Link></li> */}
@@ -30,21 +30,21 @@ export function Footer() {
           <div>
             <h3 className="text-white font-semibold mb-4">Resources</h3>
             <ul className="space-y-2 text-sm">
-              <li><Link href="/about" className="text-gray-400 hover:text-white transition-colors">About Us</Link></li>
-              <li><Link href="/docs" className="text-gray-400 hover:text-white transition-colors">Docs</Link></li>
-              <li><Link href="/blog" className="text-gray-400 hover:text-white transition-colors">Blog</Link></li>
-              <li><Link href="/learn" className="text-gray-400 hover:text-white transition-colors">Learn</Link></li>
-              <li><Link href="/privacy" className="text-gray-400 hover:text-white transition-colors">Privacy Policy</Link></li>
-              <li><Link href="/terms" className="text-gray-400 hover:text-white transition-colors">Terms & Conditions</Link></li>
-              <li><Link href="/refund-policy" className="text-gray-400 hover:text-white transition-colors">Refund Policy</Link></li>
+              <li><Link href="/about" className="text-gray-400 hover:text-orange-400 transition-colors">About Us</Link></li>
+              <li><Link href="/docs" className="text-gray-400 hover:text-orange-400 transition-colors">Docs</Link></li>
+              <li><Link href="/blog" className="text-gray-400 hover:text-orange-400 transition-colors">Blog</Link></li>
+              <li><Link href="/learn" className="text-gray-400 hover:text-orange-400 transition-colors">Learn</Link></li>
+              <li><Link href="/privacy" className="text-gray-400 hover:text-orange-400 transition-colors">Privacy Policy</Link></li>
+              <li><Link href="/terms" className="text-gray-400 hover:text-orange-400 transition-colors">Terms & Conditions</Link></li>
+              <li><Link href="/refund-policy" className="text-gray-400 hover:text-orange-400 transition-colors">Refund Policy</Link></li>
             </ul>
           </div>
 
           <div>
             <h3 className="text-white font-semibold mb-4">Community</h3>
             <ul className="space-y-2 text-sm">
-              <li><Link href="/community" className="text-gray-400 hover:text-white transition-colors">Community</Link></li>
-              <li><Link href="/support" className="text-gray-400 hover:text-white transition-colors">Support</Link></li>
+              <li><Link href="/community" className="text-gray-400 hover:text-orange-400 transition-colors">Community</Link></li>
+              <li><Link href="/support" className="text-gray-400 hover:text-orange-400 transition-colors">Support</Link></li>
               {/* <li><Link href="#" className="text-gray-400 hover:text-white transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); toast.info("Coming soon!") }}>Discord</Link></li> */}
               {/* <li><Link href="#" className="text-gray-400 hover:text-white transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); toast.info("Coming soon!") }}>Reddit</Link></li> */}
               {/* <li><Link href="#" className="text-gray-400 hover:text-white transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); toast.info("Coming soon!") }}>X/Twitter</Link></li> */}

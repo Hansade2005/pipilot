@@ -278,7 +278,7 @@ export default function PricingPage() {
             </h1>
             <p className="text-xl md:text-2xl text-white/90 max-w-3xl mx-auto leading-relaxed">
               Join thousands of developers building production-ready apps with AI. 
-              <span className="block mt-2 text-purple-300 font-semibold">From prototype to deployment in minutes, not months.</span>
+              <span className="block mt-2 text-orange-300 font-semibold">From prototype to deployment in minutes, not months.</span>
             </p>
             
             {/* Social Proof */}
@@ -288,7 +288,7 @@ export default function PricingPage() {
                 <span className="font-medium">4.9/5 rating</span>
               </div>
               <div className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-purple-400" />
+                <Users className="w-5 h-5 text-orange-400" />
                 <span className="font-medium">10,000+ developers</span>
               </div>
               <div className="flex items-center gap-2">
@@ -312,7 +312,7 @@ export default function PricingPage() {
 
           {/* Value Proposition Banner */}
           <div className="mb-12 max-w-4xl mx-auto">
-            <div className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 border border-purple-500/30 rounded-2xl p-6 backdrop-blur-sm transform transition-all duration-300 hover:scale-105">
+            <div className="bg-gradient-to-r from-orange-600/20 to-orange-500/20 border border-orange-500/30 rounded-2xl p-6 backdrop-blur-sm transform transition-all duration-300 hover:scale-105">
               <div className="grid md:grid-cols-3 gap-6 text-center">
                 <div className="space-y-2">
                   <div className="text-3xl font-bold text-white">10x</div>
@@ -337,7 +337,7 @@ export default function PricingPage() {
               <Switch
                 checked={isAnnual}
                 onCheckedChange={setIsAnnual}
-                className="data-[state=checked]:bg-purple-600"
+                className="data-[state=checked]:bg-orange-600"
               />
               <span className={`text-sm ${isAnnual ? 'text-white' : 'text-gray-400'}`}>Annual</span>
               {isAnnual && (
@@ -351,10 +351,10 @@ export default function PricingPage() {
           {/* Pricing Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
             {pricingTiers.map((tier, index) => (
-              <Card key={index} className={`bg-gradient-to-br from-gray-800/60 to-gray-900/60 border-gray-700/50 backdrop-blur-sm relative transform transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/20 ${tier.isPopular ? 'ring-2 ring-purple-500 shadow-lg shadow-purple-500/30 scale-105' : 'hover:border-purple-500/50'} animate-slide-up`} style={{animationDelay: `${index * 100}ms`}}>
+              <Card key={index} className={`bg-gradient-to-br from-gray-800/60 to-gray-900/60 border-gray-700/50 backdrop-blur-sm relative transform transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-orange-500/20 ${tier.isPopular ? 'ring-2 ring-orange-500 shadow-lg shadow-orange-500/30 scale-105' : 'hover:border-orange-500/50'} animate-slide-up`} style={{animationDelay: `${index * 100}ms`}}>
                 {tier.isPopular && (
                   <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 z-10">
-                    <Badge className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-1.5 shadow-lg animate-pulse">
+                    <Badge className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-4 py-1.5 shadow-lg animate-pulse">
                       ⭐ Most Popular
                     </Badge>
                   </div>
@@ -368,9 +368,9 @@ export default function PricingPage() {
                 <CardContent className="space-y-6">
                   <div>
                     <div className="flex items-baseline space-x-2">
-                      <span className="text-4xl font-bold bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent">{tier.price}</span>
+                      <span className="text-4xl font-bold bg-gradient-to-r from-white to-orange-200 bg-clip-text text-transparent">{tier.price}</span>
                       {tier.priceAmount && (
-                        <span className="text-4xl font-bold bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent">{tier.priceAmount}</span>
+                        <span className="text-4xl font-bold bg-gradient-to-r from-white to-orange-200 bg-clip-text text-transparent">{tier.priceAmount}</span>
                       )}
                       {tier.period && (
                         <span className="text-gray-400 text-sm">{tier.period}</span>
@@ -402,7 +402,7 @@ export default function PricingPage() {
                   </div>
 
                   <Button 
-                    className={`w-full font-semibold transition-all duration-300 ${tier.buttonVariant === 'default' ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg hover:shadow-purple-500/50 transform hover:-translate-y-0.5' : 'border-2 border-gray-600 hover:border-purple-500 hover:bg-purple-500/10'} ${tier.isPopular ? 'ring-2 ring-purple-400 ring-offset-2 ring-offset-gray-900' : ''}`}
+                    className={`w-full font-semibold transition-all duration-300 ${tier.buttonVariant === 'default' ? 'bg-orange-600 hover:bg-orange-500 shadow-lg hover:shadow-orange-500/50 transform hover:-translate-y-0.5' : 'border-2 border-gray-600 hover:border-orange-500 hover:bg-orange-500/10'} ${tier.isPopular ? 'ring-2 ring-orange-400 ring-offset-2 ring-offset-gray-900' : ''}`}
                     disabled={
                       loadingPlan === tier.planType ||
                       tier.buttonText === "Current Plan"
@@ -511,7 +511,7 @@ export default function PricingPage() {
                     </div>
                     <div>
                       <h3 className="text-lg font-semibold text-white mb-2">24-Hour Satisfaction Window</h3>
-                      <p className="text-gray-300 text-sm">If you're unsatisfied and <strong className="text-white">have not used any credits</strong>, contact <a href="mailto:support@pipilot.dev" className="text-purple-400 hover:underline">support@pipilot.dev</a> within <strong className="text-white">24 hours</strong> of purchase for a full refund.</p>
+                      <p className="text-gray-300 text-sm">If you're unsatisfied and <strong className="text-white">have not used any credits</strong>, contact <a href="mailto:support@pipilot.dev" className="text-orange-400 hover:underline">support@pipilot.dev</a> within <strong className="text-white">24 hours</strong> of purchase for a full refund.</p>
                     </div>
                   </div>
 
@@ -530,12 +530,12 @@ export default function PricingPage() {
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="text-center sm:text-left">
                       <p className="text-gray-400 text-sm">
-                        Questions? Contact <a href="mailto:support@pipilot.dev" className="text-purple-400 hover:underline">support@pipilot.dev</a>
+                        Questions? Contact <a href="mailto:support@pipilot.dev" className="text-orange-400 hover:underline">support@pipilot.dev</a>
                       </p>
                     </div>
                     <a
                       href="/refund-policy"
-                      className="inline-flex items-center text-purple-400 hover:text-purple-300 font-medium text-sm transition-colors"
+                      className="inline-flex items-center text-orange-400 hover:text-orange-300 font-medium text-sm transition-colors"
                     >
                       View Full Refund Policy
                       <ChevronDown className="w-4 h-4 ml-1 -rotate-90" />

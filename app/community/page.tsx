@@ -196,7 +196,7 @@ export default function BlogPage() {
                     placeholder="Search articles, tags, or authors..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-12 pr-4 py-4 text-lg bg-gray-800/50 border-gray-700/50 text-white placeholder-gray-400 focus:border-purple-500 focus:ring-purple-500 rounded-xl"
+                    className="pl-12 pr-4 py-4 text-lg bg-gray-800/50 border-gray-700/50 text-white placeholder-gray-400 focus:border-orange-500 focus:ring-orange-500 rounded-xl"
                   />
                   {(searchQuery || selectedCategory !== "all" || selectedTag !== "all") && (
                     <Button
@@ -219,7 +219,7 @@ export default function BlogPage() {
                   <select
                     value={selectedCategory}
                     onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm focus:border-purple-500 focus:ring-purple-500"
+                    className="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm focus:border-orange-500 focus:ring-orange-500"
                   >
                     {categories.map((category) => (
                       <option key={category.id} value={category.id}>
@@ -235,7 +235,7 @@ export default function BlogPage() {
                   <select
                     value={selectedTag}
                     onChange={(e) => setSelectedTag(e.target.value)}
-                    className="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm focus:border-purple-500 focus:ring-purple-500"
+                    className="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm focus:border-orange-500 focus:ring-orange-500"
                   >
                     <option value="all">All Tags</option>
                     {allTags.map((tag) => (
@@ -251,17 +251,17 @@ export default function BlogPage() {
               {(searchQuery || selectedCategory !== "all" || selectedTag !== "all") && (
                 <div className="mt-4 flex flex-wrap gap-2 justify-center">
                   {searchQuery && (
-                    <Badge variant="secondary" className="bg-purple-600 text-white">
+                    <Badge variant="secondary" className="bg-orange-600 text-white">
                       Search: "{searchQuery}"
                     </Badge>
                   )}
                   {selectedCategory !== "all" && (
-                    <Badge variant="secondary" className="bg-blue-600 text-white">
+                    <Badge variant="secondary" className="bg-orange-600 text-white">
                       Category: {categories.find(c => c.id === selectedCategory)?.name}
                     </Badge>
                   )}
                   {selectedTag !== "all" && (
-                    <Badge variant="secondary" className="bg-green-600 text-white">
+                    <Badge variant="secondary" className="bg-orange-600 text-white">
                       Tag: {selectedTag}
                     </Badge>
                   )}
@@ -285,12 +285,12 @@ export default function BlogPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
               {filteredPosts.map((post, index) => {
                 const thumbnailGradients = [
-                  "bg-gradient-to-br from-blue-500 to-purple-600",
-                  "bg-gradient-to-br from-green-500 to-blue-600",
-                  "bg-gradient-to-br from-purple-500 to-pink-600",
-                  "bg-gradient-to-br from-yellow-500 to-orange-600",
-                  "bg-gradient-to-br from-cyan-500 to-blue-600",
-                  "bg-gradient-to-br from-emerald-500 to-teal-600"
+                  "bg-gradient-to-br from-orange-500 to-orange-600",
+                  "bg-gradient-to-br from-orange-500 to-orange-600",
+                  "bg-gradient-to-br from-orange-500 to-orange-600",
+                  "bg-gradient-to-br from-orange-500 to-orange-600",
+                  "bg-gradient-to-br from-orange-500 to-orange-600",
+                  "bg-gradient-to-br from-orange-500 to-orange-600"
                 ]
 
                 return (
@@ -301,17 +301,10 @@ export default function BlogPage() {
                         <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors"></div>
                       </div>
                       <CardContent className="p-6 flex-1 flex flex-col">
-                        <Badge className={`w-fit mb-3 ${
-                          post.category === 'platform-updates' ? 'bg-blue-500' :
-                          post.category === 'tutorials' ? 'bg-green-500' :
-                          post.category === 'case-studies' ? 'bg-yellow-500' :
-                          post.category === 'industry-insights' ? 'bg-purple-500' :
-                          post.category === 'best-practices' ? 'bg-orange-500' :
-                          'bg-red-500'
-                        } text-white`}>
+                        <Badge className={`w-fit mb-3 bg-orange-500 text-white`}>
                           {post.category.replace('-', ' ').toUpperCase()}
                         </Badge>
-                        <h3 className="text-lg font-semibold text-white mb-3 group-hover:text-purple-400 transition-colors line-clamp-2 leading-tight">
+                        <h3 className="text-lg font-semibold text-white mb-3 group-hover:text-orange-400 transition-colors line-clamp-2 leading-tight">
                           {post.title}
                         </h3>
                         <p className="text-gray-300 text-sm mb-4 line-clamp-3 flex-1">
