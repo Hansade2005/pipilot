@@ -34,7 +34,10 @@ import {
   MousePointer2,
   Gamepad2,
   ClipboardList,
-  Key
+  Key,
+  MessageSquare,
+  Play,
+  Rocket
 } from "lucide-react"
 import Link from "next/link"
 import { ChatInput } from "@/components/chat-input"
@@ -72,15 +75,15 @@ export default function LandingPage() {
 
   const badgeItems = [
     { icon: <Gamepad2 className="w-4 h-4 text-emerald-400" />, text: "PiPilot Game Kit Now Available! 🎮" },
-    { icon: <Wand2 className="w-4 h-4 text-cyan-400" />, text: "Visual Editor Now Live! 🎨" },
-    { icon: <Database className="w-4 h-4 text-blue-400" />, text: "Introducing PiPilot DB 🎉" },
-    { icon: <Building2 className="w-4 h-4 text-purple-400" />, text: "PiPilot Enterprise now live 🚀" },
+    { icon: <Wand2 className="w-4 h-4 text-orange-400" />, text: "Visual Editor Now Live! 🎨" },
+    { icon: <Database className="w-4 h-4 text-orange-400" />, text: "Introducing PiPilot DB 🎉" },
+    { icon: <Building2 className="w-4 h-4 text-orange-300" />, text: "PiPilot Enterprise now live 🚀" },
     { icon: <Users className="w-4 h-4 text-green-400" />, text: "PiPilot Teams Coming soon 🎉" },
     { icon: <Server className="w-4 h-4 text-orange-400" />, text: "PiPilot DB MCP Server Now Live! 🚀" },
-    { icon: <Workflow className="w-4 h-4 text-indigo-400" />, text: "Teams Workspace Coming soon 🎉" },
-    { icon: <Figma className="w-4 h-4 text-pink-400" />, text: "Figma Import Coming soon 🚀" },
+    { icon: <Workflow className="w-4 h-4 text-orange-400" />, text: "Teams Workspace Coming soon 🎉" },
+    { icon: <Figma className="w-4 h-4 text-orange-300" />, text: "Figma Import Coming soon 🚀" },
     { icon: <ClipboardList className="w-4 h-4 text-yellow-400" />, text: "Project Plan & Context Now Live! 🚀" },
-    { icon: <Key className="w-4 h-4 text-cyan-400" />, text: "BYOK: Bring Your Own API Keys! 🔑" }
+    { icon: <Key className="w-4 h-4 text-orange-400" />, text: "BYOK: Bring Your Own API Keys! 🔑" }
   ]
 
   const buttonItems = [
@@ -439,9 +442,11 @@ export default function LandingPage() {
       {/* Background Grid Overlay */}
       <div className="fixed inset-0 pointer-events-none z-0 bg-grid opacity-20" />
       
-      {/* Decorative Glows */}
-      <div className="decorative-glow-purple" />
-      <div className="decorative-glow-cyan" />
+      {/* Decorative Glows - Orange brand */}
+      <div className="decorative-glow-orange-top" />
+      <div className="horizon-glow" />
+      <div className="decorative-glow-left" />
+      <div className="decorative-glow-right" />
 
       {/* Navigation */}
       <Navigation />
@@ -507,7 +512,76 @@ export default function LandingPage() {
             <img src="/e2b-badge.svg" alt="Sponsored by E2B for Startups" className="h-8 md:h-10 w-auto rounded" />
           </a>
         </div>
+
+        {/* Social Proof - Powered By Logo Bar */}
+        <div className="mt-16 mb-8 w-full max-w-3xl mx-auto">
+          <p className="text-center text-sm text-gray-500 mb-6 tracking-widest uppercase">Powered by</p>
+          <div className="flex items-center justify-center gap-8 md:gap-12 flex-wrap opacity-50">
+            <img src="/logos/anthropic.svg" alt="Anthropic" className="h-5 md:h-6 w-auto" />
+            <img src="/logos/xai.svg" alt="xAI" className="h-5 md:h-6 w-auto" />
+            <img src="/logos/mistral.svg" alt="Mistral AI" className="h-5 md:h-6 w-auto" />
+            <img src="/logos/vercel.svg" alt="Vercel" className="h-4 md:h-5 w-auto" />
+            <img src="/logos/supabase.svg" alt="Supabase" className="h-4 md:h-5 w-auto" />
+            <img src="/logos/e2b.svg" alt="E2B" className="h-5 md:h-6 w-auto" />
+          </div>
+        </div>
       </main>
+
+      {/* How It Works Section */}
+      <section className="relative z-[5] py-24 px-4">
+        <div className="max-w-5xl mx-auto">
+          <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-4">How it works</h2>
+          <p className="text-gray-400 text-center mb-16 text-lg">From idea to live app in three steps</p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
+            {/* Step 1 */}
+            <div className="relative group">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-14 h-14 rounded-2xl bg-orange-600/15 border border-orange-500/20 flex items-center justify-center mb-6 group-hover:border-orange-500/40 transition-colors">
+                  <MessageSquare className="w-6 h-6 text-orange-400" />
+                </div>
+                <div className="text-sm font-semibold text-orange-400 mb-2">01</div>
+                <h3 className="text-xl font-semibold text-white mb-3">Describe your idea</h3>
+                <p className="text-gray-400 text-sm leading-relaxed">
+                  Tell PiPilot what you want to build in plain English. Drop in screenshots, reference designs, or just describe it.
+                </p>
+              </div>
+              {/* Connector line (hidden on mobile) */}
+              <div className="hidden md:block absolute top-7 left-[calc(50%+48px)] w-[calc(100%-48px)] h-px bg-gradient-to-r from-orange-500/30 to-transparent" />
+            </div>
+
+            {/* Step 2 */}
+            <div className="relative group">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-14 h-14 rounded-2xl bg-orange-600/15 border border-orange-500/20 flex items-center justify-center mb-6 group-hover:border-orange-500/40 transition-colors">
+                  <Play className="w-6 h-6 text-orange-400" />
+                </div>
+                <div className="text-sm font-semibold text-orange-400 mb-2">02</div>
+                <h3 className="text-xl font-semibold text-white mb-3">Watch it build live</h3>
+                <p className="text-gray-400 text-sm leading-relaxed">
+                  AI writes the code in real-time. See your app come to life in the live preview as files get generated.
+                </p>
+              </div>
+              {/* Connector line (hidden on mobile) */}
+              <div className="hidden md:block absolute top-7 left-[calc(50%+48px)] w-[calc(100%-48px)] h-px bg-gradient-to-r from-orange-500/30 to-transparent" />
+            </div>
+
+            {/* Step 3 */}
+            <div className="group">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-14 h-14 rounded-2xl bg-orange-600/15 border border-orange-500/20 flex items-center justify-center mb-6 group-hover:border-orange-500/40 transition-colors">
+                  <Rocket className="w-6 h-6 text-orange-400" />
+                </div>
+                <div className="text-sm font-semibold text-orange-400 mb-2">03</div>
+                <h3 className="text-xl font-semibold text-white mb-3">Refine and ship</h3>
+                <p className="text-gray-400 text-sm leading-relaxed">
+                  Iterate with chat, click-to-edit visually, then deploy to Vercel or Netlify with one click.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Projects Section */}
       <div className="relative z-[5] w-full max-w-7xl mx-auto mb-16">
