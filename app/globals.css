@@ -624,25 +624,11 @@ body {
   }
 }
 
-@keyframes marquee-mobile {
-  0% {
-    transform: translateX(0);
-  }
-  100% {
-    transform: translateX(-33.33%);
-  }
-}
-
 .animate-marquee {
-  animation: marquee 20s linear infinite;
+  animation: marquee 25s linear infinite;
 }
 
-.animate-marquee-mobile {
-  animation: marquee-mobile 15s linear infinite;
-}
-
-.animate-marquee:hover,
-.animate-marquee-mobile:hover {
+.animate-marquee:hover {
   animation-play-state: paused;
 }
 
