@@ -443,11 +443,27 @@ export default function LandingPage() {
       {/* Background Grid Overlay */}
       <div className="fixed inset-0 pointer-events-none z-0 bg-grid opacity-20" />
       
-      {/* Decorative Glows - Orange brand */}
-      <div className="decorative-glow-orange-top" />
-      <div className="horizon-glow" />
-      <div className="decorative-glow-left" />
-      <div className="decorative-glow-right" />
+      {/* Half-Sphere Arc Background */}
+      <div className="arc-container">
+        <div className="arc-radial-glow" />
+        <div className="arc-ambient-glow" />
+        <div className="arc-ellipses">
+          <div className="arc-ellipse arc-ellipse-1" />
+          <div className="arc-ellipse arc-ellipse-2" />
+          <div className="arc-ellipse arc-ellipse-3" />
+          <div className="arc-ellipse arc-ellipse-4" />
+          <div className="arc-ellipse arc-ellipse-5" />
+        </div>
+      </div>
+
+      {/* Light Rays */}
+      <div className="light-rays-container">
+        <div className="light-ray light-ray-1" />
+        <div className="light-ray light-ray-2" />
+        <div className="light-ray light-ray-3" />
+        <div className="light-ray light-ray-4" />
+        <div className="light-ray light-ray-5" />
+      </div>
 
       {/* Floating Particles */}
       <ParticleBackground />

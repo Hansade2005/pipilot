@@ -172,60 +172,192 @@ body {
   background-size: 40px 40px;
 }
 
-/* Decorative Glows - Orange brand accent */
-.decorative-glow-orange-top {
-  position: absolute;
-  top: 10%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 600px;
-  height: 300px;
-  background: radial-gradient(ellipse at center, rgba(249, 115, 22, 0.15) 0%, transparent 70%);
-  border-radius: 50%;
-  filter: blur(80px);
+/* ===== Half-Sphere Arc Background (bolt.new inspired) ===== */
+
+/* Container for the arc system - fixed at bottom of viewport */
+.arc-container {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 100vh;
   pointer-events: none;
   z-index: 0;
+  overflow: hidden;
 }
 
-/* Bolt.new-style horizon glow arc */
-.horizon-glow {
+/* Radial glow emanating upward from the bottom center */
+.arc-radial-glow {
   position: absolute;
-  bottom: -200px;
+  bottom: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: 140%;
+  width: 200%;
+  height: 100%;
+  background: radial-gradient(
+    circle at center 800px,
+    rgba(249, 115, 22, 0.18) 0%,
+    rgba(249, 115, 22, 0.10) 14%,
+    rgba(234, 88, 12, 0.06) 18%,
+    rgba(234, 88, 12, 0.03) 22%,
+    transparent 25%
+  );
+}
+
+/* Elliptical gradient at bottom - the ambient glow behind the arc */
+.arc-ambient-glow {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: radial-gradient(
+    43.89% 25.74% at 50.02% 97.24%,
+    rgba(249, 115, 22, 0.12) 0%,
+    transparent 100%
+  );
+}
+
+/* The concentric ellipses that form the visible arc lines */
+.arc-ellipses {
+  position: absolute;
+  bottom: -60%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 160%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Shared styles for each ellipse ring */
+.arc-ellipse {
+  position: absolute;
+  border-radius: 50%;
+  border-style: solid;
+  border-bottom: none;
+}
+
+/* Outermost ellipse - faintest */
+.arc-ellipse-1 {
+  width: 100%;
+  height: 100%;
+  border-width: 1px;
+  border-color: rgba(249, 115, 22, 0.06);
+}
+
+/* Second ellipse */
+.arc-ellipse-2 {
+  width: 88%;
+  height: 88%;
+  border-width: 1px;
+  border-color: rgba(249, 115, 22, 0.10);
+}
+
+/* Third ellipse */
+.arc-ellipse-3 {
+  width: 76%;
+  height: 76%;
+  border-width: 1px;
+  border-color: rgba(249, 115, 22, 0.16);
+}
+
+/* Fourth ellipse */
+.arc-ellipse-4 {
+  width: 64%;
+  height: 64%;
+  border-width: 1px;
+  border-color: rgba(249, 115, 22, 0.25);
+}
+
+/* Innermost ellipse - brightest, with glow */
+.arc-ellipse-5 {
+  width: 52%;
+  height: 52%;
+  border-width: 1.5px;
+  border-color: rgba(249, 115, 22, 0.40);
+  box-shadow: 0 -15px 40px rgba(249, 115, 22, 0.15),
+              0 -5px 20px rgba(249, 115, 22, 0.10);
+}
+
+/* Light rays emanating from top */
+.light-rays-container {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+  opacity: 0.5;
+}
+
+.light-ray {
+  position: absolute;
+  border-radius: 100%;
+  background: radial-gradient(
+    rgba(249, 115, 22, var(--ray-opacity, 0.12)) 0%,
+    rgba(234, 88, 12, 0) 100%
+  );
+  mix-blend-mode: screen;
+}
+
+.light-ray-1 {
+  width: 480px;
+  height: 680px;
+  top: -540px;
+  left: calc(50% + 250px);
+  transform: rotate(80deg);
+  filter: blur(110px);
+  --ray-opacity: 0.10;
+}
+
+.light-ray-2 {
+  width: 110px;
   height: 400px;
-  background: radial-gradient(ellipse at 50% 100%, rgba(249, 115, 22, 0.12) 0%, rgba(234, 88, 12, 0.06) 30%, transparent 70%);
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: 0;
+  top: -280px;
+  left: calc(50% + 100px);
+  transform: rotate(-20deg);
+  filter: blur(60px);
+  --ray-opacity: 0.14;
 }
 
-/* Subtle side glows */
-.decorative-glow-left {
-  position: absolute;
-  top: 30%;
-  left: -5%;
+.light-ray-3 {
   width: 400px;
-  height: 400px;
-  background: radial-gradient(circle, rgba(249, 115, 22, 0.08) 0%, transparent 70%);
-  border-radius: 50%;
-  filter: blur(100px);
-  pointer-events: none;
-  z-index: 0;
+  height: 370px;
+  top: -350px;
+  left: calc(50% - 200px);
+  filter: blur(21px);
+  --ray-opacity: 0.08;
 }
 
-.decorative-glow-right {
-  position: absolute;
-  top: 40%;
-  right: -5%;
-  width: 350px;
-  height: 350px;
-  background: radial-gradient(circle, rgba(249, 115, 22, 0.06) 0%, transparent 70%);
-  border-radius: 50%;
-  filter: blur(100px);
-  pointer-events: none;
-  z-index: 0;
+.light-ray-4 {
+  width: 330px;
+  height: 370px;
+  top: -330px;
+  left: calc(50% - 350px);
+  filter: blur(21px);
+  --ray-opacity: 0.08;
+}
+
+.light-ray-5 {
+  width: 110px;
+  height: 400px;
+  top: -280px;
+  left: calc(50% - 200px);
+  transform: rotate(-40deg);
+  filter: blur(60px);
+  --ray-opacity: 0.14;
+}
+
+/* Responsive adjustments for mobile */
+@media (max-width: 640px) {
+  .arc-ellipses {
+    bottom: -70%;
+    width: 250%;
+  }
+  .light-rays-container {
+    opacity: 0.3;
+  }
 }
 
 @keyframes pulse-glow {
