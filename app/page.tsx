@@ -510,12 +510,12 @@ export default function LandingPage() {
       </main>
 
       {/* Projects Section */}
-      <div className="relative z-10 w-full max-w-7xl mx-auto mb-16">
+      <div className="relative z-[5] w-full max-w-7xl mx-auto mb-16">
         <ProjectGrid userProfile={userProfile} />
       </div>
 
       {/* From Pixel Community Section */}
-      <section id="template-library" className="relative z-10 py-24 bg-gray-900/30">
+      <section id="template-library" className="relative z-[5] py-24 bg-gray-900/30">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           {/* Section Header */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-12">
