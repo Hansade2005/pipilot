@@ -1,9 +1,10 @@
 "use client"
 
-import React, { useState, useRef, useEffect } from 'react'
-import { Check, Lock, ChevronDown } from 'lucide-react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
+import { Check, Lock, ChevronDown, Key } from 'lucide-react'
 import { chatModels, type ChatModel, getModelById } from '@/lib/ai-models'
 import { getLimits } from '@/lib/stripe-config'
+import type { ByokConfig, ByokProviderKey } from '@/lib/storage-manager'
 
 interface ModelSelectorProps {
   selectedModel?: string
@@ -15,6 +16,7 @@ interface ModelSelectorProps {
   dropdownAlign?: 'left' | 'right'
   dropdownDirection?: 'up' | 'down'
   dropdownClassName?: string
+  byokConfig?: ByokConfig | null
 }
 
 // Short, clean display names (like Anthropic's "Opus 4.6", "Sonnet 4.5")
@@ -67,6 +69,17 @@ const descriptionMap = new Map<string, string>([
   ['openai/o3', 'Advanced reasoning model'],
 ])
 
+// Map BYOK provider IDs to model ID prefixes
+const BYOK_PROVIDER_MODEL_PREFIXES: Record<string, string[]> = {
+  openai: ['openai/'],
+  anthropic: ['anthropic/'],
+  mistral: ['mistral/'],
+  xai: ['xai/'],
+  google: ['google/'],
+  openrouter: [], // OpenRouter unlocks all models
+  'vercel-gateway': [], // Vercel Gateway unlocks all models
+}
+
 export function ModelSelector({
   selectedModel,
   onModelChange,
@@ -77,6 +90,7 @@ export function ModelSelector({
   dropdownAlign = 'right',
   dropdownDirection = 'up',
   dropdownClassName = '',
+  byokConfig,
 }: ModelSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -85,6 +99,59 @@ export function ModelSelector({
   const isPremium = ['pro', 'creator', 'teams', 'collaborate', 'enterprise', 'scale'].includes(userPlan)
   const defaultSelectedModel: string = isPremium ? 'anthropic/claude-sonnet-4.5' : 'xai/grok-code-fast-1'
   const effectiveSelectedModel = selectedModel || defaultSelectedModel
+
+  // Determine active BYOK providers
+  const activeByokProviders = useMemo(() => {
+    if (!byokConfig?.enabled) return []
+    return byokConfig.keys.filter(k => k.enabled && k.apiKey)
+  }, [byokConfig])
+
+  const isByokActive = activeByokProviders.length > 0
+  const hasUniversalByok = activeByokProviders.some(
+    k => k.providerId === 'openrouter' || k.providerId === 'vercel-gateway'
+  )
+
+  // Collect model IDs that BYOK unlocks
+  const byokUnlockedModelIds = useMemo(() => {
+    if (!isByokActive) return new Set<string>()
+    if (hasUniversalByok) {
+      // OpenRouter or Vercel Gateway unlocks everything
+      return new Set(shortNameMap.keys())
+    }
+    const unlocked = new Set<string>()
+    for (const key of activeByokProviders) {
+      const prefixes = BYOK_PROVIDER_MODEL_PREFIXES[key.providerId]
+      if (prefixes && prefixes.length > 0) {
+        for (const [modelId] of shortNameMap) {
+          if (prefixes.some(prefix => modelId.startsWith(prefix))) {
+            unlocked.add(modelId)
+          }
+        }
+      }
+    }
+    return unlocked
+  }, [activeByokProviders, isByokActive, hasUniversalByok])
+
+  // Collect custom BYOK models (from custom providers with customModels)
+  const customByokModels = useMemo(() => {
+    if (!isByokActive) return []
+    const models: Array<{ id: string; name: string; description: string; providerLabel: string }> = []
+    for (const key of activeByokProviders) {
+      if (key.customModels && key.customModels.length > 0) {
+        for (const modelId of key.customModels) {
+          if (!shortNameMap.has(modelId)) {
+            models.push({
+              id: modelId,
+              name: modelId.split('/').pop() || modelId,
+              description: `via ${key.label || key.providerId}`,
+              providerLabel: key.label || key.providerId,
+            })
+          }
+        }
+      }
+    }
+    return models
+  }, [activeByokProviders, isByokActive])
 
   // Allowed models per plan
   let allowedModels: string[]
@@ -109,7 +176,13 @@ export function ModelSelector({
     allowedModels = userLimits.allowedModels || ['auto']
   }
 
-  const isModelAllowed = (modelId: string) => allowedModels.includes(modelId)
+  // Model is allowed if plan allows it OR BYOK unlocks it
+  const isModelAllowed = (modelId: string) =>
+    allowedModels.includes(modelId) || byokUnlockedModelIds.has(modelId)
+
+  // Check if a model is specifically unlocked by BYOK (not by plan)
+  const isByokUnlocked = (modelId: string) =>
+    !allowedModels.includes(modelId) && byokUnlockedModelIds.has(modelId)
 
   // Close on outside click
   useEffect(() => {
@@ -133,7 +206,11 @@ export function ModelSelector({
     return () => document.removeEventListener('keydown', handleKey)
   }, [isOpen])
 
-  const displayName = shortNameMap.get(effectiveSelectedModel) || effectiveSelectedModel.split('/').pop() || effectiveSelectedModel
+  const isCustomByokModel = customByokModels.some(m => m.id === effectiveSelectedModel)
+  const displayName = shortNameMap.get(effectiveSelectedModel)
+    || (isCustomByokModel ? customByokModels.find(m => m.id === effectiveSelectedModel)?.name : null)
+    || effectiveSelectedModel.split('/').pop()
+    || effectiveSelectedModel
 
   // Ordered model list for the dropdown
   const modelOrder = [
@@ -158,15 +235,20 @@ export function ModelSelector({
         onClick={() => setIsOpen(!isOpen)}
       >
         <span className="font-medium">{displayName}</span>
+        {isByokActive && (isByokUnlocked(effectiveSelectedModel) || isCustomByokModel) && (
+          <Key className="size-3 text-orange-400" />
+        )}
         <ChevronDown className={`size-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {/* Dropdown */}
       {isOpen && (
         <div className={`absolute ${dropdownDirection === 'down' ? 'top-8' : 'bottom-8'} ${dropdownAlign === 'left' ? 'left-0' : 'right-0'} w-[240px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[100] overflow-hidden ${dropdownClassName}`}>
-          <div className="max-h-[320px] overflow-y-auto py-1">
+          <div className="max-h-[380px] overflow-y-auto py-1">
+            {/* Platform models */}
             {orderedModels.map((modelId) => {
               const allowed = isModelAllowed(modelId)
+              const byokOnly = isByokUnlocked(modelId)
               const isSelected = modelId === effectiveSelectedModel
               const name = shortNameMap.get(modelId) || modelId
               const desc = descriptionMap.get(modelId) || ''
@@ -188,15 +270,54 @@ export function ModelSelector({
                     <div className={`text-sm font-medium ${isSelected ? 'text-white' : 'text-gray-200'}`}>
                       {name}
                     </div>
-                    <div className="text-[11px] text-gray-500 truncate">{desc}</div>
+                    <div className="text-[11px] text-gray-500 truncate">
+                      {byokOnly ? `${desc} (BYOK)` : desc}
+                    </div>
                   </div>
                   <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
+                    {byokOnly && <Key className="size-3 text-orange-400" />}
                     {!allowed && <Lock className="size-3 text-gray-500" />}
                     {isSelected && allowed && <Check className="size-4 text-orange-400" />}
                   </div>
                 </button>
               )
             })}
+
+            {/* Custom BYOK provider models */}
+            {customByokModels.length > 0 && (
+              <>
+                <div className="px-4 py-2 border-t border-gray-700/60">
+                  <div className="flex items-center gap-1.5 text-[11px] text-orange-400 font-medium uppercase tracking-wider">
+                    <Key className="size-3" />
+                    Your Models
+                  </div>
+                </div>
+                {customByokModels.map((model) => {
+                  const isSelected = model.id === effectiveSelectedModel
+                  return (
+                    <button
+                      key={model.id}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 text-left transition-colors hover:bg-gray-800 cursor-pointer ${isSelected ? 'bg-gray-800/50' : ''}`}
+                      onClick={() => {
+                        onModelChange(model.id)
+                        setIsOpen(false)
+                      }}
+                    >
+                      <div className="min-w-0">
+                        <div className={`text-sm font-medium ${isSelected ? 'text-white' : 'text-gray-200'}`}>
+                          {model.name}
+                        </div>
+                        <div className="text-[11px] text-gray-500 truncate">{model.description}</div>
+                      </div>
+                      <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
+                        <Key className="size-3 text-orange-400" />
+                        {isSelected && <Check className="size-4 text-orange-400" />}
+                      </div>
+                    </button>
+                  )
+                })}
+              </>
+            )}
           </div>
         </div>
       )}
