@@ -21,7 +21,7 @@ export default function FeaturesPage() {
       details: ["Conversational app creation", "Intelligent code generation", "Auto-optimization", "Smart suggestions"]
     },
     {
-      icon: <Code className="w-8 h-8 text-blue-500" />,
+      icon: <Code className="w-8 h-8 text-orange-500" />,
       title: "Visual Editor",
       description: "Drag-and-drop interface for designing beautiful user interfaces with real-time preview.",
       details: ["Component library", "Responsive design", "Custom styling", "Live preview"]
@@ -33,19 +33,19 @@ export default function FeaturesPage() {
       details: ["AI schema generation", "PostgreSQL backend", "Real-time subscriptions", "Row-level security"]
     },
     {
-      icon: <Users className="w-8 h-8 text-purple-500" />,
+      icon: <Users className="w-8 h-8 text-orange-500" />,
       title: "Team Collaboration",
       description: "Work together in real-time with your team members on projects and deployments.",
       details: ["Real-time editing", "Role-based access", "Version control", "Comment system"]
     },
     {
-      icon: <Globe className="w-8 h-8 text-indigo-500" />,
+      icon: <Globe className="w-8 h-8 text-orange-500" />,
       title: "Instant Deployment",
       description: "Deploy your apps instantly to the web with automatic hosting and scaling.",
       details: ["Vercel integration", "Netlify support", "Global CDN", "Auto-scaling"]
     },
     {
-      icon: <Smartphone className="w-8 h-8 text-pink-500" />,
+      icon: <Smartphone className="w-8 h-8 text-orange-500" />,
       title: "Multi-Framework Support",
       description: "Build with Next.js, Vite+React, or Expo for web and mobile applications.",
       details: ["Next.js App Router", "Vite+React SPA", "Expo mobile apps", "Framework migration"]
@@ -57,7 +57,7 @@ export default function FeaturesPage() {
       details: ["OAuth 2.0 auth", "Encrypted storage", "Audit logging", "GDPR compliance"]
     },
     {
-      icon: <CheckCircle className="w-8 h-8 text-teal-500" />,
+      icon: <CheckCircle className="w-8 h-8 text-orange-500" />,
       title: "Advanced Integrations",
       description: "Connect with GitHub, Supabase, Stripe, and more for complete development workflow.",
       details: ["GitHub version control", "Supabase backend", "Stripe payments", "Tavily web search"]
@@ -75,7 +75,7 @@ export default function FeaturesPage() {
       details: ["Auto-generated project docs", "Tech stack awareness", "Cross-session continuity", "Architecture documentation"]
     },
     {
-      icon: <Key className="w-8 h-8 text-cyan-500" />,
+      icon: <Key className="w-8 h-8 text-orange-500" />,
       title: "BYOK (Bring Your Own Key)",
       description: "Connect your own AI provider API keys to unlock additional models and use your own accounts.",
       details: ["7+ built-in providers", "100+ models via OpenRouter", "Custom provider support", "Local-only key storage"]
@@ -90,7 +90,7 @@ export default function FeaturesPage() {
           Discover the powerful features that make PiPilot the leading AI app builder.
           Build production-ready applications faster than ever before.
         </p>
-        <Link href="/" className="bg-blue-500 text-white px-8 py-4 rounded-lg text-lg hover:bg-blue-600 transition-colors">
+        <Link href="/" className="bg-orange-600 text-white px-8 py-4 rounded-lg text-lg hover:bg-orange-500 transition-colors">
           Start Building Free
         </Link>
       </div>
@@ -113,14 +113,14 @@ export default function FeaturesPage() {
         ))}
       </div>
 
-      <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-12 rounded-lg text-center">
+      <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-12 rounded-lg text-center">
         <h2 className="text-3xl font-bold mb-6">Ready to Experience All Features?</h2>
         <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
           Join thousands of developers who are building amazing apps with PiPilot's comprehensive feature set.
           Start with our free tier and upgrade as you grow.
         </p>
         <div className="space-x-4">
-          <Link href="/pricing" className="bg-blue-500 text-white px-8 py-4 rounded-lg text-lg hover:bg-blue-600 transition-colors">
+          <Link href="/pricing" className="bg-orange-600 text-white px-8 py-4 rounded-lg text-lg hover:bg-orange-500 transition-colors">
             View Pricing
           </Link>
           <Link href="/showcase" className="bg-gray-500 text-white px-8 py-4 rounded-lg text-lg hover:bg-gray-600 transition-colors">

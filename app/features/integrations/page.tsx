@@ -110,31 +110,31 @@ const howItWorks = [
     step: 1,
     title: "Connect Your Accounts",
     description: "Go to Account Settings and connect your preferred services using API tokens or OAuth.",
-    icon: <Settings className="w-8 h-8 text-blue-500" />
+    icon: <Settings className="w-8 h-8 text-orange-500" />
   },
   {
     step: 2,
     title: "Configure Projects",
     description: "Select repositories, projects, or configure API keys for each connected service.",
-    icon: <Code className="w-8 h-8 text-blue-500" />
+    icon: <Code className="w-8 h-8 text-orange-500" />
   },
   {
     step: 3,
     title: "Deploy & Integrate",
     description: "Use integrated tools to deploy, manage databases, or process payments seamlessly.",
-    icon: <Rocket className="w-8 h-8 text-blue-500" />
+    icon: <Rocket className="w-8 h-8 text-orange-500" />
   },
   {
     step: 4,
     title: "Monitor & Manage",
     description: "Track deployments, manage subscriptions, and monitor your integrated services.",
-    icon: <Globe className="w-8 h-8 text-blue-500" />
+    icon: <Globe className="w-8 h-8 text-orange-500" />
   },
   {
     step: 5,
     title: "Scale Automatically",
     description: "Your integrations scale with your needs, from development to production environments.",
-    icon: <Zap className="w-8 h-8 text-blue-500" />
+    icon: <Zap className="w-8 h-8 text-orange-500" />
   }
 ]
 
@@ -172,7 +172,7 @@ const serviceDetails = [
     icon: <StripeIcon className="w-8 h-8" />,
     description: "Payment processing and subscription management",
     features: ["Payment intents", "Subscriptions", "Webhooks", "Refunds"],
-    color: "bg-purple-500"
+    color: "bg-orange-500"
   }
 ]
 
@@ -180,7 +180,7 @@ const useCases = [
   {
     title: "Full-Stack Development",
     description: "Build complete applications with integrated databases, payments, and hosting.",
-    icon: <Server className="w-6 h-6 text-blue-500" />
+    icon: <Server className="w-6 h-6 text-orange-500" />
   },
   {
     title: "E-commerce Platforms",
@@ -190,7 +190,7 @@ const useCases = [
   {
     title: "SaaS Applications",
     description: "Build subscription-based apps with user management and billing.",
-    icon: <Target className="w-6 h-6 text-purple-500" />
+    icon: <Target className="w-6 h-6 text-orange-500" />
   },
   {
     title: "API-First Development",
@@ -211,8 +211,8 @@ export default function IntegrationsPage() {
       <section className="relative pt-32 pb-20 overflow-hidden">
         {/* Background Effects */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-20 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
-          <div className="absolute bottom-20 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
+          <div className="absolute top-20 left-1/4 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-20 right-1/4 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl" />
         </div>
 
         <div className="container mx-auto px-4 relative z-10">
@@ -222,12 +222,12 @@ export default function IntegrationsPage() {
             transition={{ duration: 0.5 }}
             className="text-center max-w-4xl mx-auto"
           >
-            <Badge className="mb-4 bg-blue-500/10 text-blue-600 border-blue-500/20">
+            <Badge className="mb-4 bg-orange-500/10 text-orange-600 border-orange-500/20">
               <Zap className="w-3 h-3 mr-1" />
               Powerful Integrations
             </Badge>
             
-            <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+            <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent">
               Seamless Integrations
             </h1>
             <br></br>
@@ -238,7 +238,7 @@ export default function IntegrationsPage() {
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/workspace/account">
-                <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 gap-2">
+                <Button size="lg" className="bg-orange-600 hover:bg-orange-500 gap-2">
                   <Settings className="w-4 h-4" />
                   Connect Services
                 </Button>
@@ -298,9 +298,9 @@ export default function IntegrationsPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: index * 0.1 }}
                   >
-                    <Card className="h-full hover:border-blue-500/50 transition-colors">
+                    <Card className="h-full hover:border-orange-500/50 transition-colors">
                       <CardHeader>
-                        <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500 mb-4">
+                        <div className="w-12 h-12 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-500 mb-4">
                           {integration.icon}
                         </div>
                         <CardTitle className="text-lg">{integration.title}</CardTitle>
@@ -348,9 +348,9 @@ export default function IntegrationsPage() {
                       className="flex gap-6 items-start"
                     >
                       <div className="flex-shrink-0">
-                        <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center relative">
+                        <div className="w-16 h-16 rounded-full bg-orange-500/10 flex items-center justify-center relative">
                           {step.icon}
-                          <span className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center font-bold">
+                          <span className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-orange-500 text-white text-xs flex items-center justify-center font-bold">
                             {step.step}
                           </span>
                         </div>
@@ -367,7 +367,7 @@ export default function IntegrationsPage() {
                 </div>
 
                 {/* Quick Start Guide */}
-                <Card className="mt-12 border-blue-500/20 bg-blue-500/5">
+                <Card className="mt-12 border-orange-500/20 bg-orange-500/5">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Lightbulb className="w-5 h-5 text-yellow-500" />
@@ -445,7 +445,7 @@ export default function IntegrationsPage() {
                 <Card className="mt-12">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <RefreshCw className="w-5 h-5 text-blue-500" />
+                      <RefreshCw className="w-5 h-5 text-orange-500" />
                       Auto-Configuration
                     </CardTitle>
                   </CardHeader>
@@ -525,7 +525,7 @@ export default function IntegrationsPage() {
                   ))}
                 </div>
 
-                <Card className="mt-12 border-blue-500/20 bg-blue-500/5">
+                <Card className="mt-12 border-orange-500/20 bg-orange-500/5">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Star className="w-5 h-5 text-yellow-500" />
@@ -562,7 +562,7 @@ export default function IntegrationsPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-pink-600/10">
+      <section className="py-20 bg-gradient-to-r from-orange-500/10 to-orange-600/10">
         <div className="container mx-auto px-4 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -579,7 +579,7 @@ export default function IntegrationsPage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/workspace/account">
-                <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 gap-2">
+                <Button size="lg" className="bg-orange-600 hover:bg-orange-500 gap-2">
                   <Settings className="w-4 h-4" />
                   Manage Integrations
                 </Button>
