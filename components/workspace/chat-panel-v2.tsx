@@ -1654,41 +1654,6 @@ export function ChatPanelV2({
     reasoningPosition?: number // Character position in reasoning when tool was called
   }>>>(new Map())
 
-  // Derive plan steps as todos from activeToolCalls (generate_plan + update_plan_progress)
-  const planTodos = useMemo(() => {
-    let latestPlanSteps: Array<{ title: string; description: string }> = []
-    const completedStepNums = new Set<number>()
-
-    for (const [, toolCalls] of activeToolCalls) {
-      for (const tc of toolCalls) {
-        if (tc.toolName === 'generate_plan' && tc.input?.steps) {
-          latestPlanSteps = tc.input.steps
-        }
-        if (tc.toolName === 'update_plan_progress' && tc.input?.stepNumber && tc.status === 'completed') {
-          completedStepNums.add(tc.input.stepNumber)
-        }
-      }
-    }
-
-    if (latestPlanSteps.length === 0) return []
-
-    let firstPendingFound = false
-    return latestPlanSteps.map((step, idx) => {
-      const stepNum = idx + 1
-      const isCompleted = completedStepNums.has(stepNum)
-      let status: 'pending' | 'in_progress' | 'completed' = 'pending'
-
-      if (isCompleted) {
-        status = 'completed'
-      } else if (isLoading && !firstPendingFound) {
-        status = 'in_progress'
-        firstPendingFound = true
-      }
-
-      return { title: step.title, description: step.description, status, stepNumber: stepNum }
-    })
-  }, [activeToolCalls, isLoading])
-
   // ABE Credit balance state
   const [creditBalance, setCreditBalance] = useState<number | null>(null)
   const [currentPlan, setCurrentPlan] = useState<string>('free')
@@ -1715,6 +1680,47 @@ export function ChatPanelV2({
   const [streamingContent, setStreamingContent] = useState<string>('')
   const [streamingReasoning, setStreamingReasoning] = useState<string>('')
   const [streamingToolCalls, setStreamingToolCalls] = useState<any[]>([])
+
+  // Derive plan steps as todos from the CURRENT streaming message's tool calls only.
+  // Historical plan data is already shown by PlanCard (which reads .pipilot/plan.md in real-time).
+  // This queue display is only for live progress during active streaming.
+  const planTodos = useMemo(() => {
+    // Only show plan steps while actively streaming a message
+    if (!isLoading || !streamingMessageId) return []
+
+    const currentToolCalls = activeToolCalls.get(streamingMessageId)
+    if (!currentToolCalls) return []
+
+    let latestPlanSteps: Array<{ title: string; description: string }> = []
+    const completedStepNums = new Set<number>()
+
+    for (const tc of currentToolCalls) {
+      if (tc.toolName === 'generate_plan' && tc.input?.steps) {
+        latestPlanSteps = tc.input.steps
+      }
+      if (tc.toolName === 'update_plan_progress' && tc.input?.stepNumber && tc.status === 'completed') {
+        completedStepNums.add(tc.input.stepNumber)
+      }
+    }
+
+    if (latestPlanSteps.length === 0) return []
+
+    let firstPendingFound = false
+    return latestPlanSteps.map((step, idx) => {
+      const stepNum = idx + 1
+      const isCompleted = completedStepNums.has(stepNum)
+      let status: 'pending' | 'in_progress' | 'completed' = 'pending'
+
+      if (isCompleted) {
+        status = 'completed'
+      } else if (!firstPendingFound) {
+        status = 'in_progress'
+        firstPendingFound = true
+      }
+
+      return { title: step.title, description: step.description, status, stepNumber: stepNum }
+    })
+  }, [activeToolCalls, isLoading, streamingMessageId])
 
   // Message actions state
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
