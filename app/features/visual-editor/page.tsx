@@ -79,31 +79,31 @@ const howItWorks = [
     step: 1,
     title: "Enable Visual Editor",
     description: "Click the 'Visual Editor' toggle in your workspace to activate the editing mode.",
-    icon: <Eye className="w-8 h-8 text-violet-500" />
+    icon: <Eye className="w-8 h-8 text-orange-500" />
   },
   {
     step: 2,
     title: "Select an Element",
     description: "Click any element in your app preview. A selection overlay appears showing what you've selected.",
-    icon: <MousePointer2 className="w-8 h-8 text-violet-500" />
+    icon: <MousePointer2 className="w-8 h-8 text-orange-500" />
   },
   {
     step: 3,
     title: "Edit Properties",
     description: "Use the sidebar panels to modify styles, layout, spacing, typography, and more.",
-    icon: <Settings className="w-8 h-8 text-violet-500" />
+    icon: <Settings className="w-8 h-8 text-orange-500" />
   },
   {
     step: 4,
     title: "Preview in Real-time",
     description: "Watch your changes appear instantly in the live preview as you adjust properties.",
-    icon: <Monitor className="w-8 h-8 text-violet-500" />
+    icon: <Monitor className="w-8 h-8 text-orange-500" />
   },
   {
     step: 5,
     title: "Save Changes",
     description: "Click 'Apply Changes' to save your edits directly to the source code files.",
-    icon: <Save className="w-8 h-8 text-violet-500" />
+    icon: <Save className="w-8 h-8 text-orange-500" />
   }
 ]
 
@@ -159,8 +159,8 @@ export default function VisualEditorPage() {
       <section className="relative pt-32 pb-20 overflow-hidden">
         {/* Background Effects */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-20 left-1/4 w-96 h-96 bg-violet-500/10 rounded-full blur-3xl" />
-          <div className="absolute bottom-20 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
+          <div className="absolute top-20 left-1/4 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-20 right-1/4 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl" />
         </div>
 
         <div className="container mx-auto px-4 relative z-10">
@@ -170,12 +170,12 @@ export default function VisualEditorPage() {
             transition={{ duration: 0.5 }}
             className="text-center max-w-4xl mx-auto"
           >
-            <Badge className="mb-4 bg-violet-500/10 text-violet-600 border-violet-500/20">
+            <Badge className="mb-4 bg-orange-500/10 text-orange-600 border-orange-500/20">
               <Sparkles className="w-3 h-3 mr-1" />
               New Feature
             </Badge>
             
-            <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+            <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent">
               Visual Editor
             </h1>
             
@@ -186,7 +186,7 @@ export default function VisualEditorPage() {
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/workspace">
-                <Button size="lg" className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 gap-2">
+                <Button size="lg" className="bg-orange-600 hover:bg-orange-500 gap-2">
                   <Play className="w-4 h-4" />
                   Try Visual Editor Now
                 </Button>
@@ -205,8 +205,8 @@ export default function VisualEditorPage() {
             transition={{ duration: 0.7, delay: 0.2 }}
             className="mt-16 relative"
           >
-            <div className="relative rounded-xl overflow-hidden border border-violet-500/20 shadow-2xl shadow-violet-500/10">
-              <div className="aspect-video bg-gradient-to-br from-violet-950/50 to-purple-950/50">
+            <div className="relative rounded-xl overflow-hidden border border-orange-500/20 shadow-2xl shadow-orange-500/10">
+              <div className="aspect-video bg-gradient-to-br from-orange-950/50 to-orange-900/50">
                 <iframe
                   src="https://drive.google.com/file/d/1itLVYWFtqnLfJaYLEgOArlYb3cWpC31V/preview"
                   width="100%"
@@ -224,7 +224,7 @@ export default function VisualEditorPage() {
                 className="absolute top-8 right-8 bg-card/80 backdrop-blur border rounded-lg p-3 shadow-lg"
               >
                 <div className="flex items-center gap-2 text-sm">
-                  <Palette className="w-4 h-4 text-violet-500" />
+                  <Palette className="w-4 h-4 text-orange-500" />
                   <span>Styles Panel</span>
                 </div>
               </motion.div>
@@ -235,7 +235,7 @@ export default function VisualEditorPage() {
                 className="absolute bottom-8 left-8 bg-card/80 backdrop-blur border rounded-lg p-3 shadow-lg"
               >
                 <div className="flex items-center gap-2 text-sm">
-                  <Type className="w-4 h-4 text-violet-500" />
+                  <Type className="w-4 h-4 text-orange-500" />
                   <span>Typography</span>
                 </div>
               </motion.div>
@@ -265,9 +265,9 @@ export default function VisualEditorPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: index * 0.1 }}
                   >
-                    <Card className="h-full hover:border-violet-500/50 transition-colors">
+                    <Card className="h-full hover:border-orange-500/50 transition-colors">
                       <CardHeader>
-                        <div className="w-12 h-12 rounded-lg bg-violet-500/10 flex items-center justify-center text-violet-500 mb-4">
+                        <div className="w-12 h-12 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-500 mb-4">
                           {feature.icon}
                         </div>
                         <CardTitle className="text-lg">{feature.title}</CardTitle>
@@ -321,9 +321,9 @@ export default function VisualEditorPage() {
                       className="flex gap-6 items-start"
                     >
                       <div className="flex-shrink-0">
-                        <div className="w-16 h-16 rounded-full bg-violet-500/10 flex items-center justify-center relative">
+                        <div className="w-16 h-16 rounded-full bg-orange-500/10 flex items-center justify-center relative">
                           {step.icon}
-                          <span className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-violet-500 text-white text-xs flex items-center justify-center font-bold">
+                          <span className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-orange-500 text-white text-xs flex items-center justify-center font-bold">
                             {step.step}
                           </span>
                         </div>
@@ -340,7 +340,7 @@ export default function VisualEditorPage() {
                 </div>
 
                 {/* Pro Tips */}
-                <Card className="mt-12 border-violet-500/20 bg-violet-500/5">
+                <Card className="mt-12 border-orange-500/20 bg-orange-500/5">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Lightbulb className="w-5 h-5 text-yellow-500" />
@@ -460,11 +460,11 @@ export default function VisualEditorPage() {
                       <Card className="h-full">
                         <CardHeader>
                           <CardTitle className="text-lg flex items-center gap-2">
-                            {group.category === "Colors" && <Palette className="w-4 h-4 text-violet-500" />}
-                            {group.category === "Typography" && <Type className="w-4 h-4 text-violet-500" />}
-                            {group.category === "Layout" && <Layout className="w-4 h-4 text-violet-500" />}
-                            {group.category === "Spacing" && <Move className="w-4 h-4 text-violet-500" />}
-                            {group.category === "Borders" && <Layers className="w-4 h-4 text-violet-500" />}
+                            {group.category === "Colors" && <Palette className="w-4 h-4 text-orange-500" />}
+                            {group.category === "Typography" && <Type className="w-4 h-4 text-orange-500" />}
+                            {group.category === "Layout" && <Layout className="w-4 h-4 text-orange-500" />}
+                            {group.category === "Spacing" && <Move className="w-4 h-4 text-orange-500" />}
+                            {group.category === "Borders" && <Layers className="w-4 h-4 text-orange-500" />}
                             {group.category}
                           </CardTitle>
                         </CardHeader>
@@ -483,10 +483,10 @@ export default function VisualEditorPage() {
                   ))}
                 </div>
 
-                <Card className="mt-12 border-violet-500/20 bg-violet-500/5">
+                <Card className="mt-12 border-orange-500/20 bg-orange-500/5">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <Code className="w-5 h-5 text-violet-500" />
+                      <Code className="w-5 h-5 text-orange-500" />
                       Tailwind CSS Integration
                     </CardTitle>
                   </CardHeader>
@@ -522,7 +522,7 @@ export default function VisualEditorPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-r from-violet-600/10 via-purple-600/10 to-pink-600/10">
+      <section className="py-20 bg-gradient-to-r from-orange-500/10 to-orange-600/10">
         <div className="container mx-auto px-4 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -538,7 +538,7 @@ export default function VisualEditorPage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/workspace">
-                <Button size="lg" className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 gap-2">
+                <Button size="lg" className="bg-orange-600 hover:bg-orange-500 gap-2">
                   <Rocket className="w-4 h-4" />
                   Open Workspace
                 </Button>

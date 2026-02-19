@@ -188,13 +188,13 @@ console.log('User created:', data);`
         {/* Hero Section */}
         <section className="pt-32 pb-20 px-4">
           <div className="container mx-auto max-w-6xl text-center">
-            <Badge className="mb-4 bg-purple-500/20 text-purple-300 border-purple-500/30">
+            <Badge className="mb-4 bg-orange-500/20 text-orange-300 border-orange-500/30">
               🎉 Database as a Service
             </Badge>
             <h1 className="text-5xl md:text-7xl font-bold text-white mb-6">
               PostgreSQL databases
               <br />
-              <span className="bg-gradient-to-r from-purple-400 to-pink-400 text-transparent bg-clip-text">
+              <span className="bg-gradient-to-r from-orange-400 to-orange-500 text-transparent bg-clip-text">
                 powered by AI
               </span>
             </h1>
@@ -204,7 +204,7 @@ console.log('User created:', data);`
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/auth/signup">
-                <Button size="lg" className="bg-purple-600 hover:bg-purple-700 text-white">
+                <Button size="lg" className="bg-orange-600 hover:bg-orange-500 text-white">
                   Start Building Free
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
@@ -267,7 +267,7 @@ console.log('User created:', data);`
                   <div className="text-xs text-gray-400">Intelligent retry with backoff</div>
                 </div>
                 <div className="bg-gray-800/30 rounded-lg p-4 border border-gray-700/50">
-                  <Shield className="h-6 w-6 text-blue-400 mx-auto mb-2" />
+                  <Shield className="h-6 w-6 text-orange-400 mx-auto mb-2" />
                   <div className="text-sm font-semibold text-white mb-1">Type-Safe Operations</div>
                   <div className="text-xs text-gray-400">Catch errors at compile time</div>
                 </div>
@@ -303,7 +303,7 @@ console.log('User created:', data);`
                     key={index}
                     onClick={() => setSelectedLanguage(index)}
                     className={`px-6 py-3 text-sm font-medium transition-colors ${selectedLanguage === index
-                      ? 'text-white bg-gray-700/50 border-b-2 border-purple-500'
+                      ? 'text-white bg-gray-700/50 border-b-2 border-orange-500'
                       : 'text-gray-400 hover:text-white'
                       }`}
                   >
@@ -323,10 +323,10 @@ console.log('User created:', data);`
         </section>
 
         {/* MCP Server Section */}
-        <section className="py-20 px-4 bg-gradient-to-br from-purple-900/20 to-blue-900/20">
+        <section className="py-20 px-4 bg-gradient-to-br from-orange-900/20 to-orange-800/20">
           <div className="container mx-auto max-w-6xl">
             <div className="text-center mb-16">
-              <Badge className="mb-4 bg-purple-500/20 text-purple-300 border-purple-500/30">
+              <Badge className="mb-4 bg-orange-500/20 text-orange-300 border-orange-500/30">
                 🚀 Now Live
               </Badge>
               <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
@@ -342,7 +342,7 @@ console.log('User created:', data);`
               <Card className="bg-gray-800/50 border-gray-700">
                 <CardHeader>
                   <CardTitle className="text-white flex items-center gap-2">
-                    <Brain className="w-5 h-5 text-purple-400" />
+                    <Brain className="w-5 h-5 text-orange-400" />
                     Natural Language Queries
                   </CardTitle>
                   <CardDescription>
@@ -370,7 +370,7 @@ console.log('User created:', data);`
               <Card className="bg-gray-800/50 border-gray-700">
                 <CardHeader>
                   <CardTitle className="text-white flex items-center gap-2">
-                    <Server className="w-5 h-5 text-blue-400" />
+                    <Server className="w-5 h-5 text-orange-400" />
                     MCP Server Ready
                   </CardTitle>
                   <CardDescription>
@@ -398,7 +398,7 @@ console.log('User created:', data);`
 
             <div className="text-center">
               <Link href="/docs/mcp-server-integration">
-                <Button size="lg" className="bg-purple-600 hover:bg-purple-700 text-white">
+                <Button size="lg" className="bg-orange-600 hover:bg-orange-500 text-white">
                   Setup MCP Integration
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
@@ -421,9 +421,9 @@ console.log('User created:', data);`
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {features.map((feature, index) => (
-                <Card key={index} className="bg-gray-800/50 border-gray-700 hover:border-purple-500/50 transition-colors">
+                <Card key={index} className="bg-gray-800/50 border-gray-700 hover:border-orange-500/30 transition-colors">
                   <CardHeader>
-                    <feature.icon className="h-8 w-8 text-purple-400 mb-4" />
+                    <feature.icon className="h-8 w-8 text-orange-400 mb-4" />
                     <CardTitle className="text-white">{feature.title}</CardTitle>
                     <CardDescription className="text-gray-400">
                       {feature.description}
@@ -512,7 +512,7 @@ console.log('User created:', data);`
               Join thousands of developers building with our database platform
             </p>
             <Link href="/auth/signup">
-              <Button size="lg" className="bg-purple-600 hover:bg-purple-700 text-white">
+              <Button size="lg" className="bg-orange-600 hover:bg-orange-500 text-white">
                 Get Started Free
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
