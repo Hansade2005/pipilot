@@ -1579,7 +1579,7 @@ function AccountSettingsPageContent() {
                   <CardTitle className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       {cloudSyncEnabled ? (
-                        <Cloud className="h-5 w-5 text-blue-500" />
+                        <Cloud className="h-5 w-5 text-orange-500" />
                       ) : (
                         <CloudOff className="h-5 w-5 text-muted-foreground" />
                       )}
@@ -1625,7 +1625,7 @@ function AccountSettingsPageContent() {
                       <div className="flex items-center justify-between">
                         <p className="font-medium">Manual Backup</p>
                         {backupStatus === "syncing" && (
-                          <RefreshCw className="h-4 w-4 animate-spin text-blue-500" />
+                          <RefreshCw className="h-4 w-4 animate-spin text-orange-500" />
                         )}
                         {backupStatus === "success" && (
                           <CheckCircle className="h-4 w-4 text-green-500" />
@@ -1760,7 +1760,7 @@ function AccountSettingsPageContent() {
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                               <div className={`w-2 h-2 rounded-full ${subscription.status === 'active' ? 'bg-green-500' :
-                                  subscription.status === 'trialing' ? 'bg-blue-500' :
+                                  subscription.status === 'trialing' ? 'bg-orange-500' :
                                     subscription.status === 'past_due' ? 'bg-yellow-500' : 'bg-red-500'
                                 }`} />
                               <div>
@@ -1915,7 +1915,7 @@ function AccountSettingsPageContent() {
                         {connections.github.connected ? (
                           "Your token is securely stored. Click disconnect to change it."
                         ) : (
-                          <>Need a token? <a href="https://github.com/settings/tokens/new?description=Pipilot%20(repo%20workflow)&scopes=repo,workflow,user,delete_repo" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Create one here</a></>
+                          <>Need a token? <a href="https://github.com/settings/tokens/new?description=Pipilot%20(repo%20workflow)&scopes=repo,workflow,user,delete_repo" target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300 hover:underline">Create one here</a></>
                         )}
                       </p>
                     </div>
@@ -2008,7 +2008,7 @@ function AccountSettingsPageContent() {
                         {connections.vercel.connected ? (
                           "Your token is securely stored. Click disconnect to change it."
                         ) : (
-                          <>Need a token? <a href="https://vercel.com/account/tokens" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Create one here</a></>
+                          <>Need a token? <a href="https://vercel.com/account/tokens" target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300 hover:underline">Create one here</a></>
                         )}
                       </p>
                     </div>
@@ -2101,7 +2101,7 @@ function AccountSettingsPageContent() {
                         {connections.netlify.connected ? (
                           "Your token is securely stored. Click disconnect to change it."
                         ) : (
-                          <>Need a token? <a href="https://app.netlify.com/user/applications#personal-access-tokens" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Create one here</a></>
+                          <>Need a token? <a href="https://app.netlify.com/user/applications#personal-access-tokens" target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300 hover:underline">Create one here</a></>
                         )}
                       </p>
                     </div>
@@ -2310,11 +2310,11 @@ function AccountSettingsPageContent() {
                         ) : (
                           <>
                             Enter your Supabase Management API token from{" "}
-                            <a href="https://supabase.com/dashboard/account/tokens" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                            <a href="https://supabase.com/dashboard/account/tokens" target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300 hover:underline">
                               supabase.com/dashboard/account/tokens
                             </a>{" "}
                             or use{" "}
-                            <a href="https://api.optimaai.cc/supabase-auth/login" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                            <a href="https://api.optimaai.cc/supabase-auth/login" target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300 hover:underline">
                               OAuth login
                             </a>
                           </>
@@ -2405,7 +2405,7 @@ function AccountSettingsPageContent() {
                         ) : (
                           <>
                             Enter your Stripe Secret Key from{" "}
-                            <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                            <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300 hover:underline">
                               dashboard.stripe.com/apikeys
                             </a>
                           </>

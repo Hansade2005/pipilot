@@ -583,7 +583,7 @@ export default function ManagementPage() {
           {/* Stats Bar */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
             {[
-              { label: 'Total Projects', value: projects.length, icon: Box, color: 'text-blue-400', bg: 'bg-blue-500/10' },
+              { label: 'Total Projects', value: projects.length, icon: Box, color: 'text-orange-400', bg: 'bg-orange-500/10' },
               { label: 'Deployed', value: deployedCount, icon: Rocket, color: 'text-green-400', bg: 'bg-green-500/10' },
               { label: 'Env Variables', value: totalEnvVars, icon: Key, color: 'text-amber-400', bg: 'bg-amber-500/10' },
               { label: 'Integrations', value: projects.filter(p => p.githubRepoUrl).length, icon: Plug, color: 'text-purple-400', bg: 'bg-purple-500/10' },
@@ -967,7 +967,7 @@ export default function ManagementPage() {
               </div>
               <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
                 <div className="flex items-center justify-between mb-3">
-                  <Lock className="h-5 w-5 text-blue-400" />
+                  <Lock className="h-5 w-5 text-orange-400" />
                 </div>
                 <p className="text-3xl font-bold text-white">AES-256</p>
                 <p className="text-xs text-gray-500 mt-1">Encryption at rest</p>

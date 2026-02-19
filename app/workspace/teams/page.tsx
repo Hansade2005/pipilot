@@ -519,7 +519,7 @@ export default function TeamsPage() {
       case 'owner':
         return <Badge className="bg-purple-500"><Crown className="h-3 w-3 mr-1" />Owner</Badge>
       case 'admin':
-        return <Badge className="bg-blue-500"><Shield className="h-3 w-3 mr-1" />Admin</Badge>
+        return <Badge className="bg-orange-600"><Shield className="h-3 w-3 mr-1" />Admin</Badge>
       case 'editor':
         return <Badge variant="secondary"><Edit2 className="h-3 w-3 mr-1" />Editor</Badge>
       case 'viewer':
@@ -732,7 +732,7 @@ export default function TeamsPage() {
                               onClick={() => router.push(`/workspace`)}
                             >
                               <div className="flex items-center gap-3">
-                                <Folder className="h-5 w-5 text-blue-500" />
+                                <Folder className="h-5 w-5 text-orange-500" />
                                 <div>
                                   <div className="font-medium">{workspace.name}</div>
                                   <div className="text-sm text-muted-foreground">
