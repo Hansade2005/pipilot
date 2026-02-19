@@ -539,7 +539,7 @@ export default function ProjectPage() {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <div className="h-12 w-12 rounded-full border-2 border-indigo-500/20 border-t-indigo-500 animate-spin" />
+          <div className="h-12 w-12 rounded-full border-2 border-orange-500/20 border-t-orange-500 animate-spin" />
           <p className="text-gray-400 text-sm">Loading project...</p>
         </div>
       </div>
@@ -556,7 +556,7 @@ export default function ProjectPage() {
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">Project Not Found</h1>
           <p className="text-gray-400 mb-6 text-sm">The project doesn't exist or you don't have access.</p>
-          <Button onClick={() => router.push('/workspace/management')} className="bg-indigo-600 hover:bg-indigo-500">
+          <Button onClick={() => router.push('/workspace/management')} className="bg-orange-600 hover:bg-orange-500">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Projects
           </Button>
@@ -572,7 +572,7 @@ export default function ProjectPage() {
 
       {/* Project Header */}
       <div className="relative border-b border-gray-800/50">
-        <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/5 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-b from-orange-500/5 via-transparent to-transparent" />
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-6">
           {/* Back button */}
           <button
@@ -586,7 +586,7 @@ export default function ProjectPage() {
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="flex items-start gap-4">
               <div className="p-3 rounded-xl bg-gray-900 border border-gray-800 shrink-0">
-                <Globe className="h-6 w-6 text-indigo-400" />
+                <Globe className="h-6 w-6 text-orange-400" />
               </div>
               <div>
                 <div className="flex items-center gap-3">
@@ -605,7 +605,7 @@ export default function ProjectPage() {
                     href={project.vercelDeploymentUrl || project.netlifyDeploymentUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 mt-2 transition-colors"
+                    className="inline-flex items-center gap-1.5 text-xs text-orange-400 hover:text-orange-300 mt-2 transition-colors"
                   >
                     <ExternalLink className="h-3 w-3" />
                     {(project.vercelDeploymentUrl || project.netlifyDeploymentUrl || '').replace(/^https?:\/\//, '')}
@@ -627,7 +627,7 @@ export default function ProjectPage() {
               <Button
                 onClick={() => deployProject(true)}
                 disabled={isDeploying}
-                className="bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-500/20 h-9 text-sm"
+                className="bg-orange-600 hover:bg-orange-500 shadow-lg shadow-orange-500/20 h-9 text-sm"
               >
                 {isDeploying && deploymentType === 'production' ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Rocket className="h-4 w-4 mr-2" />}
                 Deploy
@@ -638,9 +638,9 @@ export default function ProjectPage() {
           {/* Quick Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
             {[
-              { label: 'Deployments', value: project.deployments.length, icon: Rocket, color: 'text-blue-400' },
+              { label: 'Deployments', value: project.deployments.length, icon: Rocket, color: 'text-orange-400' },
               { label: 'Env Variables', value: project.environmentVariables.length, icon: Key, color: 'text-amber-400' },
-              { label: 'MCP Servers', value: mcpServers.length, icon: Server, color: 'text-purple-400' },
+              { label: 'MCP Servers', value: mcpServers.length, icon: Server, color: 'text-orange-400' },
               { label: 'Last Activity', value: new Date(project.lastActivity).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), icon: Clock, color: 'text-gray-400' },
             ].map((stat) => (
               <div key={stat.label} className="flex items-center gap-3 p-3 rounded-xl bg-gray-900/50 border border-gray-800/50">
@@ -715,7 +715,7 @@ export default function ProjectPage() {
                       <Separator className="bg-gray-800" />
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-400">URL</span>
-                        <a href={project.vercelDeploymentUrl || project.netlifyDeploymentUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
+                        <a href={project.vercelDeploymentUrl || project.netlifyDeploymentUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-orange-400 hover:text-orange-300 flex items-center gap-1">
                           Visit <ExternalLink className="h-3 w-3" />
                         </a>
                       </div>
@@ -738,7 +738,7 @@ export default function ProjectPage() {
                       <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-800/50 border border-gray-800">
                         <Github className="h-5 w-5 text-white" />
                         <div className="min-w-0 flex-1">
-                          <a href={project.githubRepoUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-indigo-400 hover:text-indigo-300 truncate block">
+                          <a href={project.githubRepoUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-orange-400 hover:text-orange-300 truncate block">
                             {project.githubRepoUrl.replace('https://github.com/', '')}
                           </a>
                         </div>
@@ -780,7 +780,7 @@ export default function ProjectPage() {
                           {deployment.status === 'ready' || deployment.status === 'deployed' ? (
                             <CheckCircle className="h-4 w-4 text-green-400 shrink-0" />
                           ) : deployment.status === 'in_progress' ? (
-                            <RefreshCw className="h-4 w-4 text-blue-400 animate-spin shrink-0" />
+                            <RefreshCw className="h-4 w-4 text-orange-400 animate-spin shrink-0" />
                           ) : (
                             <AlertCircle className="h-4 w-4 text-red-400 shrink-0" />
                           )}
@@ -807,14 +807,14 @@ export default function ProjectPage() {
               >
                 <div className="px-5 py-4 border-b border-gray-800/50 flex items-center justify-between">
                   <h3 className="font-semibold text-white text-sm flex items-center gap-2">
-                    <Database className="h-4 w-4 text-purple-400" />
+                    <Database className="h-4 w-4 text-orange-400" />
                     Database
                   </h3>
-                  <Badge variant="outline" className="text-[10px] h-5 border-purple-500/30 text-purple-400">Manage</Badge>
+                  <Badge variant="outline" className="text-[10px] h-5 border-orange-500/30 text-orange-400">Manage</Badge>
                 </div>
                 <div className="p-5">
                   <p className="text-sm text-gray-400 mb-4">Create and manage databases for this project</p>
-                  <Button className="w-full bg-purple-600 hover:bg-purple-500 h-9 text-sm" onClick={(e) => { e.stopPropagation(); router.push(`/workspace/${project.id}/database`) }}>
+                  <Button className="w-full bg-orange-600 hover:bg-orange-500 h-9 text-sm" onClick={(e) => { e.stopPropagation(); router.push(`/workspace/${project.id}/database`) }}>
                     <Database className="h-4 w-4 mr-2" />
                     Open Database Manager
                   </Button>
@@ -877,7 +877,7 @@ export default function ProjectPage() {
                   <Switch checked={newEnvVar.isSecret} onCheckedChange={(checked) => setNewEnvVar(prev => ({ ...prev, isSecret: checked }))} />
                   <span className="text-xs text-gray-400">Secret</span>
                 </label>
-                <Button onClick={addEnvironmentVariable} className="bg-indigo-600 hover:bg-indigo-500 h-9 text-sm ml-auto">
+                <Button onClick={addEnvironmentVariable} className="bg-orange-600 hover:bg-orange-500 h-9 text-sm ml-auto">
                   <Plus className="h-3.5 w-3.5 mr-1.5" />
                   Add
                 </Button>
@@ -897,7 +897,7 @@ export default function ProjectPage() {
                   {project.environmentVariables.map((envVar, idx) => (
                     <div key={idx} className="flex items-center justify-between px-5 py-3 hover:bg-gray-800/30 transition-colors group">
                       <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <code className="text-sm text-indigo-400 font-mono">{envVar.key}</code>
+                        <code className="text-sm text-orange-400 font-mono">{envVar.key}</code>
                         <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-gray-700 text-gray-500 shrink-0">{envVar.environment}</Badge>
                       </div>
                       <div className="flex items-center gap-2">
@@ -947,7 +947,7 @@ export default function ProjectPage() {
                     Export
                   </Button>
                 )}
-                <Button onClick={() => setIsAddMCPOpen(true)} className="bg-indigo-600 hover:bg-indigo-500 h-8 text-xs">
+                <Button onClick={() => setIsAddMCPOpen(true)} className="bg-orange-600 hover:bg-orange-500 h-8 text-xs">
                   <Plus className="h-3.5 w-3.5 mr-1.5" />
                   Add Server
                 </Button>
@@ -974,7 +974,7 @@ export default function ProjectPage() {
                             {server.transport}
                           </Badge>
                           {scope === 'global' && (
-                            <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-purple-500/30 text-purple-400 bg-purple-500/5">
+                            <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-orange-500/30 text-orange-400 bg-orange-500/5">
                               Global
                             </Badge>
                           )}
@@ -1033,7 +1033,7 @@ export default function ProjectPage() {
                           <div className="space-y-1">
                             {Object.entries(server.headers).map(([k, v]) => (
                               <div key={k} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-gray-800/50">
-                                <code className="text-xs text-indigo-400 font-mono">{k}</code>
+                                <code className="text-xs text-orange-400 font-mono">{k}</code>
                                 <code className="text-xs text-gray-500 font-mono">
                                   {k.toLowerCase() === 'authorization' ? `${v.slice(0, 10)}${'*'.repeat(Math.max(0, Math.min(v.length - 10, 15)))}` : '*'.repeat(Math.max(0, Math.min(v.length, 20)))}
                                 </code>
@@ -1048,7 +1048,7 @@ export default function ProjectPage() {
                           <div className="space-y-1">
                             {Object.entries(server.env).map(([k, v]) => (
                               <div key={k} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-gray-800/50">
-                                <code className="text-xs text-indigo-400 font-mono">{k}</code>
+                                <code className="text-xs text-orange-400 font-mono">{k}</code>
                                 <code className="text-xs text-gray-500 font-mono">{'*'.repeat(Math.max(0, Math.min(v.length, 20)))}</code>
                               </div>
                             ))}
@@ -1066,8 +1066,8 @@ export default function ProjectPage() {
                   {globalMcpServers.length > 0 && (
                     <div className="space-y-3">
                       <div className="flex items-center gap-2">
-                        <Globe className="h-3.5 w-3.5 text-purple-400" />
-                        <span className="text-xs font-medium text-purple-400 uppercase tracking-wider">Global Servers (All Projects)</span>
+                        <Globe className="h-3.5 w-3.5 text-orange-400" />
+                        <span className="text-xs font-medium text-orange-400 uppercase tracking-wider">Global Servers (All Projects)</span>
                       </div>
                       {globalMcpServers.map(s => renderServerCard(s, 'global'))}
                     </div>
@@ -1076,8 +1076,8 @@ export default function ProjectPage() {
                     <div className="space-y-3">
                       {globalMcpServers.length > 0 && (
                         <div className="flex items-center gap-2">
-                          <Box className="h-3.5 w-3.5 text-indigo-400" />
-                          <span className="text-xs font-medium text-indigo-400 uppercase tracking-wider">Project Servers</span>
+                          <Box className="h-3.5 w-3.5 text-orange-400" />
+                          <span className="text-xs font-medium text-orange-400 uppercase tracking-wider">Project Servers</span>
                         </div>
                       )}
                       {mcpServers.map(s => renderServerCard(s, 'project'))}
@@ -1091,7 +1091,7 @@ export default function ProjectPage() {
                   <p className="text-sm text-gray-500 mb-4 max-w-md mx-auto">
                     Add MCP servers to give your AI assistant access to external tools like file systems, databases, web search, and more.
                   </p>
-                  <Button onClick={() => setIsAddMCPOpen(true)} className="bg-indigo-600 hover:bg-indigo-500 h-9 text-sm">
+                  <Button onClick={() => setIsAddMCPOpen(true)} className="bg-orange-600 hover:bg-orange-500 h-9 text-sm">
                     <Plus className="h-4 w-4 mr-2" />
                     Add Your First Server
                   </Button>
@@ -1150,7 +1150,7 @@ export default function ProjectPage() {
                     className="flex items-start gap-3 p-3 rounded-lg bg-gray-800/30 border border-gray-800 hover:border-gray-700 hover:bg-gray-800/50 transition-all text-left"
                   >
                     {s.transport === 'http' ? (
-                      <Wifi className="h-4 w-4 text-indigo-400 mt-0.5 shrink-0" />
+                      <Wifi className="h-4 w-4 text-orange-400 mt-0.5 shrink-0" />
                     ) : (
                       <Terminal className="h-4 w-4 text-gray-500 mt-0.5 shrink-0" />
                     )}
@@ -1158,7 +1158,7 @@ export default function ProjectPage() {
                       <div className="flex items-center gap-1.5">
                         <p className="text-sm font-medium text-white">{s.name}</p>
                         {s.transport === 'http' && (
-                          <Badge variant="outline" className="text-[9px] h-3.5 px-1 border-indigo-500/30 text-indigo-400 bg-indigo-500/5">HTTP</Badge>
+                          <Badge variant="outline" className="text-[9px] h-3.5 px-1 border-orange-500/30 text-orange-400 bg-orange-500/5">HTTP</Badge>
                         )}
                       </div>
                       <p className="text-xs text-gray-500">{s.desc}</p>
@@ -1191,7 +1191,7 @@ export default function ProjectPage() {
                     <div className="space-y-3">
                       <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-800/50 border border-gray-800">
                         <Github className="h-5 w-5 text-white shrink-0" />
-                        <a href={project.githubRepoUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-indigo-400 hover:text-indigo-300 truncate">
+                        <a href={project.githubRepoUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-orange-400 hover:text-orange-300 truncate">
                           {project.githubRepoUrl.replace('https://github.com/', '')}
                         </a>
                       </div>
@@ -1275,7 +1275,7 @@ export default function ProjectPage() {
                   <Label className="text-xs text-gray-400 mb-1.5 block">Name</Label>
                   <div className="flex items-center gap-3">
                     <span className="text-sm text-white">{project.name}</span>
-                    <button onClick={openEditDialog} className="text-xs text-indigo-400 hover:text-indigo-300">Edit</button>
+                    <button onClick={openEditDialog} className="text-xs text-orange-400 hover:text-orange-300">Edit</button>
                   </div>
                 </div>
                 <Separator className="bg-gray-800" />
@@ -1343,7 +1343,7 @@ export default function ProjectPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} disabled={isSaving} className="bg-transparent border-gray-700 text-gray-300">Cancel</Button>
-            <Button onClick={saveProjectDetails} disabled={isSaving || !editName.trim()} className="bg-indigo-600 hover:bg-indigo-500">{isSaving ? "Saving..." : "Save Changes"}</Button>
+            <Button onClick={saveProjectDetails} disabled={isSaving || !editName.trim()} className="bg-orange-600 hover:bg-orange-500">{isSaving ? "Saving..." : "Save Changes"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1353,7 +1353,7 @@ export default function ProjectPage() {
         <DialogContent className="sm:max-w-lg bg-gray-900 border-gray-800 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-white flex items-center gap-2">
-              <Server className="h-5 w-5 text-indigo-400" />
+              <Server className="h-5 w-5 text-orange-400" />
               Add MCP Server
             </DialogTitle>
             <DialogDescription className="text-gray-400">Configure a new Model Context Protocol server</DialogDescription>
@@ -1365,7 +1365,7 @@ export default function ProjectPage() {
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => setAddServerScope('project')}
-                  className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors text-left ${addServerScope === 'project' ? 'border-indigo-500 bg-indigo-500/10 text-white' : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'}`}
+                  className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors text-left ${addServerScope === 'project' ? 'border-orange-500 bg-orange-500/10 text-white' : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'}`}
                 >
                   <Box className="h-3.5 w-3.5" />
                   <div>
@@ -1374,7 +1374,7 @@ export default function ProjectPage() {
                 </button>
                 <button
                   onClick={() => setAddServerScope('global')}
-                  className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors text-left ${addServerScope === 'global' ? 'border-purple-500 bg-purple-500/10 text-white' : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'}`}
+                  className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors text-left ${addServerScope === 'global' ? 'border-orange-500 bg-orange-500/10 text-white' : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'}`}
                 >
                   <Globe className="h-3.5 w-3.5" />
                   <div>
@@ -1401,7 +1401,7 @@ export default function ProjectPage() {
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => setNewMCPServer(prev => ({ ...prev, transport: 'http' }))}
-                  className={`flex items-center gap-2 p-3 rounded-lg border transition-colors ${newMCPServer.transport === 'http' ? 'border-indigo-500 bg-indigo-500/10 text-white' : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'}`}
+                  className={`flex items-center gap-2 p-3 rounded-lg border transition-colors ${newMCPServer.transport === 'http' ? 'border-orange-500 bg-orange-500/10 text-white' : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'}`}
                 >
                   <Wifi className="h-4 w-4" />
                   <div className="text-left">
@@ -1459,7 +1459,7 @@ export default function ProjectPage() {
                     <div className="space-y-1.5 mb-3">
                       {Object.entries(newMCPServer.env).map(([k, v]) => (
                         <div key={k} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-800/50 border border-gray-800">
-                          <code className="text-xs text-indigo-400 font-mono flex-1">{k}</code>
+                          <code className="text-xs text-orange-400 font-mono flex-1">{k}</code>
                           <code className="text-xs text-gray-500 font-mono">{v ? '***' : '(empty)'}</code>
                           <button onClick={() => removeMCPEnvVar(k)} className="text-gray-600 hover:text-red-400">
                             <X className="h-3.5 w-3.5" />
@@ -1514,7 +1514,7 @@ export default function ProjectPage() {
                         setNewMCPHeaderKey('Authorization')
                         setNewMCPHeaderValue('Bearer ')
                       }}
-                      className="flex items-center gap-1.5 mb-3 px-2.5 py-1.5 rounded-md bg-indigo-500/5 border border-indigo-500/20 text-xs text-indigo-400 hover:bg-indigo-500/10 transition-colors"
+                      className="flex items-center gap-1.5 mb-3 px-2.5 py-1.5 rounded-md bg-orange-500/5 border border-orange-500/20 text-xs text-orange-400 hover:bg-orange-500/10 transition-colors"
                     >
                       <Key className="h-3 w-3" />
                       Add Bearer Token
@@ -1526,7 +1526,7 @@ export default function ProjectPage() {
                     <div className="space-y-1.5 mb-3">
                       {Object.entries(newMCPServer.headers).map(([k, v]) => (
                         <div key={k} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-800/50 border border-gray-800">
-                          <code className="text-xs text-indigo-400 font-mono shrink-0">{k}</code>
+                          <code className="text-xs text-orange-400 font-mono shrink-0">{k}</code>
                           <code className="text-xs text-gray-500 font-mono truncate flex-1">
                             {k.toLowerCase() === 'authorization' ? `${v.slice(0, 10)}${'*'.repeat(Math.max(0, Math.min(v.length - 10, 20)))}` : (v ? '***' : '(empty)')}
                           </code>
@@ -1566,7 +1566,7 @@ export default function ProjectPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setIsAddMCPOpen(false); resetMCPForm() }} className="bg-transparent border-gray-700 text-gray-300">Cancel</Button>
-            <Button onClick={addMCPServer} className="bg-indigo-600 hover:bg-indigo-500">
+            <Button onClick={addMCPServer} className="bg-orange-600 hover:bg-orange-500">
               <Plus className="h-4 w-4 mr-1.5" />
               Add Server
             </Button>
@@ -1579,7 +1579,7 @@ export default function ProjectPage() {
         <DialogContent className="sm:max-w-lg bg-gray-900 border-gray-800">
           <DialogHeader>
             <DialogTitle className="text-white flex items-center gap-2">
-              <Upload className="h-5 w-5 text-indigo-400" />
+              <Upload className="h-5 w-5 text-orange-400" />
               Import MCP Config
             </DialogTitle>
             <DialogDescription className="text-gray-400">
@@ -1612,7 +1612,7 @@ export default function ProjectPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setIsImportConfigOpen(false); setImportConfigText('') }} className="bg-transparent border-gray-700 text-gray-300">Cancel</Button>
-            <Button onClick={importMCPConfig} disabled={!importConfigText.trim()} className="bg-indigo-600 hover:bg-indigo-500">
+            <Button onClick={importMCPConfig} disabled={!importConfigText.trim()} className="bg-orange-600 hover:bg-orange-500">
               <Upload className="h-4 w-4 mr-1.5" />
               Import
             </Button>

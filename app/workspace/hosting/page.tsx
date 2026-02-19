@@ -217,7 +217,7 @@ function HostingManagementContent() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-black">
         <div className="text-center space-y-4">
-          <Loader2 className="w-12 h-12 animate-spin mx-auto text-blue-500" />
+          <Loader2 className="w-12 h-12 animate-spin mx-auto text-orange-500" />
           <p className="text-gray-600 dark:text-gray-400">Loading hosting management...</p>
         </div>
       </div>
@@ -248,14 +248,14 @@ function HostingManagementContent() {
               <div className="flex gap-2 mt-4">
                 <a 
                   href="/workspace" 
-                  className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline"
+                  className="text-orange-600 hover:text-orange-500 dark:text-orange-400 dark:hover:text-orange-300 underline"
                 >
                   Go to Workspace
                 </a>
                 <span className="text-gray-400 dark:text-gray-600">|</span>
                 <a 
                   href="/workspace/account" 
-                  className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline"
+                  className="text-orange-600 hover:text-orange-500 dark:text-orange-400 dark:hover:text-orange-300 underline"
                 >
                   Account Settings
                 </a>
@@ -283,7 +283,7 @@ function HostingManagementContent() {
           <CardContent>
             <a 
               href="/workspace" 
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg transition-colors"
             >
               <Rocket className="w-4 h-4" />
               Go to Workspace
@@ -298,13 +298,13 @@ function HostingManagementContent() {
     <div className="w-full min-h-screen m-0 p-0 hosting-container">
       {/* Alert notification - only show if tokens missing */}
       {(!vercelToken || !githubToken) && (
-        <div className="w-full bg-blue-50 dark:bg-blue-950 border-b border-blue-200 dark:border-blue-800">
+        <div className="w-full bg-orange-50 dark:bg-orange-950 border-b border-orange-200 dark:border-orange-800">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-            <Alert className="border-blue-200 dark:border-blue-800 bg-transparent">
-              <Info className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              <AlertDescription className="text-blue-800 dark:text-blue-200">
+            <Alert className="border-orange-200 dark:border-orange-800 bg-transparent">
+              <Info className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+              <AlertDescription className="text-orange-800 dark:text-orange-200">
                 <strong>Tip:</strong> You haven't configured your API tokens yet. You can add them in{' '}
-                <a href="/workspace/account" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline">
+                <a href="/workspace/account" className="text-orange-600 hover:text-orange-500 dark:text-orange-400 dark:hover:text-orange-300 underline">
                   Account Settings
                 </a>{' '}
                 or enter them directly in the form below.
@@ -332,7 +332,7 @@ export default function HostingManagementPage() {
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-black">
         <div className="text-center space-y-4">
-          <Loader2 className="w-12 h-12 animate-spin mx-auto text-blue-500" />
+          <Loader2 className="w-12 h-12 animate-spin mx-auto text-orange-500" />
           <p className="text-gray-600 dark:text-gray-400">Loading hosting management...</p>
         </div>
       </div>
