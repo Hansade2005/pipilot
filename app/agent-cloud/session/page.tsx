@@ -21,6 +21,7 @@ import {
   ChevronRight,
   ChevronLeft,
   Server,
+  Plug,
   FileCode,
   Eye,
   Plus,
@@ -31,7 +32,7 @@ import {
   Monitor,
   X,
 } from "lucide-react"
-import { useAgentCloud, MODELS, DEFAULT_MCPS, type TerminalLine } from "../layout"
+import { useAgentCloud, MODELS, DEFAULT_MCPS, DEFAULT_CONNECTORS, type TerminalLine } from "../layout"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -179,6 +180,7 @@ function SessionPageInner() {
     setSessions,
     storedTokens,
     connectors,
+    setConnectors,
     selectedModel,
     setSelectedModel,
   } = useAgentCloud()
@@ -1843,33 +1845,34 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
 
                             <div className="my-1.5 border-t border-gray-700/50" />
 
-                            {/* MCP Servers - drill into submenu */}
+                            {/* MCP & Connectors - drill into submenu */}
                             <button
                               className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
                               onClick={() => setCommandMenuView('mcp')}
                             >
                               <Server className="size-4 text-gray-400" />
-                              <span>MCP Servers</span>
+                              <span>MCP & Connectors</span>
                               <span className="ml-auto flex items-center gap-1.5 text-[11px] text-gray-500">
-                                {Object.values(mcpToggles).filter(Boolean).length}/{DEFAULT_MCPS.length}
+                                {Object.values(mcpToggles).filter(Boolean).length + connectors.filter(c => c.enabled).length}
                                 <ChevronRight className="size-3.5" />
                               </span>
                             </button>
                           </>
                         ) : (
                           <>
-                            {/* MCP Servers submenu */}
+                            {/* MCP & Connectors submenu */}
                             <button
                               className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors border-b border-gray-700/50"
                               onClick={() => setCommandMenuView('main')}
                             >
                               <ChevronLeft className="size-4" />
-                              <span className="font-medium">MCP Servers</span>
-                              <span className="text-[11px] text-gray-500 ml-auto">
-                                {DEFAULT_MCPS.length} server{DEFAULT_MCPS.length !== 1 ? 's' : ''}
-                              </span>
+                              <span className="font-medium">MCP & Connectors</span>
                             </button>
-                            <div className="max-h-[280px] overflow-y-auto">
+                            <div className="max-h-[340px] overflow-y-auto">
+                              {/* MCP Servers section */}
+                              <div className="px-4 pt-2.5 pb-1">
+                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">MCP Servers</span>
+                              </div>
                               {DEFAULT_MCPS.map(mcp => {
                                 const isOn = mcpToggles[mcp.id] !== false
                                 return (
@@ -1878,7 +1881,7 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
                                     className="flex items-center hover:bg-gray-800 transition-colors"
                                   >
                                     <button
-                                      className="flex-1 flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 min-w-0"
+                                      className="flex-1 flex items-center gap-3 px-4 py-2 text-sm text-gray-200 min-w-0"
                                       onClick={() => setMcpToggles(prev => ({ ...prev, [mcp.id]: !isOn }))}
                                     >
                                       <Server className={`size-4 flex-shrink-0 ${isOn ? 'text-green-400' : 'text-gray-500'}`} />
@@ -1898,6 +1901,47 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
                                   </div>
                                 )
                               })}
+
+                              {/* Connectors section */}
+                              <div className="px-4 pt-3 pb-1 border-t border-gray-700/40 mt-1">
+                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Connectors</span>
+                              </div>
+                              {connectors.map(connector => (
+                                <div
+                                  key={connector.id}
+                                  className="flex items-center hover:bg-gray-800 transition-colors"
+                                >
+                                  <button
+                                    className="flex-1 flex items-center gap-3 px-4 py-2 text-sm text-gray-200 min-w-0"
+                                    onClick={() => {
+                                      setConnectors(prev => prev.map(c =>
+                                        c.id === connector.id ? { ...c, enabled: !c.enabled } : c
+                                      ))
+                                    }}
+                                  >
+                                    <Plug className={`size-4 flex-shrink-0 ${connector.enabled ? 'text-orange-400' : 'text-gray-500'}`} />
+                                    <div className="text-left min-w-0 flex-1">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className={`truncate ${connector.enabled ? 'text-gray-200' : 'text-gray-500'}`}>{connector.name}</span>
+                                        <span className="text-[9px] px-1 py-px rounded bg-gray-800 text-gray-500 flex-shrink-0">{connector.type}</span>
+                                      </div>
+                                      <div className="text-[10px] text-gray-600 truncate">{connector.description}</div>
+                                    </div>
+                                  </button>
+                                  <div className="pr-3">
+                                    <Switch
+                                      checked={connector.enabled}
+                                      onCheckedChange={(checked) => {
+                                        setConnectors(prev => prev.map(c =>
+                                          c.id === connector.id ? { ...c, enabled: checked } : c
+                                        ))
+                                      }}
+                                      className="h-4 w-7 flex-shrink-0 data-[state=checked]:bg-orange-600"
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           </>
                         )}
