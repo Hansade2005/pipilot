@@ -28,8 +28,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Switch } from "@/components/ui/switch"
 import { useAgentCloud, MODELS, DEFAULT_MCPS } from "../layout"
 import { usePageTitle } from '@/hooks/use-page-title'
+import { ParticleBackground } from "@/components/particle-background"
+import { SpaceBackground } from "@/components/space-background"
 
 export default function NewSessionPage() {
   usePageTitle('New Agent')
@@ -63,7 +66,9 @@ export default function NewSessionPage() {
   const [isNewProject, setIsNewProject] = useState(false)
   const [projectName, setProjectName] = useState('')
   const [showCommandMenu, setShowCommandMenu] = useState(false)
-  const [playwrightEnabled, setPlaywrightEnabled] = useState(false)
+  const [mcpToggles, setMcpToggles] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(DEFAULT_MCPS.map(mcp => [mcp.id, true]))
+  )
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const combinedFileInputRef = useRef<HTMLInputElement>(null)
@@ -281,7 +286,7 @@ export default function NewSessionPage() {
       setAttachedFiles([])
     }
 
-    if (playwrightEnabled) {
+    if (mcpToggles['playwright']) {
       enhancedPrompt += `\n\n[Playwright Browser Testing - ENABLED]
 The user has enabled Playwright for browser testing. When setting up browser testing:
 1. Install Playwright as a dev dependency: pnpm add -D @playwright/test
@@ -335,8 +340,35 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
   const currentModelInfo = MODELS.find(m => m.id === selectedModel)
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-6">
-      <div className="w-full max-w-[720px]">
+    <div className="flex-1 flex flex-col items-center justify-center px-6 relative overflow-hidden">
+      {/* Background layers (matching app/page.tsx) */}
+      <div className="absolute inset-0 lovable-gradient" />
+      <div className="absolute inset-0 noise-texture" />
+      <div className="absolute inset-0 pointer-events-none bg-grid opacity-20" />
+      <div className="arc-container">
+        <div className="arc-radial-glow" />
+        <div className="arc-ambient-glow" />
+        <div className="arc-ellipses">
+          <div className="arc-ellipse arc-ellipse-1" />
+          <div className="arc-ellipse arc-ellipse-2" />
+          <div className="arc-ellipse arc-ellipse-3" />
+          <div className="arc-ellipse arc-ellipse-4" />
+          <div className="arc-ellipse arc-ellipse-5" />
+        </div>
+      </div>
+      <div className="light-rays-container">
+        <div className="light-ray light-ray-1" />
+        <div className="light-ray light-ray-2" />
+        <div className="light-ray light-ray-3" />
+        <div className="light-ray light-ray-4" />
+        <div className="light-ray light-ray-5" />
+      </div>
+      <div className="hero-top-glow" />
+      <ParticleBackground />
+      <SpaceBackground />
+
+      {/* Main content */}
+      <div className="w-full max-w-[720px] relative z-10">
         {/* Greeting */}
         <div className="mb-8">
           <h1 className="text-3xl font-semibold text-gray-100 tracking-tight">
@@ -511,29 +543,37 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
 
                       <div className="my-1.5 border-t border-gray-700/50" />
 
-                      {/* Playwright toggle */}
-                      <button
-                        className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
-                        onClick={() => setPlaywrightEnabled(!playwrightEnabled)}
-                      >
-                        <div className="flex items-center gap-3">
-                          <Globe className="size-4 text-gray-400" />
-                          <span>Playwright</span>
-                        </div>
-                        {playwrightEnabled && <Check className="size-4 text-green-400" />}
-                      </button>
-
-                      <div className="my-1.5 border-t border-gray-700/50" />
-
-                      {/* MCP Tools info */}
-                      <div className="px-4 py-2 text-[11px] text-gray-500">
-                        <span className="font-medium text-gray-400">MCP Tools</span>
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {DEFAULT_MCPS.map(mcp => (
-                            <span key={mcp.id} className="px-1.5 py-0.5 bg-gray-800 rounded text-gray-500">{mcp.name}</span>
-                          ))}
+                      {/* MCP Servers */}
+                      <div className="px-4 pt-2 pb-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-medium text-gray-400">MCP Servers</span>
+                          <span className="text-[10px] text-gray-600">
+                            {Object.values(mcpToggles).filter(Boolean).length}/{DEFAULT_MCPS.length}
+                          </span>
                         </div>
                       </div>
+                      {DEFAULT_MCPS.map(mcp => {
+                        const isOn = mcpToggles[mcp.id] !== false
+                        return (
+                          <div
+                            key={mcp.id}
+                            className="flex items-center justify-between px-4 py-2 hover:bg-gray-800 transition-colors"
+                          >
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <Globe className={`size-3.5 shrink-0 ${isOn ? 'text-green-400' : 'text-gray-600'}`} />
+                              <div className="min-w-0">
+                                <span className={`text-sm ${isOn ? 'text-gray-200' : 'text-gray-500'}`}>{mcp.name}</span>
+                                <div className="text-[10px] text-gray-600 truncate">{mcp.description}</div>
+                              </div>
+                            </div>
+                            <Switch
+                              checked={isOn}
+                              onCheckedChange={(checked) => setMcpToggles(prev => ({ ...prev, [mcp.id]: checked }))}
+                              className="h-4 w-7 shrink-0 data-[state=checked]:bg-orange-600"
+                            />
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )}

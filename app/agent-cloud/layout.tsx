@@ -947,9 +947,10 @@ function AgentCloudLayoutInner({
         <div className={`
           fixed inset-y-0 left-0 w-[260px] bg-[#171717] z-50
           transform transition-transform duration-300 ease-out md:hidden
+          flex flex-col
           ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
         `}>
-          <div className="flex items-center justify-between px-3 py-3">
+          <div className="flex items-center justify-between px-3 py-3 shrink-0">
             <span className="font-semibold text-sm text-gray-200 pl-1">PiPilot Code</span>
             <button
               onClick={() => setMobileMenuOpen(false)}
@@ -958,7 +959,9 @@ function AgentCloudLayoutInner({
               <X className="h-4 w-4 text-gray-500" />
             </button>
           </div>
-          <SidebarContent />
+          <div className="flex-1 min-h-0">
+            <SidebarContent />
+          </div>
         </div>
 
         {/* Desktop sidebar */}
@@ -971,25 +974,30 @@ function AgentCloudLayoutInner({
         {/* Main area */}
         <div className="flex-1 flex flex-col min-w-0">
           {/* Clean minimal header */}
-          <header className="flex items-center justify-between px-4 h-12 shrink-0">
+          <header className="flex items-center justify-between px-4 h-12 shrink-0 border-b border-gray-800/40 md:border-0">
             <div className="flex items-center gap-2">
+              {/* Mobile: hamburger menu */}
               <button
-                onClick={() => {
-                  if (window.innerWidth < 768) {
-                    setMobileMenuOpen(!mobileMenuOpen)
-                  } else {
-                    setSidebarOpen(!sidebarOpen)
-                  }
-                }}
-                className="p-1.5 hover:bg-gray-800/60 rounded-lg transition-colors"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="p-1.5 hover:bg-gray-800/60 rounded-lg transition-colors md:hidden"
+              >
+                <Menu className="h-[18px] w-[18px] text-gray-500" />
+              </button>
+              {/* Desktop: sidebar toggle */}
+              <button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="p-1.5 hover:bg-gray-800/60 rounded-lg transition-colors hidden md:flex"
               >
                 <PanelLeft className="h-[18px] w-[18px] text-gray-500" />
               </button>
 
+              {/* Mobile: show brand name always */}
+              <span className="text-sm font-semibold text-gray-300 md:hidden">PiPilot Code</span>
+
               {!sidebarOpen && (
                 <>
-                  <span className="text-sm font-semibold text-gray-300 hidden sm:inline">PiPilot Code</span>
-                  <Badge className="text-[10px] bg-gray-800 text-gray-500 font-normal border-0 px-1.5 hidden sm:inline-flex">
+                  <span className="text-sm font-semibold text-gray-300 hidden md:inline">PiPilot Code</span>
+                  <Badge className="text-[10px] bg-gray-800 text-gray-500 font-normal border-0 px-1.5 hidden md:inline-flex">
                     preview
                   </Badge>
                 </>
