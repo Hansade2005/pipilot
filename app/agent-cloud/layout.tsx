@@ -248,6 +248,7 @@ interface AgentCloudContextType {
   terminateSession: (sessionId: string) => Promise<void>
   deleteSession: (sessionId: string) => Promise<void>
   isCreating: boolean
+  userFirstName: string | null
 }
 
 const AgentCloudContext = createContext<AgentCloudContextType | null>(null)
@@ -300,6 +301,7 @@ function AgentCloudLayoutInner({
   }>({})
   const [isLoadingTokens, setIsLoadingTokens] = useState(true)
   const [isLoadingRepos, setIsLoadingRepos] = useState(false)
+  const [userFirstName, setUserFirstName] = useState<string | null>(null)
 
   const isConnected = !!storedTokens.github
 
@@ -486,6 +488,16 @@ function AgentCloudLayoutInner({
       if (!user) {
         setIsLoadingTokens(false)
         return
+      }
+
+      // Fetch user profile for personalized greeting
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single()
+      if (profile?.full_name) {
+        setUserFirstName(profile.full_name.trim().split(' ')[0])
       }
 
       const tokens = await getDeploymentTokens(user.id)
@@ -928,6 +940,7 @@ function AgentCloudLayoutInner({
     terminateSession,
     deleteSession,
     isCreating,
+    userFirstName,
   }
 
   // Active session for header context
@@ -952,7 +965,7 @@ function AgentCloudLayoutInner({
           ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
         `}>
           <div className="flex items-center justify-between px-3 py-3 shrink-0">
-            <span className="font-semibold text-sm text-gray-200 pl-1">PiPilot Code</span>
+            <span className="font-semibold text-sm text-gray-200 pl-1">PiPilot Cloud Code</span>
             <button
               onClick={() => setMobileMenuOpen(false)}
               className="p-1.5 hover:bg-gray-800 rounded-lg transition-colors"
@@ -993,11 +1006,11 @@ function AgentCloudLayoutInner({
               </button>
 
               {/* Mobile: show brand name always */}
-              <span className="text-sm font-semibold text-gray-300 md:hidden">PiPilot Code</span>
+              <span className="text-sm font-semibold text-gray-300 md:hidden">PiPilot Cloud Code</span>
 
               {!sidebarOpen && (
                 <>
-                  <span className="text-sm font-semibold text-gray-300 hidden md:inline">PiPilot Code</span>
+                  <span className="text-sm font-semibold text-gray-300 hidden md:inline">PiPilot Cloud Code</span>
                   <Badge className="text-[10px] bg-gray-800 text-gray-500 font-normal border-0 px-1.5 hidden md:inline-flex">
                     preview
                   </Badge>
