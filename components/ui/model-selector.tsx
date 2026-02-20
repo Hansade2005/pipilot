@@ -42,6 +42,10 @@ const shortNameMap = new Map<string, string>([
   ['openai/gpt-5.1-thinking', 'GPT-5.1'],
   ['openai/gpt-5.2-codex', 'Codex 5.2'],
   ['openai/o3', 'O3'],
+  ['bonsai/claude-sonnet-4.5', 'Sonnet 4.5 (Bonsai)'],
+  ['bonsai/claude-opus-4', 'Opus 4 (Bonsai)'],
+  ['bonsai/gpt-5.1-codex', 'Codex 5.1 (Bonsai)'],
+  ['bonsai/glm-4.6', 'GLM 4.6 (Bonsai)'],
 ])
 
 // Descriptions for dropdown
@@ -67,6 +71,10 @@ const descriptionMap = new Map<string, string>([
   ['openai/gpt-5.1-thinking', 'Deep reasoning by OpenAI'],
   ['openai/gpt-5.2-codex', 'Specialized for code'],
   ['openai/o3', 'Advanced reasoning model'],
+  ['bonsai/claude-sonnet-4.5', 'Sonnet 4.5 via Bonsai'],
+  ['bonsai/claude-opus-4', 'Opus 4 via Bonsai'],
+  ['bonsai/gpt-5.1-codex', 'GPT-5.1 Codex via Bonsai'],
+  ['bonsai/glm-4.6', 'GLM 4.6 via Bonsai'],
 ])
 
 // Map BYOK provider IDs to model ID prefixes
@@ -76,6 +84,7 @@ const BYOK_PROVIDER_MODEL_PREFIXES: Record<string, string[]> = {
   mistral: ['mistral/'],
   xai: ['xai/'],
   google: ['google/'],
+  bonsai: ['bonsai/'],
   openrouter: [], // OpenRouter unlocks all models
   'vercel-gateway': [], // Vercel Gateway unlocks all models
 }
@@ -169,7 +178,8 @@ export function ModelSelector({
       'kwaipilot/kat-coder-pro-v1', 'alibaba/qwen3-max',
       'alibaba/qwen3-vl-thinking',
       'anthropic/claude-haiku-4.5', 'anthropic/claude-sonnet-4.5', 'anthropic/claude-opus-4.5',
-      'openai/gpt-5.1-thinking', 'openai/gpt-5.2-codex', 'openai/o3'
+      'openai/gpt-5.1-thinking', 'openai/gpt-5.2-codex', 'openai/o3',
+      'bonsai/claude-sonnet-4.5', 'bonsai/claude-opus-4', 'bonsai/gpt-5.1-codex', 'bonsai/glm-4.6'
     ]
   } else {
     const userLimits = getLimits(userPlan)
@@ -222,6 +232,7 @@ export function ModelSelector({
     'xai/glm-4.7', 'zai/glm-4.7-flash',
     'moonshotai/kimi-k2-thinking', 'minimax/minimax-m2.1', 'kwaipilot/kat-coder-pro-v1',
     'alibaba/qwen3-max', 'alibaba/qwen3-vl-thinking',
+    'bonsai/claude-sonnet-4.5', 'bonsai/claude-opus-4', 'bonsai/gpt-5.1-codex', 'bonsai/glm-4.6',
     'auto',
   ]
   const orderedModels = modelOrder.filter(id => shortNameMap.has(id))

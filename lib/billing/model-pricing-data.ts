@@ -2219,6 +2219,78 @@ export const VERCEL_MODEL_PRICING: Record<string, ModelPricingEntry> = {
     latencySeconds: 0.7,
     throughputTps: 80,
   },
+
+  // =============================================================================
+  // BONSAI (Anthropic-compatible API via go.trybons.ai)
+  // =============================================================================
+
+  'bonsai/claude-sonnet-4.5': {
+    name: 'Claude Sonnet 4.5 (Bonsai)',
+    provider: 'bonsai',
+    contextWindow: 200_000,
+    maxOutput: 64_000,
+    inputPerToken: 0.000003,       // $3/M
+    outputPerToken: 0.000015,      // $15/M
+    cacheReadPerToken: 0.0000003,  // $0.30/M
+    cacheWritePerToken: 0.00000375, // $3.75/M
+    webSearchPer1K: 0,
+    supportsImageInput: true,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 1.0,
+    throughputTps: 80,
+  },
+
+  'bonsai/claude-opus-4': {
+    name: 'Claude Opus 4 (Bonsai)',
+    provider: 'bonsai',
+    contextWindow: 200_000,
+    maxOutput: 32_000,
+    inputPerToken: 0.000015,       // $15/M
+    outputPerToken: 0.000075,      // $75/M
+    cacheReadPerToken: 0.0000015,  // $1.50/M
+    cacheWritePerToken: 0.00001875, // $18.75/M
+    webSearchPer1K: 0,
+    supportsImageInput: true,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 1.5,
+    throughputTps: 45,
+  },
+
+  'bonsai/gpt-5.1-codex': {
+    name: 'GPT-5.1 Codex (Bonsai)',
+    provider: 'bonsai',
+    contextWindow: 200_000,
+    maxOutput: 64_000,
+    inputPerToken: 0.000003,       // $3/M
+    outputPerToken: 0.000012,      // $12/M
+    cacheReadPerToken: 0.0000003,  // $0.30/M
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: true,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 0.8,
+    throughputTps: 100,
+  },
+
+  'bonsai/glm-4.6': {
+    name: 'GLM 4.6 (Bonsai)',
+    provider: 'bonsai',
+    contextWindow: 128_000,
+    maxOutput: 32_000,
+    inputPerToken: 0.000001,       // $1/M
+    outputPerToken: 0.000004,      // $4/M
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: false,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 0.6,
+    throughputTps: 120,
+  },
 }
 
 // =============================================================================
