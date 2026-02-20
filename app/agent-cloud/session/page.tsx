@@ -19,6 +19,8 @@ import {
   Globe,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
+  Server,
   FileCode,
   Eye,
   Plus,
@@ -193,6 +195,7 @@ function SessionPageInner() {
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [showCommandMenu, setShowCommandMenu] = useState(false)
+  const [commandMenuView, setCommandMenuView] = useState<'main' | 'mcp'>('main')
   const [mcpToggles, setMcpToggles] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(DEFAULT_MCPS.map(mcp => [mcp.id, true]))
   )
@@ -436,6 +439,7 @@ function SessionPageInner() {
     const handleClickOutside = (e: MouseEvent) => {
       if (commandMenuRef.current && !commandMenuRef.current.contains(e.target as Node)) {
         setShowCommandMenu(false)
+        setCommandMenuView('main')
       }
     }
     if (showCommandMenu) {
@@ -1767,7 +1771,7 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
                   <button
                     type="button"
                     className="h-8 w-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
-                    onClick={() => setShowCommandMenu(!showCommandMenu)}
+                    onClick={() => { setShowCommandMenu(!showCommandMenu); setCommandMenuView('main') }}
                   >
                     <Plus className={`size-4 transition-transform ${showCommandMenu ? 'rotate-45' : ''}`} />
                   </button>
@@ -1775,64 +1779,93 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
                   {showCommandMenu && (
                     <div className="absolute bottom-10 left-0 w-[260px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[80] overflow-hidden">
                       <div className="py-1.5">
-                        {/* Add images or files */}
-                        <button
-                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
-                          onClick={() => {
-                            setShowCommandMenu(false)
-                            combinedFileInputRef.current?.click()
-                          }}
-                        >
-                          <FileUp className="size-4 text-gray-400" />
-                          <span>Add images or files</span>
-                        </button>
-
-                        {/* Capture screen */}
-                        <button
-                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
-                          onClick={() => {
-                            setShowCommandMenu(false)
-                            handleScreenToggle()
-                          }}
-                        >
-                          <Monitor className={`size-4 ${isScreenSharing ? 'text-red-400' : 'text-gray-400'}`} />
-                          <span>{isScreenSharing ? 'Stop screen sharing' : 'Capture screen'}</span>
-                          {isScreenSharing && <div className="ml-auto w-2 h-2 rounded-full bg-red-400 animate-pulse" />}
-                        </button>
-
-                        <div className="my-1.5 border-t border-gray-700/50" />
-
-                        {/* MCP Servers */}
-                        <div className="px-4 pt-2 pb-1">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-medium text-gray-400">MCP Servers</span>
-                            <span className="text-[10px] text-gray-600">
-                              {Object.values(mcpToggles).filter(Boolean).length}/{DEFAULT_MCPS.length}
-                            </span>
-                          </div>
-                        </div>
-                        {DEFAULT_MCPS.map(mcp => {
-                          const isOn = mcpToggles[mcp.id] !== false
-                          return (
-                            <div
-                              key={mcp.id}
-                              className="flex items-center justify-between px-4 py-2 hover:bg-gray-800 transition-colors"
+                        {commandMenuView === 'main' ? (
+                          <>
+                            {/* Add images or files */}
+                            <button
+                              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                              onClick={() => {
+                                setShowCommandMenu(false)
+                                combinedFileInputRef.current?.click()
+                              }}
                             >
-                              <div className="flex items-center gap-3 min-w-0 flex-1">
-                                <Globe className={`size-3.5 shrink-0 ${isOn ? 'text-green-400' : 'text-gray-600'}`} />
-                                <div className="min-w-0">
-                                  <span className={`text-sm ${isOn ? 'text-gray-200' : 'text-gray-500'}`}>{mcp.name}</span>
-                                  <div className="text-[10px] text-gray-600 truncate">{mcp.description}</div>
-                                </div>
-                              </div>
-                              <Switch
-                                checked={isOn}
-                                onCheckedChange={(checked) => setMcpToggles(prev => ({ ...prev, [mcp.id]: checked }))}
-                                className="h-4 w-7 shrink-0 data-[state=checked]:bg-orange-600"
-                              />
+                              <FileUp className="size-4 text-gray-400" />
+                              <span>Add images or files</span>
+                            </button>
+
+                            {/* Capture screen */}
+                            <button
+                              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                              onClick={() => {
+                                setShowCommandMenu(false)
+                                handleScreenToggle()
+                              }}
+                            >
+                              <Monitor className={`size-4 ${isScreenSharing ? 'text-red-400' : 'text-gray-400'}`} />
+                              <span>{isScreenSharing ? 'Stop screen sharing' : 'Capture screen'}</span>
+                              {isScreenSharing && <div className="ml-auto w-2 h-2 rounded-full bg-red-400 animate-pulse" />}
+                            </button>
+
+                            <div className="my-1.5 border-t border-gray-700/50" />
+
+                            {/* MCP Servers - drill into submenu */}
+                            <button
+                              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                              onClick={() => setCommandMenuView('mcp')}
+                            >
+                              <Server className="size-4 text-gray-400" />
+                              <span>MCP Servers</span>
+                              <span className="ml-auto flex items-center gap-1.5 text-[11px] text-gray-500">
+                                {Object.values(mcpToggles).filter(Boolean).length}/{DEFAULT_MCPS.length}
+                                <ChevronRight className="size-3.5" />
+                              </span>
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            {/* MCP Servers submenu */}
+                            <button
+                              className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors border-b border-gray-700/50"
+                              onClick={() => setCommandMenuView('main')}
+                            >
+                              <ChevronLeft className="size-4" />
+                              <span className="font-medium">MCP Servers</span>
+                              <span className="text-[11px] text-gray-500 ml-auto">
+                                {DEFAULT_MCPS.length} server{DEFAULT_MCPS.length !== 1 ? 's' : ''}
+                              </span>
+                            </button>
+                            <div className="max-h-[280px] overflow-y-auto">
+                              {DEFAULT_MCPS.map(mcp => {
+                                const isOn = mcpToggles[mcp.id] !== false
+                                return (
+                                  <div
+                                    key={mcp.id}
+                                    className="flex items-center hover:bg-gray-800 transition-colors"
+                                  >
+                                    <button
+                                      className="flex-1 flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 min-w-0"
+                                      onClick={() => setMcpToggles(prev => ({ ...prev, [mcp.id]: !isOn }))}
+                                    >
+                                      <Server className={`size-4 flex-shrink-0 ${isOn ? 'text-green-400' : 'text-gray-500'}`} />
+                                      <div className="text-left min-w-0 flex-1">
+                                        <span className={`truncate ${isOn ? 'text-gray-200' : 'text-gray-500'}`}>{mcp.name}</span>
+                                        <div className="text-[10px] text-gray-600 truncate">{mcp.description}</div>
+                                      </div>
+                                    </button>
+                                    <div className="pr-3">
+                                      <Switch
+                                        checked={isOn}
+                                        onCheckedChange={(checked) => setMcpToggles(prev => ({ ...prev, [mcp.id]: checked }))}
+                                        className="h-4 w-7 flex-shrink-0 data-[state=checked]:bg-orange-600"
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                    </div>
+                                  </div>
+                                )
+                              })}
                             </div>
-                          )
-                        })}
+                          </>
+                        )}
                       </div>
                     </div>
                   )}
