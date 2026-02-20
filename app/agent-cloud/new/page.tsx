@@ -338,7 +338,7 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
   const currentModelInfo = MODELS.find(m => m.id === selectedModel)
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-6">
+    <div className="flex-1 flex flex-col items-center justify-center px-6 bg-[#030305]">
       <div className="w-full max-w-[720px]">
         {/* Greeting */}
         <div className="mb-8">
