@@ -11,6 +11,7 @@
 import { createClient } from '@/lib/supabase/client'
 import { createAgentCloudClient } from '@/lib/supabase/agent-cloud-client'
 import type { Session, TerminalLine, ConnectorConfig } from '@/app/agent-cloud/layout'
+import { saveImages, loadImagesBySession, deleteImagesBySession } from '@/lib/agent-cloud-image-db'
 
 // Database types
 interface DbSession {
@@ -42,13 +43,6 @@ interface DbMessage {
   timestamp: string
   meta: any | null
   sequence_num: number
-}
-
-interface DbMessageImage {
-  id: string
-  message_id: string
-  data: string
-  mime_type: string
 }
 
 interface DbConnector {
@@ -159,49 +153,40 @@ class AgentCloudStorage {
         console.error('[AgentCloudStorage] Error loading messages:', messagesError)
       }
 
-      // Fetch images for all messages
-      const messageIds = (dbMessages || []).map(m => m.id)
-      let dbImages: DbMessageImage[] = []
-      if (messageIds.length > 0) {
-        const { data: images, error: imagesError } = await this.storageClient
-          .from('agent_cloud_message_images')
-          .select('*')
-          .in('message_id', messageIds)
-
-        if (imagesError) {
-          console.error('[AgentCloudStorage] Error loading images:', imagesError)
-        }
-        dbImages = images || []
-      }
-
-      // Group messages by session and convert
+      // Group messages by session (images loaded from IndexedDB below)
       const messagesBySession = new Map<string, TerminalLine[]>()
-      const imagesByMessage = new Map<string, Array<{ data: string; type: string }>>()
+      // Track sequence numbers per session so we can match IndexedDB images
+      const seqBySession = new Map<string, number>()
 
-      // Group images by message
-      for (const img of dbImages) {
-        if (!imagesByMessage.has(img.message_id)) {
-          imagesByMessage.set(img.message_id, [])
-        }
-        imagesByMessage.get(img.message_id)!.push({
-          data: img.data,
-          type: img.mime_type,
-        })
-      }
-
-      // Convert messages
       for (const msg of (dbMessages || [])) {
         if (!messagesBySession.has(msg.session_id)) {
           messagesBySession.set(msg.session_id, [])
+          seqBySession.set(msg.session_id, 0)
         }
+        const seq = seqBySession.get(msg.session_id)!
         const line: TerminalLine = {
           type: msg.type as TerminalLine['type'],
           content: msg.content,
           timestamp: new Date(msg.timestamp),
           meta: msg.meta || undefined,
-          images: imagesByMessage.get(msg.id),
+          // images will be attached below from IndexedDB
         }
         messagesBySession.get(msg.session_id)!.push(line)
+        seqBySession.set(msg.session_id, seq + 1)
+      }
+
+      // Load images from IndexedDB for each session and attach to lines
+      for (const sid of sessionIds) {
+        const imageMap = await loadImagesBySession(sid)
+        const lines = messagesBySession.get(sid)
+        if (lines && imageMap.size > 0) {
+          lines.forEach((line, idx) => {
+            const imgs = imageMap.get(idx)
+            if (imgs && imgs.length > 0) {
+              line.images = imgs
+            }
+          })
+        }
       }
 
       // Convert sessions
@@ -297,6 +282,9 @@ class AgentCloudStorage {
         return false
       }
 
+      // Clean up images from IndexedDB
+      await deleteImagesBySession(sessionId)
+
       return true
     } catch (error) {
       console.error('[AgentCloudStorage] Error in deleteSession:', error)
@@ -338,41 +326,27 @@ class AgentCloudStorage {
         meta: line.meta || null,
       }))
 
-      const { data: insertedMessages, error: messagesError } = await this.storageClient
+      const { error: messagesError } = await this.storageClient
         .from('agent_cloud_messages')
         .insert(messages)
-        .select('id')
 
       if (messagesError) {
         console.error('[AgentCloudStorage] Error saving messages:', messagesError)
         return false
       }
 
-      // Save images if any
-      if (insertedMessages) {
-        const imagesToInsert: Array<{ message_id: string; data: string; mime_type: string }> = []
-
-        newLines.forEach((line, idx) => {
-          if (line.images && line.images.length > 0 && insertedMessages[idx]) {
-            line.images.forEach(img => {
-              imagesToInsert.push({
-                message_id: insertedMessages[idx].id,
-                data: img.data,
-                mime_type: img.type,
-              })
-            })
-          }
-        })
-
-        if (imagesToInsert.length > 0) {
-          const { error: imagesError } = await this.storageClient
-            .from('agent_cloud_message_images')
-            .insert(imagesToInsert)
-
-          if (imagesError) {
-            console.error('[AgentCloudStorage] Error saving images:', imagesError)
-          }
+      // Save images to IndexedDB (not Supabase) to avoid 400 payload errors
+      const imageEntries: Array<{ sequenceNum: number; images: Array<{ data: string; type: string }> }> = []
+      newLines.forEach((line, idx) => {
+        if (line.images && line.images.length > 0) {
+          imageEntries.push({
+            sequenceNum: startIndex + idx,
+            images: line.images,
+          })
         }
+      })
+      if (imageEntries.length > 0) {
+        await saveImages(sessionId, imageEntries)
       }
 
       return true
@@ -385,12 +359,12 @@ class AgentCloudStorage {
   /**
    * Append a single message to a session
    */
-  async appendMessage(sessionId: string, line: TerminalLine): Promise<boolean> {
+  async appendMessage(sessionId: string, line: TerminalLine, sequenceNum: number = 0): Promise<boolean> {
     const userId = await this.getUserId()
     if (!userId) return false
 
     try {
-      const { data: insertedMessage, error: messageError } = await this.storageClient
+      const { error: messageError } = await this.storageClient
         .from('agent_cloud_messages')
         .insert({
           session_id: sessionId,
@@ -399,29 +373,15 @@ class AgentCloudStorage {
           timestamp: line.timestamp.toISOString(),
           meta: line.meta || null,
         })
-        .select('id')
-        .single()
 
       if (messageError) {
         console.error('[AgentCloudStorage] Error appending message:', messageError)
         return false
       }
 
-      // Save images if any
-      if (line.images && line.images.length > 0 && insertedMessage) {
-        const imagesToInsert = line.images.map(img => ({
-          message_id: insertedMessage.id,
-          data: img.data,
-          mime_type: img.type,
-        }))
-
-        const { error: imagesError } = await this.storageClient
-          .from('agent_cloud_message_images')
-          .insert(imagesToInsert)
-
-        if (imagesError) {
-          console.error('[AgentCloudStorage] Error saving images:', imagesError)
-        }
+      // Save images to IndexedDB
+      if (line.images && line.images.length > 0) {
+        await saveImages(sessionId, [{ sequenceNum, images: line.images }])
       }
 
       return true
