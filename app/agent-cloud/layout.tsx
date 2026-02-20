@@ -775,119 +775,132 @@ function AgentCloudLayoutInner({
     }
   }
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase()
+  // Group sessions by time period
+  const groupSessions = (allSessions: Session[]) => {
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const yesterday = new Date(today.getTime() - 86400000)
+    const weekAgo = new Date(today.getTime() - 7 * 86400000)
+
+    const groups: { label: string; sessions: Session[] }[] = []
+    const todaySessions = allSessions.filter(s => new Date(s.createdAt) >= today)
+    const yesterdaySessions = allSessions.filter(s => {
+      const d = new Date(s.createdAt)
+      return d >= yesterday && d < today
+    })
+    const weekSessions = allSessions.filter(s => {
+      const d = new Date(s.createdAt)
+      return d >= weekAgo && d < yesterday
+    })
+    const olderSessions = allSessions.filter(s => new Date(s.createdAt) < weekAgo)
+
+    if (todaySessions.length) groups.push({ label: 'Today', sessions: todaySessions })
+    if (yesterdaySessions.length) groups.push({ label: 'Yesterday', sessions: yesterdaySessions })
+    if (weekSessions.length) groups.push({ label: 'Previous 7 days', sessions: weekSessions })
+    if (olderSessions.length) groups.push({ label: 'Older', sessions: olderSessions })
+
+    return groups
   }
 
-  // Sidebar content - sessions list only
-  const SidebarContent = () => (
-    <div className="flex flex-col h-full">
-      {/* Sessions list */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="px-4 py-3">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs text-zinc-500 font-medium tracking-wide uppercase">Sessions</span>
-          </div>
+  // Sidebar content
+  const SidebarContent = () => {
+    const sessionGroups = groupSessions(sessions)
 
+    return (
+      <div className="flex flex-col h-full">
+        {/* New session button */}
+        <div className="p-3">
+          <button
+            onClick={() => router.push('/agent-cloud/new')}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-gray-300 hover:bg-gray-800/60 transition-colors"
+          >
+            <div className="h-7 w-7 rounded-lg bg-gray-800 flex items-center justify-center">
+              <Plus className="h-4 w-4 text-gray-400" />
+            </div>
+            <span className="font-medium">New session</span>
+          </button>
+        </div>
+
+        {/* Sessions list */}
+        <div className="flex-1 overflow-y-auto px-3 pb-3">
           {sessions.length === 0 ? (
-            <div className="text-center py-12">
-              <Bot className="h-10 w-10 mx-auto mb-3 text-zinc-800" />
-              <p className="text-sm text-zinc-600">No sessions yet</p>
-              <p className="text-xs text-zinc-700 mt-1">Create a new session to start</p>
+            <div className="text-center py-16 px-4">
+              <p className="text-sm text-gray-500">No sessions yet</p>
+              <p className="text-xs text-gray-600 mt-1">Start a new session to begin coding</p>
             </div>
           ) : (
-            <div className="space-y-1">
-              {sessions.map(session => (
-                <button
-                  key={session.id}
-                  onClick={() => setActiveSessionId(session.id)}
-                  className={`w-full text-left px-3 py-3 rounded-xl transition-all group ${
-                    activeSessionId === session.id
-                      ? 'bg-zinc-800/80'
-                      : 'hover:bg-zinc-800/40'
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${
-                      session.status === 'active'
-                        ? 'bg-gradient-to-br from-purple-500 to-violet-600'
-                        : 'bg-zinc-700'
-                    }`}>
-                      <Bot className="h-4 w-4 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate leading-tight">
-                        {session.title || session.repo?.name || 'Untitled'}
-                      </div>
-                      <div className="text-xs text-zinc-500 flex items-center gap-1.5 mt-1 font-mono">
-                        <span>{session.isNewProject ? session.newProjectName : session.repo?.name}</span>
-                        <span className="text-zinc-700">·</span>
-                        <span>{formatTime(session.createdAt)}</span>
-                        {session.stats && (session.stats.additions > 0 || session.stats.deletions > 0) && (
-                          <>
-                            <span className="text-zinc-700">·</span>
-                            <span className="text-green-500">+{session.stats.additions}</span>
-                            <span className="text-red-500">-{session.stats.deletions}</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          onClick={(e) => e.stopPropagation()}
-                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-zinc-700 rounded-md transition-all"
-                        >
-                          <MoreVertical className="h-3.5 w-3.5" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="bg-zinc-900 border-zinc-800">
-                        {session.status === 'active' && (
-                          <DropdownMenuItem
-                            onClick={() => terminateSession(session.id)}
-                            className="cursor-pointer text-yellow-500"
-                          >
-                            <Square className="h-3 w-3 mr-2" />
-                            Stop
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem
-                          onClick={() => deleteSession(session.id)}
-                          className="cursor-pointer text-red-500"
-                        >
-                          <Trash2 className="h-3 w-3 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+            <div className="space-y-5">
+              {sessionGroups.map(group => (
+                <div key={group.label}>
+                  <div className="px-2 mb-1.5">
+                    <span className="text-[11px] font-medium text-gray-500">{group.label}</span>
                   </div>
-                </button>
+                  <div className="space-y-0.5">
+                    {group.sessions.map(session => (
+                      <button
+                        key={session.id}
+                        onClick={() => setActiveSessionId(session.id)}
+                        className={`w-full text-left px-2.5 py-2 rounded-lg transition-all group relative ${
+                          activeSessionId === session.id
+                            ? 'bg-gray-800/70 text-white'
+                            : 'text-gray-400 hover:bg-gray-800/40 hover:text-gray-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm truncate leading-snug">
+                            {session.title || session.repo?.name || 'Untitled'}
+                          </span>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                onClick={(e) => e.stopPropagation()}
+                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-700 rounded-md transition-all shrink-0"
+                              >
+                                <MoreVertical className="h-3.5 w-3.5 text-gray-500" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-gray-900 border-gray-700 min-w-[140px]">
+                              {session.status === 'active' && (
+                                <DropdownMenuItem
+                                  onClick={() => terminateSession(session.id)}
+                                  className="cursor-pointer text-yellow-400 focus:text-yellow-400"
+                                >
+                                  <Square className="h-3.5 w-3.5 mr-2" />
+                                  Stop session
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem
+                                onClick={() => deleteSession(session.id)}
+                                className="cursor-pointer text-red-400 focus:text-red-400"
+                              >
+                                <Trash2 className="h-3.5 w-3.5 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           )}
         </div>
-      </div>
 
-      {/* New session + Settings buttons */}
-      <div className="p-4 border-t border-zinc-800/50 space-y-2">
-        <Button
-          onClick={() => router.push('/agent-cloud/new')}
-          className="w-full bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl h-10 font-medium"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          New Session
-        </Button>
-        <Button
-          onClick={() => router.push('/agent-cloud/settings')}
-          variant="ghost"
-          className="w-full text-zinc-400 hover:text-white hover:bg-zinc-800/50 rounded-xl h-9 font-medium text-sm"
-        >
-          <Settings className="h-4 w-4 mr-2" />
-          Settings
-        </Button>
+        {/* Bottom settings */}
+        <div className="p-3 border-t border-gray-800/50">
+          <button
+            onClick={() => router.push('/agent-cloud/settings')}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 transition-colors"
+          >
+            <Settings className="h-4 w-4" />
+            <span>Settings</span>
+          </button>
+        </div>
       </div>
-    </div>
-  )
+    )
+  }
 
   const contextValue: AgentCloudContextType = {
     sessions,
@@ -916,82 +929,12 @@ function AgentCloudLayoutInner({
     isCreating,
   }
 
+  // Active session for header context
+  const activeSession = activeSessionId ? sessions.find(s => s.id === activeSessionId) : null
+
   return (
     <AgentCloudContext.Provider value={contextValue}>
-      <div className="h-screen flex flex-col bg-zinc-950 text-zinc-100">
-        {/* Header */}
-        <header className="flex items-center justify-between px-4 py-3 border-b border-zinc-800/50 bg-zinc-950/95 backdrop-blur-sm sticky top-0 z-50">
-          <div className="flex items-center gap-3">
-            {/* Mobile menu button */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 hover:bg-zinc-800 rounded-lg transition-colors md:hidden"
-            >
-              {mobileMenuOpen ? (
-                <X className="h-5 w-5 text-zinc-400" />
-              ) : (
-                <Menu className="h-5 w-5 text-zinc-400" />
-              )}
-            </button>
-
-            {/* Desktop sidebar toggle */}
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 hover:bg-zinc-800 rounded-lg transition-colors hidden md:block"
-            >
-              <PanelLeft className="h-5 w-5 text-zinc-400" />
-            </button>
-
-            <div className="flex items-center gap-2.5">
-              <span className="font-semibold text-lg tracking-tight">PiPilot Code</span>
-              <Badge className="text-[10px] bg-zinc-800 text-zinc-400 font-normal border-0 px-2">
-                Research preview
-              </Badge>
-            </div>
-          </div>
-
-          {/* Right - Branch, View PR, MCP indicator */}
-          <div className="flex items-center gap-3">
-            {/* Branch name - clickable to open in GitHub */}
-            {activeSessionId && sessions.find(s => s.id === activeSessionId)?.workingBranch && (
-              <a
-                href={`https://github.com/${sessions.find(s => s.id === activeSessionId)?.repo?.full_name}/tree/${sessions.find(s => s.id === activeSessionId)?.workingBranch}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
-                title={sessions.find(s => s.id === activeSessionId)?.workingBranch}
-              >
-                <GitBranch className="h-3.5 w-3.5" />
-                <span className="font-mono hidden sm:inline">
-                  {(sessions.find(s => s.id === activeSessionId)?.workingBranch || '').length > 25
-                    ? (sessions.find(s => s.id === activeSessionId)?.workingBranch || '').slice(0, 25) + '...'
-                    : sessions.find(s => s.id === activeSessionId)?.workingBranch}
-                </span>
-              </a>
-            )}
-
-            {/* View PR button */}
-            {activeSessionId && sessions.find(s => s.id === activeSessionId)?.workingBranch && (
-              <a
-                href={`https://github.com/${sessions.find(s => s.id === activeSessionId)?.repo?.full_name}/pulls?q=head:${sessions.find(s => s.id === activeSessionId)?.workingBranch}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Button size="sm" variant="outline" className="h-7 text-xs bg-zinc-900/50 border-zinc-800 hover:bg-zinc-800 rounded-lg">
-                  View PR
-                  <ExternalLink className="h-3 w-3 ml-1.5" />
-                </Button>
-              </a>
-            )}
-
-            {/* MCP indicator */}
-            <div className="flex items-center gap-1.5 text-xs text-zinc-500">
-              <Globe className="h-3.5 w-3.5 text-emerald-500" />
-              <span className="hidden sm:inline">MCP Enabled</span>
-            </div>
-          </div>
-        </header>
-
+      <div className="h-screen flex bg-[#1a1a1a] text-gray-100">
         {/* Mobile sidebar overlay */}
         {mobileMenuOpen && (
           <div
@@ -1000,35 +943,95 @@ function AgentCloudLayoutInner({
           />
         )}
 
-        <div className="flex-1 flex overflow-hidden relative">
-          {/* Mobile sidebar */}
-          <div className={`
-            fixed inset-y-0 left-0 w-72 bg-zinc-950 border-r border-zinc-800/50 z-50
-            transform transition-transform duration-300 ease-out md:hidden
-            ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
-          `}>
-            {/* Mobile sidebar header with close button */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800/50">
-              <span className="font-semibold text-sm">Sessions</span>
-              <button
-                onClick={() => setMobileMenuOpen(false)}
-                className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
-              >
-                <X className="h-5 w-5 text-zinc-400" />
-              </button>
-            </div>
+        {/* Mobile sidebar */}
+        <div className={`
+          fixed inset-y-0 left-0 w-[260px] bg-[#171717] z-50
+          transform transition-transform duration-300 ease-out md:hidden
+          ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+        `}>
+          <div className="flex items-center justify-between px-3 py-3">
+            <span className="font-semibold text-sm text-gray-200 pl-1">PiPilot Code</span>
+            <button
+              onClick={() => setMobileMenuOpen(false)}
+              className="p-1.5 hover:bg-gray-800 rounded-lg transition-colors"
+            >
+              <X className="h-4 w-4 text-gray-500" />
+            </button>
+          </div>
+          <SidebarContent />
+        </div>
+
+        {/* Desktop sidebar */}
+        {sidebarOpen && (
+          <div className="w-[260px] min-w-[260px] bg-[#171717] flex-col hidden md:flex">
             <SidebarContent />
           </div>
+        )}
 
-          {/* Desktop sidebar */}
-          {sidebarOpen && (
-            <div className="w-72 min-w-[288px] border-r border-zinc-800/50 flex-col bg-zinc-950 hidden md:flex">
-              <SidebarContent />
+        {/* Main area */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Clean minimal header */}
+          <header className="flex items-center justify-between px-4 h-12 shrink-0">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  if (window.innerWidth < 768) {
+                    setMobileMenuOpen(!mobileMenuOpen)
+                  } else {
+                    setSidebarOpen(!sidebarOpen)
+                  }
+                }}
+                className="p-1.5 hover:bg-gray-800/60 rounded-lg transition-colors"
+              >
+                <PanelLeft className="h-[18px] w-[18px] text-gray-500" />
+              </button>
+
+              {!sidebarOpen && (
+                <>
+                  <span className="text-sm font-semibold text-gray-300 hidden sm:inline">PiPilot Code</span>
+                  <Badge className="text-[10px] bg-gray-800 text-gray-500 font-normal border-0 px-1.5 hidden sm:inline-flex">
+                    preview
+                  </Badge>
+                </>
+              )}
             </div>
-          )}
 
-          {/* Main Content */}
-          <div className="flex-1 flex flex-col min-w-0">
+            <div className="flex items-center gap-2.5">
+              {activeSession?.workingBranch && (
+                <a
+                  href={`https://github.com/${activeSession.repo?.full_name}/tree/${activeSession.workingBranch}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                >
+                  <GitBranch className="h-3.5 w-3.5" />
+                  <span className="font-mono hidden sm:inline max-w-[150px] truncate">
+                    {activeSession.workingBranch}
+                  </span>
+                </a>
+              )}
+
+              {activeSession?.workingBranch && (
+                <a
+                  href={`https://github.com/${activeSession.repo?.full_name}/pulls?q=head:${activeSession.workingBranch}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-gray-300 hover:bg-gray-800/50 rounded-md transition-colors"
+                >
+                  View PR
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
+
+              <div className="flex items-center gap-1 text-xs text-gray-600">
+                <Globe className="h-3 w-3 text-emerald-600" />
+                <span className="hidden sm:inline">MCP</span>
+              </div>
+            </div>
+          </header>
+
+          {/* Content */}
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
             {children}
           </div>
         </div>
@@ -1045,7 +1048,7 @@ export default function AgentCloudLayout({
 }) {
   return (
     <Suspense fallback={
-      <div className="h-screen flex items-center justify-center bg-zinc-950">
+      <div className="h-screen flex items-center justify-center bg-[#1a1a1a]">
         <div className="animate-spin h-8 w-8 border-2 border-orange-500 border-t-transparent rounded-full" />
       </div>
     }>

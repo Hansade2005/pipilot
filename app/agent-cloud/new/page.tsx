@@ -9,16 +9,15 @@ import {
   Github,
   GitBranch,
   ChevronDown,
-  Bot,
   FolderGit2,
   Search,
-  Circle,
   ArrowUp,
   Sparkles,
   ImageIcon,
   Monitor,
   X,
   Plus,
+  Check,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -251,17 +250,26 @@ export default function NewSessionPage() {
     }
   }
 
+  // Time-based greeting
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return 'Good morning'
+    if (hour < 17) return 'Good afternoon'
+    return 'Good evening'
+  }
+
+  const currentModelInfo = MODELS.find(m => m.id === selectedModel)
+
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-8">
-      <div className="w-full max-w-2xl">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-orange-500/20 to-amber-600/20 inline-block mb-4">
-            <Bot className="h-12 w-12 text-orange-500" />
-          </div>
-          <h1 className="text-2xl font-semibold mb-2">Start a new session</h1>
-          <p className="text-zinc-500 text-sm">
-            Select a repository and describe what you want to build
+    <div className="flex-1 flex flex-col items-center justify-center px-6">
+      <div className="w-full max-w-[720px]">
+        {/* Greeting */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-semibold text-gray-100 tracking-tight">
+            {getGreeting()}.
+          </h1>
+          <p className="text-gray-500 mt-2 text-base">
+            What would you like to build today?
           </p>
         </div>
 
@@ -270,7 +278,7 @@ export default function NewSessionPage() {
           <button
             onClick={() => setIsNewProject(!isNewProject)}
             className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
-              isNewProject ? 'bg-orange-500' : 'bg-zinc-700'
+              isNewProject ? 'bg-orange-600' : 'bg-gray-700'
             }`}
           >
             <span
@@ -279,7 +287,7 @@ export default function NewSessionPage() {
               }`}
             />
           </button>
-          <span className="text-sm text-zinc-300 flex items-center gap-1.5">
+          <span className="text-sm text-gray-400 flex items-center gap-1.5">
             <Plus className="h-3.5 w-3.5" />
             New project
           </span>
@@ -296,18 +304,20 @@ export default function NewSessionPage() {
               value={projectName}
               onChange={(e) => setProjectName(e.target.value.replace(/[^a-zA-Z0-9-_]/g, '-'))}
               placeholder="my-new-app"
-              className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
+              className="w-full bg-transparent border border-gray-700/60 rounded-xl px-4 py-2.5 text-sm text-gray-100 placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50 transition-colors"
             />
-            <p className="text-[11px] text-zinc-600 mt-1.5 px-1">
+            <p className="text-[11px] text-gray-600 mt-1.5 px-1">
               This will be the GitHub repository name
             </p>
           </div>
         )}
 
-        {/* Chat input card */}
+        {/* Input card */}
         <div
-          className={`relative bg-zinc-900/50 border rounded-2xl overflow-hidden transition-all ${
-            isDragging ? 'border-orange-500 bg-orange-500/5' : 'border-zinc-800'
+          className={`relative rounded-2xl border transition-all ${
+            isDragging
+              ? 'border-orange-500/50 bg-orange-500/5'
+              : 'border-gray-700/60 bg-gray-900/50 focus-within:border-gray-600'
           }`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -315,10 +325,11 @@ export default function NewSessionPage() {
         >
           {/* Drag overlay */}
           {isDragging && (
-            <div className="absolute inset-0 flex items-center justify-center bg-zinc-900/80 z-10 pointer-events-none rounded-2xl">
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80 z-10 pointer-events-none rounded-2xl">
               <div className="text-orange-400 text-sm font-medium">Drop images here</div>
             </div>
           )}
+
           {/* Image previews */}
           {attachedImages.length > 0 && (
             <div className="flex gap-2 px-4 pt-4 flex-wrap">
@@ -327,37 +338,32 @@ export default function NewSessionPage() {
                   <img
                     src={`data:${img.type};base64,${img.data}`}
                     alt={img.name}
-                    className="h-16 w-16 object-cover rounded-lg border border-zinc-700 cursor-pointer hover:opacity-80 transition-opacity"
+                    className="h-16 w-16 object-cover rounded-lg border border-gray-700 cursor-pointer hover:opacity-80 transition-opacity"
                     onClick={() => setPreviewImage(`data:${img.type};base64,${img.data}`)}
                   />
                   <button
                     onClick={() => removeImage(i)}
-                    className="absolute -top-1.5 -right-1.5 h-4 w-4 bg-zinc-700 hover:bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity"
+                    className="absolute -top-1.5 -right-1.5 h-4 w-4 bg-gray-700 hover:bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity"
                   >
                     <X className="h-2.5 w-2.5" />
                   </button>
-                  <div className="absolute bottom-0.5 left-0.5 right-0.5 text-[8px] text-zinc-400 truncate bg-black/60 rounded px-0.5">
-                    {img.name}
-                  </div>
                 </div>
               ))}
             </div>
           )}
 
           {/* Textarea */}
-          <div className="p-4">
-            <textarea
-              ref={textareaRef}
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              placeholder={isNewProject ? "Describe the app you want to build..." : "Ask PiPilot to write code..."}
-              disabled={isNewProject ? (!isConnected || !projectName.trim() || isCreating) : (!selectedRepo || isCreating)}
-              className="w-full bg-transparent resize-none outline-none text-sm text-zinc-100 placeholder:text-zinc-500 min-h-[56px] max-h-[200px] leading-6"
-              rows={2}
-            />
-          </div>
+          <textarea
+            ref={textareaRef}
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            placeholder={isNewProject ? "Describe the app you want to build..." : "What do you want to work on?"}
+            disabled={isNewProject ? (!isConnected || !projectName.trim() || isCreating) : (!selectedRepo || isCreating)}
+            className="w-full bg-transparent resize-none outline-none text-sm text-gray-100 placeholder:text-gray-500 min-h-[56px] max-h-[200px] leading-relaxed px-4 pt-4 pb-2"
+            rows={2}
+          />
 
           {/* Hidden file input */}
           <input
@@ -370,61 +376,61 @@ export default function NewSessionPage() {
           />
 
           {/* Bottom toolbar */}
-          <div className="px-4 pb-4 flex items-center justify-between gap-4">
-            {/* Left - Attach/Repo/Branch/Model selectors */}
-            <div className="flex items-center gap-2 flex-wrap">
-              {/* Attach image button (only for models that support images) */}
+          <div className="px-3 pb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {/* Image attach */}
               {supportsImages && (
                 <>
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isNewProject ? (!isConnected || !projectName.trim() || isCreating) : (!selectedRepo || isCreating)}
-                    className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors px-2.5 py-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 disabled:opacity-40"
+                    className="p-2 text-gray-500 hover:text-gray-300 hover:bg-gray-800/60 disabled:opacity-30 rounded-lg transition-colors"
                     title="Attach image"
                   >
-                    <ImageIcon className="h-3.5 w-3.5" />
+                    <ImageIcon className="h-4 w-4" />
                   </button>
-
-                  {/* Screen capture button */}
                   <button
                     onClick={handleScreenToggle}
                     disabled={isCapturing || (isNewProject ? (!isConnected || !projectName.trim() || isCreating) : (!selectedRepo || isCreating))}
-                    className={`flex items-center gap-1.5 text-xs transition-colors px-2.5 py-1.5 rounded-lg disabled:opacity-40 ${
+                    className={`p-2 rounded-lg disabled:opacity-30 transition-colors ${
                       isScreenSharing
                         ? 'text-red-400 bg-red-500/10 hover:bg-red-500/20'
-                        : 'text-zinc-400 hover:text-white bg-zinc-800/50 hover:bg-zinc-800'
+                        : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/60'
                     }`}
                     title={isScreenSharing ? "Stop screen sharing" : "Capture screen"}
                   >
                     {isCapturing ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <Monitor className="h-3.5 w-3.5" />
+                      <Monitor className="h-4 w-4" />
                     )}
                   </button>
                 </>
               )}
 
-              {/* Repo selector (hidden in new project mode) */}
+              {/* Divider */}
+              <div className="w-px h-4 bg-gray-800 mx-0.5" />
+
+              {/* Repo selector */}
               {!isNewProject && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors px-2.5 py-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800">
+                    <button className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors px-2 py-1.5 rounded-lg hover:bg-gray-800/60">
                       <Github className="h-3.5 w-3.5" />
-                      <span className="max-w-[100px] truncate">
-                        {selectedRepo ? selectedRepo.name.slice(0, 4) + '...' : 'Select repo'}
+                      <span className="max-w-[80px] truncate">
+                        {selectedRepo ? selectedRepo.name : 'Repo'}
                       </span>
                       <ChevronDown className="h-3 w-3" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-72 bg-zinc-900 border-zinc-800 max-h-80 overflow-hidden">
+                  <DropdownMenuContent className="w-72 bg-gray-900 border-gray-700 max-h-80 overflow-hidden">
                     {isLoadingTokens || isLoadingRepos ? (
-                      <div className="p-4 text-center text-zinc-500 text-sm">
+                      <div className="p-4 text-center text-gray-500 text-sm">
                         <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
                         <span>Loading...</span>
                       </div>
                     ) : !isConnected ? (
-                      <div className="p-4 text-center text-zinc-500 text-sm">
+                      <div className="p-4 text-center text-gray-500 text-sm">
                         <Github className="h-6 w-6 mx-auto mb-2 opacity-50" />
                         <p className="mb-2">GitHub not connected</p>
                         <Button
@@ -437,21 +443,20 @@ export default function NewSessionPage() {
                         </Button>
                       </div>
                     ) : repos.length === 0 ? (
-                      <div className="p-4 text-center text-zinc-500 text-sm">
+                      <div className="p-4 text-center text-gray-500 text-sm">
                         No repositories found
                       </div>
                     ) : (
                       <>
-                        {/* Search */}
-                        <div className="p-2 border-b border-zinc-800">
+                        <div className="p-2 border-b border-gray-800">
                           <div className="relative">
-                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-500" />
                             <input
                               type="text"
                               placeholder="Search..."
                               value={repoSearchQuery}
                               onChange={(e) => setRepoSearchQuery(e.target.value)}
-                              className="w-full bg-zinc-800/50 border border-zinc-700 rounded-md pl-8 pr-3 py-1.5 text-sm placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50"
+                              className="w-full bg-gray-800/50 border border-gray-700 rounded-md pl-8 pr-3 py-1.5 text-sm placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50"
                             />
                           </div>
                         </div>
@@ -462,7 +467,7 @@ export default function NewSessionPage() {
                               onClick={() => selectRepo(repo)}
                               className="flex items-center gap-2 cursor-pointer py-2.5"
                             >
-                              <FolderGit2 className="h-4 w-4 text-zinc-500 shrink-0" />
+                              <FolderGit2 className="h-4 w-4 text-gray-500 shrink-0" />
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
                                   <span className="truncate font-medium">{repo.name}</span>
@@ -473,7 +478,7 @@ export default function NewSessionPage() {
                                   )}
                                 </div>
                                 {repo.description && (
-                                  <div className="text-xs text-zinc-500 truncate">{repo.description}</div>
+                                  <div className="text-xs text-gray-500 truncate">{repo.description}</div>
                                 )}
                               </div>
                             </DropdownMenuItem>
@@ -485,22 +490,22 @@ export default function NewSessionPage() {
                 </DropdownMenu>
               )}
 
-              {/* Branch selector (hidden in new project mode) */}
+              {/* Branch selector */}
               {!isNewProject && selectedRepo && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors px-2.5 py-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800">
+                    <button className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors px-2 py-1.5 rounded-lg hover:bg-gray-800/60">
                       <GitBranch className="h-3.5 w-3.5" />
                       <span>{selectedBranch}</span>
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="bg-zinc-900 border-zinc-800 max-h-60 overflow-y-auto">
+                  <DropdownMenuContent className="bg-gray-900 border-gray-700 max-h-60 overflow-y-auto">
                     {isLoadingBranches ? (
                       <div className="p-2 text-center">
                         <Loader2 className="h-3 w-3 animate-spin mx-auto" />
                       </div>
                     ) : branches.length === 0 ? (
-                      <div className="p-2 text-center text-zinc-500 text-xs">
+                      <div className="p-2 text-center text-gray-500 text-xs">
                         No branches
                       </div>
                     ) : (
@@ -521,21 +526,27 @@ export default function NewSessionPage() {
               {/* Model selector */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors px-2.5 py-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800">
+                  <button className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors px-2 py-1.5 rounded-lg hover:bg-gray-800/60">
                     <Sparkles className="h-3.5 w-3.5" />
-                    <span>{MODELS.find(m => m.id === selectedModel)?.name}</span>
+                    <span>{currentModelInfo?.name || selectedModel}</span>
+                    <ChevronDown className="h-3 w-3" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-zinc-900 border-zinc-800">
+                <DropdownMenuContent align="start" side="top" className="bg-gray-900 border-gray-700 w-[240px]">
                   {MODELS.map(model => (
                     <DropdownMenuItem
                       key={model.id}
                       onClick={() => setSelectedModel(model.id)}
-                      className="cursor-pointer"
+                      className={`cursor-pointer ${model.id === selectedModel ? 'bg-gray-800/50' : ''}`}
                     >
-                      <div>
-                        <div className="font-medium">{model.name}</div>
-                        <div className="text-xs text-zinc-500">{model.description}</div>
+                      <div className="flex items-center justify-between w-full">
+                        <div>
+                          <div className="font-medium text-sm">{model.name}</div>
+                          <div className="text-xs text-gray-500">{model.description}</div>
+                        </div>
+                        {model.id === selectedModel && (
+                          <Check className="h-4 w-4 text-orange-400 shrink-0 ml-2" />
+                        )}
                       </div>
                     </DropdownMenuItem>
                   ))}
@@ -543,38 +554,29 @@ export default function NewSessionPage() {
               </DropdownMenu>
             </div>
 
-            {/* Right - Submit button */}
-            <Button
+            {/* Submit button */}
+            <button
               onClick={handleSubmit}
               disabled={
                 (!prompt.trim() && attachedImages.length === 0) ||
                 (isNewProject ? (!isConnected || !projectName.trim()) : !selectedRepo) ||
                 isCreating
               }
-              size="icon"
-              className="h-9 w-9 rounded-xl bg-orange-500 hover:bg-orange-600 text-white shrink-0 disabled:opacity-40 disabled:bg-zinc-700"
+              className="h-8 w-8 rounded-lg bg-orange-600 hover:bg-orange-500 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors shrink-0"
             >
               {isCreating ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 text-white animate-spin" />
               ) : (
-                <ArrowUp className="h-4 w-4" />
+                <ArrowUp className="h-4 w-4 text-white" />
               )}
-            </Button>
+            </button>
           </div>
         </div>
 
         {/* Helper text */}
-        <div className="flex items-center justify-center mt-3 text-[10px] text-zinc-600">
-          <span>Press</span>
-          <kbd className="mx-1 px-1.5 py-0.5 rounded bg-zinc-800/60 text-zinc-500 font-mono">
-            Enter
-          </kbd>
-          <span>to send,</span>
-          <kbd className="mx-1 px-1.5 py-0.5 rounded bg-zinc-800/60 text-zinc-500 font-mono">
-            Shift + Enter
-          </kbd>
-          <span>for new line</span>
-        </div>
+        <p className="text-center mt-3 text-[11px] text-gray-600">
+          Press <kbd className="mx-0.5 px-1 py-0.5 rounded bg-gray-800/60 text-gray-500 font-mono text-[10px]">Enter</kbd> to send, <kbd className="mx-0.5 px-1 py-0.5 rounded bg-gray-800/60 text-gray-500 font-mono text-[10px]">Shift+Enter</kbd> for new line
+        </p>
       </div>
 
       {/* Image preview dialog */}
@@ -585,7 +587,7 @@ export default function NewSessionPage() {
         >
           <button
             onClick={() => setPreviewImage(null)}
-            className="absolute top-4 right-4 p-2 bg-zinc-800 hover:bg-zinc-700 rounded-full transition-colors"
+            className="absolute top-4 right-4 p-2 bg-gray-800 hover:bg-gray-700 rounded-full transition-colors"
           >
             <X className="h-5 w-5 text-white" />
           </button>
