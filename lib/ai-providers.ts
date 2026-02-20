@@ -114,7 +114,9 @@ function getOpenRouterProvider() {
 
 function getBonsaiProvider() {
   if (!_bonsaiProvider) {
-    const bonsaiBaseURL = 'https://go.trybons.ai';
+    // Bonsai exposes an Anthropic-compatible API at https://go.trybons.ai/v1
+    // The SDK appends /messages → https://go.trybons.ai/v1/messages
+    const bonsaiBaseURL = 'https://go.trybons.ai/v1';
     _bonsaiProvider = createAnthropic({
       baseURL: bonsaiBaseURL,
       apiKey: process.env.BONSAI_API_KEY || '',
@@ -127,7 +129,7 @@ function getBonsaiProvider() {
         // If the SDK rewrote the URL away from Bonsai, force it back
         if (!url.startsWith(bonsaiBaseURL)) {
           const path = new URL(url).pathname; // e.g. /v1/messages
-          url = `${bonsaiBaseURL}${path}`;
+          url = `${bonsaiBaseURL}${path.replace(/^\/v1/, '')}`;
           console.log(`[Bonsai] Redirected request back to Bonsai: ${url}`);
         }
         return globalThis.fetch(url, init);
@@ -529,7 +531,7 @@ export function createByokModel(modelId: string, byokKeys: ByokKeySet): any | nu
       return provider(bare)
     }
     case 'bonsai': {
-      const bonsaiBase = 'https://go.trybons.ai'
+      const bonsaiBase = 'https://go.trybons.ai/v1'
       const provider = createAnthropic({
         baseURL: bonsaiBase,
         apiKey,
@@ -537,7 +539,7 @@ export function createByokModel(modelId: string, byokKeys: ByokKeySet): any | nu
           let url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url
           if (!url.startsWith(bonsaiBase)) {
             const path = new URL(url).pathname
-            url = `${bonsaiBase}${path}`
+            url = `${bonsaiBase}${path.replace(/^\/v1/, '')}`
           }
           return globalThis.fetch(url, init)
         },
