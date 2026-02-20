@@ -652,9 +652,10 @@ IMPORTANT SETUP INSTRUCTIONS (do this FIRST before writing any code):
 2. After the repo is created, run these commands to set up the remote:
    git remote add origin https://x-access-token:${storedTokens.github}@github.com/USER/${activeSession.newProjectName}.git
    (Replace USER with the authenticated GitHub username - you can get this from the GitHub MCP whoami or get_me tool)
-3. Build the project as requested by the user
-4. When done building, commit all changes and push to the remote:
-   git add -A && git commit -m "Initial commit: <brief description>" && git push -u origin main
+3. After setting up the remote, make an initial commit and push immediately:
+   git add -A && git commit -m "Initial project setup" && git push -u origin main
+4. Build the project as requested by the user
+5. COMMIT AND PUSH INCREMENTALLY as you build - after each meaningful step (new component, feature, config change), commit and push right away. Do NOT wait until everything is done. This protects against session disconnects or credit exhaustion.
 
 GitHub Token: ${storedTokens.github}
 Working Directory: /home/user/

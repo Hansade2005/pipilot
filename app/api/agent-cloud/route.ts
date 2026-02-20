@@ -444,9 +444,23 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 - You are working on branch: ${workingBranch}
 - BEFORE committing, ALWAYS configure git user: git config user.name "pipilot-swe-bot" && git config user.email "hello@pipilot.dev"
 - Do NOT use git config user.name "Claude" or user.email "noreply@anthropic.com"
-- After making code changes, ALWAYS commit them with a clear message
-- After committing, push to the remote: git push -u origin ${workingBranch}
-- After pushing, use the GitHub MCP tools to create a pull request (you have GitHub MCP installed with authentication)
+
+INCREMENTAL COMMIT & PUSH (CRITICAL - prevents work loss):
+- Do NOT wait until you finish everything to commit. Commit and push INCREMENTALLY as you build.
+- After completing each meaningful unit of work (e.g. a new component, a feature, a config change, a bug fix), immediately:
+  1. git add the relevant files
+  2. git commit -m "descriptive message of what was done"
+  3. git push -u origin ${workingBranch}
+- Examples of when to commit & push:
+  - After initial project setup / scaffolding
+  - After adding each new component or page
+  - After installing and configuring dependencies
+  - After implementing each feature or fixing each bug
+  - After adding styles or updating layouts
+  - Before starting a risky or complex change
+- This protects the user's work if the session disconnects, credits run out, or the sandbox closes.
+- The user can always recover from the last pushed commit on reconnection.
+- After ALL work is complete, use the GitHub MCP tools to create a pull request (you have GitHub MCP installed with authentication)
 - Always provide meaningful commit messages and PR descriptions
 - A .gitignore file exists in the project to prevent committing node_modules and other artifacts
 `.trim()
@@ -2192,8 +2206,22 @@ CRITICAL PROJECT DIRECTORY INFORMATION:
 IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 - You are working on branch: \${WORKING_BRANCH}
 - BEFORE committing, ALWAYS configure git user: git config user.name "pipilot-swe-bot" && git config user.email "hello@pipilot.dev"
-- After making code changes, ALWAYS commit them with a clear message
-- After committing, push to the remote: git push -u origin \${WORKING_BRANCH}
+
+INCREMENTAL COMMIT & PUSH (CRITICAL - prevents work loss):
+- Do NOT wait until you finish everything to commit. Commit and push INCREMENTALLY as you build.
+- After completing each meaningful unit of work (e.g. a new component, a feature, a config change, a bug fix), immediately:
+  1. git add the relevant files
+  2. git commit -m "descriptive message of what was done"
+  3. git push -u origin \${WORKING_BRANCH}
+- Examples of when to commit & push:
+  - After initial project setup / scaffolding
+  - After adding each new component or page
+  - After installing and configuring dependencies
+  - After implementing each feature or fixing each bug
+  - After adding styles or updating layouts
+  - Before starting a risky or complex change
+- This protects the user's work if the session disconnects, credits run out, or the sandbox closes.
+- The user can always recover from the last pushed commit on reconnection.
 - A .gitignore file exists in the project to prevent committing node_modules and other artifacts
 \`.trim();
 
