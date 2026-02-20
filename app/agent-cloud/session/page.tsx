@@ -261,6 +261,7 @@ function SessionPageInner() {
     setConnectors,
     selectedModel,
     setSelectedModel,
+    loadSessionMessages,
   } = useAgentCloud()
 
   const [prompt, setPrompt] = useState('')
@@ -351,6 +352,15 @@ function SessionPageInner() {
 
   // Find the active session
   const activeSession = sessions.find(s => s.id === sessionId) || null
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false)
+
+  // Lazy-load messages from Supabase when opening a session
+  useEffect(() => {
+    if (sessionId && activeSession && activeSession.lines.length === 0 && !activeSession.pendingPrompt) {
+      setIsLoadingMessages(true)
+      loadSessionMessages(sessionId).finally(() => setIsLoadingMessages(false))
+    }
+  }, [sessionId, activeSession?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Redirect to new page if session was deleted (sessions loaded but ID not found)
   useEffect(() => {
@@ -652,9 +662,10 @@ IMPORTANT SETUP INSTRUCTIONS (do this FIRST before writing any code):
 2. After the repo is created, run these commands to set up the remote:
    git remote add origin https://x-access-token:${storedTokens.github}@github.com/USER/${activeSession.newProjectName}.git
    (Replace USER with the authenticated GitHub username - you can get this from the GitHub MCP whoami or get_me tool)
-3. Build the project as requested by the user
-4. When done building, commit all changes and push to the remote:
-   git add -A && git commit -m "Initial commit: <brief description>" && git push -u origin main
+3. After setting up the remote, make an initial commit and push immediately:
+   git add -A && git commit -m "Initial project setup" && git push -u origin main
+4. Build the project as requested by the user
+5. COMMIT AND PUSH INCREMENTALLY as you build - after each meaningful step (new component, feature, config change), commit and push right away. Do NOT wait until everything is done. This protects against session disconnects or credit exhaustion.
 
 GitHub Token: ${storedTokens.github}
 Working Directory: /home/user/
@@ -1950,6 +1961,12 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
         className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6"
       >
         <div className="max-w-3xl mx-auto space-y-2 min-w-0">
+          {isLoadingMessages && activeSession.lines.length === 0 && (
+            <div className="flex items-center justify-center gap-2 py-12 text-gray-500">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm font-mono">Loading messages...</span>
+            </div>
+          )}
           {activeSession.lines.map((line, index) => renderLine(line, index))}
           {isRecreating && (
             <div className="flex items-center gap-2 py-3 text-amber-400">

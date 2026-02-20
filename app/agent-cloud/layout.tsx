@@ -247,6 +247,7 @@ interface AgentCloudContextType {
   createSession: (initialPrompt: string, images?: Array<{ data: string; type: string; name: string }>, newProject?: { name: string }) => Promise<Session | null>
   terminateSession: (sessionId: string) => Promise<void>
   deleteSession: (sessionId: string) => Promise<void>
+  loadSessionMessages: (sessionId: string) => Promise<void>
   isCreating: boolean
   userFirstName: string | null
 }
@@ -319,6 +320,8 @@ function AgentCloudLayoutInner({
   // Track if initial load is complete
   const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false)
   const [lastSavedLinesCount, setLastSavedLinesCount] = useState<Map<string, number>>(new Map())
+  // Track which sessions have had their messages loaded (lazy loading)
+  const messagesLoadedRef = useRef<Set<string>>(new Set())
 
   // Load sessions from Supabase (with localStorage migration)
   useEffect(() => {
@@ -331,14 +334,10 @@ function AgentCloudLayoutInner({
           await agentCloudStorage.migrateFromLocalStorage(STORAGE_KEY)
         }
 
-        // Load sessions from Supabase
+        // Load sessions from Supabase (metadata only, messages loaded lazily)
         const loadedSessions = await agentCloudStorage.loadSessions()
         if (loadedSessions.length > 0) {
           setSessions(loadedSessions)
-          // Initialize lines count tracking
-          const countsMap = new Map<string, number>()
-          loadedSessions.forEach(s => countsMap.set(s.id, s.lines.length))
-          setLastSavedLinesCount(countsMap)
         }
 
         // Load connectors from Supabase
@@ -598,6 +597,29 @@ function AgentCloudLayoutInner({
     loadStoredTokens()
   }, [])
 
+  // Lazy-load messages for a session from Supabase (called when user opens a session)
+  const loadSessionMessages = useCallback(async (sessionId: string) => {
+    // Skip if already loaded (messages are in state from this device or a previous load)
+    if (messagesLoadedRef.current.has(sessionId)) return
+
+    const lines = await agentCloudStorage.loadSessionMessages(sessionId)
+    messagesLoadedRef.current.add(sessionId)
+
+    if (lines.length > 0) {
+      setSessions(prev => prev.map(s =>
+        s.id === sessionId && s.lines.length === 0
+          ? { ...s, lines }
+          : s
+      ))
+      // Mark these lines as already saved so the debounce doesn't re-save them
+      setLastSavedLinesCount(prev => {
+        const updated = new Map(prev)
+        updated.set(sessionId, lines.length)
+        return updated
+      })
+    }
+  }, [])
+
   // Create session
   const createSession = async (initialPrompt: string, images?: Array<{ data: string; type: string; name: string }>, newProject?: { name: string }): Promise<Session | null> => {
     if (!newProject && !selectedRepo) {
@@ -702,6 +724,9 @@ function AgentCloudLayoutInner({
           { type: 'system', content: `Failed to clone ${selectedRepo!.full_name}`, timestamp: new Date() },
         ]
       }
+
+      // Mark as loaded so lazy loader won't overwrite lines from this device
+      messagesLoadedRef.current.add(newSession.id)
 
       // Save to Supabase - only proceed if save succeeds
       const saved = await agentCloudStorage.createSession(newSession)
@@ -939,6 +964,7 @@ function AgentCloudLayoutInner({
     createSession,
     terminateSession,
     deleteSession,
+    loadSessionMessages,
     isCreating,
     userFirstName,
   }
