@@ -2,7 +2,7 @@
  * Agent Cloud API
  *
  * API endpoint for running Claude Code in E2B sandboxes.
- * Configured with Vercel AI Gateway for unified AI routing.
+ * Configured with Bonsai AI Gateway (go.trybons.ai) for AI routing.
  *
  * Features:
  * - Sandbox reuse with Sandbox.connect() for persistent sessions
@@ -25,7 +25,7 @@
  * - action: 'list' - List all sandboxes for user
  *
  * Environment Variables Required:
- * - VERCEL_AI_GATEWAY_API_KEY: Your Vercel AI Gateway API key
+ * - BONSAI_API_KEY: Your Bonsai API key (go.trybons.ai)
  * - E2B_API_KEY: Your E2B API key (for sandbox creation)
  */
 
@@ -34,14 +34,17 @@ import { Sandbox } from 'e2b'
 import { createClient } from '@/lib/supabase/server'
 // getDeploymentTokens uses browser client - query user_settings directly with server client instead
 
-// Vercel AI Gateway configuration
-const AI_GATEWAY_BASE_URL = 'https://ai-gateway.vercel.sh'
+// Bonsai AI Gateway configuration (testing Bonsai as general API proxy)
+// Bonsai exposes an Anthropic-compatible API at https://go.trybons.ai
+// Claude Code reads ANTHROPIC_BASE_URL to know where to send requests
+const AI_GATEWAY_BASE_URL = 'https://go.trybons.ai'
 
-// Available models through Vercel AI Gateway
+// Available models through Bonsai AI Gateway
+// These model IDs are what Bonsai expects (provider/model format)
 const AVAILABLE_MODELS = {
-  sonnet: 'mistral/devstral-small-2',   // Default - fast code generation
-  opus: 'zai/glm-4.7',                  // High quality
-  haiku: 'xai/grok-code-fast-1',        // Quick tasks
+  sonnet: 'anthropic/claude-sonnet-4.5',   // Default - fast code generation
+  opus: 'anthropic/claude-opus-4',         // High quality
+  haiku: 'anthropic/claude-sonnet-4.5',    // Quick tasks (Bonsai has no haiku, use sonnet)
 } as const
 
 // Store active sandboxes with user association
@@ -252,11 +255,11 @@ async function doStreaming(
     )
   }
 
-  // Get Vercel AI Gateway API key for SDK authentication
-  const aiGatewayKey = process.env.VERCEL_AI_GATEWAY_API_KEY
+  // Get Bonsai API key for SDK authentication
+  const aiGatewayKey = process.env.BONSAI_API_KEY
   if (!aiGatewayKey) {
     return NextResponse.json(
-      { error: 'VERCEL_AI_GATEWAY_API_KEY not configured' },
+      { error: 'BONSAI_API_KEY not configured' },
       { status: 500 }
     )
   }
@@ -859,11 +862,11 @@ async function handleCreate(
 
   const userId = user.id
 
-  // Get Vercel AI Gateway API key
-  const aiGatewayKey = process.env.VERCEL_AI_GATEWAY_API_KEY
+  // Get Bonsai API key
+  const aiGatewayKey = process.env.BONSAI_API_KEY
   if (!aiGatewayKey) {
     return NextResponse.json(
-      { error: 'VERCEL_AI_GATEWAY_API_KEY not configured. Add it to your environment variables.' },
+      { error: 'BONSAI_API_KEY not configured. Add it to your environment variables.' },
       { status: 500 }
     )
   }
@@ -1027,9 +1030,9 @@ async function handleCreate(
     console.log(`[Agent Cloud] GitHub token available: ${!!githubToken}`)
   }
 
-  // Configure environment variables for Claude Code with Vercel AI Gateway
+  // Configure environment variables for Claude Code with Bonsai AI Gateway
   const envs: Record<string, string> = {
-    // Vercel AI Gateway configuration
+    // Bonsai AI Gateway configuration
     ANTHROPIC_BASE_URL: AI_GATEWAY_BASE_URL,
     ANTHROPIC_AUTH_TOKEN: aiGatewayKey,
     ANTHROPIC_API_KEY: '', // Must be empty - Claude Code checks this first
@@ -1091,7 +1094,7 @@ async function handleCreate(
   const selectedModel = config?.model || 'sonnet'
 
   console.log(`[Agent Cloud] Creating new sandbox with template: ${template}`)
-  console.log(`[Agent Cloud] Using Vercel AI Gateway: ${AI_GATEWAY_BASE_URL}`)
+  console.log(`[Agent Cloud] Using Bonsai AI Gateway: ${AI_GATEWAY_BASE_URL}`)
   console.log(`[Agent Cloud] Default model: ${AVAILABLE_MODELS[selectedModel]}`)
 
   // Create sandbox (MCP is configured directly in Claude Agent SDK script)
@@ -1386,7 +1389,7 @@ async function handleCreate(
       ? `Sandbox created for new project: ${config.newProject.name} (MCP enabled)`
       : repoCloned
         ? `Sandbox created with ${config?.repo?.full_name} cloned (MCP enabled)`
-        : 'Sandbox created with Vercel AI Gateway (MCP enabled)',
+        : 'Sandbox created with Bonsai AI Gateway (MCP enabled)',
   })
 }
 
@@ -1980,11 +1983,11 @@ async function handleStartStreamServer(request: NextRequest, sandboxId: string) 
     )
   }
 
-  // Get Vercel AI Gateway API key
-  const aiGatewayKey = process.env.VERCEL_AI_GATEWAY_API_KEY
+  // Get Bonsai API key
+  const aiGatewayKey = process.env.BONSAI_API_KEY
   if (!aiGatewayKey) {
     return NextResponse.json(
-      { error: 'VERCEL_AI_GATEWAY_API_KEY not configured' },
+      { error: 'BONSAI_API_KEY not configured' },
       { status: 500 }
     )
   }
