@@ -31,6 +31,8 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { useAgentCloud, MODELS, DEFAULT_MCPS } from "../layout"
 import { usePageTitle } from '@/hooks/use-page-title'
+import { ParticleBackground } from "@/components/particle-background"
+import { SpaceBackground } from "@/components/space-background"
 
 export default function NewSessionPage() {
   usePageTitle('New Agent')
@@ -338,8 +340,35 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
   const currentModelInfo = MODELS.find(m => m.id === selectedModel)
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-6 bg-[#030305]">
-      <div className="w-full max-w-[720px]">
+    <div className="flex-1 flex flex-col items-center justify-center px-6 relative overflow-hidden">
+      {/* Background layers (matching app/page.tsx) */}
+      <div className="absolute inset-0 lovable-gradient" />
+      <div className="absolute inset-0 noise-texture" />
+      <div className="absolute inset-0 pointer-events-none bg-grid opacity-20" />
+      <div className="arc-container">
+        <div className="arc-radial-glow" />
+        <div className="arc-ambient-glow" />
+        <div className="arc-ellipses">
+          <div className="arc-ellipse arc-ellipse-1" />
+          <div className="arc-ellipse arc-ellipse-2" />
+          <div className="arc-ellipse arc-ellipse-3" />
+          <div className="arc-ellipse arc-ellipse-4" />
+          <div className="arc-ellipse arc-ellipse-5" />
+        </div>
+      </div>
+      <div className="light-rays-container">
+        <div className="light-ray light-ray-1" />
+        <div className="light-ray light-ray-2" />
+        <div className="light-ray light-ray-3" />
+        <div className="light-ray light-ray-4" />
+        <div className="light-ray light-ray-5" />
+      </div>
+      <div className="hero-top-glow" />
+      <ParticleBackground />
+      <SpaceBackground />
+
+      {/* Main content */}
+      <div className="w-full max-w-[720px] relative z-10">
         {/* Greeting */}
         <div className="mb-8">
           <h1 className="text-3xl font-semibold text-gray-100 tracking-tight">
