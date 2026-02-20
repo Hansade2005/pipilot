@@ -1958,7 +1958,7 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
       {/* Chat area */}
       <div
         ref={terminalRef}
-        className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 pb-24 md:pb-6"
+        className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 pb-40 md:pb-6"
       >
         <div className="max-w-3xl mx-auto space-y-2 min-w-0">
           {isLoadingMessages && activeSession.lines.length === 0 && (
@@ -1985,7 +1985,7 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
 
       {/* Input area */}
       {activeSession.status === 'active' && (
-        <div className="fixed bottom-0 left-0 right-0 z-[60] px-3 pb-3 pt-2 md:relative md:z-auto md:px-4 md:pb-4 md:pt-0 md:border-t md:border-gray-800/50" style={{ backgroundColor: 'rgba(17, 24, 39, 0.8)' }}>
+        <div className="fixed bottom-0 left-0 right-0 z-[60] px-3 pb-3 pt-2 md:relative md:z-auto md:px-4 md:pb-4 md:pt-0 md:border-t md:border-gray-800/50 md:bg-transparent" style={{ backgroundColor: 'rgba(17, 24, 39, 0.8)' }}>
           <div className="max-w-3xl mx-auto">
             <div
               className={`relative rounded-2xl border transition-colors ${
