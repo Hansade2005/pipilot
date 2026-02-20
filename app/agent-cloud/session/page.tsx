@@ -260,8 +260,9 @@ function SessionPageInner() {
     }
   }, [sessionId, sessions, activeSession, router])
 
-  // Only Devstral model supports image input
-  const supportsImages = activeSession?.model?.includes('devstral') ?? false
+  // Claude, GPT, and Devstral models support image input
+  const modelName = activeSession?.model || ''
+  const supportsImages = modelName.includes('claude') || modelName.includes('gpt') || modelName.includes('devstral')
 
   // Recreate sandbox with conversation history
   const recreateSandbox = useCallback(async (pendingPrompt?: string) => {

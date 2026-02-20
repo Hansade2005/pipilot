@@ -44,7 +44,8 @@ const AI_GATEWAY_BASE_URL = 'https://go.trybons.ai'
 const AVAILABLE_MODELS = {
   sonnet: 'anthropic/claude-sonnet-4.5',   // Default - fast code generation
   opus: 'anthropic/claude-opus-4',         // High quality
-  haiku: 'anthropic/claude-sonnet-4.5',    // Quick tasks (Bonsai has no haiku, use sonnet)
+  haiku: 'openai/gpt-5.1-codex',          // OpenAI Codex via Bonsai
+  flash: 'z-ai/glm-4.6',                  // Fast inference via Bonsai
 } as const
 
 // Store active sandboxes with user association
@@ -637,7 +638,8 @@ try {
               ANTHROPIC_BASE_URL: AI_GATEWAY_BASE_URL,
               ANTHROPIC_AUTH_TOKEN: aiGatewayKey,
               ANTHROPIC_API_KEY: '', // Must be empty
-              ANTHROPIC_DEFAULT_SONNET_MODEL: AVAILABLE_MODELS.sonnet,
+              // Selected model goes into sonnet slot (Claude Code's default tier)
+              ANTHROPIC_DEFAULT_SONNET_MODEL: AVAILABLE_MODELS[(sandboxEntry!.model as keyof typeof AVAILABLE_MODELS) || 'sonnet'] || AVAILABLE_MODELS.sonnet,
               ANTHROPIC_DEFAULT_OPUS_MODEL: AVAILABLE_MODELS.opus,
               ANTHROPIC_DEFAULT_HAIKU_MODEL: AVAILABLE_MODELS.haiku,
               // Playwright browser path (0 = use node_modules local install)
@@ -1031,14 +1033,16 @@ async function handleCreate(
   }
 
   // Configure environment variables for Claude Code with Bonsai AI Gateway
+  // The user's selected model becomes the sonnet tier (Claude Code's default)
+  const selectedModelId = AVAILABLE_MODELS[(config?.model || 'sonnet') as keyof typeof AVAILABLE_MODELS] || AVAILABLE_MODELS.sonnet
   const envs: Record<string, string> = {
     // Bonsai AI Gateway configuration
     ANTHROPIC_BASE_URL: AI_GATEWAY_BASE_URL,
     ANTHROPIC_AUTH_TOKEN: aiGatewayKey,
     ANTHROPIC_API_KEY: '', // Must be empty - Claude Code checks this first
 
-    // Model overrides via AI Gateway
-    ANTHROPIC_DEFAULT_SONNET_MODEL: AVAILABLE_MODELS.sonnet,
+    // Model overrides via Bonsai - selected model goes into sonnet slot (default tier)
+    ANTHROPIC_DEFAULT_SONNET_MODEL: selectedModelId,
     ANTHROPIC_DEFAULT_OPUS_MODEL: AVAILABLE_MODELS.opus,
     ANTHROPIC_DEFAULT_HAIKU_MODEL: AVAILABLE_MODELS.haiku,
 
@@ -2275,7 +2279,8 @@ app.listen(PORT, '0.0.0.0', () => {
         ANTHROPIC_BASE_URL: AI_GATEWAY_BASE_URL,
         ANTHROPIC_AUTH_TOKEN: aiGatewayKey,
         ANTHROPIC_API_KEY: '',
-        ANTHROPIC_DEFAULT_SONNET_MODEL: AVAILABLE_MODELS.sonnet,
+        // Selected model goes into sonnet slot (Claude Code's default tier)
+        ANTHROPIC_DEFAULT_SONNET_MODEL: AVAILABLE_MODELS[(sandboxEntry.model as keyof typeof AVAILABLE_MODELS) || 'sonnet'] || AVAILABLE_MODELS.sonnet,
         ANTHROPIC_DEFAULT_OPUS_MODEL: AVAILABLE_MODELS.opus,
         ANTHROPIC_DEFAULT_HAIKU_MODEL: AVAILABLE_MODELS.haiku,
         PLAYWRIGHT_BROWSERS_PATH: '0',
