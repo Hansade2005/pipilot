@@ -465,6 +465,9 @@ export default function LandingPage() {
         <div className="light-ray light-ray-5" />
       </div>
 
+      {/* Hero Top Glow */}
+      <div className="hero-top-glow" />
+
       {/* Floating Particles */}
       <ParticleBackground />
 
