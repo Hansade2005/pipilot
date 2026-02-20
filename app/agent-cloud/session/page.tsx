@@ -13,6 +13,7 @@ import {
   Terminal,
   FileEdit,
   FileText,
+  FileUp,
   FolderSearch,
   Search,
   Globe,
@@ -28,7 +29,7 @@ import {
   Monitor,
   X,
 } from "lucide-react"
-import { useAgentCloud, MODELS, type TerminalLine } from "../layout"
+import { useAgentCloud, MODELS, DEFAULT_MCPS, type TerminalLine } from "../layout"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -190,8 +191,13 @@ function SessionPageInner() {
   const [attachedImages, setAttachedImages] = useState<Array<{ data: string; type: string; name: string }>>([])
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [showCommandMenu, setShowCommandMenu] = useState(false)
+  const [playwrightEnabled, setPlaywrightEnabled] = useState(false)
+  const [attachedFiles, setAttachedFiles] = useState<Array<{ id: string; name: string; content: string; size: number }>>([])
   const abortControllerRef = useRef<AbortController | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const combinedFileInputRef = useRef<HTMLInputElement>(null)
+  const commandMenuRef = useRef<HTMLDivElement>(null)
 
   // Screen recording state and refs - must be defined before runPrompt which uses them
   const [isScreenSharing, setIsScreenSharing] = useState(false)
@@ -422,6 +428,23 @@ function SessionPageInner() {
     textarea.style.height = `${newHeight}px`
   }, [prompt])
 
+  // Close command menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (commandMenuRef.current && !commandMenuRef.current.contains(e.target as Node)) {
+        setShowCommandMenu(false)
+      }
+    }
+    if (showCommandMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showCommandMenu])
+
+  const removeFile = (id: string) => {
+    setAttachedFiles(prev => prev.filter(f => f.id !== id))
+  }
+
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text)
     setCopied(id)
@@ -446,7 +469,7 @@ function SessionPageInner() {
     }
 
     const currentPrompt = overridePrompt || prompt.trim()
-    if (!currentPrompt && imagesToUse.length === 0) return
+    if (!currentPrompt && imagesToUse.length === 0 && attachedFiles.length === 0) return
 
     const sandboxIdToUse = overrideSandboxId || activeSession.sandboxId
 
@@ -563,6 +586,37 @@ User Request: ${currentPrompt}`
         // No GitHub but has connectors
         enhancedPrompt = `${connectorContext}
 User Request: ${currentPrompt}`
+      }
+
+      // Add Playwright setup instructions if enabled
+      if (playwrightEnabled) {
+        enhancedPrompt += `\n\n[Playwright Browser Testing - ENABLED]
+The user has enabled Playwright for browser testing. When setting up browser testing:
+1. Install Playwright as a dev dependency: pnpm add -D @playwright/test
+2. Install Playwright Chromium browser from the project directory: pnpm exec playwright install chromium
+3. Create playwright.config.ts in the project root:
+import { defineConfig, devices } from "@playwright/test";
+export default defineConfig({
+  testDir: "./tests",
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: "html",
+  use: { baseURL: "http://localhost:3000", trace: "on-first-retry", screenshot: "only-on-failure" },
+  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  webServer: { command: "pnpm dev", url: "http://localhost:3000", reuseExistingServer: !process.env.CI },
+});
+4. Create a tests/ directory and write test files as needed
+5. Run tests with: pnpm exec playwright test
+Use the Playwright MCP server for browser automation, interaction, and visual testing.`
+      }
+
+      // Add attached file contents as context
+      if (attachedFiles.length > 0) {
+        const fileContext = attachedFiles.map(f => `[Attached File: ${f.name} (${(f.size / 1024).toFixed(1)}KB)]\n\`\`\`\n${f.content}\n\`\`\``).join('\n\n')
+        enhancedPrompt = `${fileContext}\n\n${enhancedPrompt}`
+        setAttachedFiles([])
       }
 
       // Pass GitHub token via header as fallback for server-side clone auth
@@ -1096,7 +1150,7 @@ User Request: ${currentPrompt}`
       setIsStreaming(false)
       abortControllerRef.current = null
     }
-  }, [activeSession, prompt, attachedImages, isLoading, isRecreating, sessionId, setSessions, storedTokens, recreateSandbox, isScreenSharing, captureCurrentFrame])
+  }, [activeSession, prompt, attachedImages, attachedFiles, isLoading, isRecreating, sessionId, setSessions, storedTokens, recreateSandbox, isScreenSharing, captureCurrentFrame, playwrightEnabled, connectors])
 
   // Stop the running agent
   const stopAgent = useCallback(() => {
@@ -1174,6 +1228,35 @@ User Request: ${currentPrompt}`
       }
       reader.readAsDataURL(file)
     })
+    e.target.value = ''
+  }
+
+  // Combined file handler - routes images and text files appropriately
+  const handleCombinedUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+    setShowCommandMenu(false)
+    for (const file of Array.from(files)) {
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader()
+        reader.onload = () => {
+          const base64 = (reader.result as string).split(',')[1]
+          setAttachedImages(prev => [...prev, { data: base64, type: file.type, name: file.name }])
+        }
+        reader.readAsDataURL(file)
+      } else {
+        const reader = new FileReader()
+        reader.onload = () => {
+          setAttachedFiles(prev => [...prev, {
+            id: Date.now().toString() + Math.random(),
+            name: file.name,
+            content: reader.result as string,
+            size: file.size
+          }])
+        }
+        reader.readAsText(file)
+      }
+    }
     e.target.value = ''
   }
 
@@ -1615,22 +1698,34 @@ User Request: ${currentPrompt}`
                   <div className="text-orange-400 text-sm font-medium">Drop images here</div>
                 </div>
               )}
-              {/* Image previews */}
-              {attachedImages.length > 0 && (
-                <div className="flex gap-2 px-3 pt-3 flex-wrap">
+              {/* Attachment pills */}
+              {(attachedImages.length > 0 || attachedFiles.length > 0) && (
+                <div className="px-3 pt-2.5 flex flex-wrap gap-1.5">
                   {attachedImages.map((img, i) => (
-                    <div key={i} className="relative group/img">
-                      <img
-                        src={`data:${img.type};base64,${img.data}`}
-                        alt={img.name}
-                        className="h-16 w-16 object-cover rounded-lg border border-gray-700 cursor-pointer hover:opacity-80 transition-opacity"
-                        onClick={() => setPreviewImage(`data:${img.type};base64,${img.data}`)}
-                      />
+                    <div
+                      key={`img-${i}`}
+                      className="flex items-center gap-1.5 bg-gray-800 px-2 py-1 rounded-lg text-xs text-gray-300 group cursor-pointer"
+                      onClick={() => setPreviewImage(`data:${img.type};base64,${img.data}`)}
+                    >
+                      <ImageIcon className="size-3 text-gray-500" />
+                      <span className="truncate max-w-[120px]">{img.name}</span>
                       <button
-                        onClick={() => removeImage(i)}
-                        className="absolute -top-1.5 -right-1.5 h-4 w-4 bg-gray-700 hover:bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity"
+                        className="md:opacity-0 md:group-hover:opacity-100 hover:text-red-400 text-gray-500 transition-all"
+                        onClick={(e) => { e.stopPropagation(); removeImage(i) }}
                       >
-                        <X className="h-2.5 w-2.5 text-white" />
+                        <X className="size-3" />
+                      </button>
+                    </div>
+                  ))}
+                  {attachedFiles.map(file => (
+                    <div key={file.id} className="flex items-center gap-1.5 bg-gray-800 px-2 py-1 rounded-lg text-xs text-gray-300 group">
+                      <FileText className="size-3 text-gray-500" />
+                      <span className="truncate max-w-[120px]">{file.name}</span>
+                      <button
+                        className="md:opacity-0 md:group-hover:opacity-100 hover:text-red-400 text-gray-500 transition-all"
+                        onClick={() => removeFile(file.id)}
+                      >
+                        <X className="size-3" />
                       </button>
                     </div>
                   ))}
@@ -1647,6 +1742,7 @@ User Request: ${currentPrompt}`
                 className="w-full bg-transparent resize-none outline-none text-sm text-gray-100 placeholder:text-gray-500 px-4 pt-3 pb-12 min-h-[44px] max-h-[120px] leading-6 overflow-y-auto"
                 rows={1}
               />
+              {/* Hidden file inputs */}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -1655,33 +1751,81 @@ User Request: ${currentPrompt}`
                 onChange={handleImageSelect}
                 className="hidden"
               />
+              <input
+                ref={combinedFileInputRef}
+                type="file"
+                multiple
+                onChange={handleCombinedUpload}
+                className="hidden"
+              />
               <div className="absolute bottom-2 left-2 flex items-center gap-1">
-                {supportsImages && (
-                  <>
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isLoading || isRecreating}
-                      className="p-1.5 text-gray-500 hover:text-gray-300 disabled:opacity-40 transition-colors"
-                      title="Attach image"
-                    >
-                      <ImageIcon className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={handleScreenToggle}
-                      disabled={isCapturing || isLoading || isRecreating}
-                      className={`p-1.5 transition-colors disabled:opacity-40 ${
-                        isScreenSharing ? 'text-red-400 hover:text-red-300' : 'text-gray-500 hover:text-gray-300'
-                      }`}
-                      title={isScreenSharing ? "Stop screen sharing" : "Capture screen"}
-                    >
-                      {isCapturing ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Monitor className="h-4 w-4" />
-                      )}
-                    </button>
-                  </>
-                )}
+                {/* Plus context menu */}
+                <div className="relative" ref={commandMenuRef}>
+                  <button
+                    type="button"
+                    className="h-8 w-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
+                    onClick={() => setShowCommandMenu(!showCommandMenu)}
+                  >
+                    <Plus className={`size-4 transition-transform ${showCommandMenu ? 'rotate-45' : ''}`} />
+                  </button>
+
+                  {showCommandMenu && (
+                    <div className="absolute bottom-10 left-0 w-[260px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[80] overflow-hidden">
+                      <div className="py-1.5">
+                        {/* Add images or files */}
+                        <button
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                          onClick={() => {
+                            setShowCommandMenu(false)
+                            combinedFileInputRef.current?.click()
+                          }}
+                        >
+                          <FileUp className="size-4 text-gray-400" />
+                          <span>Add images or files</span>
+                        </button>
+
+                        {/* Capture screen */}
+                        <button
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                          onClick={() => {
+                            setShowCommandMenu(false)
+                            handleScreenToggle()
+                          }}
+                        >
+                          <Monitor className={`size-4 ${isScreenSharing ? 'text-red-400' : 'text-gray-400'}`} />
+                          <span>{isScreenSharing ? 'Stop screen sharing' : 'Capture screen'}</span>
+                          {isScreenSharing && <div className="ml-auto w-2 h-2 rounded-full bg-red-400 animate-pulse" />}
+                        </button>
+
+                        <div className="my-1.5 border-t border-gray-700/50" />
+
+                        {/* Playwright toggle */}
+                        <button
+                          className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                          onClick={() => setPlaywrightEnabled(!playwrightEnabled)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Globe className="size-4 text-gray-400" />
+                            <span>Playwright</span>
+                          </div>
+                          {playwrightEnabled && <Check className="size-4 text-green-400" />}
+                        </button>
+
+                        <div className="my-1.5 border-t border-gray-700/50" />
+
+                        {/* MCP Tools info */}
+                        <div className="px-4 py-2 text-[11px] text-gray-500">
+                          <span className="font-medium text-gray-400">MCP Tools</span>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {DEFAULT_MCPS.map(mcp => (
+                              <span key={mcp.id} className="px-1.5 py-0.5 bg-gray-800 rounded text-gray-500">{mcp.name}</span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {/* Model selector */}
                 <DropdownMenu>
@@ -1727,7 +1871,7 @@ User Request: ${currentPrompt}`
                 ) : (
                   <Button
                     onClick={() => runPrompt()}
-                    disabled={!prompt.trim() && attachedImages.length === 0}
+                    disabled={!prompt.trim() && attachedImages.length === 0 && attachedFiles.length === 0}
                     size="icon"
                     className="h-8 w-8 rounded-lg bg-orange-600 hover:bg-orange-500 text-white disabled:opacity-40 disabled:bg-gray-700"
                   >

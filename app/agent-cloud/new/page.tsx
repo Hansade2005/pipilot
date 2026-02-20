@@ -14,7 +14,10 @@ import {
   ArrowUp,
   Sparkles,
   ImageIcon,
+  FileText,
+  FileUp,
   Monitor,
+  Globe,
   X,
   Plus,
   Check,
@@ -25,7 +28,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useAgentCloud, MODELS } from "../layout"
+import { useAgentCloud, MODELS, DEFAULT_MCPS } from "../layout"
 import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function NewSessionPage() {
@@ -56,10 +59,15 @@ export default function NewSessionPage() {
   const [prompt, setPrompt] = useState('')
   const [repoSearchQuery, setRepoSearchQuery] = useState('')
   const [attachedImages, setAttachedImages] = useState<Array<{ data: string; type: string; name: string }>>([])
+  const [attachedFiles, setAttachedFiles] = useState<Array<{ id: string; name: string; content: string; size: number }>>([])
   const [isNewProject, setIsNewProject] = useState(false)
   const [projectName, setProjectName] = useState('')
+  const [showCommandMenu, setShowCommandMenu] = useState(false)
+  const [playwrightEnabled, setPlaywrightEnabled] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const combinedFileInputRef = useRef<HTMLInputElement>(null)
+  const commandMenuRef = useRef<HTMLDivElement>(null)
 
   // Filter repos by search
   const filteredRepos = repoSearchQuery
@@ -99,6 +107,52 @@ export default function NewSessionPage() {
         setAttachedImages(prev => [...prev, { data: base64, type: file.type, name: file.name }])
       }
       reader.readAsDataURL(file)
+    }
+    e.target.value = ''
+  }
+
+  // Close command menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (commandMenuRef.current && !commandMenuRef.current.contains(e.target as Node)) {
+        setShowCommandMenu(false)
+      }
+    }
+    if (showCommandMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showCommandMenu])
+
+  const removeFile = (id: string) => {
+    setAttachedFiles(prev => prev.filter(f => f.id !== id))
+  }
+
+  // Combined file handler - routes images and text files appropriately
+  const handleCombinedUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+    setShowCommandMenu(false)
+    for (const file of Array.from(files)) {
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader()
+        reader.onload = () => {
+          const base64 = (reader.result as string).split(',')[1]
+          setAttachedImages(prev => [...prev, { data: base64, type: file.type, name: file.name }])
+        }
+        reader.readAsDataURL(file)
+      } else {
+        const reader = new FileReader()
+        reader.onload = () => {
+          setAttachedFiles(prev => [...prev, {
+            id: Date.now().toString() + Math.random(),
+            name: file.name,
+            content: reader.result as string,
+            size: file.size
+          }])
+        }
+        reader.readAsText(file)
+      }
     }
     e.target.value = ''
   }
@@ -208,7 +262,7 @@ export default function NewSessionPage() {
 
   // Handle submit
   const handleSubmit = async () => {
-    if ((!prompt.trim() && attachedImages.length === 0) || isCreating) return
+    if ((!prompt.trim() && attachedImages.length === 0 && attachedFiles.length === 0) || isCreating) return
 
     // If screen sharing is active, store flag so session page can resume it
     if (isScreenSharing && mediaStreamRef.current) {
@@ -218,12 +272,32 @@ export default function NewSessionPage() {
       mediaStreamRef.current = null
     }
 
+    // Build enhanced prompt with file context and Playwright instructions
+    let enhancedPrompt = prompt.trim()
+
+    if (attachedFiles.length > 0) {
+      const fileContext = attachedFiles.map(f => `[Attached File: ${f.name} (${(f.size / 1024).toFixed(1)}KB)]\n\`\`\`\n${f.content}\n\`\`\``).join('\n\n')
+      enhancedPrompt = `${fileContext}\n\n${enhancedPrompt}`
+      setAttachedFiles([])
+    }
+
+    if (playwrightEnabled) {
+      enhancedPrompt += `\n\n[Playwright Browser Testing - ENABLED]
+The user has enabled Playwright for browser testing. When setting up browser testing:
+1. Install Playwright as a dev dependency: pnpm add -D @playwright/test
+2. Install Playwright Chromium browser from the project directory: pnpm exec playwright install chromium
+3. Create playwright.config.ts in the project root with proper configuration (testDir: "./tests", baseURL: "http://localhost:3000", Chromium project, webServer config)
+4. Create a tests/ directory and write test files as needed
+5. Run tests with: pnpm exec playwright test
+Use the Playwright MCP server for browser automation, interaction, and visual testing.`
+    }
+
     if (isNewProject) {
       // New project mode - requires GitHub connection and project name
       if (!isConnected) return
       if (!projectName.trim()) return
       const session = await createSession(
-        prompt.trim(),
+        enhancedPrompt,
         attachedImages.length > 0 ? attachedImages : undefined,
         { name: projectName.trim() }
       )
@@ -234,7 +308,7 @@ export default function NewSessionPage() {
     } else {
       // Existing repo mode
       if (!selectedRepo) return
-      const session = await createSession(prompt.trim(), attachedImages.length > 0 ? attachedImages : undefined)
+      const session = await createSession(enhancedPrompt, attachedImages.length > 0 ? attachedImages : undefined)
       if (session) {
         setAttachedImages([])
         router.push(`/agent-cloud/session?id=${session.id}`)
@@ -330,22 +404,34 @@ export default function NewSessionPage() {
             </div>
           )}
 
-          {/* Image previews */}
-          {attachedImages.length > 0 && (
-            <div className="flex gap-2 px-4 pt-4 flex-wrap">
+          {/* Attachment pills */}
+          {(attachedImages.length > 0 || attachedFiles.length > 0) && (
+            <div className="px-4 pt-3 flex flex-wrap gap-1.5">
               {attachedImages.map((img, i) => (
-                <div key={i} className="relative group/img">
-                  <img
-                    src={`data:${img.type};base64,${img.data}`}
-                    alt={img.name}
-                    className="h-16 w-16 object-cover rounded-lg border border-gray-700 cursor-pointer hover:opacity-80 transition-opacity"
-                    onClick={() => setPreviewImage(`data:${img.type};base64,${img.data}`)}
-                  />
+                <div
+                  key={`img-${i}`}
+                  className="flex items-center gap-1.5 bg-gray-800 px-2 py-1 rounded-lg text-xs text-gray-300 group cursor-pointer"
+                  onClick={() => setPreviewImage(`data:${img.type};base64,${img.data}`)}
+                >
+                  <ImageIcon className="size-3 text-gray-500" />
+                  <span className="truncate max-w-[120px]">{img.name}</span>
                   <button
-                    onClick={() => removeImage(i)}
-                    className="absolute -top-1.5 -right-1.5 h-4 w-4 bg-gray-700 hover:bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity"
+                    className="md:opacity-0 md:group-hover:opacity-100 hover:text-red-400 text-gray-500 transition-all"
+                    onClick={(e) => { e.stopPropagation(); removeImage(i) }}
                   >
-                    <X className="h-2.5 w-2.5" />
+                    <X className="size-3" />
+                  </button>
+                </div>
+              ))}
+              {attachedFiles.map(file => (
+                <div key={file.id} className="flex items-center gap-1.5 bg-gray-800 px-2 py-1 rounded-lg text-xs text-gray-300 group">
+                  <FileText className="size-3 text-gray-500" />
+                  <span className="truncate max-w-[120px]">{file.name}</span>
+                  <button
+                    className="md:opacity-0 md:group-hover:opacity-100 hover:text-red-400 text-gray-500 transition-all"
+                    onClick={() => removeFile(file.id)}
+                  >
+                    <X className="size-3" />
                   </button>
                 </div>
               ))}
@@ -365,7 +451,7 @@ export default function NewSessionPage() {
             rows={2}
           />
 
-          {/* Hidden file input */}
+          {/* Hidden file inputs */}
           <input
             ref={fileInputRef}
             type="file"
@@ -374,39 +460,84 @@ export default function NewSessionPage() {
             onChange={handleImageSelect}
             className="hidden"
           />
+          <input
+            ref={combinedFileInputRef}
+            type="file"
+            multiple
+            onChange={handleCombinedUpload}
+            className="hidden"
+          />
 
           {/* Bottom toolbar */}
           <div className="px-3 pb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-1.5 flex-wrap">
-              {/* Image attach */}
-              {supportsImages && (
-                <>
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isNewProject ? (!isConnected || !projectName.trim() || isCreating) : (!selectedRepo || isCreating)}
-                    className="p-2 text-gray-500 hover:text-gray-300 hover:bg-gray-800/60 disabled:opacity-30 rounded-lg transition-colors"
-                    title="Attach image"
-                  >
-                    <ImageIcon className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={handleScreenToggle}
-                    disabled={isCapturing || (isNewProject ? (!isConnected || !projectName.trim() || isCreating) : (!selectedRepo || isCreating))}
-                    className={`p-2 rounded-lg disabled:opacity-30 transition-colors ${
-                      isScreenSharing
-                        ? 'text-red-400 bg-red-500/10 hover:bg-red-500/20'
-                        : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/60'
-                    }`}
-                    title={isScreenSharing ? "Stop screen sharing" : "Capture screen"}
-                  >
-                    {isCapturing ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Monitor className="h-4 w-4" />
-                    )}
-                  </button>
-                </>
-              )}
+              {/* Plus context menu */}
+              <div className="relative" ref={commandMenuRef}>
+                <button
+                  type="button"
+                  className="h-8 w-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
+                  onClick={() => setShowCommandMenu(!showCommandMenu)}
+                >
+                  <Plus className={`size-4 transition-transform ${showCommandMenu ? 'rotate-45' : ''}`} />
+                </button>
+
+                {showCommandMenu && (
+                  <div className="absolute bottom-10 left-0 w-[260px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[80] overflow-hidden">
+                    <div className="py-1.5">
+                      {/* Add images or files */}
+                      <button
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                        onClick={() => {
+                          setShowCommandMenu(false)
+                          combinedFileInputRef.current?.click()
+                        }}
+                      >
+                        <FileUp className="size-4 text-gray-400" />
+                        <span>Add images or files</span>
+                      </button>
+
+                      {/* Capture screen */}
+                      <button
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                        onClick={() => {
+                          setShowCommandMenu(false)
+                          handleScreenToggle()
+                        }}
+                      >
+                        <Monitor className={`size-4 ${isScreenSharing ? 'text-red-400' : 'text-gray-400'}`} />
+                        <span>{isScreenSharing ? 'Stop screen sharing' : 'Capture screen'}</span>
+                        {isScreenSharing && <div className="ml-auto w-2 h-2 rounded-full bg-red-400 animate-pulse" />}
+                      </button>
+
+                      <div className="my-1.5 border-t border-gray-700/50" />
+
+                      {/* Playwright toggle */}
+                      <button
+                        className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                        onClick={() => setPlaywrightEnabled(!playwrightEnabled)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Globe className="size-4 text-gray-400" />
+                          <span>Playwright</span>
+                        </div>
+                        {playwrightEnabled && <Check className="size-4 text-green-400" />}
+                      </button>
+
+                      <div className="my-1.5 border-t border-gray-700/50" />
+
+                      {/* MCP Tools info */}
+                      <div className="px-4 py-2 text-[11px] text-gray-500">
+                        <span className="font-medium text-gray-400">MCP Tools</span>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {DEFAULT_MCPS.map(mcp => (
+                            <span key={mcp.id} className="px-1.5 py-0.5 bg-gray-800 rounded text-gray-500">{mcp.name}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* Divider */}
               <div className="w-px h-4 bg-gray-800 mx-0.5" />
@@ -558,7 +689,7 @@ export default function NewSessionPage() {
             <button
               onClick={handleSubmit}
               disabled={
-                (!prompt.trim() && attachedImages.length === 0) ||
+                (!prompt.trim() && attachedImages.length === 0 && attachedFiles.length === 0) ||
                 (isNewProject ? (!isConnected || !projectName.trim()) : !selectedRepo) ||
                 isCreating
               }
