@@ -60,6 +60,7 @@ export default function NewSessionPage() {
     createSession,
     setActiveSessionId,
     isCreating,
+    userFirstName,
   } = useAgentCloud()
 
   // Claude and GPT models support image input via Bonsai
@@ -380,7 +381,7 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
         {/* Greeting */}
         <div className="mb-8">
           <h1 className="text-3xl font-semibold text-gray-100 tracking-tight">
-            {getGreeting()}.
+            {getGreeting()}{userFirstName ? `, ${userFirstName}` : ''}.
           </h1>
           <p className="text-gray-500 mt-2 text-base">
             What would you like to build today?

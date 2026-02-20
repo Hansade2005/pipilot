@@ -248,6 +248,7 @@ interface AgentCloudContextType {
   terminateSession: (sessionId: string) => Promise<void>
   deleteSession: (sessionId: string) => Promise<void>
   isCreating: boolean
+  userFirstName: string | null
 }
 
 const AgentCloudContext = createContext<AgentCloudContextType | null>(null)
@@ -300,6 +301,7 @@ function AgentCloudLayoutInner({
   }>({})
   const [isLoadingTokens, setIsLoadingTokens] = useState(true)
   const [isLoadingRepos, setIsLoadingRepos] = useState(false)
+  const [userFirstName, setUserFirstName] = useState<string | null>(null)
 
   const isConnected = !!storedTokens.github
 
@@ -486,6 +488,16 @@ function AgentCloudLayoutInner({
       if (!user) {
         setIsLoadingTokens(false)
         return
+      }
+
+      // Fetch user profile for personalized greeting
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single()
+      if (profile?.full_name) {
+        setUserFirstName(profile.full_name.trim().split(' ')[0])
       }
 
       const tokens = await getDeploymentTokens(user.id)
@@ -928,6 +940,7 @@ function AgentCloudLayoutInner({
     terminateSession,
     deleteSession,
     isCreating,
+    userFirstName,
   }
 
   // Active session for header context
