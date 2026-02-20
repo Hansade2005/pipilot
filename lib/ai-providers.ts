@@ -21,6 +21,7 @@ let _mistralGatewayProvider: ReturnType<typeof createMistral> | null = null;
 let _xaiProvider: ReturnType<typeof createXai> | null = null;
 let _anthropicProvider: ReturnType<typeof createAnthropic> | null = null;
 let _openrouterProvider: ReturnType<typeof createOpenAICompatible> | null = null;
+let _bonsaiProvider: ReturnType<typeof createAnthropic> | null = null;
 
 function getA0DevProvider() {
   if (!_a0devProvider) _a0devProvider = createA0Dev();
@@ -110,6 +111,24 @@ function getOpenRouterProvider() {
   }
   return _openrouterProvider;
 }
+
+function getBonsaiProvider() {
+  if (!_bonsaiProvider) {
+    _bonsaiProvider = createAnthropic({
+      baseURL: 'https://go.trybons.ai',
+      apiKey: process.env.BONSAI_API_KEY || '',
+    });
+  }
+  return _bonsaiProvider;
+}
+
+// Mapping from PiPilot bonsai/ model IDs to the actual model IDs expected by Bonsai API
+const bonsaiModelMap: Record<string, string> = {
+  'bonsai/claude-sonnet-4.5': 'anthropic/claude-sonnet-4.5',
+  'bonsai/claude-opus-4': 'anthropic/claude-opus-4',
+  'bonsai/gpt-5.1-codex': 'openai/gpt-5.1-codex',
+  'bonsai/glm-4.6': 'z-ai/glm-4.6',
+};
 
 // Custom a0.dev provider implementation (no API key required)
 function createA0Dev(options: { apiKey?: string } = {}) {
@@ -262,6 +281,13 @@ function createModelInstance(modelId: string): any {
     case 'xai/grok-code-fast-1':
       return getXaiProvider()('grok-code-fast-1');
 
+    // Bonsai models (Anthropic-compatible API)
+    case 'bonsai/claude-sonnet-4.5':
+    case 'bonsai/claude-opus-4':
+    case 'bonsai/gpt-5.1-codex':
+    case 'bonsai/glm-4.6':
+      return getBonsaiProvider()(bonsaiModelMap[modelId]);
+
     // Anthropic via Vercel AI Gateway
     case 'anthropic/claude-haiku-4.5':
       return getAnthropicProvider()('anthropic/claude-haiku-4.5');
@@ -370,6 +396,7 @@ export interface ByokKeySet {
   mistral?: string
   xai?: string
   google?: string
+  bonsai?: string
   openrouter?: string
   'vercel-gateway'?: string
   // Custom providers: keyed by custom provider ID
@@ -391,6 +418,8 @@ export function resolveByokProvider(modelId: string, byokKeys: ByokKeySet): stri
   if (modelId.startsWith('mistral/') && byokKeys.mistral) return 'mistral'
   if (modelId.startsWith('xai/') && byokKeys.xai) return 'xai'
   if (modelId.startsWith('google/') && byokKeys.google) return 'google'
+
+  if (modelId.startsWith('bonsai/') && byokKeys.bonsai) return 'bonsai'
 
   // Direct model names
   if ((modelId === 'pixtral-12b-2409' || modelId === 'codestral-latest') && byokKeys.mistral) return 'mistral'
@@ -483,6 +512,14 @@ export function createByokModel(modelId: string, byokKeys: ByokKeySet): any | nu
       })
       const bare = stripPrefix(modelId, 'google/')
       return provider(bare)
+    }
+    case 'bonsai': {
+      const provider = createAnthropic({
+        baseURL: 'https://go.trybons.ai',
+        apiKey,
+      })
+      const bonsaiId = bonsaiModelMap[modelId] || modelId.replace('bonsai/', '')
+      return provider(bonsaiId)
     }
     case 'openrouter': {
       const provider = createOpenAICompatible({
