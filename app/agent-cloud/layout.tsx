@@ -57,6 +57,7 @@ export interface TerminalLine {
     url?: string              // WebFetch URL
     query?: string            // WebSearch query
     isComplete?: boolean      // Whether tool has completed
+    todos?: Array<{ content: string; status: string; activeForm?: string }>  // TodoWrite items
   }
 }
 

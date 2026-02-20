@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback, Suspense } from "react"
+import React, { useState, useRef, useEffect, useCallback, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
@@ -170,6 +170,80 @@ const SPINNER_PHRASES = [
   'Transmuting ideas into features',
   'Distilling your vision into code',
 ]
+
+// Lightweight regex-based syntax highlighter for code in tool outputs
+// Uses indexed groups to stay compatible with ES2015 target
+// Token rules: [regex, colorClass]  — ordered by priority (first match wins)
+const SYNTAX_RULES: Array<[RegExp, string]> = [
+  // Comments
+  [/\/\/.*$/, 'text-gray-500 italic'],
+  [/\/\*[\s\S]*?\*\//, 'text-gray-500 italic'],
+  // Strings
+  [/"(?:[^"\\]|\\.)*"/, 'text-amber-300/90'],
+  [/'(?:[^'\\]|\\.)*'/, 'text-amber-300/90'],
+  [/`(?:[^`\\]|\\.)*`/, 'text-amber-300/90'],
+  // Keywords
+  [/\b(?:import|export|from|default|return|const|let|var|function|async|await|class|extends|implements|interface|type|enum|new|this|super|if|else|switch|case|break|continue|for|while|do|try|catch|finally|throw|typeof|instanceof|in|of|void|delete|yield|as|is|readonly|declare|namespace|module|require|static|get|set|public|private|protected|abstract|override)\b/, 'text-purple-400'],
+  // Booleans / null / undefined
+  [/\b(?:true|false|null|undefined|NaN|Infinity)\b/, 'text-orange-400'],
+  // Numbers
+  [/\b(?:0[xXoObB][\da-fA-F_]+|\d[\d_]*(?:\.[\d_]+)?(?:[eE][+-]?\d+)?)\b/, 'text-cyan-300'],
+  // JSX / HTML tags
+  [/<\/?[A-Z][\w.]*/, 'text-red-400'],
+  [/<\/?(?:div|span|button|input|form|img|a|p|h[1-6]|ul|ol|li|table|tr|td|th|thead|tbody|nav|header|footer|section|main|article|aside|pre|code|label|select|option|textarea)(?=[\s/>])/, 'text-red-400'],
+  // Decorators
+  [/@\w+/, 'text-yellow-400'],
+  // Type references (PascalCase followed by space, <, (, .)
+  [/\b[A-Z][\w]*(?=[\s<(.])/, 'text-teal-300'],
+  // Operators
+  [/=>|===|!==|==|!=|<=|>=|&&|\|\||[+\-*/%]=?|\.{3}|[<>?:!&|^~]/, 'text-pink-400/80'],
+  // Punctuation
+  [/[{}()[\];,]/, 'text-gray-500'],
+]
+
+const highlightSyntax = (code: string, baseClass?: string): React.ReactNode => {
+  if (!code) return ' '
+
+  const parts: React.ReactNode[] = []
+  let remaining = code
+  let pos = 0
+
+  while (remaining.length > 0) {
+    let bestMatch: { idx: number; len: number; color: string } | null = null
+
+    for (const [pattern, color] of SYNTAX_RULES) {
+      // Reset and match from the start of remaining
+      const re = new RegExp(pattern.source, 'm')
+      const m = re.exec(remaining)
+      if (m && (bestMatch === null || m.index < bestMatch.idx || (m.index === bestMatch.idx && m[0].length > bestMatch.len))) {
+        bestMatch = { idx: m.index, len: m[0].length, color }
+      }
+    }
+
+    if (!bestMatch || bestMatch.idx === -1) {
+      // No more matches, push rest as plain
+      parts.push(<span key={`p${pos}`} className={baseClass}>{remaining}</span>)
+      break
+    }
+
+    // Push text before the match
+    if (bestMatch.idx > 0) {
+      parts.push(<span key={`p${pos}`} className={baseClass}>{remaining.slice(0, bestMatch.idx)}</span>)
+    }
+
+    // Push the highlighted token
+    parts.push(
+      <span key={`h${pos + bestMatch.idx}`} className={bestMatch.color}>
+        {remaining.slice(bestMatch.idx, bestMatch.idx + bestMatch.len)}
+      </span>
+    )
+
+    pos += bestMatch.idx + bestMatch.len
+    remaining = remaining.slice(bestMatch.idx + bestMatch.len)
+  }
+
+  return parts.length > 0 ? <>{parts}</> : <span className={baseClass}>{code}</span>
+}
 
 // Max lines before truncation
 const MAX_LINES_COLLAPSED = 8
@@ -1650,9 +1724,9 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
                     <div className="text-xs font-mono overflow-hidden">
                       {meta.command && (
                         <div className="px-3 py-2.5 bg-gray-950/60 border-b border-gray-800/40 overflow-hidden">
-                          <div className="flex items-start gap-2 text-emerald-400/90">
+                          <div className="flex items-start gap-2">
                             <span className="text-emerald-600 shrink-0 select-none font-bold">$</span>
-                            <span className="break-all whitespace-pre-wrap [overflow-wrap:anywhere] text-[11px] leading-4">{meta.command}</span>
+                            <span className="break-all whitespace-pre-wrap [overflow-wrap:anywhere] text-[11px] leading-4">{highlightSyntax(meta.command, 'text-emerald-400/90')}</span>
                           </div>
                         </div>
                       )}
@@ -1664,48 +1738,172 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
                     </div>
                   )}
 
-                  {/* Edit: Show diff */}
-                  {toolName === 'Edit' && (meta.oldString || meta.newString) && (
-                    <div className="text-xs font-mono overflow-hidden">
-                      {meta.oldString && (
-                        <div className="px-3 py-2 bg-red-500/5 border-b border-gray-800/50 overflow-hidden">
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <Minus className="h-3 w-3 text-red-400 shrink-0" />
-                            <span className="text-red-400/70 text-[10px]">old</span>
-                          </div>
-                          <pre className="whitespace-pre-wrap break-all [overflow-wrap:anywhere] text-red-300/70 text-[11px] leading-4 pl-4 max-h-40 overflow-y-auto overflow-x-hidden">{meta.oldString}</pre>
-                        </div>
-                      )}
-                      {meta.newString && (
-                        <div className="px-3 py-2 bg-emerald-500/5 overflow-hidden">
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <Plus className="h-3 w-3 text-emerald-400 shrink-0" />
-                            <span className="text-emerald-400/70 text-[10px]">new</span>
-                          </div>
-                          <pre className="whitespace-pre-wrap break-all [overflow-wrap:anywhere] text-emerald-300/70 text-[11px] leading-4 pl-4 max-h-40 overflow-y-auto overflow-x-hidden">{meta.newString}</pre>
-                        </div>
-                      )}
-                      {meta.result && (
-                        <div className="px-3 py-1.5 text-gray-500 text-[10px] border-t border-gray-800/50 break-words">
-                          {meta.result.includes('successfully') ? '✓ Applied' : meta.result.substring(0, 100)}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {/* Edit: Git-style unified diff */}
+                  {toolName === 'Edit' && (meta.oldString || meta.newString) && (() => {
+                    const oldLines = (meta.oldString || '').split('\n')
+                    const newLines = (meta.newString || '').split('\n')
 
-                  {/* Write: Show file content preview */}
-                  {toolName === 'Write' && meta.fileContent && (
-                    <div className="text-xs font-mono px-3 py-2 bg-[#1a1a1a]/50 max-h-60 overflow-y-auto overflow-x-hidden">
-                      <pre className="whitespace-pre-wrap break-all [overflow-wrap:anywhere] text-gray-400 text-[11px] leading-4">{meta.fileContent}{meta.fileContent.length >= 500 ? '\n...' : ''}</pre>
-                    </div>
-                  )}
+                    // Simple LCS-based diff to produce unified diff lines
+                    const buildDiff = () => {
+                      const diffResult: Array<{ type: 'remove' | 'add' | 'context'; content: string; oldNum?: number; newNum?: number }> = []
 
-                  {/* Read: Show result */}
-                  {toolName === 'Read' && meta.result && (
-                    <div className="text-xs font-mono px-3 py-2 bg-[#1a1a1a]/50 max-h-60 overflow-y-auto overflow-x-hidden">
-                      <pre className="whitespace-pre-wrap break-all [overflow-wrap:anywhere] text-gray-400 text-[11px] leading-4">{meta.result}</pre>
-                    </div>
-                  )}
+                      // Build LCS table
+                      const m = oldLines.length
+                      const n = newLines.length
+                      const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0))
+                      for (let i = 1; i <= m; i++) {
+                        for (let j = 1; j <= n; j++) {
+                          dp[i][j] = oldLines[i - 1] === newLines[j - 1]
+                            ? dp[i - 1][j - 1] + 1
+                            : Math.max(dp[i - 1][j], dp[i][j - 1])
+                        }
+                      }
+
+                      // Backtrack to produce diff
+                      const lines: Array<{ type: 'remove' | 'add' | 'context'; content: string }> = []
+                      let i = m, j = n
+                      while (i > 0 || j > 0) {
+                        if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
+                          lines.unshift({ type: 'context', content: oldLines[i - 1] })
+                          i--; j--
+                        } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+                          lines.unshift({ type: 'add', content: newLines[j - 1] })
+                          j--
+                        } else {
+                          lines.unshift({ type: 'remove', content: oldLines[i - 1] })
+                          i--
+                        }
+                      }
+
+                      // Assign line numbers
+                      let oldNum = 1, newNum = 1
+                      for (const line of lines) {
+                        if (line.type === 'context') {
+                          diffResult.push({ ...line, oldNum, newNum })
+                          oldNum++; newNum++
+                        } else if (line.type === 'remove') {
+                          diffResult.push({ ...line, oldNum })
+                          oldNum++
+                        } else {
+                          diffResult.push({ ...line, newNum })
+                          newNum++
+                        }
+                      }
+
+                      return diffResult
+                    }
+
+                    const diffLines = buildDiff()
+                    const additions = diffLines.filter(l => l.type === 'add').length
+                    const removals = diffLines.filter(l => l.type === 'remove').length
+
+                    return (
+                      <div className="font-mono overflow-hidden">
+                        {/* Diff header */}
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800/40 border-b border-gray-700/40 text-[10px]">
+                          {meta.fileName && <span className="text-gray-400">{meta.fileName}</span>}
+                          <span className="text-emerald-400">+{additions}</span>
+                          <span className="text-red-400">-{removals}</span>
+                        </div>
+                        {/* Diff lines */}
+                        <div className="max-h-60 overflow-y-auto overflow-x-hidden">
+                          {diffLines.map((dl, dlIdx) => (
+                            <div
+                              key={dlIdx}
+                              className={`flex text-[11px] leading-[18px] ${
+                                dl.type === 'remove'
+                                  ? 'bg-red-500/10'
+                                  : dl.type === 'add'
+                                    ? 'bg-emerald-500/10'
+                                    : ''
+                              }`}
+                            >
+                              {/* Old line number */}
+                              <span className={`w-8 text-right pr-1 select-none shrink-0 ${
+                                dl.type === 'remove' ? 'text-red-400/50' : dl.type === 'add' ? 'text-transparent' : 'text-gray-600'
+                              }`}>
+                                {dl.oldNum ?? ''}
+                              </span>
+                              {/* New line number */}
+                              <span className={`w-8 text-right pr-1 select-none shrink-0 ${
+                                dl.type === 'add' ? 'text-emerald-400/50' : dl.type === 'remove' ? 'text-transparent' : 'text-gray-600'
+                              }`}>
+                                {dl.newNum ?? ''}
+                              </span>
+                              {/* +/- indicator */}
+                              <span className={`w-4 text-center select-none shrink-0 ${
+                                dl.type === 'remove' ? 'text-red-400' : dl.type === 'add' ? 'text-emerald-400' : 'text-transparent'
+                              }`}>
+                                {dl.type === 'remove' ? '-' : dl.type === 'add' ? '+' : ' '}
+                              </span>
+                              {/* Content */}
+                              <span className="flex-1 whitespace-pre-wrap break-all [overflow-wrap:anywhere] pr-3">
+                                {highlightSyntax(dl.content, dl.type === 'remove' ? 'text-red-300/80' : dl.type === 'add' ? 'text-emerald-300/80' : 'text-gray-400')}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        {/* Status footer */}
+                        {meta.result && (
+                          <div className="px-3 py-1.5 text-gray-500 text-[10px] border-t border-gray-700/40 break-words">
+                            {meta.result.includes('successfully') ? '✓ Applied' : meta.result.substring(0, 100)}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
+
+                  {/* Write: Git-style all-green new file content */}
+                  {toolName === 'Write' && meta.fileContent && (() => {
+                    const writeLines = meta.fileContent.split('\n')
+                    const isTruncated = meta.fileContent.length >= 500
+                    return (
+                      <div className="font-mono overflow-hidden">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800/40 border-b border-gray-700/40 text-[10px]">
+                          {meta.fileName && <span className="text-gray-400">{meta.fileName}</span>}
+                          <span className="text-emerald-400">+{writeLines.length} lines</span>
+                          {isTruncated && <span className="text-gray-500">(preview)</span>}
+                        </div>
+                        <div className="max-h-60 overflow-y-auto overflow-x-hidden">
+                          {writeLines.map((wl: string, wlIdx: number) => (
+                            <div key={wlIdx} className="flex text-[11px] leading-[18px] bg-emerald-500/10">
+                              <span className="w-8 text-right pr-1 select-none shrink-0 text-emerald-400/50">{wlIdx + 1}</span>
+                              <span className="w-4 text-center select-none shrink-0 text-emerald-400">+</span>
+                              <span className="flex-1 whitespace-pre-wrap break-all [overflow-wrap:anywhere] pr-3">{highlightSyntax(wl, 'text-emerald-300/80')}</span>
+                            </div>
+                          ))}
+                          {isTruncated && (
+                            <div className="flex text-[11px] leading-[18px]">
+                              <span className="w-8 shrink-0" />
+                              <span className="w-4 shrink-0" />
+                              <span className="text-gray-500 px-1">...</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })()}
+
+                  {/* Read: Show result with line numbers */}
+                  {toolName === 'Read' && meta.result && (() => {
+                    const readLines = meta.result.split('\n')
+                    return (
+                      <div className="font-mono overflow-hidden">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800/40 border-b border-gray-700/40 text-[10px]">
+                          {meta.fileName && <span className="text-gray-400">{meta.fileName}</span>}
+                          <span className="text-purple-400">{readLines.length} lines</span>
+                        </div>
+                        <div className="max-h-60 overflow-y-auto overflow-x-hidden">
+                          {readLines.map((rl: string, rlIdx: number) => (
+                            <div key={rlIdx} className="flex text-[11px] leading-[18px]">
+                              <span className="w-10 text-right pr-2 select-none shrink-0 text-gray-600">{rlIdx + 1}</span>
+                              <span className="flex-1 whitespace-pre-wrap break-all [overflow-wrap:anywhere] pr-3">{highlightSyntax(rl, 'text-gray-400')}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })()}
 
                   {/* Glob/Grep: Show results */}
                   {(toolName === 'Glob' || toolName === 'Grep') && meta.result && (
