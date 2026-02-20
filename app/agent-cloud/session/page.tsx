@@ -2218,7 +2218,7 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
                       <ChevronDown className="h-3 w-3" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" side="top" className="bg-gray-900 border-gray-700 w-[240px]">
+                  <DropdownMenuContent align="start" side="top" className="bg-gray-900 border-gray-700 w-[240px] z-[70]">
                     {MODELS.map(model => (
                       <DropdownMenuItem
                         key={model.id}
