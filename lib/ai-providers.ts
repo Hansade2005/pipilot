@@ -114,9 +114,24 @@ function getOpenRouterProvider() {
 
 function getBonsaiProvider() {
   if (!_bonsaiProvider) {
+    const bonsaiBaseURL = 'https://go.trybons.ai';
     _bonsaiProvider = createAnthropic({
-      baseURL: 'https://go.trybons.ai',
+      baseURL: bonsaiBaseURL,
       apiKey: process.env.BONSAI_API_KEY || '',
+      // Custom fetch to guarantee requests go to Bonsai, not Vercel Gateway.
+      // The @ai-sdk/anthropic SDK may try to reroute model IDs containing
+      // provider prefixes (e.g. "anthropic/claude-sonnet-4.5") to the
+      // Vercel AI Gateway. This fetch wrapper forces the correct base URL.
+      fetch: async (input, init) => {
+        let url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
+        // If the SDK rewrote the URL away from Bonsai, force it back
+        if (!url.startsWith(bonsaiBaseURL)) {
+          const path = new URL(url).pathname; // e.g. /v1/messages
+          url = `${bonsaiBaseURL}${path}`;
+          console.log(`[Bonsai] Redirected request back to Bonsai: ${url}`);
+        }
+        return globalThis.fetch(url, init);
+      },
     });
   }
   return _bonsaiProvider;
@@ -514,9 +529,18 @@ export function createByokModel(modelId: string, byokKeys: ByokKeySet): any | nu
       return provider(bare)
     }
     case 'bonsai': {
+      const bonsaiBase = 'https://go.trybons.ai'
       const provider = createAnthropic({
-        baseURL: 'https://go.trybons.ai',
+        baseURL: bonsaiBase,
         apiKey,
+        fetch: async (input, init) => {
+          let url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url
+          if (!url.startsWith(bonsaiBase)) {
+            const path = new URL(url).pathname
+            url = `${bonsaiBase}${path}`
+          }
+          return globalThis.fetch(url, init)
+        },
       })
       const bonsaiId = bonsaiModelMap[modelId] || modelId.replace('bonsai/', '')
       return provider(bonsaiId)
