@@ -22,6 +22,10 @@ import {
   ChevronLeft,
   Server,
   Plug,
+  ListTodo,
+  CircleCheck,
+  CircleDot,
+  Circle,
   FileCode,
   Eye,
   Plus,
@@ -842,7 +846,9 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
             } else if (toolName === 'Task' && input?.description) {
               toolDescription = input.description
             } else if (toolName === 'TodoWrite') {
-              toolDescription = 'Updating task list'
+              const todoCount = input?.todos?.length || 0
+              const doneCount = input?.todos?.filter((t: any) => t.status === 'completed')?.length || 0
+              toolDescription = `${doneCount}/${todoCount} tasks`
             } else {
               toolDescription = `Using ${toolName}`
             }
@@ -860,6 +866,7 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
               pattern: (toolName === 'Glob' || toolName === 'Grep') ? input?.pattern : undefined,
               url: toolName === 'WebFetch' ? input?.url : undefined,
               query: toolName === 'WebSearch' ? input?.query : undefined,
+              todos: toolName === 'TodoWrite' ? input?.todos : undefined,
               isComplete: false,
             }
 
@@ -1508,7 +1515,7 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
             case 'WebSearch': return <Globe className="h-3.5 w-3.5" />
             case 'WebFetch': return <Globe className="h-3.5 w-3.5" />
             case 'Task': return <Bot className="h-3.5 w-3.5" />
-            case 'TodoWrite': return <FileText className="h-3.5 w-3.5" />
+            case 'TodoWrite': return <ListTodo className="h-3.5 w-3.5" />
             default: return <Sparkles className="h-3.5 w-3.5" />
           }
         }
@@ -1525,6 +1532,7 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
             case 'WebSearch': return { icon: 'text-indigo-400', dot: 'bg-indigo-400', border: 'border-l-indigo-500/60' }
             case 'WebFetch': return { icon: 'text-indigo-400', dot: 'bg-indigo-400', border: 'border-l-indigo-500/60' }
             case 'Task': return { icon: 'text-orange-400', dot: 'bg-orange-400', border: 'border-l-orange-500/60' }
+            case 'TodoWrite': return { icon: 'text-violet-400', dot: 'bg-violet-400', border: 'border-l-violet-500/60' }
             default: return { icon: 'text-gray-400', dot: 'bg-gray-400', border: 'border-l-gray-500/60' }
           }
         }
@@ -1552,7 +1560,8 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
         }
 
         // Check if this tool has expandable content
-        const hasExpandableContent = !!(meta.command || meta.result || meta.oldString || meta.newString || meta.fileContent)
+        // TodoWrite shows todos inline (always visible), so it's not "expandable" in the click-to-expand sense
+        const hasExpandableContent = toolName !== 'TodoWrite' && !!(meta.command || meta.result || meta.oldString || meta.newString || meta.fileContent)
 
         return (
           <div key={index} className="py-1 ml-10">
@@ -1594,6 +1603,30 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
                   <Check className="h-3 w-3 text-gray-600 shrink-0" />
                 )}
               </div>
+
+              {/* TodoWrite: Always show todo items inline */}
+              {toolName === 'TodoWrite' && meta.todos && meta.todos.length > 0 && (
+                <div className="border-t border-gray-700/40 px-3 py-2 space-y-1">
+                  {meta.todos.map((todo: { content: string; status: string; activeForm?: string }, tIdx: number) => (
+                    <div key={tIdx} className="flex items-start gap-2 py-0.5">
+                      {todo.status === 'completed' ? (
+                        <CircleCheck className="h-3.5 w-3.5 text-emerald-400 shrink-0 mt-px" />
+                      ) : todo.status === 'in_progress' ? (
+                        <CircleDot className="h-3.5 w-3.5 text-blue-400 shrink-0 mt-px animate-pulse" />
+                      ) : (
+                        <Circle className="h-3.5 w-3.5 text-gray-600 shrink-0 mt-px" />
+                      )}
+                      <span className={`text-xs leading-snug ${
+                        todo.status === 'completed' ? 'text-gray-500 line-through' :
+                        todo.status === 'in_progress' ? 'text-gray-200' :
+                        'text-gray-400'
+                      }`}>
+                        {todo.status === 'in_progress' && todo.activeForm ? todo.activeForm : todo.content}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Expanded content */}
               {isExpanded && hasExpandableContent && (
