@@ -32,6 +32,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Sandbox } from 'e2b'
 import { createClient } from '@/lib/supabase/server'
+import { getNextBonsaiKey } from '@/lib/ai-providers'
 // getDeploymentTokens uses browser client - query user_settings directly with server client instead
 
 // Bonsai AI Gateway configuration (testing Bonsai as general API proxy)
@@ -327,8 +328,8 @@ async function doStreaming(
     )
   }
 
-  // Get Bonsai API key for SDK authentication
-  const aiGatewayKey = process.env.BONSAI_API_KEY
+  // Get Bonsai API key (round-robin rotation for load distribution)
+  const aiGatewayKey = getNextBonsaiKey()
   if (!aiGatewayKey) {
     return NextResponse.json(
       { error: 'BONSAI_API_KEY not configured' },
@@ -940,8 +941,8 @@ async function handleCreate(
 
   const userId = user.id
 
-  // Get Bonsai API key
-  const aiGatewayKey = process.env.BONSAI_API_KEY
+  // Get Bonsai API key (round-robin rotation for load distribution)
+  const aiGatewayKey = getNextBonsaiKey()
   if (!aiGatewayKey) {
     return NextResponse.json(
       { error: 'BONSAI_API_KEY not configured. Add it to your environment variables.' },
@@ -2063,8 +2064,8 @@ async function handleStartStreamServer(request: NextRequest, sandboxId: string) 
     )
   }
 
-  // Get Bonsai API key
-  const aiGatewayKey = process.env.BONSAI_API_KEY
+  // Get Bonsai API key (round-robin rotation for load distribution)
+  const aiGatewayKey = getNextBonsaiKey()
   if (!aiGatewayKey) {
     return NextResponse.json(
       { error: 'BONSAI_API_KEY not configured' },

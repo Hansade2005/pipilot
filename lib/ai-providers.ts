@@ -21,7 +21,8 @@ let _mistralGatewayProvider: ReturnType<typeof createMistral> | null = null;
 let _xaiProvider: ReturnType<typeof createXai> | null = null;
 let _anthropicProvider: ReturnType<typeof createAnthropic> | null = null;
 let _openrouterProvider: ReturnType<typeof createOpenAICompatible> | null = null;
-let _bonsaiProvider: ReturnType<typeof createAnthropic> | null = null;
+// Bonsai API key rotation: supports comma-separated keys in BONSAI_API_KEY
+let _bonsaiKeyIndex = 0;
 
 function getA0DevProvider() {
   if (!_a0devProvider) _a0devProvider = createA0Dev();
@@ -112,31 +113,42 @@ function getOpenRouterProvider() {
   return _openrouterProvider;
 }
 
+/**
+ * Get the next Bonsai API key using round-robin rotation.
+ * Supports comma-separated keys in BONSAI_API_KEY env var.
+ * e.g. BONSAI_API_KEY="key1,key2,key3"
+ */
+export function getNextBonsaiKey(): string {
+  const raw = process.env.BONSAI_API_KEY || '';
+  const keys = raw.split(',').map(k => k.trim()).filter(Boolean);
+  if (keys.length === 0) return '';
+  const key = keys[_bonsaiKeyIndex % keys.length];
+  _bonsaiKeyIndex = (_bonsaiKeyIndex + 1) % keys.length;
+  return key;
+}
+
 function getBonsaiProvider() {
-  if (!_bonsaiProvider) {
-    // Bonsai exposes an Anthropic-compatible API at https://go.trybons.ai/v1
-    // The SDK appends /messages → https://go.trybons.ai/v1/messages
-    const bonsaiBaseURL = 'https://go.trybons.ai/v1';
-    _bonsaiProvider = createAnthropic({
-      baseURL: bonsaiBaseURL,
-      apiKey: process.env.BONSAI_API_KEY || '',
-      // Custom fetch to guarantee requests go to Bonsai, not Vercel Gateway.
-      // The @ai-sdk/anthropic SDK may try to reroute model IDs containing
-      // provider prefixes (e.g. "anthropic/claude-sonnet-4.5") to the
-      // Vercel AI Gateway. This fetch wrapper forces the correct base URL.
-      fetch: async (input, init) => {
-        let url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
-        // If the SDK rewrote the URL away from Bonsai, force it back
-        if (!url.startsWith(bonsaiBaseURL)) {
-          const path = new URL(url).pathname; // e.g. /v1/messages
-          url = `${bonsaiBaseURL}${path.replace(/^\/v1/, '')}`;
-          console.log(`[Bonsai] Redirected request back to Bonsai: ${url}`);
-        }
-        return globalThis.fetch(url, init);
-      },
-    });
-  }
-  return _bonsaiProvider;
+  // Create a fresh provider each call to use the rotated key
+  const bonsaiBaseURL = 'https://go.trybons.ai/v1';
+  const apiKey = getNextBonsaiKey();
+  return createAnthropic({
+    baseURL: bonsaiBaseURL,
+    apiKey,
+    // Custom fetch to guarantee requests go to Bonsai, not Vercel Gateway.
+    // The @ai-sdk/anthropic SDK may try to reroute model IDs containing
+    // provider prefixes (e.g. "anthropic/claude-sonnet-4.5") to the
+    // Vercel AI Gateway. This fetch wrapper forces the correct base URL.
+    fetch: async (input, init) => {
+      let url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
+      // If the SDK rewrote the URL away from Bonsai, force it back
+      if (!url.startsWith(bonsaiBaseURL)) {
+        const path = new URL(url).pathname; // e.g. /v1/messages
+        url = `${bonsaiBaseURL}${path.replace(/^\/v1/, '')}`;
+        console.log(`[Bonsai] Redirected request back to Bonsai: ${url}`);
+      }
+      return globalThis.fetch(url, init);
+    },
+  });
 }
 
 // Mapping from PiPilot bonsai/ model IDs to the actual model IDs expected by Bonsai API
