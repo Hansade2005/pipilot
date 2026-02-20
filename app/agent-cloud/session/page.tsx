@@ -1384,12 +1384,22 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
         )
 
       case 'input': {
-        const inputLines = line.content.split('\n')
+        // Strip injected system context from displayed message
+        // These markers get appended/prepended to the prompt before sending to the AI
+        const cleanContent = line.content
+          .replace(/\n*\[Playwright Browser Testing[\s\S]*$/i, '')
+          .replace(/\n*\[GitHub Context[\s\S]*?User Request:\s*/i, '')
+          .replace(/\n*\[New Project - Build From Scratch\][\s\S]*?User Request:\s*/i, '')
+          .replace(/\n*\[Available Tools[\s\S]*?User Request:\s*/i, '')
+          .replace(/\n*\[Connector Context[\s\S]*?User Request:\s*/i, '')
+          .replace(/\n*\[File Context[\s\S]*?\n\n/i, '')
+          .trim()
+        const inputLines = cleanContent.split('\n')
         const isLong = inputLines.length > MAX_LINES_COLLAPSED
         const isExpanded = expandedMessages.has(index)
         const displayContent = isLong && !isExpanded
           ? inputLines.slice(0, MAX_LINES_COLLAPSED).join('\n')
-          : line.content
+          : cleanContent
         return (
           <div key={index} className="flex items-start gap-3 py-4 group min-w-0">
             <div className="h-7 w-7 rounded-full bg-gray-700 flex items-center justify-center shrink-0">
@@ -1487,93 +1497,118 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
         // Tool icon mapping
         const getToolIcon = () => {
           switch (toolName) {
-            case 'Bash': return <Terminal className="h-3 w-3" />
-            case 'Edit': return <FileEdit className="h-3 w-3" />
-            case 'Write': return <FileCode className="h-3 w-3" />
-            case 'Read': return <Eye className="h-3 w-3" />
-            case 'Glob': return <FolderSearch className="h-3 w-3" />
-            case 'Grep': return <Search className="h-3 w-3" />
-            case 'WebSearch': return <Globe className="h-3 w-3" />
-            case 'WebFetch': return <Globe className="h-3 w-3" />
-            case 'Task': return <Bot className="h-3 w-3" />
-            case 'TodoWrite': return <FileText className="h-3 w-3" />
-            default: return <Sparkles className="h-3 w-3" />
+            case 'Bash': return <Terminal className="h-3.5 w-3.5" />
+            case 'Edit': return <FileEdit className="h-3.5 w-3.5" />
+            case 'Write': return <FileCode className="h-3.5 w-3.5" />
+            case 'Read': return <Eye className="h-3.5 w-3.5" />
+            case 'Glob': return <FolderSearch className="h-3.5 w-3.5" />
+            case 'Grep': return <Search className="h-3.5 w-3.5" />
+            case 'WebSearch': return <Globe className="h-3.5 w-3.5" />
+            case 'WebFetch': return <Globe className="h-3.5 w-3.5" />
+            case 'Task': return <Bot className="h-3.5 w-3.5" />
+            case 'TodoWrite': return <FileText className="h-3.5 w-3.5" />
+            default: return <Sparkles className="h-3.5 w-3.5" />
           }
         }
 
-        // Tool badge color
-        const getToolColor = () => {
+        // Tool accent color (icon + left border accent)
+        const getToolAccent = () => {
           switch (toolName) {
-            case 'Bash': return 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-            case 'Edit': return 'bg-amber-500/15 text-amber-400 border-amber-500/30'
-            case 'Write': return 'bg-blue-500/15 text-blue-400 border-blue-500/30'
-            case 'Read': return 'bg-purple-500/15 text-purple-400 border-purple-500/30'
-            case 'Glob': return 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30'
-            case 'Grep': return 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30'
-            case 'WebSearch': return 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30'
-            case 'WebFetch': return 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30'
-            case 'Task': return 'bg-orange-500/15 text-orange-400 border-orange-500/30'
-            default: return 'bg-gray-500/15 text-gray-400 border-gray-500/30'
+            case 'Bash': return { icon: 'text-emerald-400', dot: 'bg-emerald-400', border: 'border-l-emerald-500/60' }
+            case 'Edit': return { icon: 'text-amber-400', dot: 'bg-amber-400', border: 'border-l-amber-500/60' }
+            case 'Write': return { icon: 'text-blue-400', dot: 'bg-blue-400', border: 'border-l-blue-500/60' }
+            case 'Read': return { icon: 'text-purple-400', dot: 'bg-purple-400', border: 'border-l-purple-500/60' }
+            case 'Glob': return { icon: 'text-cyan-400', dot: 'bg-cyan-400', border: 'border-l-cyan-500/60' }
+            case 'Grep': return { icon: 'text-cyan-400', dot: 'bg-cyan-400', border: 'border-l-cyan-500/60' }
+            case 'WebSearch': return { icon: 'text-indigo-400', dot: 'bg-indigo-400', border: 'border-l-indigo-500/60' }
+            case 'WebFetch': return { icon: 'text-indigo-400', dot: 'bg-indigo-400', border: 'border-l-indigo-500/60' }
+            case 'Task': return { icon: 'text-orange-400', dot: 'bg-orange-400', border: 'border-l-orange-500/60' }
+            default: return { icon: 'text-gray-400', dot: 'bg-gray-400', border: 'border-l-gray-500/60' }
           }
+        }
+
+        const accent = getToolAccent()
+
+        // Format description with syntax-highlighted code/paths
+        const rawDesc = meta.fileName || meta.description || line.content || ''
+        const renderDescription = () => {
+          // Highlight file paths (anything like /foo/bar.ts or src/foo.tsx)
+          // and inline code/commands (backtick-wrapped or shell-like commands)
+          const parts = rawDesc.split(/(`[^`]+`|(?:\/[\w.\-/]+(?:\.\w+)?)|(?:[\w.\-]+\/[\w.\-/]+(?:\.\w+)?))/g)
+          return parts.map((part: string, i: number) => {
+            if (!part) return null
+            // Backtick-wrapped code
+            if (part.startsWith('`') && part.endsWith('`')) {
+              return <code key={i} className="px-1 py-px rounded bg-gray-800 text-orange-300 text-[11px]">{part.slice(1, -1)}</code>
+            }
+            // File path (starts with / or contains / with extension)
+            if (/^\/[\w.\-/]+|^[\w.\-]+\/[\w.\-/]+/.test(part)) {
+              return <span key={i} className="text-blue-300">{part}</span>
+            }
+            return <span key={i}>{part}</span>
+          })
         }
 
         // Check if this tool has expandable content
         const hasExpandableContent = !!(meta.command || meta.result || meta.oldString || meta.newString || meta.fileContent)
 
         return (
-          <div key={index} className="py-1.5 ml-10">
+          <div key={index} className="py-1 ml-10">
             <div
-              className={`rounded-lg border border-gray-800/80 bg-gray-900/50 overflow-hidden ${hasExpandableContent ? '' : ''}`}
+              className={`rounded-lg border border-gray-700/50 bg-gray-900/60 overflow-hidden border-l-2 ${accent.border} backdrop-blur-sm`}
             >
               {/* Tool header */}
               <div
-                className={`flex items-center gap-2 px-3 py-2 min-w-0 ${hasExpandableContent ? 'cursor-pointer hover:bg-gray-800/30' : ''}`}
+                className={`flex items-center gap-2.5 px-3 py-2 min-w-0 ${hasExpandableContent ? 'cursor-pointer hover:bg-gray-800/40 transition-colors' : ''}`}
                 onClick={() => hasExpandableContent && toggleToolExpanded(index)}
               >
-                {/* Expand/collapse icon */}
+                {/* Expand/collapse or status dot */}
                 {hasExpandableContent ? (
-                  isExpanded ? (
-                    <ChevronDown className="h-3 w-3 text-gray-500 shrink-0" />
-                  ) : (
-                    <ChevronRight className="h-3 w-3 text-gray-500 shrink-0" />
-                  )
+                  <ChevronRight className={`h-3.5 w-3.5 text-gray-500 shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
                 ) : (
-                  <div className={`w-2 h-2 rounded-full shrink-0 ${isComplete ? 'bg-blue-500' : 'bg-blue-500 animate-pulse'}`} />
+                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isComplete ? accent.dot : `${accent.dot} animate-pulse`}`} />
                 )}
 
-                {/* Tool badge */}
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border shrink-0 ${getToolColor()}`}>
+                {/* Tool icon */}
+                <span className={`shrink-0 ${accent.icon}`}>
                   {getToolIcon()}
+                </span>
+
+                {/* Tool name */}
+                <span className="text-[11px] font-semibold text-gray-300 shrink-0 uppercase tracking-wider">
                   {toolName}
                 </span>
 
-                {/* Description */}
-                <span className="text-xs text-gray-400 truncate flex-1 font-mono min-w-0">
-                  {meta.fileName || meta.description || line.content}
+                {/* Description with syntax highlighting */}
+                <span className="text-xs text-gray-500 truncate flex-1 min-w-0">
+                  {renderDescription()}
                 </span>
 
                 {/* Status indicator */}
                 {!isComplete && (
-                  <Loader2 className="h-3 w-3 animate-spin text-blue-400 shrink-0" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-400 shrink-0" />
+                )}
+                {isComplete && hasExpandableContent && (
+                  <Check className="h-3 w-3 text-gray-600 shrink-0" />
                 )}
               </div>
 
               {/* Expanded content */}
               {isExpanded && hasExpandableContent && (
-                <div className="border-t border-gray-800/80 overflow-hidden">
+                <div className="border-t border-gray-700/40 overflow-hidden">
                   {/* Bash: Show command and output */}
                   {toolName === 'Bash' && (
                     <div className="text-xs font-mono overflow-hidden">
                       {meta.command && (
-                        <div className="px-3 py-2 bg-[#1a1a1a]/50 border-b border-gray-800/50 overflow-hidden">
-                          <div className="flex items-start gap-1.5 text-emerald-400/80 mb-1">
-                            <span className="text-gray-500 shrink-0">$</span>
-                            <span className="break-all whitespace-pre-wrap [overflow-wrap:anywhere]">{meta.command}</span>
+                        <div className="px-3 py-2.5 bg-gray-950/60 border-b border-gray-800/40 overflow-hidden">
+                          <div className="flex items-start gap-2 text-emerald-400/90">
+                            <span className="text-emerald-600 shrink-0 select-none font-bold">$</span>
+                            <span className="break-all whitespace-pre-wrap [overflow-wrap:anywhere] text-[11px] leading-4">{meta.command}</span>
                           </div>
                         </div>
                       )}
                       {meta.result && (
-                        <div className="px-3 py-2 text-gray-400 max-h-60 overflow-y-auto overflow-x-hidden">
+                        <div className="px-3 py-2 text-gray-400 max-h-60 overflow-y-auto overflow-x-hidden bg-gray-950/30">
                           <pre className="whitespace-pre-wrap break-all [overflow-wrap:anywhere] text-[11px] leading-4">{meta.result}</pre>
                         </div>
                       )}
