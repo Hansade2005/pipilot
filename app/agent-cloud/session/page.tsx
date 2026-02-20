@@ -1387,11 +1387,11 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
           ? inputLines.slice(0, MAX_LINES_COLLAPSED).join('\n')
           : line.content
         return (
-          <div key={index} className="flex items-start gap-3 py-4 group">
+          <div key={index} className="flex items-start gap-3 py-4 group min-w-0">
             <div className="h-7 w-7 rounded-full bg-gray-700 flex items-center justify-center shrink-0">
               <span className="text-xs font-semibold">U</span>
             </div>
-            <div className="flex-1 pt-0.5">
+            <div className="flex-1 min-w-0 pt-0.5 overflow-hidden">
               {/* Display attached images */}
               {line.images && line.images.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-2">
@@ -1436,13 +1436,13 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
 
       case 'output':
         return (
-          <div key={index} className="flex items-start gap-3 py-4 group">
+          <div key={index} className="flex items-start gap-3 py-4 group min-w-0">
             <div className="h-7 w-7 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shrink-0">
               <Bot className="h-4 w-4 text-white" />
             </div>
             <div className="flex-1 min-w-0 pt-0.5 overflow-hidden">
               <div className="relative">
-                <div className="prose prose-invert prose-sm max-w-none break-words [overflow-wrap:anywhere] prose-a:break-all prose-pre:overflow-x-auto">
+                <div className="prose prose-invert prose-sm max-w-none break-words [overflow-wrap:anywhere] prose-a:break-all prose-pre:overflow-x-auto prose-code:break-all [&_*]:max-w-full">
                   <Response className="text-gray-300">
                     {line.content}
                   </Response>
@@ -1464,11 +1464,11 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
 
       case 'error':
         return (
-          <div key={index} className="flex items-start gap-3 py-2">
+          <div key={index} className="flex items-start gap-3 py-2 min-w-0">
             <div className="h-7 w-7 rounded-full bg-red-500/20 flex items-center justify-center shrink-0">
               <span className="text-xs text-red-400 font-bold">!</span>
             </div>
-            <div className="flex-1 text-red-400 text-sm bg-red-500/10 rounded-lg px-3 py-2 font-mono break-words [overflow-wrap:anywhere]">
+            <div className="flex-1 min-w-0 text-red-400 text-sm bg-red-500/10 rounded-lg px-3 py-2 font-mono break-words [overflow-wrap:anywhere] overflow-hidden">
               {line.content}
             </div>
           </div>
@@ -1664,9 +1664,9 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
       {/* Chat area */}
       <div
         ref={terminalRef}
-        className="flex-1 overflow-y-auto px-4 py-6"
+        className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6"
       >
-        <div className="max-w-3xl mx-auto space-y-2">
+        <div className="max-w-3xl mx-auto space-y-2 min-w-0">
           {activeSession.lines.map((line, index) => renderLine(line, index))}
           {isRecreating && (
             <div className="flex items-center gap-2 py-3 text-amber-400">
