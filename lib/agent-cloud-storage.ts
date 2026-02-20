@@ -120,14 +120,14 @@ class AgentCloudStorage {
   }
 
   /**
-   * Load all sessions for the current user
+   * Load all sessions for the current user (metadata only, no messages).
+   * Messages are loaded lazily per-session via loadSessionMessages().
    */
   async loadSessions(): Promise<Session[]> {
     const userId = await this.getUserId()
     if (!userId) return []
 
     try {
-      // Fetch sessions
       const { data: dbSessions, error: sessionsError } = await this.storageClient
         .from('agent_cloud_sessions')
         .select('*')
@@ -141,63 +141,54 @@ class AgentCloudStorage {
 
       if (!dbSessions || dbSessions.length === 0) return []
 
-      // Fetch messages per session to avoid Supabase default 1000-row limit
-      // (bulk .in() query silently truncates at 1000 rows, causing blank sessions)
-      const sessionIds = dbSessions.map(s => s.id)
-      const messagesBySession = new Map<string, TerminalLine[]>()
-
-      // Batch sessions into chunks to balance between per-session queries and bulk limits
-      const BATCH_SIZE = 10
-      for (let i = 0; i < sessionIds.length; i += BATCH_SIZE) {
-        const batchIds = sessionIds.slice(i, i + BATCH_SIZE)
-        const { data: dbMessages, error: messagesError } = await this.storageClient
-          .from('agent_cloud_messages')
-          .select('*')
-          .in('session_id', batchIds)
-          .order('sequence_num', { ascending: true })
-          .order('timestamp', { ascending: true })
-          .limit(10000)
-
-        if (messagesError) {
-          console.error('[AgentCloudStorage] Error loading messages batch:', messagesError)
-          continue
-        }
-
-        for (const msg of (dbMessages || [])) {
-          if (!messagesBySession.has(msg.session_id)) {
-            messagesBySession.set(msg.session_id, [])
-          }
-          const line: TerminalLine = {
-            type: msg.type as TerminalLine['type'],
-            content: msg.content,
-            timestamp: new Date(msg.timestamp),
-            meta: msg.meta || undefined,
-            // images will be attached below from IndexedDB
-          }
-          messagesBySession.get(msg.session_id)!.push(line)
-        }
-      }
-
-      // Load images from IndexedDB for each session and attach to lines
-      for (const sid of sessionIds) {
-        const imageMap = await loadImagesBySession(sid)
-        const lines = messagesBySession.get(sid)
-        if (lines && imageMap.size > 0) {
-          lines.forEach((line, idx) => {
-            const imgs = imageMap.get(idx)
-            if (imgs && imgs.length > 0) {
-              line.images = imgs
-            }
-          })
-        }
-      }
-
-      // Convert sessions
-      return dbSessions.map(dbSession =>
-        dbSessionToSession(dbSession, messagesBySession.get(dbSession.id) || [])
-      )
+      // Return sessions with empty lines - messages loaded on demand
+      return dbSessions.map(dbSession => dbSessionToSession(dbSession, []))
     } catch (error) {
       console.error('[AgentCloudStorage] Error in loadSessions:', error)
+      return []
+    }
+  }
+
+  /**
+   * Load messages for a single session (lazy loading).
+   * Called when user opens a session.
+   */
+  async loadSessionMessages(sessionId: string): Promise<TerminalLine[]> {
+    try {
+      const { data: dbMessages, error: messagesError } = await this.storageClient
+        .from('agent_cloud_messages')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('sequence_num', { ascending: true })
+        .order('timestamp', { ascending: true })
+        .limit(10000)
+
+      if (messagesError) {
+        console.error('[AgentCloudStorage] Error loading session messages:', messagesError)
+        return []
+      }
+
+      const lines: TerminalLine[] = (dbMessages || []).map(msg => ({
+        type: msg.type as TerminalLine['type'],
+        content: msg.content,
+        timestamp: new Date(msg.timestamp),
+        meta: msg.meta || undefined,
+      }))
+
+      // Load images from IndexedDB and attach to lines
+      const imageMap = await loadImagesBySession(sessionId)
+      if (imageMap.size > 0) {
+        lines.forEach((line, idx) => {
+          const imgs = imageMap.get(idx)
+          if (imgs && imgs.length > 0) {
+            line.images = imgs
+          }
+        })
+      }
+
+      return lines
+    } catch (error) {
+      console.error('[AgentCloudStorage] Error in loadSessionMessages:', error)
       return []
     }
   }

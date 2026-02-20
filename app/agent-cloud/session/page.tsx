@@ -261,6 +261,7 @@ function SessionPageInner() {
     setConnectors,
     selectedModel,
     setSelectedModel,
+    loadSessionMessages,
   } = useAgentCloud()
 
   const [prompt, setPrompt] = useState('')
@@ -351,6 +352,15 @@ function SessionPageInner() {
 
   // Find the active session
   const activeSession = sessions.find(s => s.id === sessionId) || null
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false)
+
+  // Lazy-load messages from Supabase when opening a session
+  useEffect(() => {
+    if (sessionId && activeSession && activeSession.lines.length === 0 && !activeSession.pendingPrompt) {
+      setIsLoadingMessages(true)
+      loadSessionMessages(sessionId).finally(() => setIsLoadingMessages(false))
+    }
+  }, [sessionId, activeSession?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Redirect to new page if session was deleted (sessions loaded but ID not found)
   useEffect(() => {
@@ -1951,6 +1961,12 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
         className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6"
       >
         <div className="max-w-3xl mx-auto space-y-2 min-w-0">
+          {isLoadingMessages && activeSession.lines.length === 0 && (
+            <div className="flex items-center justify-center gap-2 py-12 text-gray-500">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm font-mono">Loading messages...</span>
+            </div>
+          )}
           {activeSession.lines.map((line, index) => renderLine(line, index))}
           {isRecreating && (
             <div className="flex items-center gap-2 py-3 text-amber-400">
