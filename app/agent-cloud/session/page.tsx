@@ -28,7 +28,13 @@ import {
   Monitor,
   X,
 } from "lucide-react"
-import { useAgentCloud, type TerminalLine } from "../layout"
+import { useAgentCloud, MODELS, type TerminalLine } from "../layout"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Response } from "@/components/ai-elements/response"
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk"
 import { usePageTitle } from '@/hooks/use-page-title'
@@ -169,6 +175,8 @@ function SessionPageInner() {
     setSessions,
     storedTokens,
     connectors,
+    selectedModel,
+    setSelectedModel,
   } = useAgentCloud()
 
   const [prompt, setPrompt] = useState('')
@@ -263,6 +271,20 @@ function SessionPageInner() {
   // Claude, GPT, and Devstral models support image input
   const modelName = activeSession?.model || ''
   const supportsImages = modelName.includes('claude') || modelName.includes('gpt') || modelName.includes('devstral')
+
+  // Resolve current model display from session or context
+  const currentModelId = activeSession?.model || selectedModel
+  const currentModelInfo = MODELS.find(m => m.id === currentModelId)
+
+  // Handle model change - updates context and session
+  const handleModelChange = useCallback((modelId: 'sonnet' | 'opus' | 'haiku' | 'flash') => {
+    setSelectedModel(modelId)
+    if (sessionId) {
+      setSessions(prev => prev.map(s =>
+        s.id === sessionId ? { ...s, model: modelId } : s
+      ))
+    }
+  }, [sessionId, setSessions, setSelectedModel])
 
   // Recreate sandbox with conversation history
   const recreateSandbox = useCallback(async (pendingPrompt?: string) => {
@@ -1660,6 +1682,36 @@ User Request: ${currentPrompt}`
                     </button>
                   </>
                 )}
+
+                {/* Model selector */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="flex items-center gap-1 text-xs text-zinc-400 hover:text-white transition-colors px-2 py-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800">
+                      <Sparkles className="h-3 w-3" />
+                      <span>{currentModelInfo?.name || currentModelId}</span>
+                      <ChevronDown className="h-3 w-3" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" side="top" className="bg-zinc-900 border-zinc-800 w-[220px]">
+                    {MODELS.map(model => (
+                      <DropdownMenuItem
+                        key={model.id}
+                        onClick={() => handleModelChange(model.id)}
+                        className={`cursor-pointer ${model.id === currentModelId ? 'bg-zinc-800/50' : ''}`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <div>
+                            <div className="font-medium text-sm">{model.name}</div>
+                            <div className="text-xs text-zinc-500">{model.description}</div>
+                          </div>
+                          {model.id === currentModelId && (
+                            <Check className="h-4 w-4 text-orange-400 shrink-0 ml-2" />
+                          )}
+                        </div>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
               <div className="absolute bottom-2 right-2">
                 {isLoading || isRecreating ? (
