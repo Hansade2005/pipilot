@@ -1403,12 +1403,26 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
           .replace(/\n*\[Connector Context[\s\S]*?User Request:\s*/i, '')
           .replace(/\n*\[File Context[\s\S]*?\n\n/i, '')
           .trim()
+        const MAX_CHARS = 308
+        const MAX_WORDS = 54
         const inputLines = cleanContent.split('\n')
-        const isLong = inputLines.length > MAX_LINES_COLLAPSED
+        const wordCount = cleanContent.split(/\s+/).filter(Boolean).length
+        const isLong = inputLines.length > MAX_LINES_COLLAPSED || cleanContent.length > MAX_CHARS || wordCount > MAX_WORDS
         const isExpanded = expandedMessages.has(index)
-        const displayContent = isLong && !isExpanded
-          ? inputLines.slice(0, MAX_LINES_COLLAPSED).join('\n')
-          : cleanContent
+        let displayContent = cleanContent
+        if (isLong && !isExpanded) {
+          // Truncate by lines first
+          let truncated = inputLines.length > MAX_LINES_COLLAPSED
+            ? inputLines.slice(0, MAX_LINES_COLLAPSED).join('\n')
+            : cleanContent
+          // Then enforce char limit
+          if (truncated.length > MAX_CHARS) {
+            // Cut at the last space before the limit to avoid mid-word breaks
+            const cut = truncated.lastIndexOf(' ', MAX_CHARS)
+            truncated = truncated.substring(0, cut > 0 ? cut : MAX_CHARS) + '...'
+          }
+          displayContent = truncated
+        }
         return (
           <div key={index} className="flex items-start gap-3 py-4 group min-w-0">
             <div className="h-7 w-7 rounded-full bg-gray-700 flex items-center justify-center shrink-0">
