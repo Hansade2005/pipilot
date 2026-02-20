@@ -436,9 +436,11 @@ CRITICAL PROJECT DIRECTORY INFORMATION:
 - PROJECT PATH: ${workDir}
 - This is where ALL project source code is located
 - ALWAYS cd to ${workDir} before running ANY commands (builds, installs, git, etc.)
-- NEVER run npm/pnpm install or create files in /home/user directly - that is the system directory
+- NEVER run install commands or create files in /home/user directly - that is the system directory
 - System tools and SDK are installed in /home/user (DO NOT modify this)
 - Your project files are ONLY in: ${workDir}
+
+PACKAGE MANAGER: Always use pnpm (NEVER npm). Use "pnpm install", "pnpm add <pkg>", "pnpm run dev", "pnpm run build", etc. npm is not available in this environment.
 
 IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 - You are working on branch: ${workingBranch}
@@ -1371,11 +1373,11 @@ async function handleCreate(
         console.log(`[Agent Cloud] Checking for project dependencies...`)
         try {
           const depsResult = await sandbox.commands.run(
-            `cd ${repoDir} && [ -f package.json ] && npm install || echo "No package.json"`,
+            `cd ${repoDir} && [ -f package.json ] && pnpm install || echo "No package.json"`,
             { timeoutMs: 180000 }
           )
           if (depsResult.stdout?.includes('No package.json')) {
-            console.log(`[Agent Cloud] No package.json found, skipping npm install`)
+            console.log(`[Agent Cloud] No package.json found, skipping pnpm install`)
           } else {
             console.log(`[Agent Cloud] Dependencies installed`)
           }
@@ -2199,9 +2201,11 @@ CRITICAL PROJECT DIRECTORY INFORMATION:
 - PROJECT PATH: \${WORK_DIR}
 - This is where ALL project source code is located
 - ALWAYS cd to \${WORK_DIR} before running ANY commands (builds, installs, git, etc.)
-- NEVER run npm/pnpm install or create files in /home/user directly - that is the system directory
+- NEVER run install commands or create files in /home/user directly - that is the system directory
 - System tools and SDK are installed in /home/user (DO NOT modify this)
 - Your project files are ONLY in: \${WORK_DIR}
+
+PACKAGE MANAGER: Always use pnpm (NEVER npm). Use "pnpm install", "pnpm add <pkg>", "pnpm run dev", "pnpm run build", etc. npm is not available in this environment.
 
 IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 - You are working on branch: \${WORKING_BRANCH}
