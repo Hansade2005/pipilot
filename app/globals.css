@@ -389,6 +389,57 @@ body {
   }
 }
 
+/* ===== Space / Universe Stars & Rocks ===== */
+
+/* Twinkling star animation */
+@keyframes star-twinkle {
+  0%, 100% {
+    opacity: var(--star-base-opacity, 0.3);
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.3);
+  }
+}
+
+.space-star {
+  animation: star-twinkle var(--twinkle-duration, 3s) ease-in-out infinite;
+  will-change: opacity, transform;
+}
+
+/* Floating rock drift animation */
+@keyframes rock-float {
+  0% {
+    transform: rotate(var(--rock-rotation, 0deg)) translateY(0px) translateX(0px);
+  }
+  25% {
+    transform: rotate(calc(var(--rock-rotation, 0deg) + 8deg)) translateY(-12px) translateX(calc(var(--drift-x, 10px) * 0.4));
+  }
+  50% {
+    transform: rotate(calc(var(--rock-rotation, 0deg) + 3deg)) translateY(-6px) translateX(var(--drift-x, 10px));
+  }
+  75% {
+    transform: rotate(calc(var(--rock-rotation, 0deg) - 5deg)) translateY(-15px) translateX(calc(var(--drift-x, 10px) * 0.6));
+  }
+  100% {
+    transform: rotate(var(--rock-rotation, 0deg)) translateY(0px) translateX(0px);
+  }
+}
+
+.space-rock {
+  animation: rock-float var(--rock-duration, 12s) ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .space-star,
+  .space-rock {
+    animation: none;
+  }
+}
+
 /* Floating Animation */
 @keyframes float {
   0%, 100% {
