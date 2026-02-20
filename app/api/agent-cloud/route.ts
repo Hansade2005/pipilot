@@ -48,6 +48,77 @@ const AVAILABLE_MODELS = {
   flash: 'z-ai/glm-4.6',                  // Fast inference via Bonsai
 } as const
 
+// Strip Bonsai routing metadata from model responses.
+// Bonsai injects lines like: "@bonsai: routing to driven-jay (stealth, free premium model)..."
+// Because text arrives in small streaming chunks, we use a stateful filter that buffers
+// the start of each response turn until we can determine if it contains a @bonsai: line.
+const BONSAI_ROUTING_PATTERN = /^@bonsai:[^\n]*\n?/gm
+
+function stripBonsaiMeta(text: string): string {
+  return text.replace(BONSAI_ROUTING_PATTERN, '')
+}
+
+/** Stateful filter for a single response turn. Buffers initial chunks until
+ *  we can confirm/deny a @bonsai: prefix, then flushes and passes through. */
+function createBonsaiFilter() {
+  let buffer = ''
+  let stripping = false  // true while inside a @bonsai: line
+  let passthrough = false // true once we've confirmed no more @bonsai: prefixes
+
+  return function filter(chunk: string): string {
+    if (passthrough) {
+      // Fast path: already past any potential Bonsai prefix
+      return stripBonsaiMeta(chunk)
+    }
+
+    buffer += chunk
+
+    // If buffer starts with @bonsai: we need to strip until newline
+    if (buffer.startsWith('@bonsai:') || stripping) {
+      stripping = true
+      const nlIndex = buffer.indexOf('\n')
+      if (nlIndex === -1) {
+        // Haven't seen end of @bonsai: line yet, keep buffering
+        return ''
+      }
+      // Found newline - strip the @bonsai: line and check remainder
+      buffer = buffer.slice(nlIndex + 1)
+      stripping = false
+      // Check if there's another @bonsai: line (unlikely but handle it)
+      if (buffer.startsWith('@bonsai:')) {
+        return filter('') // recurse to strip next line
+      }
+      // Done stripping, flush remainder
+      passthrough = true
+      const result = buffer
+      buffer = ''
+      return stripBonsaiMeta(result)
+    }
+
+    // Buffer doesn't start with @bonsai: - could be partial "@bon" etc.
+    // If we have enough chars to rule out @bonsai: prefix, flush
+    if (buffer.length >= 8 && !buffer.startsWith('@bonsai:')) {
+      passthrough = true
+      const result = buffer
+      buffer = ''
+      return result
+    }
+
+    // Still ambiguous (< 8 chars that could still become @bonsai:)
+    // Check if what we have so far is still a valid prefix of "@bonsai:"
+    const prefix = '@bonsai:'
+    if (prefix.startsWith(buffer)) {
+      return '' // keep buffering
+    }
+
+    // Buffer diverged from "@bonsai:" - not a match, flush everything
+    passthrough = true
+    const result = buffer
+    buffer = ''
+    return result
+  }
+}
+
 // Store active sandboxes with user association
 // Key: `${userId}-${repoFullName}` or `${userId}-default`
 const activeSandboxes = new Map<string, {
@@ -544,7 +615,8 @@ try {
       const event = message.event;
       if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
         hasStreamedText = true;
-        console.log(JSON.stringify({ type: 'text', data: event.delta.text, timestamp: Date.now() }));
+        const cleaned = event.delta.text.replace(/^@bonsai:[^\\n]*\\n?/gm, '');
+        if (cleaned) console.log(JSON.stringify({ type: 'text', data: cleaned, timestamp: Date.now() }));
       } else if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
         console.log(JSON.stringify({ type: 'tool_use', name: event.content_block.name, input: {}, timestamp: Date.now() }));
       }
@@ -621,6 +693,7 @@ try {
         let textContent = '' // Accumulate text for conversation history
         let jsonBuffer = '' // Buffer for incomplete JSON lines
         let sdkStarted = false // Track when SDK script starts (to filter install noise)
+        const bonsaiFilter = createBonsaiFilter() // Stateful filter for @bonsai: lines
 
         // Start heartbeat to keep connection alive
         const heartbeatInterval = setInterval(() => {
@@ -677,8 +750,11 @@ try {
 
                   // Handle different message types from Agent SDK stream output
                   if (message.type === 'text') {
-                    textContent += message.data || ''
-                    send({ type: 'text', data: message.data, timestamp: Date.now() })
+                    const cleaned = bonsaiFilter(message.data || '')
+                    if (cleaned) {
+                      textContent += cleaned
+                      send({ type: 'text', data: cleaned, timestamp: Date.now() })
+                    }
                   } else if (message.type === 'tool_use') {
                     send({
                       type: 'tool_use',
@@ -2179,8 +2255,11 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
           const event = message.event;
           if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
             hasStreamedText = true;
-            textContent += event.delta.text;
-            send({ type: 'text', data: event.delta.text, timestamp: Date.now() });
+            const cleaned = event.delta.text.replace(/^@bonsai:[^\\n]*\\n?/gm, '');
+            if (cleaned) {
+              textContent += cleaned;
+              send({ type: 'text', data: cleaned, timestamp: Date.now() });
+            }
           } else if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
             send({ type: 'tool_use', name: event.content_block.name, input: {}, timestamp: Date.now() });
           }

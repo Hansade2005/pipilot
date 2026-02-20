@@ -11195,7 +11195,15 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
               }
 
               // Send each part as newline-delimited JSON (no SSE "data:" prefix)
-              controller.enqueue(encoder.encode(JSON.stringify(part) + '\n'))
+              // Strip Bonsai routing metadata from text-delta parts
+              if (part.type === 'text-delta' && part.text) {
+                const cleaned = part.text.replace(/^@bonsai:[^\n]*\n?/gm, '')
+                if (cleaned) {
+                  controller.enqueue(encoder.encode(JSON.stringify({ ...part, text: cleaned }) + '\n'))
+                }
+              } else {
+                controller.enqueue(encoder.encode(JSON.stringify(part) + '\n'))
+              }
             }
           } catch (error) {
             const isAbort = clientAborted || (error instanceof Error && (error.name === 'AbortError' || error.message.includes('aborted') || error.message.includes('Client aborted')))
@@ -11357,7 +11365,15 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                     currentStepTools = []
                   }
 
-                  controller.enqueue(encoder.encode(JSON.stringify(part) + '\n'))
+                  // Strip Bonsai routing metadata from text-delta parts
+                  if (part.type === 'text-delta' && part.text) {
+                    const cleaned = part.text.replace(/^@bonsai:[^\n]*\n?/gm, '')
+                    if (cleaned) {
+                      controller.enqueue(encoder.encode(JSON.stringify({ ...part, text: cleaned }) + '\n'))
+                    }
+                  } else {
+                    controller.enqueue(encoder.encode(JSON.stringify(part) + '\n'))
+                  }
                 }
 
                 // Replace result reference so billing uses fallback's usage data
