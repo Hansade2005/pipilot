@@ -213,11 +213,12 @@ export const DEFAULT_MCPS = [
   { id: 'sequential-thinking', name: 'Sequential Thinking', description: 'Structured reasoning' },
 ]
 
-// Available models
+// Available models (powered by Bonsai AI Gateway)
 export const MODELS = [
-  { id: 'sonnet', name: 'Default', provider: 'Mistral', description: 'Devstral Small 2' },
-  { id: 'opus', name: 'GLM 4.7', provider: 'ZAI', description: 'High quality responses' },
-  { id: 'haiku', name: 'Grok', provider: 'xAI', description: 'Grok Code Fast 1' },
+  { id: 'sonnet', name: 'Claude Sonnet 4.5', provider: 'Anthropic', description: 'Fast code generation via Bonsai' },
+  { id: 'opus', name: 'Claude Opus 4', provider: 'Anthropic', description: 'High quality responses via Bonsai' },
+  { id: 'haiku', name: 'GPT-5.1 Codex', provider: 'OpenAI', description: 'OpenAI Codex via Bonsai' },
+  { id: 'flash', name: 'GLM 4.6', provider: 'ZAI', description: 'Fast inference via Bonsai' },
 ] as const
 
 // Context for sharing state across pages
@@ -232,8 +233,8 @@ interface AgentCloudContextType {
   branches: string[]
   selectedBranch: string
   setSelectedBranch: (branch: string) => void
-  selectedModel: 'sonnet' | 'opus' | 'haiku'
-  setSelectedModel: (model: 'sonnet' | 'opus' | 'haiku') => void
+  selectedModel: 'sonnet' | 'opus' | 'haiku' | 'flash'
+  setSelectedModel: (model: 'sonnet' | 'opus' | 'haiku' | 'flash') => void
   storedTokens: { github?: string; vercel?: string; netlify?: string }
   isConnected: boolean
   isLoadingTokens: boolean
@@ -278,7 +279,7 @@ function AgentCloudLayoutInner({
   const [isCreating, setIsCreating] = useState(false)
 
   // Settings
-  const [selectedModel, setSelectedModel] = useState<'sonnet' | 'opus' | 'haiku'>('sonnet')
+  const [selectedModel, setSelectedModel] = useState<'sonnet' | 'opus' | 'haiku' | 'flash'>('sonnet')
 
   // Connectors state (persisted to localStorage)
   const [connectors, setConnectors] = useState<ConnectorConfig[]>(DEFAULT_CONNECTORS)

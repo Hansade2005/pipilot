@@ -51,8 +51,8 @@ export default function NewSessionPage() {
     isCreating,
   } = useAgentCloud()
 
-  // Only Devstral model (sonnet slot) supports image input
-  const supportsImages = selectedModel === 'sonnet'
+  // Claude and GPT models support image input via Bonsai
+  const supportsImages = selectedModel === 'sonnet' || selectedModel === 'opus' || selectedModel === 'haiku'
 
   const [prompt, setPrompt] = useState('')
   const [repoSearchQuery, setRepoSearchQuery] = useState('')
