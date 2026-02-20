@@ -952,7 +952,7 @@ function AgentCloudLayoutInner({
           ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
         `}>
           <div className="flex items-center justify-between px-3 py-3 shrink-0">
-            <span className="font-semibold text-sm text-gray-200 pl-1">PiPilot Code</span>
+            <span className="font-semibold text-sm text-gray-200 pl-1">PiPilot Cloud Code</span>
             <button
               onClick={() => setMobileMenuOpen(false)}
               className="p-1.5 hover:bg-gray-800 rounded-lg transition-colors"
@@ -993,11 +993,11 @@ function AgentCloudLayoutInner({
               </button>
 
               {/* Mobile: show brand name always */}
-              <span className="text-sm font-semibold text-gray-300 md:hidden">PiPilot Code</span>
+              <span className="text-sm font-semibold text-gray-300 md:hidden">PiPilot Cloud Code</span>
 
               {!sidebarOpen && (
                 <>
-                  <span className="text-sm font-semibold text-gray-300 hidden md:inline">PiPilot Code</span>
+                  <span className="text-sm font-semibold text-gray-300 hidden md:inline">PiPilot Cloud Code</span>
                   <Badge className="text-[10px] bg-gray-800 text-gray-500 font-normal border-0 px-1.5 hidden md:inline-flex">
                     preview
                   </Badge>
