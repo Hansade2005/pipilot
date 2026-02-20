@@ -1498,11 +1498,8 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
           displayContent = truncated
         }
         return (
-          <div key={index} className="flex items-start gap-3 py-4 group min-w-0">
-            <div className="h-7 w-7 rounded-full bg-gray-700 flex items-center justify-center shrink-0">
-              <span className="text-xs font-semibold">U</span>
-            </div>
-            <div className="flex-1 min-w-0 pt-0.5 overflow-hidden">
+          <div key={index} className="flex items-start gap-3 py-4 group min-w-0 justify-end">
+            <div className="max-w-[85%] min-w-0 overflow-hidden bg-orange-600 text-white rounded-2xl rounded-br-sm px-4 py-2.5">
               {/* Display attached images */}
               {line.images && line.images.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-2">
@@ -1511,14 +1508,14 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
                       key={imgIdx}
                       src={`data:${img.type};base64,${img.data}`}
                       alt="Attached"
-                      className="max-w-[200px] max-h-[150px] rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity border border-gray-700"
+                      className="max-w-[200px] max-h-[150px] rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity border border-white/20"
                       onClick={() => setPreviewImage(`data:${img.type};base64,${img.data}`)}
                     />
                   ))}
                 </div>
               )}
               {line.content && (
-                <p className="text-gray-100 text-sm leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{displayContent}</p>
+                <p className="text-white text-sm leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{displayContent}</p>
               )}
               {isLong && (
                 <button
@@ -1527,7 +1524,7 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
                     if (next.has(index)) { next.delete(index) } else { next.add(index) }
                     return next
                   })}
-                  className="text-xs text-orange-400 hover:text-orange-300 mt-1 font-mono"
+                  className="text-xs text-white/70 hover:text-white mt-1 font-mono"
                 >
                   {isExpanded ? 'Show less' : 'Show more'}
                 </button>
@@ -1536,7 +1533,7 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
             <button
               onClick={() => !isLoading && runPrompt(line.content)}
               disabled={isLoading}
-              className="p-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-800 rounded-md hover:bg-gray-700 disabled:opacity-30 shrink-0 mt-0.5"
+              className="p-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-800 rounded-md hover:bg-gray-700 disabled:opacity-30 shrink-0 mt-0.5 self-end"
               title="Retry this prompt"
             >
               <RotateCw className="h-3.5 w-3.5 text-gray-400" />
