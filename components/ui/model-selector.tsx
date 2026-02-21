@@ -30,7 +30,6 @@ const shortNameMap = new Map<string, string>([
   ['moonshotai/kimi-k2-thinking', 'Kimi K2'],
   ['google/gemini-2.5-flash', 'Gemini Flash'],
   ['google/gemini-2.5-pro', 'Gemini Pro'],
-  ['xai/glm-4.7', 'GLM 4.7'],
   ['zai/glm-4.7-flash', 'GLM Flash'],
   ['minimax/minimax-m2.1', 'MiniMax M2'],
   ['kwaipilot/kat-coder-pro-v1', 'KAT Coder'],
@@ -46,7 +45,6 @@ const shortNameMap = new Map<string, string>([
   ['bonsai/claude-opus-4', 'Opus 4 (Bonsai)'],
   ['bonsai/gpt-5.1-codex', 'Codex 5.1 (Bonsai)'],
   ['bonsai/glm-4.6', 'GLM 4.6 (Bonsai)'],
-  ['llmgateway/glm-4.7-flash', 'GLM 4.7 Flash (Gateway)'],
 ])
 
 // Descriptions for dropdown
@@ -60,7 +58,6 @@ const descriptionMap = new Map<string, string>([
   ['moonshotai/kimi-k2-thinking', 'Deep reasoning model'],
   ['google/gemini-2.5-flash', 'Fast multimodal by Google'],
   ['google/gemini-2.5-pro', 'Most capable Google model'],
-  ['xai/glm-4.7', 'General language model'],
   ['zai/glm-4.7-flash', 'Fast general language model'],
   ['minimax/minimax-m2.1', 'Efficient code generation'],
   ['kwaipilot/kat-coder-pro-v1', 'Fast code by KwaiPilot'],
@@ -76,7 +73,6 @@ const descriptionMap = new Map<string, string>([
   ['bonsai/claude-opus-4', 'Opus 4 via Bonsai'],
   ['bonsai/gpt-5.1-codex', 'GPT-5.1 Codex via Bonsai'],
   ['bonsai/glm-4.6', 'GLM 4.6 via Bonsai'],
-  ['llmgateway/glm-4.7-flash', 'Free GLM 4.7 Flash via LLM Gateway'],
 ])
 
 // Map BYOK provider IDs to model ID prefixes
@@ -87,7 +83,6 @@ const BYOK_PROVIDER_MODEL_PREFIXES: Record<string, string[]> = {
   xai: ['xai/'],
   google: ['google/'],
   bonsai: ['bonsai/'],
-  llmgateway: ['llmgateway/'],
   openrouter: [], // OpenRouter unlocks all models
   'vercel-gateway': [], // Vercel Gateway unlocks all models
 }
@@ -170,21 +165,19 @@ export function ModelSelector({
   if (userPlan === 'free') {
     allowedModels = [
       'xai/grok-code-fast-1', 'mistral/devstral-2', 'mistral/devstral-small-2',
-      'google/gemini-2.5-flash', 'zai/glm-4.7-flash', 'anthropic/claude-sonnet-4.5',
-      'llmgateway/glm-4.7-flash'
+      'google/gemini-2.5-flash', 'zai/glm-4.7-flash', 'anthropic/claude-sonnet-4.5'
     ]
   } else if (isPremium && effectiveStatus === 'active') {
     allowedModels = [
       'auto', 'mistral/devstral-2', 'mistral/devstral-small-2', 'xai/grok-code-fast-1',
       'xai/grok-4.1-fast-reasoning', 'xai/grok-4.1-fast-non-reasoning',
       'google/gemini-2.5-flash', 'zai/glm-4.7-flash', 'moonshotai/kimi-k2-thinking',
-      'google/gemini-2.5-pro', 'xai/glm-4.7', 'minimax/minimax-m2.1',
+      'google/gemini-2.5-pro', 'minimax/minimax-m2.1',
       'kwaipilot/kat-coder-pro-v1', 'alibaba/qwen3-max',
       'alibaba/qwen3-vl-thinking',
       'anthropic/claude-haiku-4.5', 'anthropic/claude-sonnet-4.5', 'anthropic/claude-opus-4.5',
       'openai/gpt-5.1-thinking', 'openai/gpt-5.2-codex', 'openai/o3',
-      'bonsai/claude-sonnet-4.5', 'bonsai/claude-opus-4', 'bonsai/gpt-5.1-codex', 'bonsai/glm-4.6',
-      'llmgateway/glm-4.7-flash'
+      'bonsai/claude-sonnet-4.5', 'bonsai/claude-opus-4', 'bonsai/gpt-5.1-codex', 'bonsai/glm-4.6'
     ]
   } else {
     const userLimits = getLimits(userPlan)
@@ -234,11 +227,10 @@ export function ModelSelector({
     'google/gemini-2.5-pro', 'google/gemini-2.5-flash',
     'mistral/devstral-2', 'mistral/devstral-small-2',
     'xai/grok-code-fast-1', 'xai/grok-4.1-fast-reasoning', 'xai/grok-4.1-fast-non-reasoning',
-    'xai/glm-4.7', 'zai/glm-4.7-flash',
+    'zai/glm-4.7-flash',
     'moonshotai/kimi-k2-thinking', 'minimax/minimax-m2.1', 'kwaipilot/kat-coder-pro-v1',
     'alibaba/qwen3-max', 'alibaba/qwen3-vl-thinking',
     'bonsai/claude-sonnet-4.5', 'bonsai/claude-opus-4', 'bonsai/gpt-5.1-codex', 'bonsai/glm-4.6',
-    'llmgateway/glm-4.7-flash',
     'auto',
   ]
   const orderedModels = modelOrder.filter(id => shortNameMap.has(id))
