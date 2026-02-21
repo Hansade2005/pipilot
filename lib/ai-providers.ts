@@ -23,7 +23,6 @@ let _anthropicProvider: ReturnType<typeof createAnthropic> | null = null;
 let _openrouterProvider: ReturnType<typeof createOpenAICompatible> | null = null;
 // Bonsai API key rotation: supports comma-separated keys in BONSAI_API_KEY
 let _bonsaiKeyIndex = 0;
-let _llmGatewayProvider: ReturnType<typeof createOpenAICompatible> | null = null;
 
 function getA0DevProvider() {
   if (!_a0devProvider) _a0devProvider = createA0Dev();
@@ -114,17 +113,6 @@ function getOpenRouterProvider() {
   return _openrouterProvider;
 }
 
-function getLLMGatewayProvider() {
-  if (!_llmGatewayProvider) {
-    _llmGatewayProvider = createOpenAICompatible({
-      name: 'llmgateway',
-      baseURL: 'https://api.llmgateway.io/v1',
-      apiKey: process.env.LLMGATEWAY_API_KEY || '',
-    });
-  }
-  return _llmGatewayProvider;
-}
-
 /**
  * Get the next Bonsai API key using round-robin rotation.
  * Supports comma-separated keys in BONSAI_API_KEY env var.
@@ -169,11 +157,6 @@ const bonsaiModelMap: Record<string, string> = {
   'bonsai/claude-opus-4': 'anthropic/claude-opus-4',
   'bonsai/gpt-5.1-codex': 'openai/gpt-5.1-codex',
   'bonsai/glm-4.6': 'z-ai/glm-4.6',
-};
-
-// Mapping from PiPilot llmgateway/ model IDs to the actual model IDs expected by LLM Gateway API
-const llmGatewayModelMap: Record<string, string> = {
-  'llmgateway/glm-4.7-flash': 'zai/glm-4.7-flash',
 };
 
 // Custom a0.dev provider implementation (no API key required)
@@ -334,10 +317,6 @@ function createModelInstance(modelId: string): any {
     case 'bonsai/glm-4.6':
       return getBonsaiProvider()(bonsaiModelMap[modelId]);
 
-    // LLM Gateway models (OpenAI-compatible API)
-    case 'llmgateway/glm-4.7-flash':
-      return getLLMGatewayProvider()(llmGatewayModelMap[modelId]);
-
     // Anthropic via Vercel AI Gateway
     case 'anthropic/claude-haiku-4.5':
       return getAnthropicProvider()('anthropic/claude-haiku-4.5');
@@ -470,7 +449,6 @@ export function resolveByokProvider(modelId: string, byokKeys: ByokKeySet): stri
   if (modelId.startsWith('google/') && byokKeys.google) return 'google'
 
   if (modelId.startsWith('bonsai/') && byokKeys.bonsai) return 'bonsai'
-  if (modelId.startsWith('llmgateway/') && byokKeys.llmgateway) return 'llmgateway'
 
   // Direct model names
   if ((modelId === 'pixtral-12b-2409' || modelId === 'codestral-latest') && byokKeys.mistral) return 'mistral'
@@ -580,15 +558,6 @@ export function createByokModel(modelId: string, byokKeys: ByokKeySet): any | nu
       })
       const bonsaiId = bonsaiModelMap[modelId] || modelId.replace('bonsai/', '')
       return provider(bonsaiId)
-    }
-    case 'llmgateway': {
-      const provider = createOpenAICompatible({
-        name: 'byok-llmgateway',
-        baseURL: 'https://api.llmgateway.io/v1',
-        apiKey,
-      })
-      const gatewayId = llmGatewayModelMap[modelId] || modelId.replace('llmgateway/', '')
-      return provider(gatewayId)
     }
     case 'openrouter': {
       const provider = createOpenAICompatible({

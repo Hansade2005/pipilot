@@ -104,12 +104,6 @@ export const chatModels: Array<ChatModel> = [
     supportsVision: true,
   },
   {
-    id: 'xai/glm-4.7',
-    name: 'xAI GLM 4.7',
-    description: 'xAI GLM 4.7 via Vercel AI Gateway',
-    provider: 'vercel-gateway',
-  },
-  {
     id: 'zai/glm-4.7-flash',
     name: 'ZAI GLM 4.7 Flash',
     description: 'ZAI GLM 4.7 Flash - Fast inference via Vercel AI Gateway',
@@ -206,13 +200,6 @@ export const chatModels: Array<ChatModel> = [
     provider: 'bonsai',
   },
 
-  // LLM Gateway Models (OpenAI-compatible API via api.llmgateway.io)
-  {
-    id: 'llmgateway/glm-4.7-flash',
-    name: 'LLM Gateway GLM 4.7 Flash',
-    description: 'GLM 4.7 Flash via LLM Gateway (free)',
-    provider: 'llmgateway',
-  },
 ];
 
 export function getModelById(modelId: string): ChatModel | undefined {
