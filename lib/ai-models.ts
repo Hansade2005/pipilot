@@ -205,6 +205,14 @@ export const chatModels: Array<ChatModel> = [
     description: 'GLM 4.6 via Bonsai API',
     provider: 'bonsai',
   },
+
+  // LLM Gateway Models (OpenAI-compatible API via api.llmgateway.io)
+  {
+    id: 'llmgateway/glm-4.7-flash',
+    name: 'LLM Gateway GLM 4.7 Flash',
+    description: 'GLM 4.7 Flash via LLM Gateway (free)',
+    provider: 'llmgateway',
+  },
 ];
 
 export function getModelById(modelId: string): ChatModel | undefined {

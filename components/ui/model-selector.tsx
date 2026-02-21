@@ -46,6 +46,7 @@ const shortNameMap = new Map<string, string>([
   ['bonsai/claude-opus-4', 'Opus 4 (Bonsai)'],
   ['bonsai/gpt-5.1-codex', 'Codex 5.1 (Bonsai)'],
   ['bonsai/glm-4.6', 'GLM 4.6 (Bonsai)'],
+  ['llmgateway/glm-4.7-flash', 'GLM 4.7 Flash (Gateway)'],
 ])
 
 // Descriptions for dropdown
@@ -75,6 +76,7 @@ const descriptionMap = new Map<string, string>([
   ['bonsai/claude-opus-4', 'Opus 4 via Bonsai'],
   ['bonsai/gpt-5.1-codex', 'GPT-5.1 Codex via Bonsai'],
   ['bonsai/glm-4.6', 'GLM 4.6 via Bonsai'],
+  ['llmgateway/glm-4.7-flash', 'Free GLM 4.7 Flash via LLM Gateway'],
 ])
 
 // Map BYOK provider IDs to model ID prefixes
@@ -85,6 +87,7 @@ const BYOK_PROVIDER_MODEL_PREFIXES: Record<string, string[]> = {
   xai: ['xai/'],
   google: ['google/'],
   bonsai: ['bonsai/'],
+  llmgateway: ['llmgateway/'],
   openrouter: [], // OpenRouter unlocks all models
   'vercel-gateway': [], // Vercel Gateway unlocks all models
 }
@@ -167,7 +170,8 @@ export function ModelSelector({
   if (userPlan === 'free') {
     allowedModels = [
       'xai/grok-code-fast-1', 'mistral/devstral-2', 'mistral/devstral-small-2',
-      'google/gemini-2.5-flash', 'zai/glm-4.7-flash', 'anthropic/claude-sonnet-4.5'
+      'google/gemini-2.5-flash', 'zai/glm-4.7-flash', 'anthropic/claude-sonnet-4.5',
+      'llmgateway/glm-4.7-flash'
     ]
   } else if (isPremium && effectiveStatus === 'active') {
     allowedModels = [
@@ -179,7 +183,8 @@ export function ModelSelector({
       'alibaba/qwen3-vl-thinking',
       'anthropic/claude-haiku-4.5', 'anthropic/claude-sonnet-4.5', 'anthropic/claude-opus-4.5',
       'openai/gpt-5.1-thinking', 'openai/gpt-5.2-codex', 'openai/o3',
-      'bonsai/claude-sonnet-4.5', 'bonsai/claude-opus-4', 'bonsai/gpt-5.1-codex', 'bonsai/glm-4.6'
+      'bonsai/claude-sonnet-4.5', 'bonsai/claude-opus-4', 'bonsai/gpt-5.1-codex', 'bonsai/glm-4.6',
+      'llmgateway/glm-4.7-flash'
     ]
   } else {
     const userLimits = getLimits(userPlan)
@@ -233,6 +238,7 @@ export function ModelSelector({
     'moonshotai/kimi-k2-thinking', 'minimax/minimax-m2.1', 'kwaipilot/kat-coder-pro-v1',
     'alibaba/qwen3-max', 'alibaba/qwen3-vl-thinking',
     'bonsai/claude-sonnet-4.5', 'bonsai/claude-opus-4', 'bonsai/gpt-5.1-codex', 'bonsai/glm-4.6',
+    'llmgateway/glm-4.7-flash',
     'auto',
   ]
   const orderedModels = modelOrder.filter(id => shortNameMap.has(id))
