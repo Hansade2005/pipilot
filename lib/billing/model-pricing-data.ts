@@ -2291,6 +2291,27 @@ export const VERCEL_MODEL_PRICING: Record<string, ModelPricingEntry> = {
     latencySeconds: 0.6,
     throughputTps: 120,
   },
+
+  // =============================================================================
+  // LLM GATEWAY (OpenAI-compatible API via api.llmgateway.io)
+  // =============================================================================
+
+  'llmgateway/glm-4.7-flash': {
+    name: 'GLM 4.7 Flash (LLM Gateway)',
+    provider: 'llmgateway',
+    contextWindow: 128_000,
+    maxOutput: 32_000,
+    inputPerToken: 0,              // Free tier
+    outputPerToken: 0,             // Free tier
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: false,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 0.8,
+    throughputTps: 100,
+  },
 }
 
 // =============================================================================
