@@ -110,6 +110,24 @@ export const chatModels: Array<ChatModel> = [
     provider: 'vercel-gateway',
   },
   {
+    id: 'zai/glm-4.6',
+    name: 'ZAI GLM 4.6',
+    description: 'ZAI GLM 4.6 via Vercel AI Gateway',
+    provider: 'vercel-gateway',
+  },
+  {
+    id: 'openai/gpt-oss-120b',
+    name: 'OpenAI GPT-OSS 120B',
+    description: 'OpenAI GPT-OSS 120B via Vercel AI Gateway',
+    provider: 'vercel-gateway',
+  },
+  {
+    id: 'meta/llama-4-scout',
+    name: 'Meta Llama 4 Scout',
+    description: 'Meta Llama 4 Scout via Vercel AI Gateway',
+    provider: 'vercel-gateway',
+  },
+  {
     id: 'minimax/minimax-m2.1',
     name: 'MiniMax M2.1',
     description: 'MiniMax M2.1 via Vercel AI Gateway',
