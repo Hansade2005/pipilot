@@ -122,12 +122,6 @@ export const chatModels: Array<ChatModel> = [
     provider: 'vercel-gateway',
   },
   {
-    id: 'meta/llama-4-scout',
-    name: 'Meta Llama 4 Scout',
-    description: 'Meta Llama 4 Scout via Vercel AI Gateway',
-    provider: 'vercel-gateway',
-  },
-  {
     id: 'minimax/minimax-m2.1',
     name: 'MiniMax M2.1',
     description: 'MiniMax M2.1 via Vercel AI Gateway',
