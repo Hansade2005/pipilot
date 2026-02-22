@@ -189,35 +189,6 @@ export const chatModels: Array<ChatModel> = [
     supportsVision: true,
   },
 
-  // Bonsai Models (Anthropic-compatible API via go.trybons.ai)
-  {
-    id: 'bonsai/claude-sonnet-4.5',
-    name: 'Bonsai Claude Sonnet 4.5',
-    description: 'Claude Sonnet 4.5 via Bonsai API',
-    provider: 'bonsai',
-    supportsVision: true,
-  },
-  {
-    id: 'bonsai/claude-opus-4',
-    name: 'Bonsai Claude Opus 4',
-    description: 'Claude Opus 4 via Bonsai API',
-    provider: 'bonsai',
-    supportsVision: true,
-  },
-  {
-    id: 'bonsai/gpt-5.1-codex',
-    name: 'Bonsai GPT-5.1 Codex',
-    description: 'GPT-5.1 Codex via Bonsai API',
-    provider: 'bonsai',
-    supportsVision: true,
-  },
-  {
-    id: 'bonsai/glm-4.6',
-    name: 'Bonsai GLM 4.6',
-    description: 'GLM 4.6 via Bonsai API',
-    provider: 'bonsai',
-  },
-
 ];
 
 export function getModelById(modelId: string): ChatModel | undefined {

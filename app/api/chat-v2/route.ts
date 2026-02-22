@@ -10618,8 +10618,6 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
       'anthropic/claude-opus-4.5',
       'anthropic/claude-sonnet-4.5',
       'anthropic/claude-haiku-4.5',
-      'bonsai/claude-sonnet-4.5',
-      'bonsai/claude-opus-4',
     ];
 
     const isAnthropicModel = anthropicModels.includes(modelId);

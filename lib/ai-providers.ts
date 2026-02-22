@@ -127,38 +127,6 @@ export function getNextBonsaiKey(): string {
   return key;
 }
 
-function getBonsaiProvider() {
-  // Create a fresh provider each call to use the rotated key
-  const bonsaiBaseURL = 'https://go.trybons.ai/v1';
-  const apiKey = getNextBonsaiKey();
-  return createAnthropic({
-    baseURL: bonsaiBaseURL,
-    apiKey,
-    // Custom fetch to guarantee requests go to Bonsai, not Vercel Gateway.
-    // The @ai-sdk/anthropic SDK may try to reroute model IDs containing
-    // provider prefixes (e.g. "anthropic/claude-sonnet-4.5") to the
-    // Vercel AI Gateway. This fetch wrapper forces the correct base URL.
-    fetch: async (input, init) => {
-      let url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
-      // If the SDK rewrote the URL away from Bonsai, force it back
-      if (!url.startsWith(bonsaiBaseURL)) {
-        const path = new URL(url).pathname; // e.g. /v1/messages
-        url = `${bonsaiBaseURL}${path.replace(/^\/v1/, '')}`;
-        console.log(`[Bonsai] Redirected request back to Bonsai: ${url}`);
-      }
-      return globalThis.fetch(url, init);
-    },
-  });
-}
-
-// Mapping from PiPilot bonsai/ model IDs to the actual model IDs expected by Bonsai API
-const bonsaiModelMap: Record<string, string> = {
-  'bonsai/claude-sonnet-4.5': 'anthropic/claude-sonnet-4.5',
-  'bonsai/claude-opus-4': 'anthropic/claude-opus-4',
-  'bonsai/gpt-5.1-codex': 'openai/gpt-5.1-codex',
-  'bonsai/glm-4.6': 'z-ai/glm-4.6',
-};
-
 // Custom a0.dev provider implementation (no API key required)
 function createA0Dev(options: { apiKey?: string } = {}) {
   // a0.dev doesn't require API key authentication
@@ -310,13 +278,6 @@ function createModelInstance(modelId: string): any {
     case 'xai/grok-code-fast-1':
       return getXaiProvider()('grok-code-fast-1');
 
-    // Bonsai models (Anthropic-compatible API)
-    case 'bonsai/claude-sonnet-4.5':
-    case 'bonsai/claude-opus-4':
-    case 'bonsai/gpt-5.1-codex':
-    case 'bonsai/glm-4.6':
-      return getBonsaiProvider()(bonsaiModelMap[modelId]);
-
     // Anthropic via Vercel AI Gateway
     case 'anthropic/claude-haiku-4.5':
       return getAnthropicProvider()('anthropic/claude-haiku-4.5');
@@ -425,7 +386,6 @@ export interface ByokKeySet {
   mistral?: string
   xai?: string
   google?: string
-  bonsai?: string
   openrouter?: string
   'vercel-gateway'?: string
   // Custom providers: keyed by custom provider ID
@@ -447,8 +407,6 @@ export function resolveByokProvider(modelId: string, byokKeys: ByokKeySet): stri
   if (modelId.startsWith('mistral/') && byokKeys.mistral) return 'mistral'
   if (modelId.startsWith('xai/') && byokKeys.xai) return 'xai'
   if (modelId.startsWith('google/') && byokKeys.google) return 'google'
-
-  if (modelId.startsWith('bonsai/') && byokKeys.bonsai) return 'bonsai'
 
   // Direct model names
   if ((modelId === 'pixtral-12b-2409' || modelId === 'codestral-latest') && byokKeys.mistral) return 'mistral'
@@ -541,23 +499,6 @@ export function createByokModel(modelId: string, byokKeys: ByokKeySet): any | nu
       })
       const bare = stripPrefix(modelId, 'google/')
       return provider(bare)
-    }
-    case 'bonsai': {
-      const bonsaiBase = 'https://go.trybons.ai/v1'
-      const provider = createAnthropic({
-        baseURL: bonsaiBase,
-        apiKey,
-        fetch: async (input, init) => {
-          let url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url
-          if (!url.startsWith(bonsaiBase)) {
-            const path = new URL(url).pathname
-            url = `${bonsaiBase}${path.replace(/^\/v1/, '')}`
-          }
-          return globalThis.fetch(url, init)
-        },
-      })
-      const bonsaiId = bonsaiModelMap[modelId] || modelId.replace('bonsai/', '')
-      return provider(bonsaiId)
     }
     case 'openrouter': {
       const provider = createOpenAICompatible({
