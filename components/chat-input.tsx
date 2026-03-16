@@ -1655,12 +1655,12 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
       />
 
       {/* Help Me Plan + Import Buttons */}
-      <div className="flex justify-center gap-2 mt-4">
+      <div className="flex flex-wrap justify-center gap-2 mt-4">
         <button
           type="button"
           onClick={() => setShowLaunchWizard(true)}
           disabled={isGenerating}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-orange-600/20 to-orange-500/10 hover:from-orange-600/30 hover:to-orange-500/20 border border-orange-500/40 hover:border-orange-400/60 rounded-full text-orange-300 hover:text-orange-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-orange-600/20 to-orange-500/10 hover:from-orange-600/30 hover:to-orange-500/20 border border-orange-500/40 hover:border-orange-400/60 rounded-full text-orange-300 hover:text-orange-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm"
           title="Get help planning your app with a guided wizard"
         >
           <Sparkles className="w-3.5 h-3.5" />
@@ -1669,16 +1669,16 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
       </div>
 
       {/* Import Badge Buttons */}
-      <div className="flex justify-center gap-2 mt-2">
+      <div className="flex flex-wrap justify-center gap-2 mt-2">
         <Popover open={showGithubPopover} onOpenChange={setShowGithubPopover}>
           <PopoverTrigger asChild>
             <button
               type="button"
               disabled={isGenerating || isImportingGithub}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-transparent hover:bg-orange-700/50 border border-orange-600/50
-              rounded-full text-gray-400 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-1.5 bg-transparent hover:bg-orange-700/50 border border-orange-600/50
+              rounded-full text-gray-400 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm"
               title="Import from GitHub"
-            >Import from
+            >
               <Github className="w-3.5 h-3.5" />
               <span className="font-medium">GitHub</span>
             </button>
@@ -1717,9 +1717,9 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
             <button
               type="button"
               disabled={isGenerating || isImportingGitlab}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-transparent hover:bg-orange-700/50 border border-orange-600/50 rounded-full text-orange-400 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-1.5 bg-transparent hover:bg-orange-700/50 border border-orange-600/50 rounded-full text-orange-400 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm"
               title="Import from GitLab"
-            >Import from
+            >
               <Gitlab className="w-3.5 h-3.5" />
               <span className="font-medium">GitLab</span>
             </button>
@@ -1764,7 +1764,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
           type="button"
           disabled={isGenerating || isImportingLocal}
           onClick={() => folderInputRef.current?.click()}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-transparent hover:bg-orange-700/50 border border-orange-600/50 rounded-full text-gray-400 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-1.5 bg-transparent hover:bg-orange-700/50 border border-orange-600/50 rounded-full text-gray-400 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm"
           title="Import a local project folder"
         >
           {isImportingLocal ? (
@@ -1780,7 +1780,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
           type="button"
           disabled={isGenerating || isImportingLocal}
           onClick={() => zipInputRef.current?.click()}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-transparent hover:bg-orange-700/50 border border-orange-600/50 rounded-full text-gray-400 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-1.5 bg-transparent hover:bg-orange-700/50 border border-orange-600/50 rounded-full text-gray-400 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm"
           title="Import a ZIP file"
         >
           {isImportingLocal ? (
