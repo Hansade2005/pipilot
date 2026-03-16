@@ -1168,14 +1168,14 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         const file = files[i]
         // webkitRelativePath gives "folder/sub/file.tsx"
         const relativePath = (file as any).webkitRelativePath || file.name
-        // Skip node_modules, .git, build artifacts — but keep dotfiles like .gitignore, .env, images, svgs
+        // Skip node_modules, .git, build artifacts, binaries, package locks — keep .gitignore, .env, .svg, .ico
         if (
           relativePath.includes('node_modules/') ||
           relativePath.includes('.git/') ||
           relativePath.includes('.next/') ||
           relativePath.includes('dist/') ||
           relativePath.includes('.cache/') ||
-          /\.(exe|dll|so|dylib|bin|woff|woff2|ttf|eot)$/i.test(file.name)
+          /\.(png|jpg|jpeg|gif|bmp|tiff|webp|heic|mp4|avi|mov|wmv|flv|mkv|webm|mp3|pdf|exe|dll|so|dylib|bin|woff|woff2|ttf|eot|lock)$/i.test(file.name)
         ) continue
 
         // Only read text-like files under 500KB
@@ -1256,7 +1256,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
           cleanPath.includes('.next/') ||
           cleanPath.includes('dist/') ||
           cleanPath.includes('.cache/') ||
-          /\.(exe|dll|so|dylib|bin|woff|woff2|ttf|eot)$/i.test(cleanPath)
+          /\.(png|jpg|jpeg|gif|bmp|tiff|webp|heic|mp4|avi|mov|wmv|flv|mkv|webm|mp3|pdf|exe|dll|so|dylib|bin|woff|woff2|ttf|eot|lock)$/i.test(cleanPath)
         ) continue
 
         try {
