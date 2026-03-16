@@ -48,6 +48,7 @@ interface SourceControlTabProps {
   githubConnected?: boolean
   githubToken?: string
   onPushToGitHub?: () => Promise<any>
+  onRepoLinked?: (repoUrl: string) => void
 }
 
 interface FileChange {
@@ -86,6 +87,7 @@ export function SourceControlTab({
   githubConnected = false,
   githubToken,
   onPushToGitHub,
+  onRepoLinked,
 }: SourceControlTabProps) {
   const [commitMessage, setCommitMessage] = useState("")
   const [isCommitting, setIsCommitting] = useState(false)
@@ -381,8 +383,8 @@ export function SourceControlTab({
   const handleCommit = async () => {
     if (!commitMessage.trim()) return
 
-    // Personal project GitHub push
-    if (!isTeamWorkspace && githubConnected && onPushToGitHub) {
+    // Personal project GitHub push (linked repo or new deploy)
+    if (!isTeamWorkspace && githubConnected && githubToken) {
       await handlePersonalGitHubPush()
       return
     }
@@ -608,6 +610,10 @@ export function SourceControlTab({
       const { filterUnwantedFiles } = await import('@/lib/utils')
       const filteredFiles = filterUnwantedFiles(allFiles as any)
 
+      // Determine mode: if repo already linked, push to it; otherwise create/link
+      const hasLinkedRepo = !!githubRepoUrl
+      const repoFullName = hasLinkedRepo ? githubRepoUrl!.replace('https://github.com/', '') : undefined
+
       const response = await fetch('/api/deploy/github', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -616,9 +622,9 @@ export function SourceControlTab({
             path: (f.path || f.name).replace(/^\//, ''),
             content: f.content || '',
           })),
-          mode: personalMode === 'new' ? 'create' : 'existing',
-          repoName: personalMode === 'new' ? personalRepoName : undefined,
-          existingRepo: personalMode === 'existing' ? personalSelectedRepo : undefined,
+          mode: hasLinkedRepo ? 'push' : personalMode === 'new' ? 'create' : 'existing',
+          repoName: !hasLinkedRepo && personalMode === 'new' ? personalRepoName : repoFullName?.split('/')[1],
+          existingRepo: hasLinkedRepo ? repoFullName : personalMode === 'existing' ? personalSelectedRepo : undefined,
           commitMessage: commitMessage.trim() || 'Update project files',
           githubToken,
         }),
@@ -632,6 +638,10 @@ export function SourceControlTab({
       const data = await response.json()
       toast.success(`Pushed to ${data.repoName || data.repoUrl}`)
       setCommitMessage('')
+      // Notify parent to update project's githubRepoUrl
+      if (data.repoUrl) {
+        onRepoLinked?.(data.repoUrl)
+      }
     } catch (err: any) {
       toast.error(err.message || "Failed to push to GitHub")
     } finally {
@@ -659,8 +669,8 @@ export function SourceControlTab({
     )
   }
 
-  // Personal project with GitHub connected but no team workspace
-  if (!isTeamWorkspace && githubConnected) {
+  // Personal project with GitHub connected but no repo linked yet — show deploy setup
+  if (!isTeamWorkspace && githubConnected && !githubRepoUrl) {
     return (
       <div className="flex flex-col h-full bg-gray-950">
         <div className="px-3 py-2 border-b border-gray-800/60">

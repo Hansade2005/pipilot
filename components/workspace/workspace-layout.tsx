@@ -1927,6 +1927,18 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                                   if (!selectedProject) return
                                   await pushToGitHub(selectedProject as any)
                                 }}
+                                onRepoLinked={(repoUrl) => {
+                                  if (selectedProject) {
+                                    setSelectedProject({ ...selectedProject, githubRepoUrl: repoUrl })
+                                    // Also update in storage
+                                    storageManager.init().then(() => {
+                                      storageManager.updateWorkspace(selectedProject.id, {
+                                        ...selectedProject,
+                                        githubRepoUrl: repoUrl,
+                                      } as any)
+                                    }).catch(() => {})
+                                  }
+                                }}
                               />
                             )}
                           </div>
