@@ -100,7 +100,6 @@ export function SourceControlTab({
   const [loadingDetail, setLoadingDetail] = useState<string | null>(null)
   const [diffView, setDiffView] = useState<{ title: string; content: string } | null>(null)
   // Personal project GitHub state
-  const [isPushingPersonal, setIsPushingPersonal] = useState(false)
 
   // True when project has a GitHub repo (team or personal)
   const hasGitHubRepo = isGitHubBacked || (!isTeamWorkspace && !!githubRepoUrl && !!githubToken)
@@ -662,12 +661,13 @@ export function SourceControlTab({
   // Personal project: push to GitHub via deploy API
   const handlePersonalGitHubPush = async () => {
     if (!projectId || !githubToken) return
-    setIsPushingPersonal(true)
+    setIsCommitting(true)
 
     try {
       const allFiles = await gatherProjectFiles()
       if (allFiles.length === 0) {
         toast.error("No files to push")
+        setIsCommitting(false)
         return
       }
 
@@ -706,10 +706,12 @@ export function SourceControlTab({
       if (data.repoUrl) {
         onRepoLinked?.(data.repoUrl)
       }
+      // Reload commit history after successful push
+      loadCommits()
     } catch (err: any) {
       toast.error(err.message || "Failed to push to GitHub")
     } finally {
-      setIsPushingPersonal(false)
+      setIsCommitting(false)
     }
   }
 
@@ -834,13 +836,13 @@ export function SourceControlTab({
             size="sm"
             onClick={handlePersonalGitHubPush}
             disabled={
-              isPushingPersonal ||
+              isCommitting ||
               (personalMode === 'new' && !personalRepoName.trim()) ||
               (personalMode === 'existing' && !personalSelectedRepo)
             }
             className="w-full h-8 text-xs bg-orange-600 hover:bg-orange-500 text-white disabled:opacity-30"
           >
-            {isPushingPersonal ? (
+            {isCommitting ? (
               <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
             ) : (
               <GitCommit className="w-3 h-3 mr-1.5" />
