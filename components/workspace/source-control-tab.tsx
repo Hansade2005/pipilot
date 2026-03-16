@@ -575,7 +575,6 @@ export function SourceControlTab({
   const [personalSelectedRepo, setPersonalSelectedRepo] = useState('')
   const [personalRepos, setPersonalRepos] = useState<Array<{ name: string; full_name: string }>>([])
   const [isLoadingRepos, setIsLoadingRepos] = useState(false)
-  const [commitMessage, setPersonalCommitMsg] = useState('')
 
   // Fetch user's GitHub repos when switching to existing mode
   useEffect(() => {
@@ -632,7 +631,7 @@ export function SourceControlTab({
 
       const data = await response.json()
       toast.success(`Pushed to ${data.repoName || data.repoUrl}`)
-      setPersonalCommitMsg('')
+      setCommitMessage('')
     } catch (err: any) {
       toast.error(err.message || "Failed to push to GitHub")
     } finally {
@@ -737,7 +736,7 @@ export function SourceControlTab({
             <div className="relative">
               <input
                 value={commitMessage}
-                onChange={(e) => setPersonalCommitMsg(e.target.value)}
+                onChange={(e) => setCommitMessage(e.target.value)}
                 placeholder="Update project files"
                 className="w-full h-8 px-2.5 pr-7 rounded-lg border border-gray-800 bg-gray-900/50 text-xs text-gray-100 placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
               />
