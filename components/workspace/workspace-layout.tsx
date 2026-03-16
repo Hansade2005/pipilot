@@ -1220,7 +1220,20 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         return
       }
 
-      const connectionStatus = await checkGitHubConnection(selectedProject)
+      // Refresh project data from IndexedDB to get latest githubRepoUrl
+      let projectToCheck = selectedProject
+      try {
+        await storageManager.init()
+        const workspaces = await storageManager.getWorkspaces(user.id)
+        const fresh = workspaces.find(w => w.id === selectedProject.id)
+        if (fresh && fresh.githubRepoUrl && !selectedProject.githubRepoUrl) {
+          const updated = { ...selectedProject, githubRepoUrl: fresh.githubRepoUrl, githubRepoName: fresh.githubRepoName }
+          setSelectedProject(updated)
+          projectToCheck = updated
+        }
+      } catch {}
+
+      const connectionStatus = await checkGitHubConnection(projectToCheck)
       setGitHubConnected(connectionStatus.hasToken)
 
       // Load token for source control (check hasToken, not connected — repo may not exist yet)
