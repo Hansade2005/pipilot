@@ -102,6 +102,9 @@ export function SourceControlTab({
   // Personal project GitHub state
   const [isPushingPersonal, setIsPushingPersonal] = useState(false)
 
+  // True when project has a GitHub repo (team or personal)
+  const hasGitHubRepo = isGitHubBacked || (!isTeamWorkspace && !!githubRepoUrl && !!githubToken)
+
   const supabase = useMemo(() => createClient(), [])
 
   // Gather all project files from IndexedDB for commit
@@ -300,7 +303,7 @@ export function SourceControlTab({
       setExpandedCommit(null)
     } else {
       setExpandedCommit(commitId)
-      if (sha && isGitHubBacked) {
+      if (sha && hasGitHubRepo) {
         loadCommitDetail(sha)
       }
     }
@@ -893,7 +896,7 @@ export function SourceControlTab({
         <div className="flex-1" />
 
         {/* Pull button for GitHub-backed workspaces */}
-        {isGitHubBacked && onPull && (
+        {hasGitHubRepo && onPull && (
           <button
             onClick={async () => {
               const result = await onPull()
@@ -931,7 +934,7 @@ export function SourceControlTab({
         )}
 
         {/* GitHub repo link */}
-        {isGitHubBacked && githubRepoUrl && (
+        {hasGitHubRepo && githubRepoUrl && (
           <a
             href={githubRepoUrl}
             target="_blank"
@@ -954,7 +957,7 @@ export function SourceControlTab({
                 value={commitMessage}
                 onChange={(e) => setCommitMessage(e.target.value)}
                 placeholder={
-                  isGitHubBacked
+                  hasGitHubRepo
                     ? "Commit message (pushes to GitHub)..."
                     : "Commit message..."
                 }
@@ -984,7 +987,7 @@ export function SourceControlTab({
               ) : (
                 <Check className="w-3 h-3 mr-1" />
               )}
-              {isGitHubBacked ? 'Commit & Push' : 'Commit'}
+              {hasGitHubRepo ? 'Commit & Push' : 'Commit'}
             </Button>
             <p className="text-[10px] text-gray-600 mt-1.5 text-center">
               Commits all project files to the repository
@@ -1057,7 +1060,7 @@ export function SourceControlTab({
                       </div>
 
                       <div className="flex items-center gap-1 flex-shrink-0">
-                        {commit.sha && isGitHubBacked && detail && (
+                        {commit.sha && detail && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
