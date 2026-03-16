@@ -115,6 +115,36 @@ export function SourceControlTab({
 
   // Load commit history
   const loadCommits = useCallback(async () => {
+    // Personal project: fetch commits directly from GitHub API
+    if (!isTeamWorkspace && githubRepoUrl && githubToken) {
+      setIsLoadingCommits(true)
+      try {
+        const repoFullName = githubRepoUrl.replace('https://github.com/', '')
+        const res = await fetch(`https://api.github.com/repos/${repoFullName}/commits?per_page=30`, {
+          headers: { Authorization: `token ${githubToken}` },
+        })
+        if (!res.ok) throw new Error('Failed to fetch commits')
+        const data = await res.json()
+        const entries: CommitEntry[] = (data || []).map((c: any) => ({
+          id: c.sha,
+          sha: c.sha,
+          message: c.commit?.message || '',
+          author_name: c.commit?.author?.name || c.author?.login || 'Unknown',
+          author_email: c.commit?.author?.email || '',
+          author_avatar: c.author?.avatar_url,
+          file_count: 0,
+          files: [],
+          created_at: c.commit?.author?.date || '',
+        }))
+        setCommits(entries)
+      } catch (err) {
+        console.error('[Source Control] Error loading personal commits:', err)
+      } finally {
+        setIsLoadingCommits(false)
+      }
+      return
+    }
+
     if (!teamWorkspaceId) return
 
     setIsLoadingCommits(true)
@@ -182,14 +212,14 @@ export function SourceControlTab({
     } finally {
       setIsLoadingCommits(false)
     }
-  }, [teamWorkspaceId, organizationId, isGitHubBacked, supabase])
+  }, [teamWorkspaceId, organizationId, isGitHubBacked, isTeamWorkspace, githubRepoUrl, githubToken, supabase])
 
   // Initial load
   useEffect(() => {
-    if (isTeamWorkspace) {
+    if (isTeamWorkspace || (githubConnected && githubRepoUrl)) {
       loadCommits()
     }
-  }, [isTeamWorkspace, loadCommits])
+  }, [isTeamWorkspace, githubConnected, githubRepoUrl, loadCommits])
 
   // Realtime subscription for new commits (legacy mode only)
   useEffect(() => {
@@ -220,10 +250,41 @@ export function SourceControlTab({
 
   // Load commit detail from GitHub API
   const loadCommitDetail = async (sha: string) => {
-    if (!teamWorkspaceId || !sha || commitDetails[sha]) return
+    if (!sha || commitDetails[sha]) return
     setLoadingDetail(sha)
     try {
-      const detail = await fetchCommitDetail(teamWorkspaceId, sha)
+      let detail: CommitDetail
+
+      if (teamWorkspaceId && isGitHubBacked) {
+        // Team workspace: use server-side API route
+        detail = await fetchCommitDetail(teamWorkspaceId, sha)
+      } else if (githubRepoUrl && githubToken) {
+        // Personal project: fetch directly from GitHub API
+        const repoFullName = githubRepoUrl.replace('https://github.com/', '')
+        const res = await fetch(`https://api.github.com/repos/${repoFullName}/commits/${sha}`, {
+          headers: { Authorization: `token ${githubToken}` },
+        })
+        if (!res.ok) throw new Error('Failed to fetch commit detail')
+        const data = await res.json()
+        detail = {
+          sha: data.sha,
+          message: data.commit?.message || '',
+          author_name: data.commit?.author?.name || data.author?.login || 'Unknown',
+          author_email: data.commit?.author?.email || '',
+          date: data.commit?.author?.date || '',
+          stats: data.stats || { additions: 0, deletions: 0, total: 0 },
+          files: (data.files || []).map((f: any) => ({
+            filename: f.filename,
+            status: f.status,
+            additions: f.additions,
+            deletions: f.deletions,
+            patch: f.patch?.slice(0, 2000),
+          })),
+        }
+      } else {
+        return
+      }
+
       setCommitDetails(prev => ({ ...prev, [sha]: detail }))
     } catch (err: any) {
       console.error('[Source Control] Failed to load commit detail:', err)
