@@ -1168,14 +1168,14 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         const file = files[i]
         // webkitRelativePath gives "folder/sub/file.tsx"
         const relativePath = (file as any).webkitRelativePath || file.name
-        // Skip binary files, node_modules, .git, etc.
+        // Skip node_modules, .git, build artifacts — but keep dotfiles like .gitignore, .env, images, svgs
         if (
           relativePath.includes('node_modules/') ||
           relativePath.includes('.git/') ||
           relativePath.includes('.next/') ||
           relativePath.includes('dist/') ||
           relativePath.includes('.cache/') ||
-          /\.(png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|mp4|mp3|pdf|exe|dll|so|dylib|bin|lock)$/i.test(file.name)
+          /\.(exe|dll|so|dylib|bin|woff|woff2|ttf|eot)$/i.test(file.name)
         ) continue
 
         // Only read text-like files under 500KB
@@ -1192,9 +1192,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         }
       }
 
-      const filtered = filterUnwantedFiles(imported)
-
-      if (filtered.length === 0) {
+      if (imported.length === 0) {
         toast.error("No importable files found in folder")
         return
       }
@@ -1203,7 +1201,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
       const firstPath = (files[0] as any).webkitRelativePath || ''
       const folderName = firstPath.split('/')[0] || 'imported-project'
 
-      setLocalImportFiles(filtered)
+      setLocalImportFiles(imported)
       setLocalImportName(folderName)
       toast.success(`${filtered.length} files ready from "${folderName}"`)
     } catch (err: any) {
@@ -1256,8 +1254,9 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
           cleanPath.includes('node_modules/') ||
           cleanPath.includes('.git/') ||
           cleanPath.includes('.next/') ||
-          cleanPath.startsWith('.') ||
-          /\.(png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|mp4|mp3|pdf|exe|dll|so|dylib|bin|lock)$/i.test(cleanPath)
+          cleanPath.includes('dist/') ||
+          cleanPath.includes('.cache/') ||
+          /\.(exe|dll|so|dylib|bin|woff|woff2|ttf|eot)$/i.test(cleanPath)
         ) continue
 
         try {
@@ -1270,15 +1269,13 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         }
       }
 
-      const filtered = filterUnwantedFiles(imported)
-
-      if (filtered.length === 0) {
+      if (imported.length === 0) {
         toast.error("No importable files found in ZIP")
         return
       }
 
       const zipName = file.name.replace(/\.zip$/i, '')
-      setLocalImportFiles(filtered)
+      setLocalImportFiles(imported)
       setLocalImportName(zipName)
       toast.success(`${filtered.length} files ready from "${zipName}"`)
     } catch (err: any) {
