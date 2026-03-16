@@ -12,7 +12,9 @@ import {
   RefreshCw,
   ChevronDown,
   Check,
-  Layers
+  Layers,
+  FolderUp,
+  FileArchive,
 } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useRouter } from "next/navigation"
@@ -155,6 +157,13 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   const [showGitlabPopover, setShowGitlabPopover] = useState(false)
   const [gitlabInput, setGitlabInput] = useState("")
   const [isImportingGitlab, setIsImportingGitlab] = useState(false)
+
+  // Local import state
+  const [localImportFiles, setLocalImportFiles] = useState<Array<{ path: string; content: string }>>([])
+  const [localImportName, setLocalImportName] = useState("")
+  const [isImportingLocal, setIsImportingLocal] = useState(false)
+  const folderInputRef = useRef<HTMLInputElement>(null)
+  const zipInputRef = useRef<HTMLInputElement>(null)
 
   // Plan mode state - true for Plan mode (default), false for Agent mode
   const [isPlanMode, setIsPlanMode] = useState(true)
@@ -936,8 +945,21 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
           slug
         })
         
-        // Apply files based on GitHub import or template selection
-        if (githubRepoUrl.trim()) {
+        // Apply files based on import source or template selection
+        if (localImportFiles.length > 0) {
+          // Apply locally imported files (folder or ZIP)
+          console.log(`📁 Applying ${localImportFiles.length} locally imported files`)
+          toast.loading('Importing project files...', { id: 'local-import' })
+          try {
+            await applyLocalImportFiles(workspace.id)
+            toast.success(`Imported ${localImportFiles.length} files from "${localImportName}"`, { id: 'local-import' })
+            setLocalImportFiles([])
+            setLocalImportName("")
+          } catch (localErr) {
+            console.error('Local import error:', localErr)
+            toast.error('Failed to import local files', { id: 'local-import' })
+          }
+        } else if (githubRepoUrl.trim()) {
           // Import from GitHub repository
           console.log('🚀 Importing from GitHub:', githubRepoUrl)
           toast.loading('Importing GitHub repository...', { id: 'github-import' })
@@ -1133,6 +1155,173 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     toast.success("GitLab repository removed")
   }
 
+  // Local folder import handler
+  const handleFolderImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    setIsImportingLocal(true)
+
+    try {
+      const imported: Array<{ path: string; content: string }> = []
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        // webkitRelativePath gives "folder/sub/file.tsx"
+        const relativePath = (file as any).webkitRelativePath || file.name
+        // Skip binary files, node_modules, .git, etc.
+        if (
+          relativePath.includes('node_modules/') ||
+          relativePath.includes('.git/') ||
+          relativePath.includes('.next/') ||
+          relativePath.includes('dist/') ||
+          relativePath.includes('.cache/') ||
+          /\.(png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|mp4|mp3|pdf|exe|dll|so|dylib|bin|lock)$/i.test(file.name)
+        ) continue
+
+        // Only read text-like files under 500KB
+        if (file.size > 500 * 1024) continue
+
+        try {
+          const content = await file.text()
+          // Remove the root folder prefix (e.g., "my-project/src/app.tsx" -> "src/app.tsx")
+          const parts = relativePath.split('/')
+          const cleanPath = parts.length > 1 ? parts.slice(1).join('/') : relativePath
+          imported.push({ path: cleanPath, content })
+        } catch {
+          // skip binary or unreadable files
+        }
+      }
+
+      const filtered = filterUnwantedFiles(imported)
+
+      if (filtered.length === 0) {
+        toast.error("No importable files found in folder")
+        return
+      }
+
+      // Derive project name from root folder
+      const firstPath = (files[0] as any).webkitRelativePath || ''
+      const folderName = firstPath.split('/')[0] || 'imported-project'
+
+      setLocalImportFiles(filtered)
+      setLocalImportName(folderName)
+      toast.success(`${filtered.length} files ready from "${folderName}"`)
+    } catch (err: any) {
+      toast.error(err.message || "Failed to read folder")
+    } finally {
+      setIsImportingLocal(false)
+      if (folderInputRef.current) folderInputRef.current.value = ''
+    }
+  }
+
+  // ZIP file import handler
+  const handleZipImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setIsImportingLocal(true)
+
+    try {
+      // Wait for JSZip
+      if (typeof window !== 'undefined' && !window.JSZip) {
+        await new Promise<void>((resolve) => {
+          const check = () => window.JSZip ? resolve() : setTimeout(check, 100)
+          check()
+        })
+      }
+      if (!window.JSZip) throw new Error('JSZip library not loaded')
+
+      const arrayBuffer = await file.arrayBuffer()
+      const zip = await window.JSZip.loadAsync(arrayBuffer)
+      const imported: Array<{ path: string; content: string }> = []
+
+      // Find common root prefix (many ZIPs have a single root folder)
+      const allPaths = Object.keys(zip.files).filter(p => !zip.files[p].dir)
+      const commonPrefix = allPaths.length > 0
+        ? allPaths[0].split('/').slice(0, -1).join('/')
+        : ''
+      // Check if all files share this prefix
+      const hasCommonRoot = commonPrefix && allPaths.every(p => p.startsWith(commonPrefix + '/'))
+
+      for (const [path, zipEntry] of Object.entries(zip.files)) {
+        const entry = zipEntry as any
+        if (entry.dir) continue
+
+        let cleanPath = path
+        if (hasCommonRoot && commonPrefix) {
+          cleanPath = path.slice(commonPrefix.length + 1)
+        }
+
+        if (
+          !cleanPath ||
+          cleanPath.includes('node_modules/') ||
+          cleanPath.includes('.git/') ||
+          cleanPath.includes('.next/') ||
+          cleanPath.startsWith('.') ||
+          /\.(png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|mp4|mp3|pdf|exe|dll|so|dylib|bin|lock)$/i.test(cleanPath)
+        ) continue
+
+        try {
+          const content = await entry.async('text')
+          if (content.length <= 500 * 1024) {
+            imported.push({ path: cleanPath, content })
+          }
+        } catch {
+          // skip binary files
+        }
+      }
+
+      const filtered = filterUnwantedFiles(imported)
+
+      if (filtered.length === 0) {
+        toast.error("No importable files found in ZIP")
+        return
+      }
+
+      const zipName = file.name.replace(/\.zip$/i, '')
+      setLocalImportFiles(filtered)
+      setLocalImportName(zipName)
+      toast.success(`${filtered.length} files ready from "${zipName}"`)
+    } catch (err: any) {
+      toast.error(err.message || "Failed to read ZIP file")
+    } finally {
+      setIsImportingLocal(false)
+      if (zipInputRef.current) zipInputRef.current.value = ''
+    }
+  }
+
+  // Apply local import files to a workspace (called during project creation)
+  const applyLocalImportFiles = async (workspaceId: string) => {
+    if (localImportFiles.length === 0) return
+    try {
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+
+      for (const file of localImportFiles) {
+        await storageManager.createFile({
+          workspaceId,
+          name: file.path.split('/').pop() || file.path,
+          path: file.path,
+          content: file.content,
+          fileType: file.path.split('.').pop() || 'text',
+          type: file.path.split('.').pop() || 'text',
+          size: file.content.length,
+          isDirectory: false,
+          folderId: undefined,
+          metadata: {}
+        })
+      }
+      console.log(`✅ Applied ${localImportFiles.length} local import files to workspace ${workspaceId}`)
+    } catch (err) {
+      console.error('❌ Error applying local import files:', err)
+    }
+  }
+
+  const handleRemoveLocalImport = () => {
+    setLocalImportFiles([])
+    setLocalImportName("")
+    toast.success("Imported files removed")
+  }
+
   const handleWizardComplete = (generatedPrompt: string, framework: string) => {
     // Map framework to template
     const frameworkMap: Record<string, 'vite-react' | 'nextjs' | 'expo' | 'html'> = {
@@ -1231,6 +1420,24 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                     onClick={handleRemoveGitlab}
                     className="ml-1 text-orange-400 hover:text-orange-200 transition-colors"
                     title="Remove GitLab repository"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Local Import Attachment Pill */}
+            {localImportFiles.length > 0 && (
+              <div className="flex items-center gap-2 px-3.5 pb-1">
+                <div className="flex items-center gap-1 bg-gray-800/50 border border-gray-700/30 px-2.5 py-1 rounded-full text-xs text-gray-300">
+                  <FolderUp className="w-3 h-3" />
+                  <span className="truncate max-w-[200px]">{localImportName}</span>
+                  <span className="text-gray-500">({localImportFiles.length} files)</span>
+                  <button
+                    onClick={handleRemoveLocalImport}
+                    className="ml-1 text-gray-400 hover:text-gray-200 transition-colors"
+                    title="Remove imported files"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -1554,6 +1761,54 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
             </div>
           </PopoverContent>
         </Popover>
+
+        {/* Local Folder Import */}
+        <button
+          type="button"
+          disabled={isGenerating || isImportingLocal}
+          onClick={() => folderInputRef.current?.click()}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-transparent hover:bg-orange-700/50 border border-orange-600/50 rounded-full text-gray-400 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs"
+          title="Import a local project folder"
+        >
+          {isImportingLocal ? (
+            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <FolderUp className="w-3.5 h-3.5" />
+          )}
+          <span className="font-medium">Folder</span>
+        </button>
+
+        {/* ZIP Import */}
+        <button
+          type="button"
+          disabled={isGenerating || isImportingLocal}
+          onClick={() => zipInputRef.current?.click()}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-transparent hover:bg-orange-700/50 border border-orange-600/50 rounded-full text-gray-400 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs"
+          title="Import a ZIP file"
+        >
+          {isImportingLocal ? (
+            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <FileArchive className="w-3.5 h-3.5" />
+          )}
+          <span className="font-medium">.zip</span>
+        </button>
+
+        {/* Hidden file inputs */}
+        <input
+          ref={folderInputRef}
+          type="file"
+          className="hidden"
+          {...({ webkitdirectory: '', directory: '', mozdirectory: '' } as any)}
+          onChange={handleFolderImport}
+        />
+        <input
+          ref={zipInputRef}
+          type="file"
+          className="hidden"
+          accept=".zip"
+          onChange={handleZipImport}
+        />
       </div>
 
       {/* Suggestion Pills */}
