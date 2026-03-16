@@ -3175,6 +3175,59 @@ export function ChatPanelV2({
     }
   }, [])
 
+  // Listen for "Load Shared Chat" events from team panel
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleLoadSharedChat = async (e: CustomEvent) => {
+      const { messages: sharedMessages, title, projectId: chatProjectId } = e.detail
+      if (chatProjectId !== project?.id || !sharedMessages?.length) return
+
+      try {
+        // Create a new session and populate with shared messages
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+
+        if (currentChatSessionId) {
+          await storageManager.updateChatSession(currentChatSessionId, { isActive: false })
+        }
+
+        const sessions = await storageManager.getChatSessions(project.userId)
+        const sessionNumber = sessions.filter(s => s.workspaceId === project.id).length + 1
+
+        const newSession = await storageManager.createChatSession({
+          userId: project.userId,
+          workspaceId: project.id,
+          title: title || `Shared Chat #${sessionNumber}`,
+          isActive: true,
+        })
+
+        // Save shared messages to the new session
+        for (const msg of sharedMessages) {
+          await storageManager.createMessage({
+            chatSessionId: newSession.id,
+            role: msg.role,
+            content: msg.content,
+          })
+        }
+
+        setCurrentChatSessionId(newSession.id)
+        setMessages(sharedMessages.map((m: any, i: number) => ({
+          id: `shared-${i}-${Date.now()}`,
+          role: m.role,
+          content: m.content,
+        })))
+      } catch (err) {
+        console.error('[ChatPanelV2] Error loading shared chat:', err)
+      }
+    }
+
+    window.addEventListener('load-shared-chat', handleLoadSharedChat as EventListener)
+    return () => {
+      window.removeEventListener('load-shared-chat', handleLoadSharedChat as EventListener)
+    }
+  }, [project?.id, project?.userId, currentChatSessionId])
+
   // Save input to localStorage whenever it changes
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -4537,6 +4590,59 @@ export function ChatPanelV2({
         title: 'Slash Commands',
         description: 'Type / to see all available commands. Use ↑↓ to navigate, Enter to select.'
       })
+    },
+    onShareToTeam: async () => {
+      if (!project?.isTeamWorkspace || !project?.organizationId) {
+        toast({ title: 'Not a team workspace', description: 'Convert to a team workspace first to share chats' })
+        return
+      }
+      if (messages.length === 0) {
+        toast({ title: 'No messages', description: 'Add some messages first to share' })
+        return
+      }
+
+      try {
+        const supabase = (await import('@/lib/supabase/client')).createClient()
+        const { data: { user: currentUser } } = await supabase.auth.getUser()
+        if (!currentUser) {
+          toast({ title: 'Not authenticated', description: 'Please sign in to share chats', variant: 'destructive' })
+          return
+        }
+
+        // Build a clean title from the first user message
+        const firstUserMsg = messages.find(m => m.role === 'user')
+        const title = firstUserMsg
+          ? (typeof firstUserMsg.content === 'string' ? firstUserMsg.content : 'Shared Chat').slice(0, 100)
+          : 'Shared Chat'
+
+        // Clean messages for sharing (text only, strip large content)
+        const cleanMessages = messages.map(m => ({
+          role: m.role,
+          content: typeof m.content === 'string'
+            ? m.content.slice(0, 3000)
+            : Array.isArray(m.content)
+              ? m.content.filter((p: any) => p.type === 'text').map((p: any) => p.text).join('\n').slice(0, 3000)
+              : '[Complex content]'
+        }))
+
+        const { error } = await supabase
+          .from('team_shared_chats')
+          .insert({
+            workspace_id: project.teamWorkspaceId,
+            organization_id: project.organizationId,
+            project_id: project.id,
+            title,
+            messages: cleanMessages,
+            shared_by: currentUser.id,
+          })
+
+        if (error) throw error
+
+        toast({ title: 'Shared to team', description: `"${title.slice(0, 50)}${title.length > 50 ? '...' : ''}" is now visible to your team` })
+      } catch (err: any) {
+        console.error('[ChatPanelV2] Share to team error:', err)
+        toast({ title: 'Failed to share', description: err.message || 'Could not share chat to team', variant: 'destructive' })
+      }
     },
   })
 

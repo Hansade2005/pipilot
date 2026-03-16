@@ -21,6 +21,7 @@ import {
   RefreshCw,
   Settings,
   HelpCircle,
+  Share2,
   type LucideIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -59,6 +60,7 @@ export function getDefaultSlashCommands(handlers: {
   onNewChat?: () => void
   onClearChat?: () => void
   onExportChat?: () => void
+  onShareToTeam?: () => void
   onImportContext?: () => void
   onRegenerate?: () => void
   onSettings?: () => void
@@ -183,6 +185,14 @@ export function getDefaultSlashCommands(handlers: {
       icon: Download,
       category: "chat",
       action: handlers.onExportChat || (() => {}),
+    },
+    {
+      id: "share",
+      label: "Share to Team",
+      description: "Share this chat with your team",
+      icon: Share2,
+      category: "chat",
+      action: handlers.onShareToTeam || (() => {}),
     },
     {
       id: "context",

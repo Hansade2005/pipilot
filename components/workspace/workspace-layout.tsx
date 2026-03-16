@@ -2112,6 +2112,12 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                               workspaceId={selectedProject?.teamWorkspaceId}
                               organizationId={selectedProject?.organizationId}
                               userId={user.id}
+                              onLoadChat={(messages, title) => {
+                                window.dispatchEvent(new CustomEvent('load-shared-chat', {
+                                  detail: { messages, title, projectId: selectedProject?.id }
+                                }))
+                                toast({ title: 'Chat loaded', description: `"${title.slice(0, 40)}" loaded into chat` })
+                              }}
                             />
                           </div>
                           {/* Convert to Team button for non-team workspaces */}
@@ -2776,6 +2782,12 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                         workspaceId={selectedProject?.teamWorkspaceId}
                         organizationId={selectedProject?.organizationId}
                         userId={user.id}
+                        onLoadChat={(messages, title) => {
+                          window.dispatchEvent(new CustomEvent('load-shared-chat', {
+                            detail: { messages, title, projectId: selectedProject?.id }
+                          }))
+                          toast({ title: 'Chat loaded', description: `"${title.slice(0, 40)}" loaded into chat` })
+                        }}
                       />
                     </div>
                   </div>
