@@ -5388,6 +5388,10 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
               }
             }
 
+            // Determine project type for the preview API
+            const hasViteConfigFile = fileEntries.some((f: any) => f.path === 'vite.config.js' || f.path === 'vite.config.ts' || f.path === 'vite.config.mjs')
+            const detectedProjectType = hasViteConfigFile ? 'vite-react' : 'html'
+
             // Convert session files to the format expected by /api/preview
             // Filter out internal metadata and non-project files
             const filesArray = fileEntries
@@ -5416,6 +5420,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
               body: JSON.stringify({
                 projectId,
                 projectSlug,
+                projectType: detectedProjectType,
                 files: filesArray,
                 authUserId: authContext?.userId || supabaseUserId || 'system',
                 authUsername: 'PiPilot AI',

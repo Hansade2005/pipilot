@@ -1518,11 +1518,12 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
       console.log(`[CodePreviewPanel] Filtered files for preview: ${filteredFiles.length} of ${files.length} (removed ${files.length - filteredFiles.length} unwanted files)`)
 
       // Compress the project files for efficient transfer
-      const compressedData = await compressProjectFiles(filteredFiles, [], [], { 
+      const compressedData = await compressProjectFiles(filteredFiles, [], [], {
         project,
         authUserId,
         authUsername,
-        isProduction: false // This is a preview site, should show badge
+        isProduction: false, // This is a preview site, should show badge
+        projectType: isExpoProject ? 'expo' : isViteProject ? 'vite-react' : 'html'
       })
 
       // Create a streaming request with EventSource-like handling

@@ -267,6 +267,9 @@ export default function ProjectPage() {
         body: JSON.stringify({
           projectId: project.id, projectSlug: project.slug, files, authUserId: currentUserId,
           authUsername: project.name || 'user', isProduction,
+          projectType: files.some((f: any) => f.path === 'vite.config.js' || f.path === 'vite.config.ts' || f.path === 'vite.config.mjs') ? 'vite-react' :
+            files.some((f: any) => f.path === 'next.config.js' || f.path === 'next.config.mjs' || f.path === 'next.config.ts') ? 'nextjs' :
+            files.some((f: any) => f.path === 'app.json' || f.path === 'app.config.js') ? 'expo' : 'html',
           customDomainId: isProduction && productionSite?.custom_domain_id ? productionSite.custom_domain_id : undefined
         })
       })

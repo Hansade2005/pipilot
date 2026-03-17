@@ -892,6 +892,7 @@ async function handleStreamingPreview(req: Request) {
     let authUsername: string | undefined
     let isProduction = false
     let customDomainId: string | undefined
+    let projectType: string | undefined // Explicit project type flag from caller
 
     if (contentType.includes('application/octet-stream')) {
       // Handle compressed data (LZ4 + Zip)
@@ -901,22 +902,24 @@ async function handleStreamingPreview(req: Request) {
       projectId = extractedData.projectId
       projectSlug = extractedData.projectSlug
       files = extractedData.files
-      // Extract auth info from metadata if available
+      // Extract auth info and projectType from metadata if available
       authUserId = extractedData.metadata?.authUserId
       authUsername = extractedData.metadata?.authUsername
       isProduction = extractedData.metadata?.isProduction || false
       customDomainId = extractedData.metadata?.customDomainId
+      projectType = extractedData.metadata?.projectType
     } else {
-      // Handle JSON format (backward compatibility)
+      // Handle JSON format
       console.log('[Preview] 📄 Received JSON data')
-      const { 
-        projectId: jsonProjectId, 
-        projectSlug: jsonProjectSlug, 
+      const {
+        projectId: jsonProjectId,
+        projectSlug: jsonProjectSlug,
         files: jsonFiles,
         authUserId: parsedAuthUserId,
         authUsername: parsedAuthUsername,
         isProduction: jsonIsProduction,
-        customDomainId: jsonCustomDomainId
+        customDomainId: jsonCustomDomainId,
+        projectType: jsonProjectType
       } = await req.json()
       projectId = jsonProjectId
       projectSlug = jsonProjectSlug || projectId // fallback to projectId
@@ -925,6 +928,11 @@ async function handleStreamingPreview(req: Request) {
       authUsername = parsedAuthUsername
       isProduction = jsonIsProduction || false
       customDomainId = jsonCustomDomainId
+      projectType = jsonProjectType
+    }
+
+    if (projectType) {
+      console.log(`[Preview] Caller provided projectType: ${projectType}`)
     }
 
     if (!projectId || !files?.length) {
@@ -1030,15 +1038,15 @@ async function handleStreamingPreview(req: Request) {
           })
           const isClassicHtmlTemplate = hasRootScriptJs && hasRootStylesCss
 
-          // HTML/static project = ANY of:
-          // 1. Has index.html with no framework configs/deps
-          // 2. No package.json at all (nothing to install/build)
-          // 3. Classic HTML template pattern (script.js + styles.css in root)
-          const isHtmlProject = (hasIndexHtml && !hasAnyFrameworkConfig && !hasAnyFrameworkDeps) ||
-            (!packageJson && !hasAnyFrameworkConfig) ||
-            isClassicHtmlTemplate
+          // Use explicit projectType flag from caller if provided (most reliable)
+          // Fall back to file-based detection for backward compatibility
+          const isHtmlProject = projectType
+            ? projectType === 'html'
+            : (hasIndexHtml && !hasAnyFrameworkConfig && !hasAnyFrameworkDeps) ||
+              (!packageJson && !hasAnyFrameworkConfig) ||
+              isClassicHtmlTemplate
 
-          console.log(`[Preview] Project detection: hasIndexHtml=${hasIndexHtml}, hasViteConfig=${hasViteConfig}, hasNextConfig=${hasNextConfig}, hasExpoConfig=${hasExpoConfig}, hasNuxtConfig=${hasNuxtConfig}, hasPackageJson=${!!packageJson}, isClassicHtmlTemplate=${isClassicHtmlTemplate}, isHtmlProject=${isHtmlProject}`)
+          console.log(`[Preview] Project detection: projectType=${projectType || 'auto'}, hasIndexHtml=${hasIndexHtml}, hasViteConfig=${hasViteConfig}, hasNextConfig=${hasNextConfig}, hasExpoConfig=${hasExpoConfig}, hasNuxtConfig=${hasNuxtConfig}, hasPackageJson=${!!packageJson}, isClassicHtmlTemplate=${isClassicHtmlTemplate}, isHtmlProject=${isHtmlProject}`)
           console.log(`[Preview] File paths: ${files.map((f: any) => f.path).join(', ')}`)
 
           if (isHtmlProject) {
@@ -1575,9 +1583,9 @@ async function handleRegularPreview(req: Request) {
     let files: any[]
     let authUserId: string | undefined
     let authUsername: string | undefined
-
-    let isProduction = false;
-    let customDomainId: string | undefined;
+    let isProduction = false
+    let customDomainId: string | undefined
+    let projectType: string | undefined
 
     if (contentType.includes('application/octet-stream')) {
       // Handle compressed data (LZ4 + Zip)
@@ -1587,30 +1595,36 @@ async function handleRegularPreview(req: Request) {
       projectId = extractedData.projectId
       projectSlug = extractedData.projectSlug
       files = extractedData.files
-      // Extract auth info from metadata if available
       authUserId = extractedData.metadata?.authUserId
       authUsername = extractedData.metadata?.authUsername
       isProduction = extractedData.metadata?.isProduction || false
       customDomainId = extractedData.metadata?.customDomainId
+      projectType = extractedData.metadata?.projectType
     } else {
-      // Handle JSON format (backward compatibility)
+      // Handle JSON format
       console.log('[Preview] 📄 Received JSON data for regular preview')
-      const { 
-        projectId: jsonProjectId, 
-        projectSlug: jsonProjectSlug, 
+      const {
+        projectId: jsonProjectId,
+        projectSlug: jsonProjectSlug,
         files: jsonFiles,
         authUserId: parsedAuthUserId,
         authUsername: parsedAuthUsername,
         isProduction: jsonIsProduction,
-        customDomainId: jsonCustomDomainId
+        customDomainId: jsonCustomDomainId,
+        projectType: jsonProjectType
       } = await req.json()
       projectId = jsonProjectId
-      projectSlug = jsonProjectSlug || projectId // fallback to projectId
+      projectSlug = jsonProjectSlug || projectId
       files = jsonFiles
       authUserId = parsedAuthUserId
       authUsername = parsedAuthUsername
       isProduction = jsonIsProduction || false
       customDomainId = jsonCustomDomainId
+      projectType = jsonProjectType
+    }
+
+    if (projectType) {
+      console.log(`[Preview] Caller provided projectType: ${projectType}`)
     }
 
     if (!projectId) {
@@ -1719,15 +1733,15 @@ async function handleRegularPreview(req: Request) {
     })
     const isClassicHtmlTemplate = hasRootScriptJs && hasRootStylesCss
 
-    // HTML/static project = ANY of:
-    // 1. Has index.html with no framework configs/deps
-    // 2. No package.json at all (nothing to install/build)
-    // 3. Classic HTML template pattern (script.js + styles.css in root)
-    const isHtmlProject = (hasIndexHtml && !hasAnyFrameworkConfig && !hasAnyFrameworkDeps) ||
-      (!packageJson && !hasAnyFrameworkConfig) ||
-      isClassicHtmlTemplate
+    // Use explicit projectType flag from caller if provided (most reliable)
+    // Fall back to file-based detection for backward compatibility
+    const isHtmlProject = projectType
+      ? projectType === 'html'
+      : (hasIndexHtml && !hasAnyFrameworkConfig && !hasAnyFrameworkDeps) ||
+        (!packageJson && !hasAnyFrameworkConfig) ||
+        isClassicHtmlTemplate
 
-    console.log(`[Preview] Project detection: hasIndexHtml=${hasIndexHtml}, hasViteConfig=${hasViteConfig}, hasNextConfig=${hasNextConfig}, hasExpoConfig=${hasExpoConfig}, hasNuxtConfig=${hasNuxtConfig}, hasPackageJson=${!!packageJson}, isClassicHtmlTemplate=${isClassicHtmlTemplate}, isHtmlProject=${isHtmlProject}`)
+    console.log(`[Preview] Project detection: projectType=${projectType || 'auto'}, hasIndexHtml=${hasIndexHtml}, hasViteConfig=${hasViteConfig}, hasNextConfig=${hasNextConfig}, hasExpoConfig=${hasExpoConfig}, hasNuxtConfig=${hasNuxtConfig}, hasPackageJson=${!!packageJson}, isClassicHtmlTemplate=${isClassicHtmlTemplate}, isHtmlProject=${isHtmlProject}`)
     console.log(`[Preview] File paths: ${files.map((f: any) => f.path).join(', ')}`)
 
     if (isHtmlProject) {
