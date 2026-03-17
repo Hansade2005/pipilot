@@ -628,6 +628,32 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
 
     const { files: sessionFiles } = sessionData
 
+    // Helper: resolve file path with or without leading /
+    // Files from imports may have /src/App.jsx while AI asks for src/App.jsx (or vice versa)
+    const resolveFile = (filePath: string) => {
+      const direct = sessionFiles.get(filePath)
+      if (direct) return direct
+      // Try with leading /
+      if (!filePath.startsWith('/')) {
+        const withSlash = sessionFiles.get('/' + filePath)
+        if (withSlash) return withSlash
+      }
+      // Try without leading /
+      if (filePath.startsWith('/')) {
+        const withoutSlash = sessionFiles.get(filePath.slice(1))
+        if (withoutSlash) return withoutSlash
+      }
+      return undefined
+    }
+
+    // Helper: resolve the actual stored key for a file path
+    const resolveFilePath = (filePath: string): string => {
+      if (sessionFiles.has(filePath)) return filePath
+      if (!filePath.startsWith('/') && sessionFiles.has('/' + filePath)) return '/' + filePath
+      if (filePath.startsWith('/') && sessionFiles.has(filePath.slice(1))) return filePath.slice(1)
+      return filePath
+    }
+
     switch (toolName) {
       case 'write_file': {
         const { path, content } = input
@@ -653,8 +679,8 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           }
         }
 
-        // Check if file already exists in memory
-        const existingFile = sessionFiles.get(path)
+        // Check if file already exists in memory (handle / prefix mismatch)
+        const existingFile = resolveFile(path)
 
         if (existingFile) {
           // Update existing file in memory
@@ -710,7 +736,7 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           }
         }
 
-        const file = sessionFiles.get(path)
+        const file = resolveFile(path)
 
         if (!file) {
           console.log(`[CONSTRUCT_TOOL_RESULT] read_file failed: File not found - ${path}`)
@@ -890,8 +916,8 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           }
         }
 
-        // Get the file from memory
-        const file = sessionFiles.get(filePath)
+        // Get the file from memory (handle / prefix mismatch)
+        const file = resolveFile(filePath)
         if (!file) {
           return {
             success: false,
@@ -1082,8 +1108,8 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           }
         }
 
-        // Get the file from memory
-        const file = sessionFiles.get(filePath)
+        // Get the file from memory (handle / prefix mismatch)
+        const file = resolveFile(filePath)
         if (!file) {
           return {
             success: false,
@@ -1276,8 +1302,9 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           }
         }
 
-        // Check if file exists in memory
-        const existingFile = sessionFiles.get(path)
+        // Check if file exists in memory (handle / prefix mismatch)
+        const resolvedPath = resolveFilePath(path)
+        const existingFile = sessionFiles.get(resolvedPath)
         if (!existingFile) {
           return {
             success: false,
@@ -1287,8 +1314,8 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           }
         }
 
-        // Delete the file from memory
-        sessionFiles.delete(path)
+        // Delete the file from memory (use resolved path)
+        sessionFiles.delete(resolvedPath)
 
         return {
           success: true,
@@ -1375,8 +1402,8 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           }
         }
 
-        // Get package.json from memory
-        const packageFile = sessionFiles.get('package.json')
+        // Get package.json from memory (handle / prefix mismatch)
+        const packageFile = resolveFile('package.json')
         if (!packageFile) {
           return {
             success: false,
