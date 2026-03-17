@@ -6572,14 +6572,10 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                   {/* Pass inline tool calls with positions to MessageWithTools for inline rendering */}
                   {(() => {
                     const toolCalls = activeToolCalls.get(message.id) || []
-                    // Filter out tools with special rendering
+                    // Only filter tools that have special card rendering (not pills)
                     const inlineToolCalls = toolCalls.filter(tc =>
                       tc.toolName !== 'request_supabase_connection' &&
-                      tc.toolName !== 'continue_backend_implementation' &&
-                      tc.toolName !== 'suggest_next_steps' &&
-                      tc.toolName !== 'generate_plan' &&
-                      tc.toolName !== 'update_plan_progress' &&
-                      tc.toolName !== 'update_project_context'
+                      tc.toolName !== 'continue_backend_implementation'
                     )
                     // Don't render MessageWithTools if this is a billing error (content is empty)
                     const hasBillingError = (message as any).metadata?.billingError
@@ -6598,14 +6594,10 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                   {/* Tool Activity Panel - Always show for summary/tracking purposes */}
                   {(() => {
                     const toolCalls = activeToolCalls.get(message.id)
-                    // Filter out tools with special rendering (like request_supabase_connection, continue_backend_implementation, suggest_next_steps, generate_plan)
+                    // Only filter tools that have special card rendering
                     const regularToolCalls = toolCalls?.filter(tc =>
                       tc.toolName !== 'request_supabase_connection' &&
-                      tc.toolName !== 'continue_backend_implementation' &&
-                      tc.toolName !== 'suggest_next_steps' &&
-                      tc.toolName !== 'generate_plan' &&
-                      tc.toolName !== 'update_plan_progress' &&
-                      tc.toolName !== 'update_project_context'
+                      tc.toolName !== 'continue_backend_implementation'
                     )
                     return regularToolCalls && regularToolCalls.length > 0 ? (
                       <ToolActivityPanel

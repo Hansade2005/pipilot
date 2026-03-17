@@ -276,29 +276,45 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
 
   // Determine if this pill should deep-link to a file in the editor
   const getFilePath = (tool: string, args?: any): string | null => {
-    if (!args) return null
+    let p: string | null = null
+    if (!args) {
+      // For plan/context tools, we know the path even without args
+      if (tool === 'generate_plan' || tool === 'update_plan_progress') return '.pipilot/plan.md'
+      if (tool === 'update_project_context') return '.pipilot/project.md'
+      return null
+    }
     switch (tool) {
       case 'write_file':
       case 'delete_file':
-      case 'read_file': return args.path || null
+      case 'read_file': p = args.path || null; break
       case 'edit_file':
-      case 'client_replace_string_in_file': return args.filePath || null
+      case 'client_replace_string_in_file': p = args.filePath || null; break
       case 'generate_plan':
       case 'update_plan_progress': return '.pipilot/plan.md'
       case 'update_project_context': return '.pipilot/project.md'
       default: return null
     }
+    // Normalize: strip leading / so path matches storage keys
+    if (p && p.startsWith('/')) p = p.slice(1)
+    return p
   }
 
   const linkedFilePath = getFilePath(toolName, input)
 
   const handleFileClick = () => {
     if (!linkedFilePath) return
+    // Try both with and without leading / to match whichever format the workspace uses
+    const normalizedPath = linkedFilePath.startsWith('/') ? linkedFilePath.slice(1) : linkedFilePath
+    const slashedPath = '/' + normalizedPath
     window.dispatchEvent(new CustomEvent('openFileInEditor', {
-      detail: { filePath: linkedFilePath }
+      detail: { filePath: normalizedPath }
+    }))
+    // Also try with leading / in case workspace stores paths that way
+    window.dispatchEvent(new CustomEvent('openFileInEditor', {
+      detail: { filePath: slashedPath }
     }))
     window.dispatchEvent(new CustomEvent('focusFileInExplorer', {
-      detail: { path: linkedFilePath }
+      detail: { path: normalizedPath }
     }))
   }
 
