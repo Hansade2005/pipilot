@@ -112,6 +112,76 @@ export function filterMediaFiles(files: any[]): any[] {
 }
 
 /**
+ * AI-powered project type detection using a0 LLM API.
+ * Analyzes the file tree and package.json to determine the framework.
+ * Used as a fallback when callers don't provide an explicit projectType flag.
+ * Returns: 'vite-react' | 'nextjs' | 'expo' | 'html'
+ */
+export async function detectProjectTypeWithAI(files: any[]): Promise<string> {
+  try {
+    // Build a compact file tree (paths only, max 80 entries)
+    const filePaths = files
+      .map((f: any) => f.path)
+      .filter(Boolean)
+      .slice(0, 80)
+      .join('\n')
+
+    // Extract package.json deps if available
+    const pkgFile = files.find((f: any) => f.path === 'package.json')
+    let depsInfo = ''
+    if (pkgFile?.content) {
+      try {
+        const pkg = JSON.parse(pkgFile.content)
+        const deps = Object.keys(pkg.dependencies || {}).join(', ')
+        const devDeps = Object.keys(pkg.devDependencies || {}).join(', ')
+        depsInfo = `\n\npackage.json dependencies: ${deps}\ndevDependencies: ${devDeps}`
+      } catch {}
+    }
+
+    const response = await fetch('https://api.a0.dev/ai/llm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a project type classifier. Given a file tree and package.json info, respond with EXACTLY one word: vite-react, nextjs, expo, or html. No explanation.'
+          },
+          {
+            role: 'user',
+            content: `Classify this project:\n\nFile tree:\n${filePaths}${depsInfo}`
+          }
+        ],
+        temperature: 0.1,
+        max_tokens: 10
+      }),
+      signal: AbortSignal.timeout(5000) // 5s timeout — don't block preview
+    })
+
+    const data = await response.json()
+    const answer = (data.completion || '').trim().toLowerCase()
+
+    // Validate the response is one of the expected types
+    const validTypes = ['vite-react', 'nextjs', 'expo', 'html']
+    if (validTypes.includes(answer)) {
+      console.log(`[AI Detection] Detected project type: ${answer}`)
+      return answer
+    }
+
+    // Partial match (e.g., "vite" → "vite-react")
+    if (answer.includes('vite') || answer.includes('react')) return 'vite-react'
+    if (answer.includes('next')) return 'nextjs'
+    if (answer.includes('expo')) return 'expo'
+
+    console.warn(`[AI Detection] Unexpected response: "${answer}", defaulting to file-based detection`)
+    return 'unknown'
+  } catch (error) {
+    console.warn('[AI Detection] Failed, falling back to file-based detection:', error)
+    return 'unknown'
+  }
+}
+
+/**
  * Auto-patch vite.config.js/ts for E2B sandbox compatibility.
  * Imported projects often have a vanilla vite config without the server
  * settings required for E2B (host, port, allowedHosts). This function

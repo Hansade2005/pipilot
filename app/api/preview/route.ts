@@ -6,7 +6,7 @@ import {
   SandboxErrorType,
   type SandboxFile 
 } from '@/lib/e2b-enhanced'
-import { filterUnwantedFiles, patchViteConfigForSandbox } from '@/lib/utils'
+import { filterUnwantedFiles, patchViteConfigForSandbox, detectProjectTypeWithAI } from '@/lib/utils'
 import JSZip from 'jszip'
 import lz4 from 'lz4js'
 import { createClient as createExternalClient } from '@supabase/supabase-js'
@@ -1038,15 +1038,24 @@ async function handleStreamingPreview(req: Request) {
           })
           const isClassicHtmlTemplate = hasRootScriptJs && hasRootStylesCss
 
-          // Use explicit projectType flag from caller if provided (most reliable)
-          // Fall back to file-based detection for backward compatibility
-          const isHtmlProject = projectType
-            ? projectType === 'html'
+          // Resolve project type: explicit flag > AI detection > file-based fallback
+          let resolvedType = projectType
+          if (!resolvedType) {
+            // Try AI detection first
+            const aiDetected = await detectProjectTypeWithAI(files)
+            if (aiDetected !== 'unknown') {
+              resolvedType = aiDetected
+              console.log(`[Preview] AI detected project type: ${resolvedType}`)
+            }
+          }
+
+          const isHtmlProject = resolvedType
+            ? resolvedType === 'html'
             : (hasIndexHtml && !hasAnyFrameworkConfig && !hasAnyFrameworkDeps) ||
               (!packageJson && !hasAnyFrameworkConfig) ||
               isClassicHtmlTemplate
 
-          console.log(`[Preview] Project detection: projectType=${projectType || 'auto'}, hasIndexHtml=${hasIndexHtml}, hasViteConfig=${hasViteConfig}, hasNextConfig=${hasNextConfig}, hasExpoConfig=${hasExpoConfig}, hasNuxtConfig=${hasNuxtConfig}, hasPackageJson=${!!packageJson}, isClassicHtmlTemplate=${isClassicHtmlTemplate}, isHtmlProject=${isHtmlProject}`)
+          console.log(`[Preview] Project detection: projectType=${projectType || 'none'}, aiResolved=${resolvedType || 'none'}, hasIndexHtml=${hasIndexHtml}, hasViteConfig=${hasViteConfig}, hasNextConfig=${hasNextConfig}, hasExpoConfig=${hasExpoConfig}, hasNuxtConfig=${hasNuxtConfig}, hasPackageJson=${!!packageJson}, isHtmlProject=${isHtmlProject}`)
           console.log(`[Preview] File paths: ${files.map((f: any) => f.path).join(', ')}`)
 
           if (isHtmlProject) {
@@ -1733,15 +1742,23 @@ async function handleRegularPreview(req: Request) {
     })
     const isClassicHtmlTemplate = hasRootScriptJs && hasRootStylesCss
 
-    // Use explicit projectType flag from caller if provided (most reliable)
-    // Fall back to file-based detection for backward compatibility
-    const isHtmlProject = projectType
-      ? projectType === 'html'
+    // Resolve project type: explicit flag > AI detection > file-based fallback
+    let resolvedType = projectType
+    if (!resolvedType) {
+      const aiDetected = await detectProjectTypeWithAI(files)
+      if (aiDetected !== 'unknown') {
+        resolvedType = aiDetected
+        console.log(`[Preview] AI detected project type: ${resolvedType}`)
+      }
+    }
+
+    const isHtmlProject = resolvedType
+      ? resolvedType === 'html'
       : (hasIndexHtml && !hasAnyFrameworkConfig && !hasAnyFrameworkDeps) ||
         (!packageJson && !hasAnyFrameworkConfig) ||
         isClassicHtmlTemplate
 
-    console.log(`[Preview] Project detection: projectType=${projectType || 'auto'}, hasIndexHtml=${hasIndexHtml}, hasViteConfig=${hasViteConfig}, hasNextConfig=${hasNextConfig}, hasExpoConfig=${hasExpoConfig}, hasNuxtConfig=${hasNuxtConfig}, hasPackageJson=${!!packageJson}, isClassicHtmlTemplate=${isClassicHtmlTemplate}, isHtmlProject=${isHtmlProject}`)
+    console.log(`[Preview] Project detection: projectType=${projectType || 'none'}, aiResolved=${resolvedType || 'none'}, hasIndexHtml=${hasIndexHtml}, hasViteConfig=${hasViteConfig}, hasNextConfig=${hasNextConfig}, hasExpoConfig=${hasExpoConfig}, hasNuxtConfig=${hasNuxtConfig}, hasPackageJson=${!!packageJson}, isHtmlProject=${isHtmlProject}`)
     console.log(`[Preview] File paths: ${files.map((f: any) => f.path).join(', ')}`)
 
     if (isHtmlProject) {
