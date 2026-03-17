@@ -2345,30 +2345,37 @@ export async function POST(req: Request) {
 
       console.log(`[DEBUG] Restored ${sessionFiles.size} files from continuation state`)
     } else {
+      // Normalize path: strip leading / so all paths are relative (e.g., "src/App.jsx" not "/src/App.jsx")
+      const normalizePath = (p: string) => p.startsWith('/') ? p.slice(1) : p
+
       // Normal initialization
       if (clientFiles.length > 0) {
         for (const file of clientFiles) {
           if (file.path && !file.isDirectory) {
-            // Store file data in memory with exact content
+            const normalizedPath = normalizePath(file.path)
+            // Skip internal metadata files
+            if (normalizedPath === '__metadata__.json') continue
+            // Store file data in memory with normalized path
             const fileData = {
               workspaceId: projectId,
-              name: file.name,
-              path: file.path,
+              name: file.name || normalizedPath.split('/').pop() || normalizedPath,
+              path: normalizedPath,
               content: file.content !== undefined ? String(file.content) : '',
               fileType: file.type || file.fileType || 'text',
               type: file.type || file.fileType || 'text',
               size: file.size || String(file.content || '').length,
               isDirectory: false
             }
-            sessionFiles.set(file.path, fileData)
-            console.log(`[DEBUG] Stored file in memory: ${file.path} (${fileData.content.length} chars)`)
+            sessionFiles.set(normalizedPath, fileData)
+            console.log(`[DEBUG] Stored file in memory: ${normalizedPath} (${fileData.content.length} chars)`)
           }
         }
       }
 
-      // Also store directory entries from fileTree
+      // Also store directory entries from fileTree (normalize paths)
       if (clientFileTree.length > 0) {
-        for (const treeItem of clientFileTree) {
+        for (const rawTreeItem of clientFileTree) {
+          const treeItem = normalizePath(rawTreeItem)
           if (treeItem.endsWith('/')) {
             // This is a directory
             const dirPath = treeItem.slice(0, -1) // Remove trailing slash
@@ -2389,13 +2396,13 @@ export async function POST(req: Request) {
           } else {
             // This is a file - make sure it's in sessionFiles
             if (!sessionFiles.has(treeItem)) {
-              // Try to find it in clientFiles or create a placeholder
-              const existingFile = clientFiles.find((f: any) => f.path === treeItem)
+              // Try to find it in clientFiles or create a placeholder (check both normalized and original paths)
+              const existingFile = clientFiles.find((f: any) => normalizePath(f.path) === treeItem)
               if (existingFile) {
                 const fileData = {
                   workspaceId: projectId,
-                  name: existingFile.name,
-                  path: existingFile.path,
+                  name: existingFile.name || treeItem.split('/').pop() || treeItem,
+                  path: treeItem,
                   content: existingFile.content !== undefined ? String(existingFile.content) : '',
                   fileType: existingFile.type || existingFile.fileType || 'text',
                   type: existingFile.type || existingFile.fileType || 'text',
@@ -2411,9 +2418,10 @@ export async function POST(req: Request) {
       }
     }
 
-    // Store session data
+    // Store session data (normalize file tree paths too)
+    const normalizedFileTree = clientFileTree.map((p: string) => p.startsWith('/') ? p.slice(1) : p)
     sessionProjectStorage.set(projectId, {
-      fileTree: clientFileTree,
+      fileTree: normalizedFileTree,
       files: sessionFiles
     })
 
