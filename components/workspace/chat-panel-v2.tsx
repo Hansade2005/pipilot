@@ -5,7 +5,7 @@
 
 'use client'
 
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useRef, useEffect, useCallback, useMemo, startTransition } from 'react'
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card } from "@/components/ui/card"
@@ -3491,11 +3491,20 @@ export function ChatPanelV2({
     }
   }, [error, toast])
 
-  // Smart scroll: only auto-scroll when user is near the bottom
+  // Smart scroll: stick to bottom during streaming without causing layout thrashing
+  // Uses scrollTop instead of scrollIntoView to avoid reflow-based shaking
+  const scrollRafRef = useRef<number | null>(null)
   useEffect(() => {
     if (userIsNearBottomRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current)
+      scrollRafRef.current = requestAnimationFrame(() => {
+        const container = scrollContainerRef.current
+        if (container) {
+          container.scrollTop = container.scrollHeight
+        }
+      })
     }
+    return () => { if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current) }
   }, [messages])
 
   // Track scroll position to show/hide scroll-to-bottom button
@@ -3514,7 +3523,10 @@ export function ChatPanelV2({
   }, [])
 
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const container = scrollContainerRef.current
+    if (container) {
+      container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
+    }
   }, [])
 
   // Fetch credit balance
@@ -5394,63 +5406,57 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
               continue
             }
 
-            console.log('[ChatPanelV2][DataStream] Parsed stream part:', parsed)
-
             // Handle different stream part types
+            // RAF-batched state updates: accumulate locally, flush to React at ~60fps
+            let flushScheduled = false
+            const scheduleFlush = () => {
+              if (!flushScheduled) {
+                flushScheduled = true
+                requestAnimationFrame(() => {
+                  flushScheduled = false
+                  startTransition(() => {
+                    setStreamingContent(accumulatedContent)
+                    setStreamingReasoning(accumulatedReasoning)
+                    setMessages(prev => prev.map(msg =>
+                      msg.id === assistantMessageId
+                        ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, reasoningBlocks: [...reasoningBlocks] }
+                        : msg
+                    ))
+                  })
+                })
+              }
+            }
+
             if (parsed.type === 'text-delta') {
-              // Text delta - accumulate the text
               if (parsed.text) {
-                // CRITICAL FIX: Filter out tool result JSON that shouldn't be displayed
-                // Some models output tool results as text instead of keeping them internal
                 const textToAdd = parsed.text
-                
-                // Check if this text looks like a tool result JSON
+                // Filter out tool result JSON that some models output as text
                 const trimmedText = textToAdd.trim()
-                const looksLikeToolResult = (
-                  (trimmedText.startsWith('{') || trimmedText.startsWith('Assistant:')) && 
-                  (trimmedText.includes('"success"') || trimmedText.includes('"toolCallId"') || 
-                   trimmedText.includes('"executionTimeMs"') || trimmedText.includes('"databaseId"'))
-                )
-                
-                // Skip text that appears to be a raw tool result JSON
+                const looksLikeToolResult = trimmedText.startsWith('{') &&
+                  (trimmedText.includes('"success"') || trimmedText.includes('"toolCallId"') || trimmedText.includes('"executionTimeMs"'))
+
                 if (!looksLikeToolResult) {
                   accumulatedContent += textToAdd
                   lastDeltaType = 'text'
-                  setStreamingContent(accumulatedContent) // Store in component state
-                  setMessages(prev => prev.map(msg =>
-                    msg.id === assistantMessageId
-                      ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, reasoningBlocks: [...reasoningBlocks] }
-                      : msg
-                  ))
-                  // Update stream recovery progress (debounced)
+                  scheduleFlush()
+                  // Update stream recovery progress (debounced internally)
                   streamRecoveryManager.updateStreamProgress(assistantMessageId, {
                     accumulatedContent,
                     accumulatedReasoning,
                     toolCalls: localToolCalls,
                     inlineToolCalls: localToolCalls
                   })
-                } else {
-                  console.log('[ChatPanelV2][Filter] Filtered out tool result JSON from text content:', trimmedText.substring(0, 100))
                 }
               }
             } else if (parsed.type === 'reasoning-delta') {
-              // Reasoning delta - accumulate reasoning separately and track position
               if (parsed.text) {
-                // Start a new reasoning block when transitioning from text/null to reasoning
                 if (lastDeltaType !== 'reasoning') {
                   reasoningBlocks.push({ content: '', textPosition: accumulatedContent.length })
                 }
                 reasoningBlocks[reasoningBlocks.length - 1].content += parsed.text
                 lastDeltaType = 'reasoning'
-
                 accumulatedReasoning += parsed.text
-                setStreamingReasoning(accumulatedReasoning) // Store in component state
-                setMessages(prev => prev.map(msg =>
-                  msg.id === assistantMessageId
-                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, reasoningBlocks: [...reasoningBlocks] }
-                    : msg
-                ))
-                // Update stream recovery progress (debounced)
+                scheduleFlush()
                 streamRecoveryManager.updateStreamProgress(assistantMessageId, {
                   accumulatedContent,
                   accumulatedReasoning,
@@ -6292,7 +6298,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
         <div
           ref={scrollContainerRef}
           className={`h-full min-w-0 overflow-y-auto overflow-x-hidden space-y-5 ${isMobile ? 'px-4 pt-4 pb-20' : 'px-4 pt-4 pb-4'}`}
-          style={{ backgroundColor: 'rgba(17, 24, 39, 0.8)' }}
+          style={{ backgroundColor: 'rgba(17, 24, 39, 0.8)', overflowAnchor: 'auto', willChange: 'scroll-position' }}
         >
         {messages.length === 0 && (
           <div className="flex items-center justify-center h-full text-gray-500">

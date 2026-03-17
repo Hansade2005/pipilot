@@ -11499,7 +11499,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
         stopWhen: stepCountIs(maxStepsAllowed),
         abortSignal: creditAbortController.signal,
         experimental_repairToolCall: repairToolCall,
-        experimental_transform: smoothStream({ chunking: 'word' }),
+        experimental_transform: smoothStream({ chunking: 'word', delayInMs: 0 }),
         ...(providerOptions ? { providerOptions } : {}),
         onChunk,
         onStepFinish: handleStepFinish,
@@ -11537,7 +11537,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
           stopWhen: stepCountIs(maxStepsAllowed),
           abortSignal: creditAbortController.signal,
           experimental_repairToolCall: repairToolCall,
-          experimental_transform: smoothStream({ chunking: 'word' }),
+          experimental_transform: smoothStream({ chunking: 'word', delayInMs: 0 }),
           // No Anthropic provider options for fallback model
           onChunk,
           onStepFinish: handleStepFinish,
@@ -11671,9 +11671,12 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
             }
 
             // Stream the text and tool calls with continuation monitoring
+            let lastTimeCheckMs = 0
             for await (const part of result.fullStream) {
-              // Check if we should trigger continuation
-              const timeStatus = getTimeStatus();
+              // Throttle timeout check to every 500ms instead of every stream part
+              const nowMs = Date.now()
+              const shouldCheckTime = !shouldContinue && (nowMs - lastTimeCheckMs > 500)
+              const timeStatus = shouldCheckTime ? (lastTimeCheckMs = nowMs, getTimeStatus()) : { shouldContinue: false, isApproachingTimeout: false, warningMessage: '' }
               if (timeStatus.shouldContinue && !shouldContinue) {
                 shouldContinue = true;
                 console.log('[Chat-V2] Triggering stream continuation due to timeout approach');
@@ -11833,7 +11836,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                   stopWhen: stepCountIs(maxStepsAllowed),
                   abortSignal: creditAbortController.signal,
                   experimental_repairToolCall: repairToolCall,
-                  experimental_transform: smoothStream({ chunking: 'word' }),
+                  experimental_transform: smoothStream({ chunking: 'word', delayInMs: 0 }),
                   onChunk,
                   onStepFinish: handleStepFinish,
                   onFinish: async () => {
@@ -12171,6 +12174,9 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
           'Transfer-Encoding': 'chunked',
+          'Cache-Control': 'no-cache, no-transform',
+          'Connection': 'keep-alive',
+          'X-Accel-Buffering': 'no',
         }
       }
     )
