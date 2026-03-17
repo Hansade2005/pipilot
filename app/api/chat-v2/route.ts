@@ -3691,12 +3691,16 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
             const { files: sessionFiles } = sessionData
 
-            // Convert to array and filter based on criteria
-            let filesToSearch = Array.from(sessionFiles.values())
+            // Convert to array, normalize paths (strip leading /)
+            let filesToSearch = Array.from(sessionFiles.values()).map((f: any) => ({
+              ...f,
+              path: f.path?.startsWith('/') ? f.path.slice(1) : f.path
+            }))
 
-            // Filter by file path if specified
+            // Filter by file path if specified (handle / prefix mismatch)
             if (filePath) {
-              filesToSearch = filesToSearch.filter((file: any) => file.path === filePath)
+              const cleanFilePath = filePath.startsWith('/') ? filePath.slice(1) : filePath
+              filesToSearch = filesToSearch.filter((file: any) => file.path === cleanFilePath || file.path === filePath)
               if (filesToSearch.length === 0) {
                 return {
                   success: false,
@@ -4245,8 +4249,11 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
             const { files: sessionFiles } = sessionData
             console.log(`[grep_search] ✅ Files loaded from ${filesSource}: ${sessionFiles.size} total files`)
 
-            // Convert session files to array
-            let filesToSearch = Array.from(sessionFiles.values())
+            // Convert session files to array, normalize paths (strip leading /)
+            let filesToSearch = Array.from(sessionFiles.values()).map((f: any) => ({
+              ...f,
+              path: f.path?.startsWith('/') ? f.path.slice(1) : f.path
+            }))
             console.log(`[grep_search] 📂 Initial files array: ${filesToSearch.length} files`)
 
             // Log first few file paths for debugging
@@ -5903,34 +5910,87 @@ Present results using this markdown structure:
             }
 
             let filesToList: any[] = []
+
+            // Normalize: strip leading / from all paths for consistent matching
+            const normalizedFiles = allFiles.map((f: any) => ({
+              ...f,
+              path: f.path?.startsWith('/') ? f.path.slice(1) : f.path
+            }))
+
             if (path) {
-              // List files in specific directory
-              const pathPrefix = path.endsWith('/') ? path : `${path}/`
-              for (const file of allFiles) {
-                if (file.path.startsWith(pathPrefix) &&
-                  !file.path.substring(pathPrefix.length).includes('/')) {
-                  filesToList.push({
-                    name: file.name,
-                    path: file.path,
-                    type: file.type,
-                    size: file.size,
-                    isDirectory: file.isDirectory,
-                    lastModified: file.updatedAt || file.createdAt || new Date().toISOString()
-                  })
+              // Normalize the requested path too
+              const cleanPath = path.startsWith('/') ? path.slice(1) : path
+              const pathPrefix = cleanPath.endsWith('/') ? cleanPath : `${cleanPath}/`
+              const seen = new Set<string>()
+              for (const file of normalizedFiles) {
+                if (!file.path) continue
+                if (file.path.startsWith(pathPrefix)) {
+                  const remainder = file.path.substring(pathPrefix.length)
+                  const slashIdx = remainder.indexOf('/')
+                  if (slashIdx === -1) {
+                    // Direct child file
+                    if (!seen.has(file.path)) {
+                      seen.add(file.path)
+                      filesToList.push({
+                        name: file.name || file.path.split('/').pop(),
+                        path: file.path,
+                        type: file.type,
+                        size: file.size,
+                        isDirectory: file.isDirectory || false,
+                        lastModified: file.updatedAt || file.createdAt || new Date().toISOString()
+                      })
+                    }
+                  } else {
+                    // Nested — derive subdirectory entry
+                    const dirName = remainder.substring(0, slashIdx)
+                    const dirPath = pathPrefix + dirName
+                    if (!seen.has(dirPath)) {
+                      seen.add(dirPath)
+                      filesToList.push({
+                        name: dirName,
+                        path: dirPath,
+                        type: 'directory',
+                        size: 0,
+                        isDirectory: true,
+                        lastModified: new Date().toISOString()
+                      })
+                    }
+                  }
                 }
               }
             } else {
-              // List root directory files
-              for (const file of allFiles) {
-                if (!file.path.includes('/')) {
-                  filesToList.push({
-                    name: file.name,
-                    path: file.path,
-                    type: file.type,
-                    size: file.size,
-                    isDirectory: file.isDirectory,
-                    lastModified: file.updatedAt || file.createdAt || new Date().toISOString()
-                  })
+              // List root directory — derive both root files and top-level directories
+              const seen = new Set<string>()
+              for (const file of normalizedFiles) {
+                if (!file.path) continue
+                const slashIdx = file.path.indexOf('/')
+                if (slashIdx === -1) {
+                  // Root file (no slash = top-level)
+                  if (!seen.has(file.path)) {
+                    seen.add(file.path)
+                    filesToList.push({
+                      name: file.name || file.path,
+                      path: file.path,
+                      type: file.type,
+                      size: file.size,
+                      isDirectory: file.isDirectory || false,
+                      lastModified: file.updatedAt || file.createdAt || new Date().toISOString()
+                    })
+                  }
+                } else {
+                  // Nested file — derive top-level directory
+                  const dirName = file.path.substring(0, slashIdx)
+                  if (!seen.has(dirName)) {
+                    seen.add(dirName)
+                    filesToList.push({
+                      name: dirName,
+                      path: dirName,
+                      type: 'directory',
+                      size: 0,
+                      isDirectory: true,
+                      lastModified: new Date().toISOString()
+                    })
+                  }
                 }
               }
             }
