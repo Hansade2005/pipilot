@@ -2747,7 +2747,11 @@ The plan should include:
 5. **After completing EACH plan step**, call \`update_plan_progress\` with the step number to mark it as done in \`.pipilot/plan.md\`
 6. Build ALL pages and the COMPLETE app - never stop at just 1-2 files
 7. **After ALL steps are done**, call \`update_project_context\` to document the project in \`.pipilot/project.md\`
-8. **IMPORTANT**: Before calling \`deploy_preview\`, check the vite.config (read_file) and ensure it has the E2B sandbox server settings: \`server: { host: '0.0.0.0', port: 3000, strictPort: true, cors: true, allowedHosts: ['localhost', '127.0.0.1', '.e2b.app', '3000-*.e2b.app'] }\`. If missing, use edit_file to add them. Then call \`deploy_preview\` to deploy to live preview hosting on a .pipilot.dev subdomain (only for Vite/React and HTML projects — NOT Next.js or Expo).
+8. **IMPORTANT DEPLOY SEQUENCE** (Vite/React and HTML only, NOT Next.js/Expo):
+   a. Ensure vite.config has E2B sandbox settings: \`server: { host: '0.0.0.0', port: 3000, strictPort: true, cors: true, allowedHosts: ['localhost', '127.0.0.1', '.e2b.app', '3000-*.e2b.app'] }\`
+   b. Run \`check_dev_errors({ mode: "build" })\` to verify the build passes
+   c. If build fails, fix the errors and re-run check_dev_errors until it passes
+   d. Only then call \`deploy_preview\` — it will succeed because the build is already verified
 9. Call \`suggest_next_steps\` with follow-up options
 
 **Tool Discovery**: You start with file CRUD, planning, and deploy only. For code search, web search, grep, Stripe, Supabase, database, images, browser, or code review — call \`discover_tools({ query: "keyword" })\` first to unlock the tools you need.
@@ -3116,12 +3120,12 @@ You start with minimal core tools: file CRUD (write, read, edit, delete, list), 
 **Categories:** file_ops, code_search, web, dev, project, pipilot_db, supabase, stripe, docs, special
 
 ## Live Preview Deployment (MANDATORY for Vite/React and HTML projects)
-After completing all file changes, BEFORE calling \`deploy_preview\`:
-1. Read the vite.config file (vite.config.ts or vite.config.js) with read_file
-2. Check if it has the E2B sandbox server settings: \`server: { host: '0.0.0.0', port: 3000, strictPort: true, cors: true, allowedHosts: ['localhost', '127.0.0.1', '.e2b.app', '3000-*.e2b.app'] }\`
-3. If missing or incomplete, use edit_file to add the full server block — this is CRITICAL for the build sandbox to work
-4. Then call \`deploy_preview\` with a short deploy message describing what changed
-Do NOT use this tool for Next.js or Expo projects.
+After completing all file changes, follow this EXACT deploy sequence:
+1. Ensure vite.config has E2B sandbox settings (host: '0.0.0.0', port: 3000, allowedHosts with '.e2b.app'). Fix with edit_file if missing.
+2. Run \`check_dev_errors({ mode: "build" })\` to verify the build passes FIRST
+3. If build fails — read the error, fix the code, re-run check_dev_errors until it passes
+4. Only call \`deploy_preview\` AFTER the build succeeds — never call it blind
+Do NOT use for Next.js or Expo projects.
 
 ## Next Step Suggestions (MANDATORY)
 At the END of every response, call \`suggest_next_steps\` with 3-4 contextual follow-up suggestions. Make them relevant, actionable, progressive, and varied. Labels: 3-8 words. ALWAYS call as your FINAL action.
@@ -5562,7 +5566,7 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
       // SERVER-SIDE TOOL: Deploy current project files to live preview hosting
       deploy_preview: tool({
-        description: 'Deploy the current project to live preview hosting on Supabase. This builds the project (npm install + build) and uploads it to a .pipilot.dev subdomain. Call this AFTER you have finished making all file changes so the user can see and test the live result. Returns the live preview URL. Only available for Vite/React and HTML projects.',
+        description: 'Deploy the current project to live .pipilot.dev hosting. IMPORTANT: Before calling this, ALWAYS run check_dev_errors with mode "build" first to verify the build passes. Fix any build errors, then call deploy_preview. Only for Vite/React and HTML projects.',
         inputSchema: z.object({
           deployMessage: z.string().optional().describe('Short message describing what was deployed (e.g., "Added login page and auth flow")')
         }),
@@ -5668,65 +5672,27 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
               }),
             })
 
-            if (!response.ok) {
-              const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-              const executionTime = Date.now() - toolStartTime
-              toolExecutionTimes['deploy_preview'] = (toolExecutionTimes['deploy_preview'] || 0) + executionTime
-              console.error(`[deploy_preview] Failed (${response.status}):`, errorData)
-              return {
-                success: false,
-                error: `Preview deployment failed (HTTP ${response.status}): ${errorData.error || response.statusText}`,
-                details: errorData.details || null,
-                errorType: errorData.type || null,
-                sandboxId: errorData.sandboxId || null,
-                suggestion: errorData.error?.includes('build failed')
-                  ? 'The Vite build failed. Check vite.config for errors, ensure all imports are valid, and verify dependencies in package.json. Use read_file to inspect the config and fix issues, then retry deploy_preview.'
-                  : errorData.error?.includes('install')
-                  ? 'Dependency installation failed. Check package.json for invalid packages or version conflicts. Use read_file on package.json to inspect and fix.'
-                  : errorData.error?.includes('upload')
-                  ? 'Built files failed to upload to hosting. This may be a temporary issue — retry deploy_preview.'
-                  : 'Check the error message above and fix the issue before retrying deploy_preview.',
-                toolCallId,
-                executionTimeMs: executionTime
-              }
-            }
-
-            const data = await response.json()
             const executionTime = Date.now() - toolStartTime
             toolExecutionTimes['deploy_preview'] = (toolExecutionTimes['deploy_preview'] || 0) + executionTime
 
-            const previewUrl = data.url || `https://${data.finalSlug || projectSlug}.pipilot.dev/`
-
-            console.log(`[deploy_preview] Successfully deployed to ${previewUrl} in ${executionTime}ms`)
-
-            return {
-              success: true,
-              url: previewUrl,
-              slug: data.finalSlug || projectSlug,
-              hosted: data.hosted || false,
-              deployMessage: deployMessage || 'Project deployed successfully',
-              filesDeployed: filesArray.length,
-              toolCallId,
-              executionTimeMs: executionTime
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({}))
+              console.error(`[deploy_preview] Failed (${response.status}):`, errorData)
+              // Return minimal error — don't dump verbose API error into AI context
+              return `Deploy failed. Run check_dev_errors({ mode: "build" }) to get the exact build error, fix it, then retry deploy_preview.`
             }
+
+            const data = await response.json()
+            const previewUrl = data.url || `https://${data.finalSlug || projectSlug}.pipilot.dev/`
+            console.log(`[deploy_preview] Deployed to ${previewUrl} in ${executionTime}ms`)
+            return `Deployed successfully. Live URL: ${previewUrl}`
+
           } catch (error) {
             const executionTime = Date.now() - toolStartTime
             toolExecutionTimes['deploy_preview'] = (toolExecutionTimes['deploy_preview'] || 0) + executionTime
             const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-            const errorStack = error instanceof Error ? error.stack?.split('\n').slice(0, 3).join('\n') : null
             console.error('[deploy_preview] Error:', errorMessage)
-            return {
-              success: false,
-              error: `Deploy failed: ${errorMessage}`,
-              suggestion: errorMessage.includes('timeout') || errorMessage.includes('abort')
-                ? 'The deployment timed out. The project may be too large or have slow dependencies. Try simplifying the build.'
-                : errorMessage.includes('fetch')
-                ? 'Could not reach the preview API. This may be a temporary server issue — retry deploy_preview.'
-                : 'Inspect the error message and fix the underlying issue before retrying deploy_preview.',
-              stackTrace: errorStack,
-              toolCallId,
-              executionTimeMs: executionTime
-            }
+            return `Deploy failed. Run check_dev_errors({ mode: "build" }) to diagnose, fix any errors, then retry deploy_preview.`
           }
         }
       }),
