@@ -1035,7 +1035,7 @@ async function handleStreamingPreview(req: Request) {
           // 2. No package.json at all (nothing to install/build)
           // 3. Classic HTML template pattern (script.js + styles.css in root)
           const isHtmlProject = (hasIndexHtml && !hasAnyFrameworkConfig && !hasAnyFrameworkDeps) ||
-            !packageJson ||
+            (!packageJson && !hasAnyFrameworkConfig) ||
             isClassicHtmlTemplate
 
           console.log(`[Preview] Project detection: hasIndexHtml=${hasIndexHtml}, hasViteConfig=${hasViteConfig}, hasNextConfig=${hasNextConfig}, hasExpoConfig=${hasExpoConfig}, hasNuxtConfig=${hasNuxtConfig}, hasPackageJson=${!!packageJson}, isClassicHtmlTemplate=${isClassicHtmlTemplate}, isHtmlProject=${isHtmlProject}`)
@@ -1724,7 +1724,7 @@ async function handleRegularPreview(req: Request) {
     // 2. No package.json at all (nothing to install/build)
     // 3. Classic HTML template pattern (script.js + styles.css in root)
     const isHtmlProject = (hasIndexHtml && !hasAnyFrameworkConfig && !hasAnyFrameworkDeps) ||
-      !packageJson ||
+      (!packageJson && !hasAnyFrameworkConfig) ||
       isClassicHtmlTemplate
 
     console.log(`[Preview] Project detection: hasIndexHtml=${hasIndexHtml}, hasViteConfig=${hasViteConfig}, hasNextConfig=${hasNextConfig}, hasExpoConfig=${hasExpoConfig}, hasNuxtConfig=${hasNuxtConfig}, hasPackageJson=${!!packageJson}, isClassicHtmlTemplate=${isClassicHtmlTemplate}, isHtmlProject=${isHtmlProject}`)

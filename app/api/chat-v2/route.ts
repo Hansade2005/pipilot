@@ -5389,8 +5389,9 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
             }
 
             // Convert session files to the format expected by /api/preview
+            // Filter out internal metadata and non-project files
             const filesArray = fileEntries
-              .filter((f: any) => !f.isDirectory && f.content !== undefined)
+              .filter((f: any) => !f.isDirectory && f.content !== undefined && f.path !== '__metadata__.json')
               .map((f: any) => ({
                 path: f.path,
                 name: f.name || f.path.split('/').pop() || f.path,
