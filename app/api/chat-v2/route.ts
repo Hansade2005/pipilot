@@ -739,10 +739,16 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
         const file = resolveFile(path)
 
         if (!file) {
-          console.log(`[CONSTRUCT_TOOL_RESULT] read_file failed: File not found - ${path}`)
+          // Suggest similar files to help the AI find the right path
+          const allPaths = Array.from(sessionFiles.keys()).map((p: string) => p.startsWith('/') ? p.slice(1) : p)
+          const fileName = path.split('/').pop() || path
+          const suggestions = allPaths
+            .filter((p: string) => p.includes(fileName) || p.endsWith(path) || path.endsWith(p.split('/').pop() || ''))
+            .slice(0, 5)
+          console.log(`[CONSTRUCT_TOOL_RESULT] read_file failed: File not found - ${path}. Similar: ${suggestions.join(', ')}`)
           return {
             success: false,
-            error: `File not found: ${path}. Use list_files to see available files.`,
+            error: `File not found: ${path}.${suggestions.length > 0 ? ` Did you mean: ${suggestions.join(', ')}?` : ''} Use list_files to see available files.`,
             path,
             toolCallId
           }
