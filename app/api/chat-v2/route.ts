@@ -2580,7 +2580,8 @@ The plan should include:
 5. **After completing EACH plan step**, call \`update_plan_progress\` with the step number to mark it as done in \`.pipilot/plan.md\`
 6. Build ALL pages and the COMPLETE app - never stop at just 1-2 files
 7. **After ALL steps are done**, call \`update_project_context\` to document the project in \`.pipilot/project.md\`
-8. Call \`suggest_next_steps\` with follow-up options
+8. **IMPORTANT**: Call \`deploy_preview\` to deploy the changes to live preview hosting. This builds and uploads the project to a .pipilot.dev subdomain so the user can see and test the result. Always call this after completing file changes (only available for Vite/React and HTML projects — NOT Next.js or Expo).
+9. Call \`suggest_next_steps\` with follow-up options
 
 **CRITICAL: Do NOT generate ANY text content before calling generate_plan. The plan card should be the first thing the user sees. After the plan, you may write brief status text as you build, but keep it minimal.**
 
@@ -2933,6 +2934,9 @@ When presenting research results, analysis, comparisons, or any informational re
 11. **Sources**: Cite web sources with \`[Name](URL)\` links
 
 ### Depth: Short answers = 300+ words with sections and a table. Research = 800+ words with 4+ sections, 2+ tables, images. Comparisons = comparison table + pros/cons + recommendation.
+
+## Live Preview Deployment (MANDATORY for Vite/React and HTML projects)
+After completing all file changes, ALWAYS call \`deploy_preview\` to deploy the project to live hosting. This builds and uploads the project to a .pipilot.dev subdomain so the user can immediately see and test the result. Include a short deploy message describing what changed. Do NOT use this tool for Next.js or Expo projects.
 
 ## Next Step Suggestions (MANDATORY)
 At the END of every response, call \`suggest_next_steps\` with 3-4 contextual follow-up suggestions. Make them relevant, actionable, progressive, and varied. Labels: 3-8 words. ALWAYS call as your FINAL action.
@@ -5304,6 +5308,153 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
               toolCallId,
               executionTimeMs: executionTime,
               timeWarning: timeStatus.warningMessage
+            }
+          }
+        }
+      }),
+
+      // SERVER-SIDE TOOL: Deploy current project files to live preview hosting
+      deploy_preview: tool({
+        description: 'Deploy the current project to live preview hosting on Supabase. This builds the project (npm install + build) and uploads it to a .pipilot.dev subdomain. Call this AFTER you have finished making all file changes so the user can see and test the live result. Returns the live preview URL. Only available for Vite/React and HTML projects.',
+        inputSchema: z.object({
+          deployMessage: z.string().optional().describe('Short message describing what was deployed (e.g., "Added login page and auth flow")')
+        }),
+        execute: async ({ deployMessage }, { toolCallId }) => {
+          const toolStartTime = Date.now()
+          const timeStatus = getTimeStatus()
+
+          if (timeStatus.isApproachingTimeout) {
+            return {
+              success: false,
+              error: `Deploy cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+              toolCallId
+            }
+          }
+
+          try {
+            // Get all files from in-memory session storage
+            const sessionData = sessionProjectStorage.get(projectId)
+            if (!sessionData) {
+              return {
+                success: false,
+                error: `Session storage not found for project ${projectId}. No files to deploy.`,
+                toolCallId
+              }
+            }
+
+            const { files: sessionFiles } = sessionData
+            if (sessionFiles.size === 0) {
+              return {
+                success: false,
+                error: 'No project files found to deploy.',
+                toolCallId
+              }
+            }
+
+            // Detect project type from session files
+            const fileEntries = Array.from(sessionFiles.values())
+            const hasNextConfig = fileEntries.some((f: any) => f.path === 'next.config.js' || f.path === 'next.config.mjs' || f.path === 'next.config.ts')
+            const hasExpoConfig = fileEntries.some((f: any) => f.path === 'app.json' || f.path === 'app.config.js')
+            const hasExpoDep = fileEntries.some((f: any) => {
+              if (f.path === 'package.json') {
+                try {
+                  const pkg = JSON.parse(f.content || '{}')
+                  return !!(pkg.dependencies?.expo || pkg.devDependencies?.expo)
+                } catch { return false }
+              }
+              return false
+            })
+
+            if (hasNextConfig) {
+              return {
+                success: false,
+                error: 'deploy_preview is not available for Next.js projects. Next.js requires a server runtime and cannot be hosted as static files.',
+                toolCallId
+              }
+            }
+
+            if (hasExpoConfig || hasExpoDep) {
+              return {
+                success: false,
+                error: 'deploy_preview is not available for Expo projects. Expo requires a native bundler.',
+                toolCallId
+              }
+            }
+
+            // Convert session files to the format expected by /api/preview
+            const filesArray = fileEntries
+              .filter((f: any) => !f.isDirectory && f.content !== undefined)
+              .map((f: any) => ({
+                path: f.path,
+                name: f.name || f.path.split('/').pop() || f.path,
+                content: f.content || '',
+                type: f.fileType || f.type || f.path.split('.').pop() || 'text',
+                fileType: f.fileType || f.type || f.path.split('.').pop() || 'text',
+                size: f.size || (f.content || '').length
+              }))
+
+            console.log(`[deploy_preview] Deploying ${filesArray.length} files for project ${projectId}`)
+
+            // Use project name as slug (sanitize it)
+            const projectSlug = projectId.replace(/[^a-z0-9-]/gi, '-').toLowerCase().substring(0, 50)
+
+            // Make internal request to /api/preview
+            const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+            const response = await fetch(`${baseUrl}/api/preview`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                projectId,
+                projectSlug,
+                files: filesArray,
+                authUserId: authContext?.userId || supabaseUserId || 'system',
+                authUsername: 'PiPilot AI',
+                isProduction: false,
+              }),
+            })
+
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+              const executionTime = Date.now() - toolStartTime
+              toolExecutionTimes['deploy_preview'] = (toolExecutionTimes['deploy_preview'] || 0) + executionTime
+              return {
+                success: false,
+                error: `Preview deployment failed: ${errorData.error || response.statusText}`,
+                details: errorData.details || null,
+                toolCallId,
+                executionTimeMs: executionTime
+              }
+            }
+
+            const data = await response.json()
+            const executionTime = Date.now() - toolStartTime
+            toolExecutionTimes['deploy_preview'] = (toolExecutionTimes['deploy_preview'] || 0) + executionTime
+
+            const previewUrl = data.url || `https://${data.finalSlug || projectSlug}.pipilot.dev/`
+
+            console.log(`[deploy_preview] Successfully deployed to ${previewUrl} in ${executionTime}ms`)
+
+            return {
+              success: true,
+              url: previewUrl,
+              slug: data.finalSlug || projectSlug,
+              hosted: data.hosted || false,
+              deployMessage: deployMessage || 'Project deployed successfully',
+              filesDeployed: filesArray.length,
+              toolCallId,
+              executionTimeMs: executionTime
+            }
+          } catch (error) {
+            const executionTime = Date.now() - toolStartTime
+            toolExecutionTimes['deploy_preview'] = (toolExecutionTimes['deploy_preview'] || 0) + executionTime
+            console.error('[deploy_preview] Error:', error)
+            return {
+              success: false,
+              error: `Deploy failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              toolCallId,
+              executionTimeMs: executionTime
             }
           }
         }
@@ -10663,13 +10814,18 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
         unavailableTools.push('node_machine')
       }
 
+      // deploy_preview is only for Vite/React and HTML projects (not Next.js or Expo)
+      if (isExpoProject) {
+        unavailableTools.push('deploy_preview')
+      }
+
       // User tool preferences - filter by disabled categories
       if (disabledToolCategories && Array.isArray(disabledToolCategories) && disabledToolCategories.length > 0) {
         const categoryToolMap: Record<string, string[]> = {
           file_ops: ['write_file', 'read_file', 'edit_file', 'delete_file', 'delete_folder', 'client_replace_string_in_file'],
           code_search: ['grep_search', 'semantic_code_navigator', 'list_files'],
           web_tools: ['web_search', 'web_extract'],
-          dev_tools: ['check_dev_errors', 'node_machine', 'remove_package'],
+          dev_tools: ['check_dev_errors', 'node_machine', 'remove_package', 'deploy_preview'],
           pipilot_db: ['pipilotdb_create_database', 'pipilotdb_query_database', 'pipilotdb_manipulate_table_data', 'pipilotdb_manage_api_keys', 'pipilotdb_list_tables', 'pipilotdb_read_table', 'pipilotdb_delete_table', 'pipilotdb_create_table'],
           supabase: ['supabase_fetch_api_keys', 'supabase_create_table', 'supabase_insert_data', 'supabase_delete_data', 'supabase_read_table', 'supabase_drop_table', 'supabase_execute_sql', 'supabase_list_tables_rls', 'request_supabase_connection'],
           stripe: ['stripe_validate_key', 'stripe_list_products', 'stripe_create_product', 'stripe_update_product', 'stripe_delete_product', 'stripe_list_prices', 'stripe_create_price', 'stripe_update_price', 'stripe_list_customers', 'stripe_create_customer', 'stripe_update_customer', 'stripe_delete_customer', 'stripe_create_payment_intent', 'stripe_update_payment_intent', 'stripe_cancel_payment_intent', 'stripe_list_charges', 'stripe_list_subscriptions', 'stripe_update_subscription', 'stripe_cancel_subscription', 'stripe_list_coupons', 'stripe_create_coupon', 'stripe_update_coupon', 'stripe_delete_coupon', 'stripe_create_refund', 'stripe_search'],
