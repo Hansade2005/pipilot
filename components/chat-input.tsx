@@ -1654,42 +1654,40 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         onComplete={handleWizardComplete}
       />
 
-      {/* Help Me Plan + Import Buttons */}
-      <div className="flex flex-wrap justify-center gap-2 mt-4">
+      {/* Action Buttons - single compact row */}
+      <div className="flex items-center justify-center gap-1.5 sm:gap-2 mt-3 px-2">
+        {/* Help me plan */}
         <button
           type="button"
           onClick={() => setShowLaunchWizard(true)}
           disabled={isGenerating}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-orange-600/20 to-orange-500/10 hover:from-orange-600/30 hover:to-orange-500/20 border border-orange-500/40 hover:border-orange-400/60 rounded-full text-orange-300 hover:text-orange-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm"
+          className="flex items-center gap-1 px-2.5 py-1 sm:px-3 sm:py-1.5 bg-gradient-to-r from-orange-600/20 to-orange-500/10 hover:from-orange-600/30 hover:to-orange-500/20 border border-orange-500/40 hover:border-orange-400/60 rounded-full text-orange-300 hover:text-orange-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-[11px] sm:text-xs"
           title="Get help planning your app with a guided wizard"
         >
-          <Sparkles className="w-3.5 h-3.5" />
-          <span className="font-medium">Help me plan</span>
+          <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" />
+          <span className="font-medium">Plan</span>
         </button>
-      </div>
 
-      {/* Import Badge Buttons */}
-      <div className="flex flex-wrap justify-center gap-2 mt-2">
+        <div className="w-px h-4 bg-gray-700/50" />
+
+        {/* GitHub */}
         <Popover open={showGithubPopover} onOpenChange={setShowGithubPopover}>
           <PopoverTrigger asChild>
             <button
               type="button"
               disabled={isGenerating || isImportingGithub}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-1.5 bg-transparent hover:bg-orange-700/50 border border-orange-600/50
-              rounded-full text-gray-400 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm"
+              className="flex items-center gap-1 px-2 py-1 sm:px-2.5 sm:py-1.5 bg-transparent hover:bg-gray-800/80 border border-gray-700/40 hover:border-gray-600/60 rounded-full text-gray-400 hover:text-gray-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-[11px] sm:text-xs"
               title="Import from GitHub"
             >
-              <Github className="w-3.5 h-3.5" />
-              <span className="font-medium">GitHub</span>
+              <Github className="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" />
+              <span className="font-medium hidden sm:inline">GitHub</span>
             </button>
           </PopoverTrigger>
-          <PopoverContent className="w-80 p-4 z-[70]" side="top" align="center">
-            <div className="space-y-3">
+          <PopoverContent className="w-72 sm:w-80 p-3 sm:p-4 z-[70]" side="top" align="center">
+            <div className="space-y-2.5">
               <div>
                 <h4 className="text-sm font-medium text-gray-200">Import from GitHub</h4>
-                <p className="text-xs text-gray-400 mt-1">
-                  Enter a GitHub repository URL to import and start building from it.
-                </p>
+                <p className="text-xs text-gray-400 mt-0.5">Paste a repository URL to import it.</p>
               </div>
               <div className="flex gap-2">
                 <input
@@ -1703,7 +1701,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                 <button
                   onClick={handleGithubAttachment}
                   disabled={!githubInput.trim()}
-                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                  className="px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                 >
                   Import
                 </button>
@@ -1712,25 +1710,24 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
           </PopoverContent>
         </Popover>
 
+        {/* GitLab */}
         <Popover open={showGitlabPopover} onOpenChange={setShowGitlabPopover}>
           <PopoverTrigger asChild>
             <button
               type="button"
               disabled={isGenerating || isImportingGitlab}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-1.5 bg-transparent hover:bg-orange-700/50 border border-orange-600/50 rounded-full text-orange-400 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm"
+              className="flex items-center gap-1 px-2 py-1 sm:px-2.5 sm:py-1.5 bg-transparent hover:bg-gray-800/80 border border-gray-700/40 hover:border-gray-600/60 rounded-full text-gray-400 hover:text-gray-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-[11px] sm:text-xs"
               title="Import from GitLab"
             >
-              <Gitlab className="w-3.5 h-3.5" />
-              <span className="font-medium">GitLab</span>
+              <Gitlab className="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" />
+              <span className="font-medium hidden sm:inline">GitLab</span>
             </button>
           </PopoverTrigger>
-          <PopoverContent className="w-80 p-4 z-[70]" side="top" align="center">
-            <div className="space-y-3">
+          <PopoverContent className="w-72 sm:w-80 p-3 sm:p-4 z-[70]" side="top" align="center">
+            <div className="space-y-2.5">
               <div>
-                <h4 className="text-sm font-medium text-orange-200">Import from GitLab</h4>
-                <p className="text-xs text-orange-400 mt-1">
-                  Enter a GitLab repository URL to import and start building from it.
-                </p>
+                <h4 className="text-sm font-medium text-gray-200">Import from GitLab</h4>
+                <p className="text-xs text-gray-400 mt-0.5">Paste a repository URL to import it.</p>
               </div>
               <div className="flex gap-2">
                 <input
@@ -1750,7 +1747,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                 <button
                   onClick={handleGitlabAttachment}
                   disabled={!gitlabInput.trim()}
-                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                  className="px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                 >
                   Import
                 </button>
@@ -1759,36 +1756,36 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
           </PopoverContent>
         </Popover>
 
-        {/* Local Folder Import */}
+        {/* Folder */}
         <button
           type="button"
           disabled={isGenerating || isImportingLocal}
           onClick={() => folderInputRef.current?.click()}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-1.5 bg-transparent hover:bg-orange-700/50 border border-orange-600/50 rounded-full text-gray-400 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm"
+          className="flex items-center gap-1 px-2 py-1 sm:px-2.5 sm:py-1.5 bg-transparent hover:bg-gray-800/80 border border-gray-700/40 hover:border-gray-600/60 rounded-full text-gray-400 hover:text-gray-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-[11px] sm:text-xs"
           title="Import a local project folder"
         >
           {isImportingLocal ? (
-            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+            <RefreshCw className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-spin flex-shrink-0" />
           ) : (
-            <FolderUp className="w-3.5 h-3.5" />
+            <FolderUp className="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" />
           )}
-          <span className="font-medium">Folder</span>
+          <span className="font-medium hidden sm:inline">Folder</span>
         </button>
 
-        {/* ZIP Import */}
+        {/* ZIP */}
         <button
           type="button"
           disabled={isGenerating || isImportingLocal}
           onClick={() => zipInputRef.current?.click()}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-1.5 bg-transparent hover:bg-orange-700/50 border border-orange-600/50 rounded-full text-gray-400 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm"
+          className="flex items-center gap-1 px-2 py-1 sm:px-2.5 sm:py-1.5 bg-transparent hover:bg-gray-800/80 border border-gray-700/40 hover:border-gray-600/60 rounded-full text-gray-400 hover:text-gray-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-[11px] sm:text-xs"
           title="Import a ZIP file"
         >
           {isImportingLocal ? (
-            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+            <RefreshCw className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-spin flex-shrink-0" />
           ) : (
-            <FileArchive className="w-3.5 h-3.5" />
+            <FileArchive className="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" />
           )}
-          <span className="font-medium">.zip</span>
+          <span className="font-medium hidden sm:inline">.zip</span>
         </button>
 
         {/* Hidden file inputs */}
