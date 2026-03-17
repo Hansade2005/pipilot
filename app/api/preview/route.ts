@@ -6,7 +6,7 @@ import {
   SandboxErrorType,
   type SandboxFile 
 } from '@/lib/e2b-enhanced'
-import { filterUnwantedFiles } from '@/lib/utils'
+import { filterUnwantedFiles, patchViteConfigForSandbox } from '@/lib/utils'
 import JSZip from 'jszip'
 import lz4 from 'lz4js'
 import { createClient as createExternalClient } from '@supabase/supabase-js'
@@ -1007,7 +1007,11 @@ async function handleStreamingPreview(req: Request) {
           )
           const hasExpoConfig = files.some((f: any) => f.path === 'app.json' || f.path === 'app.config.js')
           const hasExpoDepInPkg = packageJson && packageJson.dependencies && packageJson.dependencies['expo']
-          const hasViteDepInPkg = packageJson && packageJson.dependencies && (packageJson.dependencies['vite'] || packageJson.dependencies['react'])
+          const hasViteDepInPkg = packageJson && (
+            packageJson.dependencies?.['vite'] || packageJson.dependencies?.['react'] ||
+            packageJson.devDependencies?.['vite'] || packageJson.devDependencies?.['@vitejs/plugin-react'] ||
+            packageJson.devDependencies?.['@vitejs/plugin-react-swc']
+          )
           const hasNuxtConfig = files.some((f: any) =>
             f.path === 'nuxt.config.js' || f.path === 'nuxt.config.ts'
           )
@@ -1142,6 +1146,11 @@ async function handleStreamingPreview(req: Request) {
 
           const isExpoProject = hasExpoConfig || !!hasExpoDepInPkg
           const template = "pipilot-expo"
+
+          // Auto-patch vite.config for E2B sandbox compatibility (host, port, allowedHosts)
+          if (!isExpoProject && hasViteConfig) {
+            patchViteConfigForSandbox(files)
+          }
 
           // 🔹 Create sandbox (only for non-HTML projects)
           const sandbox = await createEnhancedSandbox({
@@ -1687,7 +1696,11 @@ async function handleRegularPreview(req: Request) {
     )
     const hasExpoConfig = files.some((f: any) => f.path === 'app.json' || f.path === 'app.config.js')
     const hasExpoDepInPkg = packageJson && packageJson.dependencies && packageJson.dependencies['expo']
-    const hasViteDepInPkg = packageJson && packageJson.dependencies && (packageJson.dependencies['vite'] || packageJson.dependencies['react'])
+    const hasViteDepInPkg = packageJson && (
+      packageJson.dependencies?.['vite'] || packageJson.dependencies?.['react'] ||
+      packageJson.devDependencies?.['vite'] || packageJson.devDependencies?.['@vitejs/plugin-react'] ||
+      packageJson.devDependencies?.['@vitejs/plugin-react-swc']
+    )
     const hasNuxtConfig = files.some((f: any) =>
       f.path === 'nuxt.config.js' || f.path === 'nuxt.config.ts'
     )
@@ -1796,6 +1809,11 @@ async function handleRegularPreview(req: Request) {
 
     const isExpoProject = hasExpoConfig || !!hasExpoDepInPkg
     const template = "pipilot-expo"
+
+    // Auto-patch vite.config for E2B sandbox compatibility (host, port, allowedHosts)
+    if (!isExpoProject && hasViteConfig) {
+      patchViteConfigForSandbox(files)
+    }
 
     // Create enhanced E2B sandbox with environment variables (only for non-HTML projects)
     let sandbox

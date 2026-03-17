@@ -6,7 +6,7 @@ import { getModel, needsMistralVisionProvider, getDevstralVisionModel, getFallba
 import { DEFAULT_CHAT_MODEL, getModelById, modelSupportsVision, chatModels } from '@/lib/ai-models'
 import { NextResponse } from 'next/server'
 import { getWorkspaceDatabaseId, workspaceHasDatabase, setWorkspaceDatabase } from '@/lib/get-current-workspace'
-import { filterUnwantedFiles } from '@/lib/utils'
+import { filterUnwantedFiles, patchViteConfigForSandbox } from '@/lib/utils'
 import JSZip from 'jszip'
 import lz4 from 'lz4js'
 import unzipper from 'unzipper'
@@ -4738,15 +4738,22 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
                 console.warn('[check_dev_errors] Failed to parse package.json')
               }
             }
-            const isExpoProject = allFiles.some((f: any) => 
-              f.path === 'app.json' || 
-              f.path === 'app.config.js' || 
+            const isExpoProject = allFiles.some((f: any) =>
+              f.path === 'app.json' ||
+              f.path === 'app.config.js' ||
               (packageJson && packageJson.dependencies && packageJson.dependencies['expo'])
             )
             const template = "pipilot-expo"
             const workingDir = isExpoProject ? "/home/user" : "/project"
 
             logs.push(`Detected project type: ${isExpoProject ? 'Expo React Native' : 'Vite/Next.js'}`)
+
+            // Auto-patch vite.config for E2B sandbox compatibility
+            const hasViteConfig = allFiles.some((f: any) => f.path === 'vite.config.js' || f.path === 'vite.config.ts' || f.path === 'vite.config.mjs')
+            if (!isExpoProject && hasViteConfig) {
+              patchViteConfigForSandbox(allFiles)
+              logs.push('Auto-patched vite.config for sandbox compatibility')
+            }
 
             // Create sandbox with reasonable timeout for error detection
             const sandbox = await createEnhancedSandbox({

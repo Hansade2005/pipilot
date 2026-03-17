@@ -112,6 +112,61 @@ export function filterMediaFiles(files: any[]): any[] {
 }
 
 /**
+ * Auto-patch vite.config.js/ts for E2B sandbox compatibility.
+ * Imported projects often have a vanilla vite config without the server
+ * settings required for E2B (host, port, allowedHosts). This function
+ * detects and patches the config in-place so the dev server binds to
+ * 0.0.0.0:3000 and accepts connections from E2B domains.
+ */
+export function patchViteConfigForSandbox(files: any[]): void {
+  const viteConfigFile = files.find((f: any) =>
+    f.path === 'vite.config.js' || f.path === 'vite.config.ts' || f.path === 'vite.config.mjs'
+  )
+  if (!viteConfigFile || !viteConfigFile.content) return
+
+  const content = viteConfigFile.content as string
+
+  // Already has sandbox-compatible server settings — skip
+  if (content.includes("host: '0.0.0.0'") && content.includes('port: 3000')) {
+    console.log('[ViteConfigPatch] Config already has sandbox-compatible server settings, skipping')
+    return
+  }
+
+  // Check if there's already a `server` block
+  if (/server\s*:\s*\{/.test(content)) {
+    let patched = content
+    if (!content.includes("host:")) {
+      patched = patched.replace(/server\s*:\s*\{/, "server: {\n    host: '0.0.0.0',")
+    }
+    if (!content.includes("port:")) {
+      patched = patched.replace(/server\s*:\s*\{/, "server: {\n    port: 3000,\n    strictPort: true,")
+    }
+    if (!content.includes("allowedHosts")) {
+      patched = patched.replace(/server\s*:\s*\{/, "server: {\n    allowedHosts: ['localhost', '127.0.0.1', '.e2b.app'],")
+    }
+    viteConfigFile.content = patched
+    console.log(`[ViteConfigPatch] Patched existing server block in ${viteConfigFile.path}`)
+  } else {
+    // No server block — inject one before the closing of defineConfig
+    const serverBlock = `  server: {
+    host: '0.0.0.0',
+    port: 3000,
+    strictPort: true,
+    cors: true,
+    allowedHosts: ['localhost', '127.0.0.1', '.e2b.app', '3000-*.e2b.app'],
+  },`
+
+    const lastClosingIndex = content.lastIndexOf('})')
+    if (lastClosingIndex !== -1) {
+      viteConfigFile.content = content.slice(0, lastClosingIndex) + serverBlock + '\n' + content.slice(lastClosingIndex)
+      console.log(`[ViteConfigPatch] Injected server block into ${viteConfigFile.path}`)
+    } else {
+      console.warn('[ViteConfigPatch] Could not find closing }) of defineConfig, skipping patch')
+    }
+  }
+}
+
+/**
  * Convert a date to a "time ago" string (e.g., "2 days ago", "1 week ago")
  */
 export function timeAgo(date: Date | string): string {
