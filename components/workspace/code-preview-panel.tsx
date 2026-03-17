@@ -990,11 +990,39 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
     const checkProjectFramework = async () => {
       try {
         const { storageManager } = await import('@/lib/storage-manager')
+        const { detectProjectTypeWithAI } = await import('@/lib/utils')
         const files = await storageManager.getFiles(project.id)
 
-        // Check Expo: app.json or app.config.js or expo in dependencies
-        const hasExpoConfig = files.some((f: StorageFile) => f.path === 'app.json' || f.path === 'app.config.js')
-        const packageJsonFile = files.find((f: StorageFile) => f.path === 'package.json')
+        // Use AI detection for accurate framework classification
+        const aiType = await detectProjectTypeWithAI(files)
+        console.log(`[CodePreviewPanel] AI detected project type: ${aiType}`)
+
+        if (aiType === 'expo') {
+          setIsExpoProject(true)
+          setIsViteProject(false)
+          return
+        }
+
+        if (aiType === 'vite-react') {
+          setIsExpoProject(false)
+          setIsViteProject(true)
+          return
+        }
+
+        if (aiType !== 'unknown') {
+          // nextjs or html — neither expo nor vite
+          setIsExpoProject(false)
+          setIsViteProject(false)
+          return
+        }
+
+        // Fallback: manual detection with normalized paths (handles leading /)
+        const normalize = (p: string) => p?.startsWith('/') ? p.slice(1) : p
+        const hasExpoConfig = files.some((f: StorageFile) => {
+          const p = normalize(f.path)
+          return p === 'app.json' || p === 'app.config.js'
+        })
+        const packageJsonFile = files.find((f: StorageFile) => normalize(f.path) === 'package.json')
         let packageJson: any = null
         if (packageJsonFile) {
           try { packageJson = JSON.parse(packageJsonFile.content) } catch {}
@@ -1007,11 +1035,12 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
         }
         setIsExpoProject(false)
 
-        // Check Vite: vite.config.ts/js/mjs or vite in devDependencies
-        const hasViteConfig = files.some((f: StorageFile) =>
-          f.path === 'vite.config.ts' || f.path === 'vite.config.js' || f.path === 'vite.config.mjs'
-        )
-        const hasViteDep = !!(packageJson?.devDependencies?.vite || packageJson?.dependencies?.vite)
+        const hasViteConfig = files.some((f: StorageFile) => {
+          const p = normalize(f.path)
+          return p === 'vite.config.ts' || p === 'vite.config.js' || p === 'vite.config.mjs'
+        })
+        const hasViteDep = !!(packageJson?.devDependencies?.vite || packageJson?.dependencies?.vite ||
+          packageJson?.devDependencies?.['@vitejs/plugin-react'] || packageJson?.devDependencies?.['@vitejs/plugin-react-swc'])
         setIsViteProject(hasViteConfig || hasViteDep)
       } catch (error) {
         console.error('Error checking project framework:', error)
