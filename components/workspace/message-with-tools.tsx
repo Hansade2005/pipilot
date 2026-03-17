@@ -210,10 +210,10 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
       case 'deploy_preview': return 'Deploy'
       case 'generate_image': return 'Generate'
       case 'generate_report': return 'Report'
-      case 'generate_plan': return 'Plan'
-      case 'update_plan_progress': return 'Update'
-      case 'update_project_context': return 'Document'
-      case 'suggest_next_steps': return 'Suggest'
+      case 'generate_plan': return 'Generate Plan'
+      case 'update_plan_progress': return 'Update Plan'
+      case 'update_project_context': return 'Update Context'
+      case 'suggest_next_steps': return 'Next Steps'
       case 'node_machine': return 'Execute'
       case 'pipilotdb_create_database': return 'Create DB'
       case 'pipilotdb_create_table':
@@ -261,6 +261,10 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
       case 'pipilotdb_create_table':
       case 'supabase_create_table': return args.tableName || null
       case 'node_machine': return args.command?.split(' ')[0] || null
+      case 'generate_plan': return '.pipilot/plan.md'
+      case 'update_plan_progress': return args.stepNumber ? `Step ${args.stepNumber}` : '.pipilot/plan.md'
+      case 'update_project_context': return '.pipilot/project.md'
+      case 'suggest_next_steps': return args.suggestions?.length ? `${args.suggestions.length} suggestions` : null
       default: return null
     }
   }
