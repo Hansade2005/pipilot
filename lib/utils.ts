@@ -68,14 +68,15 @@ export function filterUnwantedFiles(files: any[]): any[] {
       return false
     }
 
-    // Filter out all .md files except specific important documentation files and files starting with "pipilot"
+    // Filter out all .md files except important docs and .pipilot/ folder files
     const importantMdFiles = [
       'readme.md',
       'external_app_integration_guide.md',
       'storage_system_implementation.md',
       'user_authentication_readme.md'
     ]
-    if (extension === 'md' && !importantMdFiles.includes(fileName) && !fileName.startsWith('pipilot')) {
+    const isInPipilotFolder = path.includes('.pipilot/') || path.includes('pipilot/')
+    if (extension === 'md' && !importantMdFiles.includes(fileName) && !fileName.startsWith('pipilot') && !isInPipilotFolder) {
       return false
     }
 
