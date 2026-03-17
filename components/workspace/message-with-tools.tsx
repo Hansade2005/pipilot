@@ -186,6 +186,7 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
       case 'update_project_context': return <FileCode className="w-3.5 h-3.5" />
       case 'suggest_next_steps': return <Zap className="w-3.5 h-3.5" />
       case 'node_machine': return <Settings className="w-3.5 h-3.5" />
+      case 'discover_tools': return <Search className="w-3.5 h-3.5" />
       default: return <Zap className="w-3.5 h-3.5" />
     }
   }
@@ -235,6 +236,7 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
       case 'code_quality_analysis':
       case 'code_review': return 'Review'
       case 'auto_documentation': return 'Document'
+      case 'discover_tools': return 'Discover'
       default: return tool.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
     }
   }
@@ -265,6 +267,7 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
       case 'update_plan_progress': return args.stepNumber ? `Step ${args.stepNumber}` : '.pipilot/plan.md'
       case 'update_project_context': return '.pipilot/project.md'
       case 'suggest_next_steps': return args.suggestions?.length ? `${args.suggestions.length} suggestions` : null
+      case 'discover_tools': return args.query ? `"${args.query}"` : args.category || null
       default: return null
     }
   }

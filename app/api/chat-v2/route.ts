@@ -259,6 +259,125 @@ const sessionProjectStorage = new Map<string, {
   files: Map<string, any>
 }>()
 
+// ═══════════════════════════════════════════════════════════════
+// TOOL REGISTRY — In-memory catalog for discover_tools system
+// Core tools are always active. Others are discovered on-demand.
+// ═══════════════════════════════════════════════════════════════
+
+interface ToolRegistryEntry {
+  name: string
+  description: string
+  category: string
+  parameters: string // Human-readable parameter summary
+}
+
+// Core tools — always loaded in every step (small schema footprint)
+const CORE_TOOLS = new Set([
+  'write_file', 'read_file', 'edit_file', 'delete_file', 'delete_folder',
+  'list_files', 'grep_search', 'semantic_code_navigator',
+  'client_replace_string_in_file', 'remove_package',
+  'web_search', 'web_extract',
+  'check_dev_errors', 'deploy_preview',
+  'generate_plan', 'update_plan_progress', 'update_project_context', 'suggest_next_steps',
+  'discover_tools', // The gateway to all other tools
+])
+
+// Full tool registry — searchable catalog of ALL tools
+const TOOL_REGISTRY: ToolRegistryEntry[] = [
+  // === File Management ===
+  { name: 'write_file', description: 'Create or update a file in the project', category: 'file_ops', parameters: 'path, content' },
+  { name: 'read_file', description: 'Read file contents with optional line ranges', category: 'file_ops', parameters: 'path, startLine?, endLine?, lineRange?' },
+  { name: 'edit_file', description: 'Edit file using search/replace blocks with optional regex', category: 'file_ops', parameters: 'filePath, searchReplaceBlock, useRegex?, replaceAll?' },
+  { name: 'delete_file', description: 'Delete a file from the project', category: 'file_ops', parameters: 'path' },
+  { name: 'delete_folder', description: 'Delete a folder and all its contents', category: 'file_ops', parameters: 'path' },
+  { name: 'client_replace_string_in_file', description: 'String replacement with regex support', category: 'file_ops', parameters: 'filePath, oldString, newString, useRegex?, replaceAll?' },
+  { name: 'list_files', description: 'List files and directories in the project', category: 'file_ops', parameters: 'path?' },
+  { name: 'remove_package', description: 'Remove npm packages from package.json', category: 'file_ops', parameters: 'name, isDev?' },
+
+  // === Code Search ===
+  { name: 'grep_search', description: 'Multi-strategy search: literal, regex, semantic, hybrid', category: 'code_search', parameters: 'query, includePattern?, searchMode?' },
+  { name: 'semantic_code_navigator', description: 'Semantic code search with cross-references and grouping', category: 'code_search', parameters: 'query, filePath?, fileType?, analysisDepth?' },
+
+  // === Web ===
+  { name: 'web_search', description: 'Search the web for current information', category: 'web', parameters: 'query' },
+  { name: 'web_extract', description: 'Extract and parse content from web URLs', category: 'web', parameters: 'urls' },
+  { name: 'browse_web', description: 'Browser automation: navigate, screenshot, click, fill forms', category: 'web', parameters: 'url, action?, selector?, text?, screenshotPath?' },
+
+  // === Development & Deploy ===
+  { name: 'check_dev_errors', description: 'Run dev server or build, check for runtime/build errors', category: 'dev', parameters: 'mode (dev|build), timeoutSeconds?' },
+  { name: 'deploy_preview', description: 'Deploy project to live .pipilot.dev preview hosting', category: 'dev', parameters: 'deployMessage?' },
+  { name: 'node_machine', description: 'Execute Node.js test scripts in sandbox with full project context', category: 'dev', parameters: 'command, timeoutSeconds?, envVars?' },
+
+  // === Project Management ===
+  { name: 'generate_plan', description: 'Generate structured execution plan persisted to .pipilot/plan.md', category: 'project', parameters: 'title, description, steps[]' },
+  { name: 'update_plan_progress', description: 'Mark plan steps as completed in .pipilot/plan.md', category: 'project', parameters: 'stepNumber, notes?' },
+  { name: 'update_project_context', description: 'Document project in .pipilot/project.md', category: 'project', parameters: 'projectName, summary, features[], techStack[]' },
+  { name: 'suggest_next_steps', description: 'Suggest follow-up actions (mandatory at end of responses)', category: 'project', parameters: 'suggestions[]' },
+  { name: 'create_snapshot', description: 'Create a project state snapshot for versioning', category: 'project', parameters: 'name, description?' },
+
+  // === PiPilot Database ===
+  { name: 'pipilotdb_create_database', description: 'Create a new PiPilot managed database', category: 'pipilot_db', parameters: 'name' },
+  { name: 'pipilotdb_create_table', description: 'Create table with AI-generated or custom schema', category: 'pipilot_db', parameters: 'name, description?, schema?' },
+  { name: 'pipilotdb_query_database', description: 'Query database with filtering, sorting, pagination', category: 'pipilot_db', parameters: 'tableId, select?, where?, operator?, value?' },
+  { name: 'pipilotdb_manipulate_table_data', description: 'Insert, update, delete records (CRUD operations)', category: 'pipilot_db', parameters: 'tableId, action, data' },
+  { name: 'pipilotdb_manage_api_keys', description: 'Create/manage API keys for external database access', category: 'pipilot_db', parameters: 'action, keyName?, keyId?' },
+  { name: 'pipilotdb_list_tables', description: 'List all tables with schemas and record counts', category: 'pipilot_db', parameters: 'includeSchema?, includeRecordCount?' },
+  { name: 'pipilotdb_read_table', description: 'Get detailed table info with schema and stats', category: 'pipilot_db', parameters: 'tableId, includeRecordCount?' },
+  { name: 'pipilotdb_delete_table', description: 'Delete a table and all its records permanently', category: 'pipilot_db', parameters: 'tableId' },
+
+  // === Supabase (Remote) ===
+  { name: 'supabase_fetch_api_keys', description: 'Fetch API keys for connected Supabase project', category: 'supabase', parameters: '(none)' },
+  { name: 'supabase_create_table', description: 'Create table in connected Supabase database', category: 'supabase', parameters: 'tableName, columns[]' },
+  { name: 'supabase_insert_data', description: 'Insert data into Supabase table', category: 'supabase', parameters: 'tableName, data' },
+  { name: 'supabase_delete_data', description: 'Delete data from Supabase table', category: 'supabase', parameters: 'tableName, deleteType, id?, where?' },
+  { name: 'supabase_read_table', description: 'Read data with filtering, ordering, pagination', category: 'supabase', parameters: 'tableName, select?, where?, orderBy?' },
+  { name: 'supabase_drop_table', description: 'Drop a table from Supabase database', category: 'supabase', parameters: 'tableName' },
+  { name: 'supabase_execute_sql', description: 'Execute raw SQL for RLS policies, functions, triggers', category: 'supabase', parameters: 'sql, confirmDangerous?' },
+  { name: 'supabase_list_tables_rls', description: 'List tables and check RLS policy status', category: 'supabase', parameters: 'schema?, includeRlsPolicies?' },
+  { name: 'request_supabase_connection', description: 'Request user to connect their Supabase account', category: 'supabase', parameters: 'title?, description?' },
+
+  // === Stripe Payments ===
+  { name: 'stripe_validate_key', description: 'Validate Stripe API key and get account info', category: 'stripe', parameters: '(none)' },
+  { name: 'stripe_list_products', description: 'List Stripe products with pagination', category: 'stripe', parameters: 'limit?, active?' },
+  { name: 'stripe_create_product', description: 'Create a new Stripe product', category: 'stripe', parameters: 'name, description?, metadata?' },
+  { name: 'stripe_update_product', description: 'Update Stripe product details', category: 'stripe', parameters: 'productId, name?, description?, active?' },
+  { name: 'stripe_delete_product', description: 'Delete a Stripe product', category: 'stripe', parameters: 'productId' },
+  { name: 'stripe_list_prices', description: 'List prices for products', category: 'stripe', parameters: 'productId?, limit?' },
+  { name: 'stripe_create_price', description: 'Create a price for a product', category: 'stripe', parameters: 'productId, unitAmount, currency, recurring?' },
+  { name: 'stripe_update_price', description: 'Update price details', category: 'stripe', parameters: 'priceId, active?' },
+  { name: 'stripe_list_customers', description: 'List Stripe customers', category: 'stripe', parameters: 'limit?, email?' },
+  { name: 'stripe_create_customer', description: 'Create a new customer', category: 'stripe', parameters: 'email, name?, metadata?' },
+  { name: 'stripe_update_customer', description: 'Update customer details', category: 'stripe', parameters: 'customerId, email?, name?' },
+  { name: 'stripe_delete_customer', description: 'Delete a customer', category: 'stripe', parameters: 'customerId' },
+  { name: 'stripe_create_payment_intent', description: 'Create a payment intent for checkout', category: 'stripe', parameters: 'amount, currency, customerId?' },
+  { name: 'stripe_update_payment_intent', description: 'Update payment intent', category: 'stripe', parameters: 'paymentIntentId, amount?, metadata?' },
+  { name: 'stripe_cancel_payment_intent', description: 'Cancel a payment intent', category: 'stripe', parameters: 'paymentIntentId' },
+  { name: 'stripe_list_charges', description: 'List charges with filtering', category: 'stripe', parameters: 'limit?, customerId?' },
+  { name: 'stripe_list_subscriptions', description: 'List subscriptions', category: 'stripe', parameters: 'limit?, customerId?, status?' },
+  { name: 'stripe_update_subscription', description: 'Update subscription', category: 'stripe', parameters: 'subscriptionId, priceId?' },
+  { name: 'stripe_cancel_subscription', description: 'Cancel a subscription', category: 'stripe', parameters: 'subscriptionId' },
+  { name: 'stripe_create_refund', description: 'Create a refund for a charge', category: 'stripe', parameters: 'chargeId, amount?' },
+  { name: 'stripe_search', description: 'Search Stripe resources (products, customers, charges)', category: 'stripe', parameters: 'resource, query' },
+  { name: 'stripe_list_coupons', description: 'List discount coupons', category: 'stripe', parameters: 'limit?' },
+  { name: 'stripe_create_coupon', description: 'Create a discount coupon', category: 'stripe', parameters: 'percentOff?, amountOff?, duration' },
+  { name: 'stripe_update_coupon', description: 'Update coupon metadata', category: 'stripe', parameters: 'couponId, metadata?' },
+  { name: 'stripe_delete_coupon', description: 'Delete a coupon', category: 'stripe', parameters: 'couponId' },
+
+  // === Documentation & Quality ===
+  { name: 'generate_report', description: 'Generate formatted analysis report', category: 'docs', parameters: 'title, content, format?' },
+  { name: 'generate_image', description: 'Generate AI image from text description', category: 'docs', parameters: 'prompt, aspect?, seed?' },
+  { name: 'pipilot_get_docs', description: 'Fetch PiPilot platform documentation', category: 'docs', parameters: 'docType' },
+  { name: 'auto_documentation', description: 'Create or update documentation files', category: 'docs', parameters: 'action, docType, filePath?, content?' },
+  { name: 'code_review', description: 'Generate code review with issues and severity', category: 'docs', parameters: 'action, reviewType?, severity?, issues[]?' },
+  { name: 'code_quality_analysis', description: 'Analyze code quality metrics and create report', category: 'docs', parameters: 'action, metrics?' },
+
+  // === Special UI ===
+  { name: 'continue_backend_implementation', description: 'Signal transition from UI prototyping to backend', category: 'special', parameters: 'prompt, title?, description?' },
+]
+
+// Per-session unlocked tools — grows as AI discovers tools
+const sessionUnlockedTools = new Map<string, Set<string>>()
+
 // Extract files from compressed data (LZ4 + Zip)
 async function extractFromCompressedData(compressedData: ArrayBuffer): Promise<{
   files: any[]
@@ -2624,6 +2743,8 @@ The plan should include:
 8. **IMPORTANT**: Before calling \`deploy_preview\`, check the vite.config (read_file) and ensure it has the E2B sandbox server settings: \`server: { host: '0.0.0.0', port: 3000, strictPort: true, cors: true, allowedHosts: ['localhost', '127.0.0.1', '.e2b.app', '3000-*.e2b.app'] }\`. If missing, use edit_file to add them. Then call \`deploy_preview\` to deploy to live preview hosting on a .pipilot.dev subdomain (only for Vite/React and HTML projects — NOT Next.js or Expo).
 9. Call \`suggest_next_steps\` with follow-up options
 
+**Tool Discovery**: For Stripe, Supabase, image generation, code review, or other specialized tasks, call \`discover_tools({ query: "keyword" })\` to find and unlock the relevant tools before using them.
+
 **CRITICAL: Do NOT generate ANY text content before calling generate_plan. The plan card should be the first thing the user sees. After the plan, you may write brief status text as you build, but keep it minimal.**
 
 ## Plan & Project Persistence (.pipilot/ folder)
@@ -2975,6 +3096,11 @@ When presenting research results, analysis, comparisons, or any informational re
 11. **Sources**: Cite web sources with \`[Name](URL)\` links
 
 ### Depth: Short answers = 300+ words with sections and a table. Research = 800+ words with 4+ sections, 2+ tables, images. Comparisons = comparison table + pros/cons + recommendation.
+
+## Tool Discovery System
+You have access to a core set of tools (file ops, search, deploy, planning). For specialized tasks like Stripe payments, Supabase database, image generation, code review, or browser automation, call \`discover_tools\` with a keyword to find and unlock the right tools. Example: \`discover_tools({ query: "stripe" })\` reveals all Stripe payment tools. Discovered tools become available immediately for subsequent steps.
+
+**Categories available:** file_ops, code_search, web, dev, project, pipilot_db, supabase, stripe, docs, special
 
 ## Live Preview Deployment (MANDATORY for Vite/React and HTML projects)
 After completing all file changes, BEFORE calling \`deploy_preview\`:
@@ -3662,6 +3788,61 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
               executionTimeMs: executionTime,
               timeWarning: timeStatus.warningMessage
             };
+          }
+        }
+      }),
+
+      // ═══ TOOL DISCOVERY — Gateway to on-demand tools ═══
+      discover_tools: tool({
+        description: 'Search and discover available tools by keyword or category. Use this when you need capabilities beyond the core tools (e.g., Stripe payments, Supabase database, image generation, code review). Returns tool names, descriptions, and parameter schemas so you know exactly what to call.',
+        inputSchema: z.object({
+          query: z.string().describe('Search query — tool name, category, or description keyword (e.g., "stripe", "database", "image", "payments", "deploy")'),
+          category: z.string().optional().describe('Filter by category: file_ops, code_search, web, dev, project, pipilot_db, supabase, stripe, docs, special'),
+          maxResults: z.number().optional().describe('Max results to return (default: 10)')
+        }),
+        execute: async ({ query, category, maxResults = 10 }, { toolCallId }) => {
+          const q = query.toLowerCase()
+          let results = TOOL_REGISTRY.filter(t => {
+            const matchesQuery = t.name.toLowerCase().includes(q) ||
+              t.description.toLowerCase().includes(q) ||
+              t.category.toLowerCase().includes(q)
+            const matchesCategory = !category || t.category === category
+            return matchesQuery && matchesCategory
+          }).slice(0, maxResults)
+
+          // If no results, try fuzzy matching on individual words
+          if (results.length === 0) {
+            const words = q.split(/\s+/)
+            results = TOOL_REGISTRY.filter(t =>
+              words.some(w => t.name.includes(w) || t.description.toLowerCase().includes(w) || t.category.includes(w))
+            ).slice(0, maxResults)
+          }
+
+          // Unlock discovered tools for this session so prepareStep includes them
+          if (!sessionUnlockedTools.has(projectId)) {
+            sessionUnlockedTools.set(projectId, new Set())
+          }
+          const unlocked = sessionUnlockedTools.get(projectId)!
+          for (const t of results) {
+            unlocked.add(t.name)
+          }
+
+          console.log(`[discover_tools] Query: "${query}", found ${results.length} tools, unlocked: ${unlocked.size} total`)
+
+          return {
+            success: true,
+            message: results.length > 0
+              ? `Found ${results.length} tools matching "${query}". You can now call these tools directly.`
+              : `No tools found for "${query}". Try different keywords or browse categories: file_ops, code_search, web, dev, project, pipilot_db, supabase, stripe, docs.`,
+            tools: results.map(t => ({
+              name: t.name,
+              description: t.description,
+              category: t.category,
+              parameters: t.parameters
+            })),
+            categories: [...new Set(TOOL_REGISTRY.map(t => t.category))],
+            totalAvailable: TOOL_REGISTRY.length,
+            toolCallId
           }
         }
       }),
@@ -11494,12 +11675,29 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
       result = await streamText({
         model,
         temperature: 0.7,
+        maxRetries: 1,
         messages: messagesWithSystem,
         tools: toolsToUse,
         stopWhen: stepCountIs(maxStepsAllowed),
         abortSignal: creditAbortController.signal,
         experimental_repairToolCall: repairToolCall,
         experimental_transform: smoothStream({ chunking: 'word', delayInMs: 0 }),
+        // Dynamic tool scoping: only send core tools + unlocked tools per step
+        // Reduces prompt token count dramatically (68 tools → ~20 core tools)
+        prepareStep: ({ steps }) => {
+          const unlockedForSession = sessionUnlockedTools.get(projectId) || new Set()
+          // Build active tools list: core tools + anything unlocked by discover_tools
+          const activeToolNames = [...CORE_TOOLS, ...unlockedForSession]
+          // Also include any tool that was called in previous steps (so results can be processed)
+          for (const step of steps) {
+            for (const tc of step.toolCalls || []) {
+              activeToolNames.push(tc.toolName)
+            }
+          }
+          return {
+            activeTools: [...new Set(activeToolNames)] as any
+          }
+        },
         ...(providerOptions ? { providerOptions } : {}),
         onChunk,
         onStepFinish: handleStepFinish,
@@ -11532,13 +11730,23 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
         result = await streamText({
           model: fallbackModel,
           temperature: 0.7,
+          maxRetries: 1,
           messages: messagesWithSystem,
           tools: toolsToUse,
           stopWhen: stepCountIs(maxStepsAllowed),
           abortSignal: creditAbortController.signal,
           experimental_repairToolCall: repairToolCall,
           experimental_transform: smoothStream({ chunking: 'word', delayInMs: 0 }),
-          // No Anthropic provider options for fallback model
+          prepareStep: ({ steps }) => {
+            const unlockedForSession = sessionUnlockedTools.get(projectId) || new Set()
+            const activeToolNames = [...CORE_TOOLS, ...unlockedForSession]
+            for (const step of steps) {
+              for (const tc of step.toolCalls || []) {
+                activeToolNames.push(tc.toolName)
+              }
+            }
+            return { activeTools: [...new Set(activeToolNames)] as any }
+          },
           onChunk,
           onStepFinish: handleStepFinish,
           onFinish: async () => {
