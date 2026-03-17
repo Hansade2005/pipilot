@@ -278,6 +278,9 @@ interface ToolRegistryEntry {
 const CORE_TOOLS = new Set([
   // File CRUD (light schemas: 1-2 params each)
   'write_file', 'read_file', 'edit_file', 'delete_file', 'list_files',
+  'client_replace_string_in_file', // Most reliable file edit tool
+  // Web (browse_web for testing/screenshots)
+  'browse_web',
   // Planning & context (mandatory workflow tools)
   'generate_plan', 'update_plan_progress', 'update_project_context', 'suggest_next_steps',
   // Deploy (1 param)
