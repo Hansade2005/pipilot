@@ -271,6 +271,34 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
 
   const contextBadge = getContextBadge(toolName, input)
 
+  // Determine if this pill should deep-link to a file in the editor
+  const getFilePath = (tool: string, args?: any): string | null => {
+    if (!args) return null
+    switch (tool) {
+      case 'write_file':
+      case 'delete_file':
+      case 'read_file': return args.path || null
+      case 'edit_file':
+      case 'client_replace_string_in_file': return args.filePath || null
+      case 'generate_plan':
+      case 'update_plan_progress': return '.pipilot/plan.md'
+      case 'update_project_context': return '.pipilot/project.md'
+      default: return null
+    }
+  }
+
+  const linkedFilePath = getFilePath(toolName, input)
+
+  const handleFileClick = () => {
+    if (!linkedFilePath) return
+    window.dispatchEvent(new CustomEvent('openFileInEditor', {
+      detail: { filePath: linkedFilePath }
+    }))
+    window.dispatchEvent(new CustomEvent('focusFileInExplorer', {
+      detail: { path: linkedFilePath }
+    }))
+  }
+
   return (
     <div className="flex items-center gap-2 py-1.5">
       <span className="text-gray-500 flex-shrink-0">
@@ -280,9 +308,19 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
         {getActionVerb(toolName)}
       </span>
       {contextBadge && (
-        <span className="text-[13px] bg-gray-800 text-gray-300 px-2 py-0.5 rounded font-mono">
-          {contextBadge}
-        </span>
+        linkedFilePath ? (
+          <button
+            onClick={handleFileClick}
+            className="text-[13px] bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-orange-400 px-2 py-0.5 rounded font-mono transition-colors cursor-pointer"
+            title={`Open ${linkedFilePath}`}
+          >
+            {contextBadge}
+          </button>
+        ) : (
+          <span className="text-[13px] bg-gray-800 text-gray-300 px-2 py-0.5 rounded font-mono">
+            {contextBadge}
+          </span>
+        )
       )}
       {status === 'executing' && (
         <Loader2 className="w-3 h-3 text-gray-500 animate-spin flex-shrink-0" />
