@@ -1824,7 +1824,7 @@ export function ChatPanelV2({
     const completedStepNums = new Set<number>()
 
     for (const tc of currentToolCalls) {
-      if (tc.toolName === 'generate_plan' && tc.input?.steps) {
+      if (tc.toolName === 'generate_plan' && Array.isArray(tc.input?.steps)) {
         latestPlanSteps = tc.input.steps
       }
       if (tc.toolName === 'update_plan_progress' && tc.input?.stepNumber && tc.status === 'completed') {

@@ -371,39 +371,66 @@ const InterleavedContent = ({
     return positionKey === 'reasoningPosition' ? tc.reasoningPosition : tc.textPosition
   }
 
-  // Filter out failed tool calls (consistent with ToolPanel activity display) and require positions
+  // Filter out failed tool calls and require valid positions
   const toolsWithPositions = toolCalls.filter(tc => tc.status !== 'failed' && typeof getPosition(tc) === 'number')
 
   if (toolsWithPositions.length === 0) {
     return <>{children(content)}</>
   }
 
-  // Sort tool calls by position
-  const sortedTools = [...toolsWithPositions].sort((a, b) => (getPosition(a) || 0) - (getPosition(b) || 0))
+  // Sort by position, clamp to valid content range
+  const contentLen = content.length
+  const sortedTools = [...toolsWithPositions]
+    .map(tc => ({ ...tc, _pos: Math.min(Math.max(getPosition(tc) || 0, 0), contentLen) }))
+    .sort((a, b) => a._pos - b._pos)
 
   // Build segments: text chunks interleaved with tool pills
+  // Snap positions to nearest paragraph/sentence boundary for cleaner rendering
   const segments: Array<{ type: 'text' | 'tool', content?: string, tool?: InlineToolCall }> = []
   let lastPosition = 0
 
   for (const tool of sortedTools) {
-    const position = getPosition(tool) || 0
+    let position = tool._pos
+
+    // Snap to nearest line break or sentence end for cleaner pill placement
+    if (position > lastPosition && position < contentLen) {
+      // Look for nearest newline within ±50 chars
+      const searchStart = Math.max(lastPosition, position - 50)
+      const searchEnd = Math.min(contentLen, position + 50)
+      const nearby = content.slice(searchStart, searchEnd)
+      const relativePos = position - searchStart
+
+      // Find closest newline
+      let bestSnap = relativePos
+      for (let i = 0; i < nearby.length; i++) {
+        if (nearby[i] === '\n') {
+          if (Math.abs(i - relativePos) < Math.abs(bestSnap - relativePos)) {
+            bestSnap = i
+          }
+        }
+      }
+      position = Math.max(lastPosition, searchStart + bestSnap)
+    }
 
     // Add text segment before this tool (if any)
     if (position > lastPosition) {
       const textSegment = content.slice(lastPosition, position)
-      if (textSegment) {
+      if (textSegment.trim()) {
         segments.push({ type: 'text', content: textSegment })
       }
     }
 
     // Add the tool pill
     segments.push({ type: 'tool', tool })
-    lastPosition = position
+    lastPosition = Math.max(lastPosition, position)
   }
 
   // Add remaining text after the last tool
-  if (lastPosition < content.length) {
-    segments.push({ type: 'text', content: content.slice(lastPosition) })
+  if (lastPosition < contentLen) {
+    const remaining = content.slice(lastPosition)
+    if (remaining.trim()) {
+      segments.push({ type: 'text', content: remaining })
+    }
   }
 
   return (

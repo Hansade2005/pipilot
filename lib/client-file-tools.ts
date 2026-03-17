@@ -1087,9 +1087,9 @@ ${(techStack || []).map((t: string) => `- ${t}`).join('\n') || '- N/A'}
 
 ## Steps
 
-${steps.map((s: any, i: number) => `### Step ${i + 1}: ${s.title}
+${(Array.isArray(steps) ? steps : []).map((s: any, i: number) => `### Step ${i + 1}: ${s?.title || 'Untitled'}
 - **Status:** [ ] Pending
-- **Description:** ${s.description}
+- **Description:** ${s?.description || ''}
 `).join('\n')}
 
 ---
@@ -1218,10 +1218,10 @@ ${steps.map((s: any, i: number) => `### Step ${i + 1}: ${s.title}
 ${summary}
 
 ## Features
-${features.map((f: string) => `- ${f}`).join('\n')}
+${(Array.isArray(features) ? features : []).map((f: string) => `- ${f}`).join('\n') || '- N/A'}
 
 ## Tech Stack
-${techStack.map((t: string) => `- ${t}`).join('\n')}
+${(Array.isArray(techStack) ? techStack : []).map((t: string) => `- ${t}`).join('\n') || '- N/A'}
 ${keyFiles && keyFiles.length > 0 ? `
 ## Key Files
 | File | Purpose |
