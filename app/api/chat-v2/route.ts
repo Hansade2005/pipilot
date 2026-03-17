@@ -6,7 +6,7 @@ import { getModel, needsMistralVisionProvider, getDevstralVisionModel, getFallba
 import { DEFAULT_CHAT_MODEL, getModelById, modelSupportsVision, chatModels } from '@/lib/ai-models'
 import { NextResponse } from 'next/server'
 import { getWorkspaceDatabaseId, workspaceHasDatabase, setWorkspaceDatabase } from '@/lib/get-current-workspace'
-import { filterUnwantedFiles, patchViteConfigForSandbox } from '@/lib/utils'
+import { filterUnwantedFiles, patchViteConfigForSandbox, detectProjectTypeWithAI } from '@/lib/utils'
 import JSZip from 'jszip'
 import lz4 from 'lz4js'
 import unzipper from 'unzipper'
@@ -5388,9 +5388,9 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
               }
             }
 
-            // Determine project type for the preview API
-            const hasViteConfigFile = fileEntries.some((f: any) => f.path === 'vite.config.js' || f.path === 'vite.config.ts' || f.path === 'vite.config.mjs')
-            const detectedProjectType = hasViteConfigFile ? 'vite-react' : 'html'
+            // Use AI to detect project type — reliable regardless of path prefixes
+            const detectedProjectType = await detectProjectTypeWithAI(fileEntries)
+            console.log(`[deploy_preview] AI detected project type: ${detectedProjectType}`)
 
             // Convert session files to the format expected by /api/preview
             // Filter out internal metadata and non-project files
