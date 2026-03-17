@@ -145,6 +145,7 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
   input?: any,
   status?: 'executing' | 'completed' | 'failed'
 }) => {
+  // Icon for the tool type
   const getToolIcon = (tool: string) => {
     switch (tool) {
       case 'write_file': return <FileText className="w-3.5 h-3.5" />
@@ -155,21 +156,21 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
       case 'delete_file':
       case 'delete_folder': return <X className="w-3.5 h-3.5" />
       case 'remove_package': return <PackageMinus className="w-3.5 h-3.5" />
-      case 'create_database': return <Database className="w-3.5 h-3.5" />
-      case 'create_table':
+      case 'pipilotdb_create_database': return <Database className="w-3.5 h-3.5" />
+      case 'pipilotdb_create_table':
       case 'supabase_create_table':
-      case 'list_tables':
+      case 'pipilotdb_list_tables':
       case 'supabase_list_tables_rls': return <Table className="w-3.5 h-3.5" />
-      case 'query_database':
+      case 'pipilotdb_query_database':
       case 'supabase_execute_sql': return <Code className="w-3.5 h-3.5" />
-      case 'manipulate_table_data':
+      case 'pipilotdb_manipulate_table_data':
       case 'supabase_insert_data':
       case 'supabase_delete_data':
-      case 'read_table':
+      case 'pipilotdb_read_table':
       case 'supabase_read_table':
-      case 'delete_table':
+      case 'pipilotdb_delete_table':
       case 'supabase_drop_table': return <Database className="w-3.5 h-3.5" />
-      case 'manage_api_keys':
+      case 'pipilotdb_manage_api_keys':
       case 'supabase_fetch_api_keys': return <Key className="w-3.5 h-3.5" />
       case 'grep_search':
       case 'semantic_code_navigator': return <Search className="w-3.5 h-3.5" />
@@ -177,65 +178,114 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
       case 'web_extract': return <Globe className="w-3.5 h-3.5" />
       case 'browse_web': return <Monitor className="w-3.5 h-3.5" />
       case 'check_dev_errors': return <Settings className="w-3.5 h-3.5" />
+      case 'deploy_preview': return <Globe className="w-3.5 h-3.5" />
       case 'generate_report': return <BarChart3 className="w-3.5 h-3.5" />
+      case 'generate_image': return <FileImage className="w-3.5 h-3.5" />
+      case 'generate_plan': return <FileText className="w-3.5 h-3.5" />
+      case 'update_plan_progress': return <CheckCircle2 className="w-3.5 h-3.5" />
+      case 'update_project_context': return <FileCode className="w-3.5 h-3.5" />
+      case 'suggest_next_steps': return <Zap className="w-3.5 h-3.5" />
+      case 'node_machine': return <Settings className="w-3.5 h-3.5" />
       default: return <Zap className="w-3.5 h-3.5" />
     }
   }
 
-  const getToolLabel = (tool: string, args?: any) => {
+  // Short action verb
+  const getActionVerb = (tool: string) => {
     switch (tool) {
-      case 'write_file': return `Creating ${args?.path ? args.path.split('/').pop() : 'file'}`
-      case 'edit_file': return `Editing ${args?.filePath ? args.filePath.split('/').pop() : 'file'}`
-      case 'client_replace_string_in_file': return `Replacing in ${args?.filePath ? args.filePath.split('/').pop() : 'file'}`
-      case 'delete_file': return `Deleting ${args?.path ? args.path.split('/').pop() : 'file'}`
-      case 'delete_folder': return `Deleting folder ${args?.path ? args.path.split('/').pop() : 'folder'}`
-      case 'read_file': return `Reading ${args?.path ? args.path.split('/').pop() : 'file'}`
-      case 'list_files': return 'Listing files'
-      case 'remove_package': return `Removing ${args?.packageName || 'package'}`
-      case 'create_database': return `Creating database "${args?.name || 'main'}"`
-      case 'create_table': return `Creating table "${args?.tableName || 'table'}"`
-      case 'supabase_create_table': return `Creating Supabase table "${args?.tableName || 'table'}"`
-      case 'query_database': return `Querying database`
-      case 'supabase_execute_sql': return `Executing SQL on Supabase`
-      case 'grep_search': return `Grep for "${args?.query || 'pattern'}"`
-      case 'semantic_code_navigator': return `Search codebase for "${args?.query || 'query'}"`
-      case 'web_search': return `Searching: ${args?.query || 'query'}`
-      case 'web_extract': return 'Extracting web content'
-      case 'browse_web': return 'Using the Browser'
-      case 'update_plan_progress': return 'Updating plan progress'
-      case 'update_project_context': return 'Documenting project'
-      case 'check_dev_errors': return 'Checking for errors'
-      case 'generate_report': return 'Generating report'
-      default: return tool
+      case 'write_file': return 'Write'
+      case 'edit_file':
+      case 'client_replace_string_in_file': return 'Edit'
+      case 'read_file': return 'Read'
+      case 'list_files': return 'List'
+      case 'delete_file':
+      case 'delete_folder': return 'Delete'
+      case 'remove_package': return 'Remove'
+      case 'grep_search': return 'Search'
+      case 'semantic_code_navigator': return 'Analyze'
+      case 'web_search': return 'Search'
+      case 'web_extract': return 'Extract'
+      case 'browse_web': return 'Browse'
+      case 'check_dev_errors': return 'Check'
+      case 'deploy_preview': return 'Deploy'
+      case 'generate_image': return 'Generate'
+      case 'generate_report': return 'Report'
+      case 'generate_plan': return 'Plan'
+      case 'update_plan_progress': return 'Update'
+      case 'update_project_context': return 'Document'
+      case 'suggest_next_steps': return 'Suggest'
+      case 'node_machine': return 'Execute'
+      case 'pipilotdb_create_database': return 'Create DB'
+      case 'pipilotdb_create_table':
+      case 'supabase_create_table': return 'Create Table'
+      case 'pipilotdb_query_database':
+      case 'supabase_execute_sql': return 'Query'
+      case 'pipilotdb_list_tables':
+      case 'supabase_list_tables_rls': return 'List Tables'
+      case 'pipilotdb_read_table':
+      case 'supabase_read_table': return 'Read Table'
+      case 'pipilotdb_delete_table':
+      case 'supabase_drop_table': return 'Drop Table'
+      case 'pipilotdb_manipulate_table_data':
+      case 'supabase_insert_data': return 'Insert'
+      case 'supabase_delete_data': return 'Delete'
+      case 'pipilotdb_manage_api_keys':
+      case 'supabase_fetch_api_keys': return 'API Keys'
+      case 'create_snapshot': return 'Snapshot'
+      case 'code_quality_analysis':
+      case 'code_review': return 'Review'
+      case 'auto_documentation': return 'Document'
+      default: return tool.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'executing': return 'bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400'
-      case 'completed': return 'bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400'
-      case 'failed': return 'bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400'
-      default: return 'bg-muted/10 border-border text-muted-foreground'
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'executing': return <Loader2 className="w-3.5 h-3.5 animate-spin" />
-      case 'completed': return <CheckCircle2 className="w-3.5 h-3.5" />
-      case 'failed': return <XCircle className="w-3.5 h-3.5" />
+  // Context badge text (filename, query, etc.)
+  const getContextBadge = (tool: string, args?: any): string | null => {
+    if (!args) return null
+    switch (tool) {
+      case 'write_file':
+      case 'delete_file':
+      case 'read_file': return args.path?.split('/').pop() || null
+      case 'edit_file':
+      case 'client_replace_string_in_file': return args.filePath?.split('/').pop() || null
+      case 'delete_folder': return args.path?.split('/').pop() || null
+      case 'list_files': return args.path || null
+      case 'remove_package': return args.packageName || args.name || null
+      case 'grep_search':
+      case 'semantic_code_navigator': return args.query ? `"${args.query}"` : null
+      case 'web_search': return args.query ? `"${args.query}"` : null
+      case 'web_extract': return args.url ? new URL(args.url).hostname : null
+      case 'browse_web': return args.url ? new URL(args.url).hostname : null
+      case 'deploy_preview': return args.deployMessage || null
+      case 'pipilotdb_create_database': return args.name || null
+      case 'pipilotdb_create_table':
+      case 'supabase_create_table': return args.tableName || null
+      case 'node_machine': return args.command?.split(' ')[0] || null
       default: return null
     }
   }
 
+  const contextBadge = getContextBadge(toolName, input)
+
   return (
-    <div className={cn(
-      "inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border",
-      getStatusColor(status)
-    )}>
-      {getToolIcon(toolName)}
-      <span className="max-w-[200px] truncate">{getToolLabel(toolName, input)}</span>
-      {getStatusIcon(status)}
+    <div className="flex items-center gap-2 py-1.5">
+      <span className="text-gray-500 flex-shrink-0">
+        {getToolIcon(toolName)}
+      </span>
+      <span className="text-[13px] text-gray-300 font-medium">
+        {getActionVerb(toolName)}
+      </span>
+      {contextBadge && (
+        <span className="text-[13px] bg-gray-800 text-gray-300 px-2 py-0.5 rounded font-mono">
+          {contextBadge}
+        </span>
+      )}
+      {status === 'executing' && (
+        <Loader2 className="w-3 h-3 text-gray-500 animate-spin flex-shrink-0" />
+      )}
+      {status === 'failed' && (
+        <XCircle className="w-3 h-3 text-red-400 flex-shrink-0" />
+      )}
     </div>
   )
 }

@@ -5481,53 +5481,84 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
 
               // Don't process any more chunks after continuation signal
               break
+            } else if (parsed.type === 'tool-input-start') {
+              // AI SDK v5: Tool call STARTING — show pill immediately before args arrive
+              const toolId = parsed.toolCallId || parsed.id
+              const toolName = parsed.toolName
+              if (toolId && toolName && !localToolCalls.find(tc => tc.toolCallId === toolId)) {
+                const toolCallEntry = {
+                  toolName,
+                  toolCallId: toolId,
+                  input: undefined, // Args not yet available
+                  status: 'executing' as 'executing' | 'completed' | 'failed',
+                  textPosition: accumulatedContent.length,
+                  reasoningPosition: accumulatedReasoning.length
+                }
+                localToolCalls.push(toolCallEntry)
+                setStreamingToolCalls([...localToolCalls])
+                setActiveToolCalls(prev => {
+                  const newMap = new Map(prev)
+                  const messageCalls = newMap.get(assistantMessageId) || []
+                  if (!messageCalls.some(tc => tc.toolCallId === toolId)) {
+                    messageCalls.push(toolCallEntry)
+                    newMap.set(assistantMessageId, messageCalls)
+                  }
+                  return newMap
+                })
+              }
+
             } else if (parsed.type === 'tool-call') {
-              // CLIENT-SIDE TOOL EXECUTION: Execute file operation tools on IndexedDB
+              // Tool call COMPLETE — args are now available, update existing pill or create new one
               const toolCall = {
                 toolName: parsed.toolName,
                 toolCallId: parsed.toolCallId,
-                args: parsed.input, // AI SDK sends 'input' not 'args'
-                dynamic: false // We don't use dynamic tools
+                args: parsed.input,
+                dynamic: false
               }
 
               console.log('[ChatPanelV2][ClientTool] 🔧 Tool call received:', {
                 toolName: toolCall.toolName,
                 toolCallId: toolCall.toolCallId,
-                args: toolCall.args
               })
 
-              // Track tool call inline with executing status (both local and state)
-              // DEDUPLICATION: Check if this toolCallId already exists to prevent duplicates
+              // Check if pill already created by tool-input-start
               const existingToolCall = localToolCalls.find(tc => tc.toolCallId === toolCall.toolCallId)
               if (existingToolCall) {
-                console.log('[ChatPanelV2][ClientTool] Skipping duplicate tool call:', toolCall.toolCallId)
-                continue // Skip duplicate tool calls
-              }
-
-              const toolCallEntry = {
-                toolName: toolCall.toolName,
-                toolCallId: toolCall.toolCallId,
-                input: toolCall.args,
-                status: 'executing' as 'executing' | 'completed' | 'failed',
-                textPosition: accumulatedContent.length, // Track where in text this tool was called
-                reasoningPosition: accumulatedReasoning.length // Track where in reasoning this tool was called
-              }
-
-              localToolCalls.push(toolCallEntry)
-
-              // Store in component state for handleStop access
-              setStreamingToolCalls([...localToolCalls])
-
-              setActiveToolCalls(prev => {
-                const newMap = new Map(prev)
-                const messageCalls = newMap.get(assistantMessageId) || []
-                // DEDUPLICATION: Check before adding to prevent duplicates
-                if (!messageCalls.some(tc => tc.toolCallId === toolCall.toolCallId)) {
-                  messageCalls.push(toolCallEntry)
-                  newMap.set(assistantMessageId, messageCalls)
+                // Update args on the existing pill (was created without args)
+                existingToolCall.input = toolCall.args
+                setStreamingToolCalls([...localToolCalls])
+                setActiveToolCalls(prev => {
+                  const newMap = new Map(prev)
+                  const messageCalls = newMap.get(assistantMessageId) || []
+                  const updatedCalls = messageCalls.map(tc =>
+                    tc.toolCallId === toolCall.toolCallId ? { ...tc, input: toolCall.args } : tc
+                  )
+                  newMap.set(assistantMessageId, updatedCalls)
+                  return newMap
+                })
+              } else {
+                // No tool-input-start received — create pill now (fallback for models that skip it)
+                const toolCallEntry = {
+                  toolName: toolCall.toolName,
+                  toolCallId: toolCall.toolCallId,
+                  input: toolCall.args,
+                  status: 'executing' as 'executing' | 'completed' | 'failed',
+                  textPosition: accumulatedContent.length,
+                  reasoningPosition: accumulatedReasoning.length
                 }
-                return newMap
-              })
+
+                localToolCalls.push(toolCallEntry)
+                setStreamingToolCalls([...localToolCalls])
+                setActiveToolCalls(prev => {
+                  const newMap = new Map(prev)
+                  const messageCalls = newMap.get(assistantMessageId) || []
+                  if (!messageCalls.some(tc => tc.toolCallId === toolCall.toolCallId)) {
+                    messageCalls.push(toolCallEntry)
+                    newMap.set(assistantMessageId, messageCalls)
+                  }
+                  return newMap
+                })
+              }
 
 
               // Check if this is a client-side tool (both read and write operations)
