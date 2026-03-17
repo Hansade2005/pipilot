@@ -271,15 +271,19 @@ interface ToolRegistryEntry {
   parameters: string // Human-readable parameter summary
 }
 
-// Core tools — always loaded in every step (small schema footprint)
+// Core tools — always loaded in every step
+// CRITICAL: Keep this set MINIMAL. Each tool schema consumes prompt tokens.
+// Heavy-schema tools (grep_search: 11 params, semantic_code_navigator: 8 params)
+// are deliberately excluded — AI discovers them via discover_tools when needed.
 const CORE_TOOLS = new Set([
-  'write_file', 'read_file', 'edit_file', 'delete_file', 'delete_folder',
-  'list_files', 'grep_search', 'semantic_code_navigator',
-  'client_replace_string_in_file', 'remove_package',
-  'web_search', 'web_extract',
-  'check_dev_errors', 'deploy_preview',
+  // File CRUD (light schemas: 1-2 params each)
+  'write_file', 'read_file', 'edit_file', 'delete_file', 'list_files',
+  // Planning & context (mandatory workflow tools)
   'generate_plan', 'update_plan_progress', 'update_project_context', 'suggest_next_steps',
-  'discover_tools', // The gateway to all other tools
+  // Deploy (1 param)
+  'deploy_preview',
+  // Gateway to everything else
+  'discover_tools',
 ])
 
 // Full tool registry — searchable catalog of ALL tools
@@ -2743,7 +2747,7 @@ The plan should include:
 8. **IMPORTANT**: Before calling \`deploy_preview\`, check the vite.config (read_file) and ensure it has the E2B sandbox server settings: \`server: { host: '0.0.0.0', port: 3000, strictPort: true, cors: true, allowedHosts: ['localhost', '127.0.0.1', '.e2b.app', '3000-*.e2b.app'] }\`. If missing, use edit_file to add them. Then call \`deploy_preview\` to deploy to live preview hosting on a .pipilot.dev subdomain (only for Vite/React and HTML projects — NOT Next.js or Expo).
 9. Call \`suggest_next_steps\` with follow-up options
 
-**Tool Discovery**: For Stripe, Supabase, image generation, code review, or other specialized tasks, call \`discover_tools({ query: "keyword" })\` to find and unlock the relevant tools before using them.
+**Tool Discovery**: You start with file CRUD, planning, and deploy only. For code search, web search, grep, Stripe, Supabase, database, images, browser, or code review — call \`discover_tools({ query: "keyword" })\` first to unlock the tools you need.
 
 **CRITICAL: Do NOT generate ANY text content before calling generate_plan. The plan card should be the first thing the user sees. After the plan, you may write brief status text as you build, but keep it minimal.**
 
@@ -3098,9 +3102,15 @@ When presenting research results, analysis, comparisons, or any informational re
 ### Depth: Short answers = 300+ words with sections and a table. Research = 800+ words with 4+ sections, 2+ tables, images. Comparisons = comparison table + pros/cons + recommendation.
 
 ## Tool Discovery System
-You have access to a core set of tools (file ops, search, deploy, planning). For specialized tasks like Stripe payments, Supabase database, image generation, code review, or browser automation, call \`discover_tools\` with a keyword to find and unlock the right tools. Example: \`discover_tools({ query: "stripe" })\` reveals all Stripe payment tools. Discovered tools become available immediately for subsequent steps.
+You start with minimal core tools: file CRUD (write, read, edit, delete, list), planning, deploy, and \`discover_tools\`. For ANYTHING ELSE — code search, web search, grep, Stripe, Supabase, database, image generation, browser, code review, package management — call \`discover_tools\` first to find and unlock the right tools. This keeps you fast and focused.
 
-**Categories available:** file_ops, code_search, web, dev, project, pipilot_db, supabase, stripe, docs, special
+**Examples:**
+- Need to search code? → \`discover_tools({ query: "search" })\` → unlocks grep_search, semantic_code_navigator
+- Need web info? → \`discover_tools({ query: "web" })\` → unlocks web_search, web_extract
+- Need payments? → \`discover_tools({ query: "stripe" })\` → unlocks all Stripe tools
+- Need database? → \`discover_tools({ query: "database" })\` → unlocks PiPilot DB + Supabase tools
+
+**Categories:** file_ops, code_search, web, dev, project, pipilot_db, supabase, stripe, docs, special
 
 ## Live Preview Deployment (MANDATORY for Vite/React and HTML projects)
 After completing all file changes, BEFORE calling \`deploy_preview\`:
