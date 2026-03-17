@@ -303,15 +303,9 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
 
   const handleFileClick = () => {
     if (!linkedFilePath) return
-    // Try both with and without leading / to match whichever format the workspace uses
     const normalizedPath = linkedFilePath.startsWith('/') ? linkedFilePath.slice(1) : linkedFilePath
-    const slashedPath = '/' + normalizedPath
     window.dispatchEvent(new CustomEvent('openFileInEditor', {
       detail: { filePath: normalizedPath }
-    }))
-    // Also try with leading / in case workspace stores paths that way
-    window.dispatchEvent(new CustomEvent('openFileInEditor', {
-      detail: { filePath: slashedPath }
     }))
     window.dispatchEvent(new CustomEvent('focusFileInExplorer', {
       detail: { path: normalizedPath }

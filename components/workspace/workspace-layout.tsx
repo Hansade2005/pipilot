@@ -678,7 +678,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       try {
         await storageManager.init()
         const files = await storageManager.getFiles(selectedProject.id)
-        const file = files.find(f => f.path === filePath)
+        // Try exact match, then with/without leading / (imported projects may differ)
+        const normalizedPath = filePath.startsWith('/') ? filePath.slice(1) : filePath
+        const file = files.find(f => f.path === filePath || f.path === normalizedPath || f.path === '/' + normalizedPath)
 
         if (file) {
           setSelectedFile(file)
