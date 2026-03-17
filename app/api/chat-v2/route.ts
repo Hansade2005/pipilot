@@ -5478,10 +5478,20 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
               const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
               const executionTime = Date.now() - toolStartTime
               toolExecutionTimes['deploy_preview'] = (toolExecutionTimes['deploy_preview'] || 0) + executionTime
+              console.error(`[deploy_preview] Failed (${response.status}):`, errorData)
               return {
                 success: false,
-                error: `Preview deployment failed: ${errorData.error || response.statusText}`,
+                error: `Preview deployment failed (HTTP ${response.status}): ${errorData.error || response.statusText}`,
                 details: errorData.details || null,
+                errorType: errorData.type || null,
+                sandboxId: errorData.sandboxId || null,
+                suggestion: errorData.error?.includes('build failed')
+                  ? 'The Vite build failed. Check vite.config for errors, ensure all imports are valid, and verify dependencies in package.json. Use read_file to inspect the config and fix issues, then retry deploy_preview.'
+                  : errorData.error?.includes('install')
+                  ? 'Dependency installation failed. Check package.json for invalid packages or version conflicts. Use read_file on package.json to inspect and fix.'
+                  : errorData.error?.includes('upload')
+                  ? 'Built files failed to upload to hosting. This may be a temporary issue — retry deploy_preview.'
+                  : 'Check the error message above and fix the issue before retrying deploy_preview.',
                 toolCallId,
                 executionTimeMs: executionTime
               }
@@ -5508,10 +5518,18 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
           } catch (error) {
             const executionTime = Date.now() - toolStartTime
             toolExecutionTimes['deploy_preview'] = (toolExecutionTimes['deploy_preview'] || 0) + executionTime
-            console.error('[deploy_preview] Error:', error)
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+            const errorStack = error instanceof Error ? error.stack?.split('\n').slice(0, 3).join('\n') : null
+            console.error('[deploy_preview] Error:', errorMessage)
             return {
               success: false,
-              error: `Deploy failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              error: `Deploy failed: ${errorMessage}`,
+              suggestion: errorMessage.includes('timeout') || errorMessage.includes('abort')
+                ? 'The deployment timed out. The project may be too large or have slow dependencies. Try simplifying the build.'
+                : errorMessage.includes('fetch')
+                ? 'Could not reach the preview API. This may be a temporary server issue — retry deploy_preview.'
+                : 'Inspect the error message and fix the underlying issue before retrying deploy_preview.',
+              stackTrace: errorStack,
               toolCallId,
               executionTimeMs: executionTime
             }

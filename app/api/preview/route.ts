@@ -2162,17 +2162,23 @@ devDependencies:
 
   } catch (error) {
     console.error('Preview API Error:', error)
-    
-    // Enhanced error handling
+
+    // Enhanced error handling — return detailed error messages for debugging
     if (error instanceof SandboxError) {
-      return Response.json({ 
+      return Response.json({
         error: error.message,
         type: error.type,
-        sandboxId: error.sandboxId 
+        sandboxId: error.sandboxId
       }, { status: 500 })
     }
-    
-    return Response.json({ error: 'Failed to create preview' }, { status: 500 })
+
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    return Response.json({
+      error: errorMessage,
+      details: errorMessage.includes('build failed') ? 'Build process failed. Check vite.config and dependencies.' :
+               errorMessage.includes('install') ? 'Dependency installation failed. Check package.json.' :
+               errorMessage.includes('upload') ? 'File upload to hosting failed.' : null
+    }, { status: 500 })
   }
 }
 
