@@ -6,7 +6,7 @@ import {
   SandboxErrorType,
   type SandboxFile 
 } from '@/lib/e2b-enhanced'
-import { filterUnwantedFiles, patchViteConfigForSandbox, detectProjectTypeWithAI } from '@/lib/utils'
+import { filterUnwantedFiles, detectProjectTypeWithAI } from '@/lib/utils'
 import JSZip from 'jszip'
 import lz4 from 'lz4js'
 import { createClient as createExternalClient } from '@supabase/supabase-js'
@@ -1161,13 +1161,9 @@ async function handleStreamingPreview(req: Request) {
             return
           }
 
-          const isExpoProject = hasExpoConfig || !!hasExpoDepInPkg
+          const isExpoProject = resolvedType === 'expo' || hasExpoConfig || !!hasExpoDepInPkg
+          const isViteProject = resolvedType === 'vite-react' || hasViteConfig
           const template = "pipilot-expo"
-
-          // Auto-patch vite.config for E2B sandbox compatibility (host, port, allowedHosts)
-          if (!isExpoProject && hasViteConfig) {
-            patchViteConfigForSandbox(files)
-          }
 
           // 🔹 Create sandbox (only for non-HTML projects)
           const sandbox = await createEnhancedSandbox({
@@ -1325,7 +1321,7 @@ async function handleStreamingPreview(req: Request) {
           }
           let buildCommand = "npm run build && PORT=3000 npm run preview" // Default to Vite
 
-          if (hasViteConfig) {
+          if (isViteProject) {
             // Vite project - build and host on Supabase storage
             send({ type: "log", message: "Detected Vite project, will build and host on pipilot" })
             
@@ -1838,13 +1834,9 @@ async function handleRegularPreview(req: Request) {
       })
     }
 
-    const isExpoProject = hasExpoConfig || !!hasExpoDepInPkg
+    const isExpoProject = resolvedType === 'expo' || hasExpoConfig || !!hasExpoDepInPkg
+    const isViteProject = resolvedType === 'vite-react' || hasViteConfig
     const template = "pipilot-expo"
-
-    // Auto-patch vite.config for E2B sandbox compatibility (host, port, allowedHosts)
-    if (!isExpoProject && hasViteConfig) {
-      patchViteConfigForSandbox(files)
-    }
 
     // Create enhanced E2B sandbox with environment variables (only for non-HTML projects)
     let sandbox

@@ -6,7 +6,7 @@ import { getModel, needsMistralVisionProvider, getDevstralVisionModel, getFallba
 import { DEFAULT_CHAT_MODEL, getModelById, modelSupportsVision, chatModels } from '@/lib/ai-models'
 import { NextResponse } from 'next/server'
 import { getWorkspaceDatabaseId, workspaceHasDatabase, setWorkspaceDatabase } from '@/lib/get-current-workspace'
-import { filterUnwantedFiles, patchViteConfigForSandbox, detectProjectTypeWithAI } from '@/lib/utils'
+import { filterUnwantedFiles, detectProjectTypeWithAI } from '@/lib/utils'
 import JSZip from 'jszip'
 import lz4 from 'lz4js'
 import unzipper from 'unzipper'
@@ -2580,7 +2580,7 @@ The plan should include:
 5. **After completing EACH plan step**, call \`update_plan_progress\` with the step number to mark it as done in \`.pipilot/plan.md\`
 6. Build ALL pages and the COMPLETE app - never stop at just 1-2 files
 7. **After ALL steps are done**, call \`update_project_context\` to document the project in \`.pipilot/project.md\`
-8. **IMPORTANT**: Call \`deploy_preview\` to deploy the changes to live preview hosting. This builds and uploads the project to a .pipilot.dev subdomain so the user can see and test the result. Always call this after completing file changes (only available for Vite/React and HTML projects — NOT Next.js or Expo).
+8. **IMPORTANT**: Before calling \`deploy_preview\`, check the vite.config (read_file) and ensure it has the E2B sandbox server settings: \`server: { host: '0.0.0.0', port: 3000, strictPort: true, cors: true, allowedHosts: ['localhost', '127.0.0.1', '.e2b.app', '3000-*.e2b.app'] }\`. If missing, use edit_file to add them. Then call \`deploy_preview\` to deploy to live preview hosting on a .pipilot.dev subdomain (only for Vite/React and HTML projects — NOT Next.js or Expo).
 9. Call \`suggest_next_steps\` with follow-up options
 
 **CRITICAL: Do NOT generate ANY text content before calling generate_plan. The plan card should be the first thing the user sees. After the plan, you may write brief status text as you build, but keep it minimal.**
@@ -2936,7 +2936,12 @@ When presenting research results, analysis, comparisons, or any informational re
 ### Depth: Short answers = 300+ words with sections and a table. Research = 800+ words with 4+ sections, 2+ tables, images. Comparisons = comparison table + pros/cons + recommendation.
 
 ## Live Preview Deployment (MANDATORY for Vite/React and HTML projects)
-After completing all file changes, ALWAYS call \`deploy_preview\` to deploy the project to live hosting. This builds and uploads the project to a .pipilot.dev subdomain so the user can immediately see and test the result. Include a short deploy message describing what changed. Do NOT use this tool for Next.js or Expo projects.
+After completing all file changes, BEFORE calling \`deploy_preview\`:
+1. Read the vite.config file (vite.config.ts or vite.config.js) with read_file
+2. Check if it has the E2B sandbox server settings: \`server: { host: '0.0.0.0', port: 3000, strictPort: true, cors: true, allowedHosts: ['localhost', '127.0.0.1', '.e2b.app', '3000-*.e2b.app'] }\`
+3. If missing or incomplete, use edit_file to add the full server block — this is CRITICAL for the build sandbox to work
+4. Then call \`deploy_preview\` with a short deploy message describing what changed
+Do NOT use this tool for Next.js or Expo projects.
 
 ## Next Step Suggestions (MANDATORY)
 At the END of every response, call \`suggest_next_steps\` with 3-4 contextual follow-up suggestions. Make them relevant, actionable, progressive, and varied. Labels: 3-8 words. ALWAYS call as your FINAL action.
@@ -4747,13 +4752,6 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
             const workingDir = isExpoProject ? "/home/user" : "/project"
 
             logs.push(`Detected project type: ${isExpoProject ? 'Expo React Native' : 'Vite/Next.js'}`)
-
-            // Auto-patch vite.config for E2B sandbox compatibility
-            const hasViteConfig = allFiles.some((f: any) => f.path === 'vite.config.js' || f.path === 'vite.config.ts' || f.path === 'vite.config.mjs')
-            if (!isExpoProject && hasViteConfig) {
-              patchViteConfigForSandbox(allFiles)
-              logs.push('Auto-patched vite.config for sandbox compatibility')
-            }
 
             // Create sandbox with reasonable timeout for error detection
             const sandbox = await createEnhancedSandbox({
