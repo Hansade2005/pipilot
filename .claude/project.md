@@ -121,6 +121,15 @@ Overhauled the workspace AI system prompt to eliminate verbose narration between
 - Persistence rules (always read plan.md/project.md): kept
 - update_plan_progress per step: kept
 
+#### LLM-Synthesized Continuation Context (a0 API)
+- **New function:** `synthesizeContinuationContext()` in `app/api/chat-v2/route.ts`
+- **Inspired by:** Claude Code's compaction system — instead of dumping raw partial content + tool results into the continuation system prompt, uses the a0 LLM API (`https://api.a0.dev/ai/llm`) to synthesize a structured ~400-word "session state" summary
+- **Applied to:** Both stream continuation (timeout) AND stream recovery (tab switch/refresh)
+- **Synthesis produces:** 4 structured sections: What was built, Plan status, Current state, What to do next
+- **Graceful fallback:** If a0 API fails or returns empty, falls back to the old raw context injection
+- **Settings:** temperature: 0.1, max_tokens: 600, 8s timeout
+- **Benefit:** Continuation AI gets a clean, actionable summary instead of raw tool result dumps — should reduce re-reading and confusion significantly
+
 ### 2026-03-18 (Session 1) — Session Summary
 Major model catalog expansion + Ollama DB rotation + tool fixes + pill accuracy.
 

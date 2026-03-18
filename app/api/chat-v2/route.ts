@@ -253,6 +253,138 @@ const getStorageManager = async () => {
   return storageManager
 }
 
+// ═══════════════════════════════════════════════════════════════
+// CONTINUATION CONTEXT SYNTHESIZER — Uses a0 LLM API to create
+// a compact "session state" summary from raw continuation data.
+// Inspired by Claude Code's compaction system: instead of dumping
+// raw partial content + tool results into the system prompt,
+// we synthesize a structured summary that lets the AI continue
+// smoothly without needing to re-read files or re-discover state.
+// ═══════════════════════════════════════════════════════════════
+
+interface ContinuationData {
+  toolResults: any[]
+  partialContent: string
+  partialReasoning: string
+  elapsedTimeMs: number
+  modifiedFiles: string[]
+}
+
+async function synthesizeContinuationContext(data: ContinuationData): Promise<string | null> {
+  try {
+    // Build a structured representation of what was done
+    const toolSummaryLines: string[] = []
+    const filesWritten: string[] = []
+    const filesRead: string[] = []
+    const filesEdited: string[] = []
+    const planUpdates: string[] = []
+    const otherActions: string[] = []
+
+    for (const tr of data.toolResults) {
+      const name = tr.toolName || tr.name || 'unknown'
+      const args = tr.args || tr.input || {}
+      const resultPreview = typeof tr.result === 'string'
+        ? tr.result.slice(0, 100)
+        : JSON.stringify(tr.result || {}).slice(0, 100)
+
+      if (name === 'write_file') {
+        filesWritten.push(args.path || 'unknown')
+      } else if (name === 'read_file') {
+        filesRead.push(args.path || 'unknown')
+      } else if (name === 'edit_file' || name === 'client_replace_string_in_file') {
+        filesEdited.push(args.filePath || args.path || 'unknown')
+      } else if (name === 'update_plan_progress') {
+        planUpdates.push(`Step ${args.stepNumber}${args.notes ? ': ' + args.notes : ''}`)
+      } else if (name === 'generate_plan') {
+        const planTitle = args.title || 'Untitled'
+        const stepCount = Array.isArray(args.steps) ? args.steps.length : '?'
+        otherActions.push(`Generated plan: "${planTitle}" (${stepCount} steps)`)
+      } else if (name !== 'suggest_next_steps' && name !== 'discover_tools') {
+        otherActions.push(`${name}(${JSON.stringify(args).slice(0, 80)})`)
+      }
+    }
+
+    // Build the synthesis prompt
+    const rawContext = `
+## Session State to Synthesize
+
+### Time elapsed: ${Math.round(data.elapsedTimeMs / 1000)} seconds
+### Total tool operations: ${data.toolResults.length}
+
+### Files CREATED (write_file):
+${filesWritten.length > 0 ? filesWritten.map(f => `- ${f}`).join('\n') : '- None'}
+
+### Files EDITED (edit_file / client_replace_string_in_file):
+${filesEdited.length > 0 ? filesEdited.map(f => `- ${f}`).join('\n') : '- None'}
+
+### Files READ for context:
+${filesRead.length > 0 ? filesRead.map(f => `- ${f}`).join('\n') : '- None'}
+
+### Plan progress updates:
+${planUpdates.length > 0 ? planUpdates.map(p => `- Completed: ${p}`).join('\n') : '- None'}
+
+### Other actions:
+${otherActions.length > 0 ? otherActions.map(a => `- ${a}`).join('\n') : '- None'}
+
+### Last partial response content (what AI was saying when interrupted):
+${data.partialContent ? data.partialContent.slice(-1500) : '(no text content)'}
+`.trim()
+
+    const response = await fetch('https://api.a0.dev/ai/llm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [
+          {
+            role: 'system',
+            content: `You are a session state synthesizer. Given raw data about an interrupted AI coding session (tool calls, files created/edited, plan progress), produce a CONCISE structured summary that another AI can use to continue the work seamlessly.
+
+Your output must be a structured summary with these EXACT sections:
+1. **What was built** — list files created/edited and their purpose (1 line each)
+2. **Plan status** — which steps are done, which is next
+3. **Current state** — what the AI was doing when interrupted
+4. **What to do next** — the specific next action to take (e.g. "Create src/pages/Calendar.tsx")
+
+Rules:
+- Be CONCISE — max 400 words total
+- Focus on ACTIONABLE state, not history
+- List file paths exactly as given
+- Do NOT add opinions or suggestions
+- Do NOT repeat the full file contents
+- The goal is to give the continuation AI enough context to immediately start building without needing to re-read files`
+          },
+          {
+            role: 'user',
+            content: rawContext
+          }
+        ],
+        temperature: 0.1,
+        max_tokens: 600
+      }),
+      signal: AbortSignal.timeout(8000) // 8s timeout — don't block continuation too long
+    })
+
+    if (!response.ok) {
+      console.warn(`[synthesizeContinuationContext] a0 API returned ${response.status}`)
+      return null
+    }
+
+    const result = await response.json()
+    const summary = (result.completion || result.message || '').trim()
+
+    if (summary && summary.length > 50) {
+      console.log(`[synthesizeContinuationContext] ✅ Synthesized ${summary.length} char summary from ${data.toolResults.length} tool results`)
+      return summary
+    }
+
+    console.warn('[synthesizeContinuationContext] Summary too short or empty, falling back to raw context')
+    return null
+  } catch (error) {
+    console.error('[synthesizeContinuationContext] Failed:', error)
+    return null // Graceful fallback — use raw context
+  }
+}
+
 // In-memory project storage for AI tool sessions
 // Key: projectId, Value: { fileTree: string[], files: Map<path, fileData> }
 const sessionProjectStorage = new Map<string, {
@@ -3245,99 +3377,123 @@ ${customPersona.trim()}`
 
     // Add continuation instructions if this is a continuation request
     if (isContinuation) {
-      // Build context about what was already said
-      const hasPartialContent = partialResponse?.content && partialResponse.content.trim().length > 0
-      const hasPartialReasoning = partialResponse?.reasoning && partialResponse.reasoning.trim().length > 0
-
-      // Truncate partial content if too long (keep last 2000 chars for context)
-      const truncatedContent = hasPartialContent
-        ? (partialResponse.content.length > 2000
-            ? '...' + partialResponse.content.slice(-2000)
-            : partialResponse.content)
-        : ''
-      const truncatedReasoning = hasPartialReasoning
-        ? (partialResponse.reasoning.length > 1000
-            ? '...' + partialResponse.reasoning.slice(-1000)
-            : partialResponse.reasoning)
-        : ''
-
-      // Extract files that were modified in previous turn (for AI to re-read and understand state)
+      // Extract files that were modified in previous turn
       const modifiedFiles = new Set<string>()
       for (const toolResult of previousToolResults) {
         const toolName = toolResult.toolName || toolResult.name
         const args = toolResult.args || toolResult.input || {}
-
-        // Track files that were written or edited
-        if (toolName === 'write_file' && args.path) {
-          modifiedFiles.add(args.path)
-        } else if (toolName === 'edit_file' && args.filePath) {
-          modifiedFiles.add(args.filePath)
-        } else if (toolName === 'client_replace_string_in_file' && args.filePath) {
-          modifiedFiles.add(args.filePath)
-        }
+        if (toolName === 'write_file' && args.path) modifiedFiles.add(args.path)
+        else if (toolName === 'edit_file' && args.filePath) modifiedFiles.add(args.filePath)
+        else if (toolName === 'client_replace_string_in_file' && args.filePath) modifiedFiles.add(args.filePath)
       }
       const modifiedFilesList = Array.from(modifiedFiles)
       const hasModifiedFiles = modifiedFilesList.length > 0
 
-      systemPrompt += `
+      // ═══════════════════════════════════════════════════════════════
+      // LLM-SYNTHESIZED CONTINUATION CONTEXT (a0 API)
+      // Instead of dumping raw partial content + tool results into the
+      // system prompt, we synthesize a compact structured summary.
+      // This gives the continuation AI a clear "session state" so it
+      // can immediately start building without re-reading files.
+      // Falls back to raw context if synthesis fails.
+      // ═══════════════════════════════════════════════════════════════
+      const hasPartialContent = partialResponse?.content && partialResponse.content.trim().length > 0
+      const hasPartialReasoning = partialResponse?.reasoning && partialResponse.reasoning.trim().length > 0
+
+      let synthesizedSummary: string | null = null
+      if (previousToolResults.length > 0) {
+        try {
+          synthesizedSummary = await synthesizeContinuationContext({
+            toolResults: previousToolResults,
+            partialContent: hasPartialContent ? partialResponse.content : '',
+            partialReasoning: hasPartialReasoning ? partialResponse.reasoning : '',
+            elapsedTimeMs: continuationState.elapsedTimeMs || 0,
+            modifiedFiles: modifiedFilesList
+          })
+          if (synthesizedSummary) {
+            console.log(`[Chat-V2] ✅ Using synthesized continuation context (${synthesizedSummary.length} chars)`)
+          }
+        } catch (e) {
+          console.warn('[Chat-V2] Synthesis failed, using raw context:', e)
+        }
+      }
+
+      if (synthesizedSummary) {
+        // ── SYNTHESIZED PATH: compact, structured summary from a0 LLM ──
+        systemPrompt += `
 
 ## 🔄 STREAM CONTINUATION MODE
-**IMPORTANT**: This is a continuation of a previous conversation that was interrupted due to time constraints. You must continue exactly where you left off without repeating previous content or restarting your response.
+**IMPORTANT**: This is a continuation of a previous build session that was interrupted. Below is a synthesized summary of what was done. Use it to continue building immediately.
+
+### Session State Summary (synthesized)
+${synthesizedSummary}
+
+**Instructions:**
+✅ Read \`.pipilot/plan.md\` to confirm which steps are completed vs pending
+✅ Then switch to **TOOL-ONLY MODE**: only call tools (write_file, edit_file, read_file, etc.) with ZERO text explanations between them
+✅ If you need to understand a file's current state before editing it, use read_file — but do NOT re-read files unnecessarily
+✅ Continue from the next uncompleted step
+✅ Call \`update_plan_progress\` as you complete each remaining step
+✅ Call \`update_project_context\` at the end when all steps are done
+✅ Only output a text summary AFTER all steps are completed
+❌ Do NOT repeat any work listed in the summary above
+❌ Do NOT explain what you're about to do between tool calls
+❌ Do not apologize for the interruption or mention being a "continuation"`
+      } else {
+        // ── FALLBACK PATH: raw context (when synthesis fails or no tool results) ──
+        const truncatedContent = hasPartialContent
+          ? (partialResponse.content.length > 2000
+              ? '...' + partialResponse.content.slice(-2000)
+              : partialResponse.content)
+          : ''
+        const truncatedReasoning = hasPartialReasoning
+          ? (partialResponse.reasoning.length > 1000
+              ? '...' + partialResponse.reasoning.slice(-1000)
+              : partialResponse.reasoning)
+          : ''
+
+        systemPrompt += `
+
+## 🔄 STREAM CONTINUATION MODE
+**IMPORTANT**: This is a continuation of a previous conversation that was interrupted due to time constraints. You must continue exactly where you left off.
 
 **Continuation Context:**
 - Previous response was interrupted after ${Math.round((continuationState.elapsedTimeMs || 0) / 1000)} seconds
 - ${previousToolResults.length} tool operations were completed
-- Continue your response seamlessly as if the interruption never happened
-- Do not repeat any content you already provided
-- Pick up exactly where your previous response ended
 ${hasModifiedFiles ? `
-**Files modified in previous turn (RE-READ these to understand current state before continuing):**
+**Files modified in previous turn (RE-READ these to understand current state):**
 ${modifiedFilesList.map(f => `- ${f}`).join('\n')}
-
-Use read_file to check the current state of these files so you understand what was already done and can continue without duplicating or conflicting.
 ` : ''}
-${hasPartialReasoning ? `
-**Your previous reasoning (that was already shown to the user):**
+${truncatedReasoning ? `
+**Your previous reasoning (already shown to user):**
 \`\`\`
 ${truncatedReasoning}
 \`\`\`
 ` : ''}
-${hasPartialContent ? `
-**Your previous response content (that was already shown to the user):**
+${truncatedContent ? `
+**Your previous response (already shown to user):**
 \`\`\`
 ${truncatedContent}
 \`\`\`
 ` : ''}
 **Instructions:**
-✅ FIRST: Read \`.pipilot/plan.md\` to see the execution plan and which steps are completed vs pending
-✅ FIRST: Read \`.pipilot/project.md\` (if it exists) to understand the full project context
-${hasModifiedFiles ? '✅ Re-read modified files listed above to understand current state (tool results are NOT available in continuations)' : ''}
-✅ After reading context, switch to **TOOL-ONLY MODE**: only call tools (write_file, edit_file, etc.) with ZERO text explanations between them
-✅ Continue from the next uncompleted step in plan.md
+✅ Read \`.pipilot/plan.md\` to see which steps are completed vs pending
+${hasModifiedFiles ? '✅ Re-read modified files listed above to understand current state' : ''}
+✅ Then switch to **TOOL-ONLY MODE**: only call tools with ZERO text explanations between them
+✅ Continue from the next uncompleted step
 ✅ Call \`update_plan_progress\` as you complete each remaining step
 ✅ Call \`update_project_context\` at the end when all steps are done
 ✅ Only output a text summary AFTER all steps are completed
-❌ Do NOT repeat any content shown above - the user already saw it
-❌ Do NOT explain what you're about to do or what you just did between tool calls
+❌ Do NOT repeat any content shown above
+❌ Do NOT explain what you're about to do between tool calls
 ❌ Do not apologize for the interruption or mention being a "continuation"`
+      }
     }
 
     // Add recovery continuation instructions if this is recovering from an interrupted stream
     if (isRecoveryContinuation && partialResponse) {
       const hasPartialContent = partialResponse?.content && partialResponse.content.trim().length > 0
       const hasPartialReasoning = partialResponse?.reasoning && partialResponse.reasoning.trim().length > 0
-
-      // Truncate partial content if too long
-      const truncatedContent = hasPartialContent
-        ? (partialResponse.content.length > 2000
-            ? '...' + partialResponse.content.slice(-2000)
-            : partialResponse.content)
-        : ''
-      const truncatedReasoning = hasPartialReasoning
-        ? (partialResponse.reasoning.length > 1000
-            ? '...' + partialResponse.reasoning.slice(-1000)
-            : partialResponse.reasoning)
-        : ''
 
       // Get modified files from recovery tool results
       const modifiedFiles = new Set<string>()
@@ -3351,28 +3507,74 @@ ${hasModifiedFiles ? '✅ Re-read modified files listed above to understand curr
       const modifiedFilesList = Array.from(modifiedFiles)
       const hasModifiedFiles = modifiedFilesList.length > 0
 
-      systemPrompt += `
+      // ── LLM-Synthesized recovery context (same approach as continuation) ──
+      let recoverySummary: string | null = null
+      if ((recoveryToolResults || []).length > 0) {
+        try {
+          recoverySummary = await synthesizeContinuationContext({
+            toolResults: recoveryToolResults || [],
+            partialContent: hasPartialContent ? partialResponse.content : '',
+            partialReasoning: hasPartialReasoning ? partialResponse.reasoning : '',
+            elapsedTimeMs: 0,
+            modifiedFiles: modifiedFilesList
+          })
+          if (recoverySummary) {
+            console.log(`[Chat-V2] ✅ Using synthesized recovery context (${recoverySummary.length} chars)`)
+          }
+        } catch (e) {
+          console.warn('[Chat-V2] Recovery synthesis failed, using raw context:', e)
+        }
+      }
+
+      if (recoverySummary) {
+        // ── SYNTHESIZED PATH ──
+        systemPrompt += `
 
 ## 🔄 STREAM RECOVERY MODE
-**IMPORTANT**: The user's connection was interrupted (tab switch, page refresh, or network issue). Your previous response was partially received by the user. You must continue EXACTLY where you left off.
+**IMPORTANT**: The user's connection was interrupted. Below is a synthesized summary of what was done before the interruption. Continue building from where it left off.
+
+### Session State Summary (synthesized)
+${recoverySummary}
+
+**Instructions:**
+✅ Read \`.pipilot/plan.md\` to confirm which steps are completed vs pending
+✅ Continue EXACTLY where the work left off — your output will be APPENDED
+✅ Switch to **TOOL-ONLY MODE**: only tool calls, ZERO text explanations between them
+✅ If you need to understand a file before editing, use read_file — but don't re-read unnecessarily
+❌ Do NOT repeat any work listed in the summary
+❌ Do NOT restart your response or introduction
+❌ Do NOT mention the interruption to the user`
+      } else {
+        // ── FALLBACK PATH ──
+        const truncatedContent = hasPartialContent
+          ? (partialResponse.content.length > 2000
+              ? '...' + partialResponse.content.slice(-2000)
+              : partialResponse.content)
+          : ''
+        const truncatedReasoning = hasPartialReasoning
+          ? (partialResponse.reasoning.length > 1000
+              ? '...' + partialResponse.reasoning.slice(-1000)
+              : partialResponse.reasoning)
+          : ''
+
+        systemPrompt += `
+
+## 🔄 STREAM RECOVERY MODE
+**IMPORTANT**: The user's connection was interrupted. Continue EXACTLY where you left off.
 
 **Recovery Context:**
 - ${(recoveryToolResults || []).length} tool operations were completed before interruption
-- User is now reconnected and waiting for you to continue
-- Your previous partial response is shown below - continue from where it ended
 ${hasModifiedFiles ? `
-**Files modified before interruption (RE-READ these first to understand current state):**
+**Files modified before interruption (RE-READ these first):**
 ${modifiedFilesList.map(f => `- ${f}`).join('\n')}
-
-Use read_file to check current state of these files before continuing.
 ` : ''}
-${hasPartialReasoning ? `
+${truncatedReasoning ? `
 **Your previous reasoning (already shown to user):**
 \`\`\`
 ${truncatedReasoning}
 \`\`\`
 ` : ''}
-${hasPartialContent ? `
+${truncatedContent ? `
 **Your previous response (already shown to user):**
 \`\`\`
 ${truncatedContent}
@@ -3380,13 +3582,12 @@ ${truncatedContent}
 ` : ''}
 **Instructions:**
 ✅ Continue EXACTLY where you left off - your output will be APPENDED
-✅ If you were mid-sentence, continue that sentence
-✅ If you were mid-code-block, continue that code
-${hasModifiedFiles ? '✅ Re-read modified files listed above to understand current state before continuing' : ''}
-✅ After re-reading context, switch to **TOOL-ONLY MODE**: only tool calls, ZERO text explanations between them
+${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : ''}
+✅ Switch to **TOOL-ONLY MODE**: only tool calls, ZERO text explanations between them
 ❌ Do NOT repeat any content shown above
 ❌ Do NOT restart your response or introduction
 ❌ Do NOT mention the interruption to the user`
+      }
 
       console.log('[Chat-V2] 🔄 Recovery continuation mode - continuing from interrupted stream')
     }
