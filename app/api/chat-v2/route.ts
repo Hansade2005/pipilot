@@ -356,6 +356,8 @@ const CORE_TOOLS = new Set([
   'browse_web',
   // Planning & context (mandatory workflow tools)
   'generate_plan', 'update_plan_progress', 'update_project_context', 'suggest_next_steps',
+  // Build mode toggle (AI controls its own tool-only enforcement)
+  'start_build_mode', 'finish_build_mode',
   // Deploy (1 param)
   'deploy_preview',
   // Gateway to everything else
@@ -457,6 +459,10 @@ const TOOL_REGISTRY: ToolRegistryEntry[] = [
 
 // Per-session unlocked tools — grows as AI discovers tools
 const sessionUnlockedTools = new Map<string, Set<string>>()
+
+// Per-session build mode — when true, prepareStep returns toolChoice: 'required'
+// The AI toggles this via start_build_mode / finish_build_mode tools
+const sessionBuildMode = new Map<string, boolean>()
 
 // Extract files from compressed data (LZ4 + Zip)
 async function extractFromCompressedData(compressedData: ArrayBuffer): Promise<{
@@ -2691,6 +2697,9 @@ export async function POST(req: Request) {
 
     console.log(`[DEBUG] In-memory storage initialized: ${sessionFiles.size} files ready for AI tools`)
 
+    // Reset build mode for this request (AI will toggle it via start_build_mode/finish_build_mode)
+    sessionBuildMode.set(projectId, false)
+
     // Build project context from session data
     const sessionData = sessionProjectStorage.get(projectId)
     const projectContext = await buildOptimizedProjectContext(projectId, sessionData, fileTree)
@@ -2839,11 +2848,15 @@ Your response follows this exact sequence every time:
 
 **Step 1 — Context**: If .pipilot/plan.md or .pipilot/project.md exist, read them first to understand prior state. For modifications to existing code, read up to 2 key files for context. For new projects, skip straight to planning.
 
-**Step 2 — Plan**: Call the generate_plan tool with a title, description (1-3 sentences with design direction and hex color codes), 2-10 ordered steps, techStack array, and estimatedFiles count. This is always your first tool call. Do not output any text before calling generate_plan.
+**Step 2 — Plan**: Call generate_plan with a title, description (1-3 sentences with design direction and hex color codes), 2-10 ordered steps, techStack array, and estimatedFiles count. This is always your first tool call. Do not output any text before calling generate_plan.
 
-**Step 3 — Build**: Immediately after the plan, start calling write_file, edit_file, and other file tools to implement every step. Call update_plan_progress after completing each step. Do not output any text during this phase — no explanations, no status updates, no commentary. Just tool calls, one after another, until every step in the plan is done and every page is fully built with real content (never "coming soon" placeholders).
+**Step 3 — Enter build mode**: Immediately after generate_plan, call the start_build_mode tool. This locks you into tool-only mode — you will only be able to make tool calls and cannot output any text. This is intentional and makes you faster.
 
-**Step 4 — Wrap up**: After all steps are complete, call update_project_context to persist what was built. Then output a brief 2-5 sentence summary of what you built. Then call the suggest_next_steps tool with 3-4 actionable follow-up options as your final action.
+**Step 4 — Build**: Now call write_file, edit_file, and other file tools to implement every step. Call update_plan_progress after completing each step. Build every page fully with real content (never "coming soon" placeholders). Continue calling tools until every step in the plan is done.
+
+**Step 5 — Finish build**: After all steps are complete, call update_project_context to persist what was built. Then call finish_build_mode to unlock text output.
+
+**Step 6 — Summary**: Now output a brief 2-5 sentence summary of what you built. Then call suggest_next_steps with 3-4 actionable follow-up options as your final action.
 
 **For Vite/React projects** (not Next.js/Expo): before the summary, verify vite.config has E2B sandbox settings, run check_dev_errors in build mode, fix any errors, then call deploy_preview.
 
@@ -2880,9 +2893,13 @@ Your response follows this exact sequence every time:
 
 **Step 2 — Plan**: Call generate_plan with title, description (include design direction and hex color codes), 2-10 steps, techStack, and estimatedFiles. Always your first tool call. No text before it.
 
-**Step 3 — Build**: Immediately call write_file, edit_file, and other tools to implement every step. Call update_plan_progress after each step. Output zero text during this phase — no explanations, no commentary, no status updates. Just continuous tool calls until every page is fully built with real content. Never deliver "coming soon" placeholders.
+**Step 3 — Enter build mode**: Immediately after generate_plan, call start_build_mode. This locks you into tool-only mode — you can only make tool calls and cannot output text. This makes you faster.
 
-**Step 4 — Wrap up**: Call update_project_context. Then output a 2-5 sentence summary. Then call suggest_next_steps with 3-4 options as your final tool call.
+**Step 4 — Build**: Call write_file, edit_file, and other tools to implement every step. Call update_plan_progress after each step. Build every page fully with real content. Never deliver "coming soon" placeholders.
+
+**Step 5 — Finish build**: After all steps, call update_project_context. Then call finish_build_mode to unlock text output.
+
+**Step 6 — Summary**: Output a 2-5 sentence summary. Then call suggest_next_steps with 3-4 options as your final tool call.
 
 **For Vite/React projects** (not Next.js/Expo): before the summary, verify vite.config E2B settings, run check_dev_errors in build mode, fix errors, then call deploy_preview.
 
@@ -10786,6 +10803,29 @@ ${mergedRoadmapLines.join('\n')}
         }
       }),
 
+      // ── BUILD MODE TOGGLE ──
+      // These two tools let the AI programmatically switch between build mode
+      // (toolChoice: 'required' — forced tool use, no text narration) and
+      // summary mode (toolChoice: 'auto' — can output text for summaries).
+      start_build_mode: tool({
+        description: 'Switch to BUILD MODE. After calling this, you can ONLY make tool calls — no text output is possible. Call this immediately after generate_plan to enter fast build mode. While in build mode, call write_file, edit_file, update_plan_progress, and other tools continuously without any text narration.',
+        inputSchema: z.object({}),
+        execute: async () => {
+          sessionBuildMode.set(projectId, true)
+          console.log(`[Chat-V2] 🔨 Build mode ENABLED for project ${projectId}`)
+          return { mode: 'build', description: 'Build mode active. Only tool calls allowed — no text output. Call finish_build_mode when done building to output your summary.' }
+        }
+      }),
+
+      finish_build_mode: tool({
+        description: 'Exit BUILD MODE and switch to SUMMARY MODE. Call this after all plan steps are completed and update_project_context has been called. After calling this, you can output text for your build summary and then call suggest_next_steps.',
+        inputSchema: z.object({}),
+        execute: async () => {
+          sessionBuildMode.set(projectId, false)
+          console.log(`[Chat-V2] ✅ Build mode DISABLED for project ${projectId}`)
+          return { mode: 'summary', description: 'Summary mode active. You can now output text. Write a brief 2-5 sentence summary of what you built, then call suggest_next_steps.' }
+        }
+      }),
 
       create_snapshot: tool({
         description: 'Create a snapshot of the current project state. Use this before making major changes so the user can rollback if needed. Captures all project files at their current state.',
@@ -11613,7 +11653,17 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
               activeToolNames.push(tc.toolName)
             }
           }
+
+          // ── TOOL-ONLY MODE: AI toggles this via start_build_mode / finish_build_mode ──
+          // When build mode is active, toolChoice: 'required' forces the model to
+          // call a tool every step — physically preventing text narration.
+          // Safety valve: release to 'auto' near step limit so it can finish gracefully.
+          const inBuildMode = sessionBuildMode.get(projectId) === true
+          const nearLimit = steps.length >= (maxStepsAllowed - 3)
+          const toolChoice = (inBuildMode && !nearLimit) ? 'required' as const : 'auto' as const
+
           return {
+            toolChoice,
             activeTools: [...new Set(activeToolNames)] as any
           }
         },
@@ -11664,7 +11714,13 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                 activeToolNames.push(tc.toolName)
               }
             }
-            return { activeTools: [...new Set(activeToolNames)] as any }
+
+            // ── TOOL-ONLY MODE (same logic as primary model) ──
+            const inBuildMode = sessionBuildMode.get(projectId) === true
+            const nearLimit = steps.length >= (maxStepsAllowed - 3)
+            const toolChoice = (inBuildMode && !nearLimit) ? 'required' as const : 'auto' as const
+
+            return { toolChoice, activeTools: [...new Set(activeToolNames)] as any }
           },
           onChunk,
           onStepFinish: handleStepFinish,
