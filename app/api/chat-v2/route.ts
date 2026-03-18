@@ -10813,108 +10813,175 @@ ${mergedRoadmapLines.join('\n')}
       // AI calls this before creating any frontend to load the design guide.
       // Returns a comprehensive design thinking framework that prevents generic AI aesthetics.
       frontend_design_guide: tool({
-        description: 'IMPORTANT: Call this tool BEFORE writing any frontend code (HTML, CSS, React components, pages, layouts). It returns a comprehensive design skill guide that helps you create distinctive, production-grade interfaces that avoid generic AI aesthetics. Call it once at the start of any build that involves UI.',
+        description: 'IMPORTANT: Call this tool BEFORE writing any frontend code (HTML, CSS, React components, pages, layouts). It uses AI to generate a project-specific design system with unique font pairings, color palette, layout recommendations, and aesthetic direction tailored to what you are building. Call it once at the start of any build that involves UI.',
         inputSchema: z.object({
-          projectType: z.string().optional().describe('Brief description of what is being built (e.g. "restaurant landing page", "SaaS dashboard", "portfolio site")'),
+          projectType: z.string().describe('What is being built (e.g. "restaurant landing page", "SaaS dashboard", "portfolio site", "fitness tracker app")'),
         }),
         execute: async ({ projectType }) => {
-          const guide = `# Frontend Design Skill — Loaded
+          try {
+            console.log(`[Chat-V2] 🎨 Generating design guide for: ${projectType}`)
+            const response = await fetch('https://api.a0.dev/ai/llm', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                messages: [
+                  {
+                    role: 'system',
+                    content: `You are an elite UI/UX design director creating a project-specific design system. You MUST produce distinctive, memorable designs that look like a human designer crafted them — NEVER generic AI aesthetics.
 
-## Design Thinking (do this BEFORE writing any code)
+BANNED (these scream "AI generated"):
+- Fonts: Inter, Roboto, Arial, system-ui, Poppins, DM Sans, Outfit, Space Grotesk alone
+- Colors: purple-to-pink gradients, mesh gradients, gradient text, default Tailwind grays alone
+- Layouts: repeating "text left, image right", cookie-cutter hero→features→testimonials→CTA→footer
+- Copy: "innovative solutions", "fast-paced world", "leverage", "empower", "seamlessly integrate", "Get started", "Learn more"
+- Visuals: floating blobs, abstract shapes, neon glow on everything
 
-1. **Purpose**: What problem does this interface solve? Who uses it?
-2. **Tone**: Pick a BOLD aesthetic direction — not "clean and modern" (that's generic). Choose from: brutally minimal, maximalist, retro-futuristic, organic/natural, luxury/refined, playful/toy-like, editorial/magazine, brutalist/raw, art deco/geometric, soft/pastel, industrial/utilitarian, cyberpunk, neo-classical, Scandinavian, Japanese-inspired, etc.
-3. **Differentiation**: What's the ONE thing someone will remember about this design?
-4. **Color Strategy**: Dominant color with sharp accents. Never evenly-distributed timid palettes. Define as CSS variables.
-
-## Typography Rules
-
-BANNED fonts (these scream "AI made this"): Inter, Roboto, Arial, system-ui, Poppins, DM Sans, Outfit, Space Grotesk (when used alone).
-
-Instead, use FONT PAIRINGS — a display/heading font + a body font:
-- **Elegant**: Playfair Display + Source Sans 3
-- **Modern Tech**: Sora + Nunito Sans
-- **Editorial**: Fraunces + Commissioner
-- **Startup**: Cabinet Grotesk + Satoshi
-- **Creative**: Clash Display + General Sans
-- **Minimal**: Instrument Serif + Instrument Sans
-- **Corporate**: Newsreader + Work Sans
-- **Playful**: Bricolage Grotesque + Outfit
-- **Luxury**: Cormorant Garamond + Lato
-- **Bold**: Plus Jakarta Sans + IBM Plex Sans
-Import via Google Fonts <link> tag. Use CSS variables: --font-display and --font-body.
-
-## Color System
-
-Define ALL colors as CSS custom properties:
-\`\`\`css
-:root {
-  --color-primary: #hex;
-  --color-primary-light: #hex;
-  --color-accent: #hex;
-  --color-surface: #hex;
-  --color-surface-alt: #hex;
-  --color-text: #hex;
-  --color-text-muted: #hex;
-  --color-border: #hex;
+You must return a JSON object with these exact fields:
+{
+  "aesthetic": "One bold aesthetic direction (e.g. 'Japanese minimalism meets warm hospitality', 'brutalist editorial with soft color accents', 'retro-futuristic neon dashboard')",
+  "fontPairing": {
+    "display": "Exact Google Font name for headings",
+    "body": "Exact Google Font name for body text",
+    "rationale": "Why this pairing fits the project"
+  },
+  "colorPalette": {
+    "primary": "#hex",
+    "primaryLight": "#hex",
+    "accent": "#hex",
+    "surface": "#hex",
+    "surfaceAlt": "#hex",
+    "text": "#hex",
+    "textMuted": "#hex",
+    "border": "#hex",
+    "rationale": "Why these colors fit"
+  },
+  "darkMode": {
+    "surface": "#hex",
+    "surfaceAlt": "#hex",
+    "text": "#hex",
+    "textMuted": "#hex",
+    "border": "#hex"
+  },
+  "layoutStrategy": ["3-4 specific layout patterns to use for different sections, picked from: bento grid, split hero 60/40, asymmetric columns, full-bleed sections, overlapping elements, masonry grid, horizontal scroll, diagonal dividers, card stack with offset"],
+  "heroStyle": "Specific hero section design (e.g. 'full-bleed food photography with dark overlay and centered serif heading', 'split layout with animated gradient left and form right')",
+  "motionDesign": ["2-3 specific animation choices for this project"],
+  "iconStyle": "Icon approach (e.g. 'Lucide outline icons at 20px', 'custom SVG illustrations', 'emoji accents')",
+  "uniqueElement": "The ONE memorable design element that makes this unforgettable (e.g. 'parallax ingredient photos that follow scroll', 'morphing blob navigation', 'typewriter effect on hero heading')",
+  "sampleCopy": {
+    "heroHeading": "A specific, compelling heading for the hero section",
+    "heroSubtext": "Supporting text under the hero",
+    "cta": "A specific, action-oriented CTA button text (NOT generic)",
+    "sectionHeadings": ["3-4 section heading examples"]
+  },
+  "cssVariables": "Complete :root CSS block with all custom properties including fonts"
 }
-\`\`\`
-Match palette to industry: navy+gold=finance, sage+cream=wellness, coral+charcoal=food, indigo+mint=SaaS, emerald+sand=eco, crimson+slate=news.
 
-## Layout Variety (NEVER repeat the same pattern)
+CRITICAL RULES:
+- Every project gets a UNIQUE design. Never repeat the same recommendations.
+- Choose fonts available on Google Fonts that are distinctive and match the aesthetic.
+- All hex colors must be real, valid hex codes that work together as a cohesive palette.
+- The heroHeading and CTA must be specific to the project, not generic.
+- Vary between light and dark base themes. Not everything should be dark mode first.
+- Return ONLY valid JSON. No markdown, no explanation.`
+                  },
+                  {
+                    role: 'user',
+                    content: `Generate a unique, project-specific design system for: "${projectType}"`
+                  }
+                ],
+                temperature: 0.9,
+                max_tokens: 1200
+              })
+            })
 
-Mix from this menu — never use the same layout twice in a row:
-- Bento grid (asymmetric card sizes: span-2 + span-1)
-- Split hero (60/40 or full-bleed image with text overlay)
-- Asymmetric columns (2/3 + 1/3, not always 50/50)
-- Full-bleed sections (edge-to-edge color/image breaks)
-- Overlapping elements (cards crossing section boundaries: -mt-16 relative z-10)
-- Masonry / Pinterest-style grids
-- Horizontal scroll sections (for testimonials, products on mobile)
-- Diagonal or angled section dividers (clip-path or skew transforms)
+            if (!response.ok) throw new Error(`a0 API returned ${response.status}`)
+            const data = await response.json()
+            const text = data.completion || ''
 
-## Motion & Micro-interactions
+            // Parse the JSON response
+            const jsonMatch = text.match(/\{[\s\S]*\}/)
+            if (!jsonMatch) throw new Error('No JSON in response')
+            const design = JSON.parse(jsonMatch[0])
 
-- Page load: staggered fadeInUp with animation-delay per element
-- Scroll: IntersectionObserver triggers .animate-fade-in-up
-- Cards: hover:shadow-xl hover:-translate-y-2 transition-all duration-300
-- Buttons: active:scale-95 transition-transform
-- Input focus: ring glow with brand color
-- Page transitions: opacity + translateY on route change
+            console.log(`[Chat-V2] 🎨 Design guide generated: aesthetic="${design.aesthetic}", fonts="${design.fontPairing?.display} + ${design.fontPairing?.body}"`)
 
-## Visual Polish Checklist
+            // Build a readable guide from the structured data
+            const guide = `# Design System for "${projectType}"
 
-- Rounded: rounded-xl/rounded-2xl on cards, rounded-full on avatars
-- Shadows: layered (shadow-sm + shadow-lg for depth)
-- Spacing: py-24 or py-32 for major sections (generous), p-8 for cards
-- Images: use Image API https://api.a0.dev/assets/image?text={description}&aspect=16:9
-- Icons: Lucide icons, consistently sized, never mix libraries
-- Loading: skeleton animate-pulse screens, not spinners
-- Real content: specific names, prices, dates — never lorem ipsum or "coming soon"
-- CTAs: action-specific ("Book a table", "Start cooking") not generic ("Get started", "Learn more")
+## Aesthetic Direction
+${design.aesthetic}
 
-## BANNED Patterns (these make sites look AI-generated)
+## Typography
+- **Display font**: ${design.fontPairing?.display} (headings, hero text)
+- **Body font**: ${design.fontPairing?.body} (paragraphs, UI text)
+- **Why**: ${design.fontPairing?.rationale || 'Chosen for this project type'}
+- Import both via Google Fonts \`<link>\` tag in index.html
+- Define as CSS variables: \`--font-display\` and \`--font-body\`
 
-- Purple-to-pink gradients, mesh gradients, gradient text
-- Floating abstract blobs/shapes as decoration
-- Repeating "text left, image right" alternating sections
-- Generic copy: "innovative solutions", "fast-paced world", "leverage", "empower", "seamlessly integrate"
-- Cookie-cutter hero → features → testimonials → CTA → footer with zero variation
-- White backgrounds with no texture, depth, or visual interest
-- Same border-radius on everything with no variation
+## Color Palette
+- Primary: ${design.colorPalette?.primary}
+- Primary Light: ${design.colorPalette?.primaryLight}
+- Accent: ${design.colorPalette?.accent}
+- Surface: ${design.colorPalette?.surface}
+- Surface Alt: ${design.colorPalette?.surfaceAlt}
+- Text: ${design.colorPalette?.text}
+- Text Muted: ${design.colorPalette?.textMuted}
+- Border: ${design.colorPalette?.border}
+- **Why**: ${design.colorPalette?.rationale || 'Industry-matched palette'}
 
-## Dark Mode
+## Dark Mode Colors
+- Surface: ${design.darkMode?.surface}
+- Surface Alt: ${design.darkMode?.surfaceAlt}
+- Text: ${design.darkMode?.text}
+- Text Muted: ${design.darkMode?.textMuted}
+- Border: ${design.darkMode?.border}
 
-When implementing dark mode, ALWAYS pair backgrounds and text:
-- bg-white dark:bg-gray-900 → text-gray-900 dark:text-white
-- Every dark:bg-* MUST have matching dark:text-* on ALL children
-- Use the CSS variable system: swap variable values in .dark class
+## CSS Variables (paste this into your globals/index.css)
+${design.cssVariables || `\`:root { --color-primary: ${design.colorPalette?.primary}; --color-accent: ${design.colorPalette?.accent}; --color-surface: ${design.colorPalette?.surface}; --color-text: ${design.colorPalette?.text}; }\``}
 
-${projectType ? `\n## Context: Building "${projectType}"\nDesign choices should be appropriate for this specific project type. Think about who uses this and what feeling the interface should evoke.` : ''}
+## Layout Strategy
+${(design.layoutStrategy || []).map((l: string, i: number) => `${i + 1}. ${l}`).join('\n')}
 
-Guide loaded. Now proceed with design thinking, then start building.`
+## Hero Section
+${design.heroStyle}
 
-          return { success: true, guide, projectType: projectType || 'general' }
+## Motion & Animations
+${(design.motionDesign || []).map((m: string) => `- ${m}`).join('\n')}
+
+## Icons
+${design.iconStyle}
+
+## Unique Memorable Element
+${design.uniqueElement}
+
+## Sample Copy (use these or similar — NOT generic text)
+- **Hero heading**: "${design.sampleCopy?.heroHeading}"
+- **Hero subtext**: "${design.sampleCopy?.heroSubtext}"
+- **CTA button**: "${design.sampleCopy?.cta}"
+- **Section headings**: ${(design.sampleCopy?.sectionHeadings || []).map((h: string) => `"${h}"`).join(', ')}
+
+## Reminders
+- Use Image API for all images: https://api.a0.dev/assets/image?text={description}&aspect=16:9
+- Use Lucide icons consistently
+- Build ALL pages fully — never "coming soon" placeholders
+- Real content: specific names, prices, dates
+- Every dark:bg-* needs matching dark:text-* on all children
+
+Apply this design system to every file you create.`
+
+            return { success: true, guide, design, projectType }
+          } catch (err) {
+            // Fallback: return a minimal static guide if LLM fails
+            console.warn('[Chat-V2] 🎨 Design guide LLM failed, using fallback:', err)
+            return {
+              success: true,
+              guide: `# Design Guide (fallback)
+Use a distinctive font pairing (not Inter/Roboto), a cohesive color palette with CSS variables, varied layout patterns (bento grids, asymmetric splits), and real content. Avoid purple gradients, floating blobs, and generic copy like "innovative solutions". Make it memorable.
+Project: ${projectType}`,
+              projectType,
+              fallback: true
+            }
+          }
         }
       }),
 
