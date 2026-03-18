@@ -6,7 +6,7 @@
 
 ---
 
-## Current State (as of 2026-02-25)
+## Current State (as of 2026-03-18)
 
 - **Production URL:** https://pipilot.dev
 - **Framework:** Next.js 14+ (App Router) / Tailwind / shadcn/ui
@@ -20,7 +20,7 @@
 
 | Role | Project ID | Purpose |
 |------|-----------|---------|
-| **Main App** | `lzuknbfbvpuscpammwzg` | Auth, billing, wallet, personas, snapshots, secrets, teams, organizations |
+| **Main App** | `lzuknbfbvpuscpammwzg` | Auth, billing, wallet, personas, snapshots, secrets, teams, organizations, **ollama_keys** |
 | **Agent Cloud** | `dlunpilhklsgvkegnnlp` | Agent sessions, messages, MCP connectors, hosted sites, site analytics |
 
 Both accessible via the same Management API token (see `local-supabase-credentials.md`).
@@ -47,6 +47,9 @@ Users build fullstack apps via conversational AI.
 | Netlify deploy | `app/api/netlify/` | Live |
 | Supabase integration | `app/api/supabase/`, `app/api/database/` | Live |
 | Stripe integration | `app/api/stripe/` | Live |
+| Tool Discovery System | `app/api/chat-v2/route.ts` (TOOL_REGISTRY + discover_tools + prepareStep) | Live |
+| Inline Tool Pills | `components/workspace/message-with-tools.tsx` | Live |
+| DB-backed Ollama Key Rotation | `lib/ai-providers.ts` + `ollama_keys` table | Live |
 
 ### Agent Cloud - `/agent-cloud`
 Cloud-based AI coding agent with E2B sandboxes.
@@ -93,50 +96,70 @@ Cloud-based AI coding agent with E2B sandboxes.
 
 ## Recent Changes (Chronological)
 
+### 2026-03-18 — Session Summary
+Major model catalog expansion + Ollama DB rotation + tool fixes + pill accuracy.
+
+#### Ollama Cloud Model Catalog Expansion
+- **Added 4 new models:** `qwen3-coder:480b`, `qwen3-coder-next`, `qwen3.5:397b`, `deepseek-v3.1:671b`
+- All added to: `lib/ai-models.ts`, `lib/ai-providers.ts`, `lib/billing/model-pricing-data.ts`, `components/ui/model-selector.tsx`
+- All Ollama Cloud models now available to **free users** (not just premium)
+- Model selector dropdown max-height reverted to 380px after testing
+
+#### DB-Backed Ollama Key Rotation System
+- **New table:** `ollama_keys` in Supabase (pixelai DB) — 58 keys seeded
+- **Smart rotation:** Picks key with fewest `requests_in_window` + oldest `last_used_at`
+- **Concurrency lock:** `in_use` boolean per key (Ollama free tier = 1 concurrent request)
+- **5hr window tracking:** `requests_in_window` counter, auto-resets when window expires
+- **Weekly tracking:** `requests_in_week` counter, auto-resets after 7 days
+- **Error tracking:** `consecutive_errors` counter, auto-disables key at 5 errors
+- **Stale lock recovery:** Keys stuck `in_use` > 3 min auto-released (crashed requests)
+- **Fallback:** If DB unavailable, falls back to env-based round-robin
+- **Integration:** `getAIModel()` in route.ts is now async, returns `{ model, ollamaKeyId }`
+- **Release:** `releaseOllamaKey()` called in `finally` block after streaming completes/errors
+- **Files changed:** `lib/ai-providers.ts` (new functions: `getOllamaModel`, `getOllamaCloudProviderFromDB`, `releaseOllamaKey`), `app/api/chat-v2/route.ts` (async getAIModel, import new functions, release in finally)
+
+#### Inline Tool Pill Accuracy Improvements
+- **Forward-only snapping:** Pills snap forward to next newline within 30 chars (not ±50 bidirectional)
+- **Sentence boundary fallback:** Snaps to `.` `!` `?` when no newline nearby
+- **Deduplication:** `Set<string>` dedup by `toolCallId` — no duplicate pills
+- **Fixed reasoning vs text classification:** Tools with `textPosition=0` + `reasoningPosition>0` now only appear in reasoning (not text stream)
+- **Old-format reasoning filter:** Only passes tools with `reasoningPosition > 0` to reasoning InterleavedContent
+- **Tighter spacing:** `space-y-1`, `my-1` for pills
+- **File:** `components/workspace/message-with-tools.tsx`
+
+#### list_files Tool Fixes
+- `"."`, `"./"`, `"/"`, `""` now correctly treated as root directory (was matching as subdirectory prefix)
+- Subdirectory paths normalized: strips `./`, leading `/`, trailing `/`, mid-path `./`
+- **File:** `app/api/chat-v2/route.ts` (list_files execute handler)
+
+#### Commits This Session
+1. `8991b209` — Add Qwen3 and DeepSeek V3.1 models to Ollama Cloud catalog
+2. `5bfc10c5` — Revert model selector dropdown height back to 380px
+3. `2ab55df5` — Improve inline tool pill positioning accuracy in chain of thought
+4. `e3443fa8` — Fix list_files treating '.' and './' as subdirectory instead of root
+5. `1c2c058c` — Harden list_files path normalization for ./ and mid-path ./ patterns
+6. `eaeedc1a` — Add DB-backed Ollama key rotation with rate limit tracking
+
+### 2026-03-17 (prior session)
+- Tool Discovery System (`TOOL_REGISTRY` + `discover_tools` + `prepareStep`)
+- Slim core tools to 13, heavy tools discoverable
+- Major streaming performance overhaul (RAF batching, smoothStream delay:0, scrollTop vs scrollIntoView)
+- Deploy preview returns plain text (context overhead fix)
+- Fix generate_plan crash, deep link toast error, plan/context pill visibility
+- Add client_replace_string_in_file and browse_web to core tools
+
 ### 2026-02-25
-- **Developer Power Tools launch** - 8 features in one sprint:
-  - Usage Analytics dashboard with real-time credit tracking
-  - AI Personas (custom instruction sets per project)
-  - Project Snapshots with one-click rollback
-  - Project Health Score (A-F grading, 5 categories)
-  - Secrets Vault (AES-256-GCM encryption, Vercel sync, audit trail)
-  - AI Code Review (security, performance, maintainability analysis)
-  - Scheduled Tasks (cron-based agent automation)
-  - Project Showcase (community gallery with likes/views)
-- Added documentation, blog post, and features page for all above
+- **Developer Power Tools launch** - 8 features in one sprint
 - Custom HTTP streamable MCP servers for agent cloud
-- Added .mcp.json to .gitignore
 
 ### 2026-02-22
 - Removed meta/llama-4-scout model
 - Refactored Bonsai models: removed from workspace, kept only in agent-cloud
-- Added openai/gpt-oss-120b, zai/glm-4.6 models
-
-### 2026-02-21
-- Removed LLM Gateway provider and broken xai/glm-4.7 model
-- Added LLM Gateway provider with zai/glm-4.7-flash (then removed)
 
 ### 2026-02-20
-- **Agent Cloud UI overhaul:**
-  - Redesigned with clean branded design
-  - Model selector in session input
-  - Plus context menu, attachment pills, Playwright toggle
-  - MCP & Connectors submenu on /new and session pages
-  - Fixed mobile: sidebar, header, fixed bottom input
-  - Lazy-load session messages
-  - Cross-device session load fix
-  - Image storage moved from Supabase to IndexedDB
-  - User message bubbles: orange bg, right-aligned
-  - Tool output: git-style diffs, syntax highlighting, TodoWrite inline
-  - Message truncation (308 chars / 54 words)
-- **Bonsai AI provider:** Added with 4 models, round-robin key rotation, Anthropic-compatible API
-- **Landing page:** Universe starfield, floating rocks, particle background, arc effects, trust layer, logo bar
-
-### 2026-02-19
-- Playwright browser testing setup (e2e/browse.spec.ts)
-- Floating particle background with orange brand theme
-- Homepage restructure: Projects section after E2B badge, trust layer, how-it-works
-- Footer badges fix (marquee own row)
+- **Agent Cloud UI overhaul**
+- **Bonsai AI provider:** Round-robin key rotation
+- **Landing page:** Universe starfield, floating rocks
 
 ---
 
@@ -150,45 +173,88 @@ Cloud-based AI coding agent with E2B sandboxes.
 6. **Bonsai provider** - Round-robin API key rotation for agent cloud models
 7. **IndexedDB for images** - Agent cloud images stored client-side, not in Supabase
 8. **Orange accent brand** - Consistent theme defined in `.claude/rules/brand-theme.md`
-
----
-
-## Pricing Tiers
-
-| Plan | Monthly | Credits | Requests |
-|------|---------|---------|----------|
-| Free | $0 | 150 | 20/mo |
-| Creator | $25 CAD | 1,000 | 250/mo |
-| Collaborate | $75 CAD | 2,500 | 600/mo |
-| Scale | $150 CAD | 5,000 | 2,000/mo |
-
-Credit top-ups: $0.01/credit (paid plans only).
+9. **DB-backed Ollama rotation** - 58 keys in `ollama_keys` table, smart rotation respecting concurrency/window/weekly limits
+10. **Tool Discovery System** - 68 tools in registry, 13 core tools always available, rest unlocked via `discover_tools` + `prepareStep`
+11. **AI-powered project detection** - `detectProjectTypeWithAI()` via a0 LLM API instead of fragile path checks
+12. **Path normalization at ingestion** - All file paths stripped of leading `/` at session storage ingestion
 
 ---
 
 ## AI Models in Use
 
+### Workspace Models (Model Selector)
+
+| Provider | Models | Tier |
+|----------|--------|------|
+| Ollama Cloud | Claude Opus 4.6 (minimax-m2.5), Claude Sonnet 4.6 (minimax-m2.1) | Free + Premium |
+| Ollama Cloud | Devstral 2 123B, DeepSeek V3.1 671B, DeepSeek V3.2 | Free + Premium |
+| Ollama Cloud | Qwen3 Coder 480B, Qwen3 Coder Next, Qwen3.5 397B | Free + Premium |
+| Ollama Cloud | Kimi K2.5, Kimi K2 Thinking, Kimi K2 1T, GLM 4.6, GLM 4.7 | Free + Premium |
+| Vercel Gateway | Devstral 2, Devstral Small 2, Grok Code Fast 1 | Free + Premium |
+| Kilo Gateway | Kilo Auto, MiniMax M2.5, Kimi K2.5, Giga Potato, Step Flash | Free + Premium |
+| Custom | Codestral (Mistral), Pixela (a0.dev), Pixtral 12B (vision) | Various |
+
+### Other Contexts
 | Context | Models |
 |---------|--------|
-| Workspace (main) | Grok Code Fast 1, Claude Sonnet 4.5, Gemini 2.5 Flash, Devstral 2 |
 | Agent Cloud | Bonsai models (round-robin), all workspace models |
 | Support chat | Mistral Pixtral (vision-enabled) |
+| Auto/Default | Grok Code Fast 1 (xAI direct) |
+| Fallback | Grok Code Fast 1 (when primary model fails) |
+
+---
+
+## Ollama Key Rotation (DB Schema)
+
+**Table:** `public.ollama_keys` (pixelai DB: `lzuknbfbvpuscpammwzg`)
+**Keys:** 58 active keys
+**Rate limits per key (free tier):** 1 concurrent request, ~5hr session window, 7-day weekly reset
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `api_key` | TEXT UNIQUE | The Ollama API key |
+| `last_used_at` | TIMESTAMPTZ | When key was last used |
+| `requests_in_window` | INT | Requests in current 5hr window |
+| `window_start_at` | TIMESTAMPTZ | When current 5hr window started |
+| `requests_in_week` | INT | Total requests this week |
+| `week_start_at` | TIMESTAMPTZ | When current week started |
+| `in_use` | BOOLEAN | Currently serving a request (concurrency lock) |
+| `is_active` | BOOLEAN | False = disabled (revoked/dead) |
+| `consecutive_errors` | INT | Auto-disables at 5 |
 
 ---
 
 ## Important File Paths
 
 ```
-app/api/chat-v2/route.ts           # Main AI chat API (~10k lines)
+app/api/chat-v2/route.ts           # Main AI chat API (~12k lines)
 app/workspace/page.tsx              # Main workspace UI
 app/agent-cloud/                    # Agent Cloud pages
 app/api/agent-cloud/                # Agent Cloud API routes
+lib/ai-providers.ts                 # All AI provider factories + Ollama DB rotation
+lib/ai-models.ts                    # Model registry (chatModels array)
+lib/billing/model-pricing-data.ts   # Per-model pricing data
+lib/billing/credit-manager.ts       # Credit deduction + billing logic
 lib/stripe-config.ts                # Pricing/plan configs
-lib/supabase/                       # Supabase client setup
+lib/supabase.ts                     # Supabase client setup (getServerSupabase)
+lib/utils.ts                        # detectProjectTypeWithAI, filterUnwantedFiles
+lib/client-file-tools.ts            # Client-side file operation handlers
+components/ui/model-selector.tsx    # Model selector dropdown (shortNameMap, modelOrder, allowedModels)
+components/workspace/message-with-tools.tsx  # Tool pills + InterleavedContent positioning
+components/workspace/chat-panel-v2.tsx       # Frontend streaming + tool call tracking
+components/workspace/workspace-layout.tsx    # Main workspace layout + file editor
 components/navigation.tsx           # Main nav bar
 components/footer.tsx               # Site footer
 public/docs.json                    # Searchable documentation data
 .claude/rules/brand-theme.md        # Orange accent color system
 .claude/rules/playwright-browser-testing.md  # Browser testing setup
-.claude/rules/local-supabase-credentials.md  # DB access (gitignored)
 ```
+
+---
+
+## Known Issues / TODO
+
+- **Ollama keys:** Only 58 of ~80 keys inserted. User may paste remaining keys.
+- **Last key possibly truncated:** `04b9571450a142ceb9ec2dc74e4227e3.JfzI4` looks short.
+- **Ollama rotation untested in prod:** Keys all show `last_used_at: null` — need live traffic to verify.
+- **list_files in clientSideTools:** `list_files` is in the client-side tools array in chat-panel-v2.tsx (4 places) but has no handler in `client-file-tools.ts`. Currently handled server-side via the tool's `execute` function. Consider removing from client-side arrays to avoid confusion.
