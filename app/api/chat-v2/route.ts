@@ -6104,9 +6104,15 @@ Present results using this markdown structure:
             // Treat ".", "./", "/", and empty string as root directory
             const isRootPath = !path || path === '.' || path === './' || path === '/'
             if (!isRootPath) {
-              // Normalize the requested path too
-              const cleanPath = path!.startsWith('/') ? path!.slice(1) : path!
-              const pathPrefix = cleanPath.endsWith('/') ? cleanPath : `${cleanPath}/`
+              // Normalize the requested path: strip leading / and ./
+              let cleanPath = path!
+              if (cleanPath.startsWith('./')) cleanPath = cleanPath.slice(2)
+              if (cleanPath.startsWith('/')) cleanPath = cleanPath.slice(1)
+              // Strip trailing slash for consistent prefix matching
+              if (cleanPath.endsWith('/')) cleanPath = cleanPath.slice(0, -1)
+              // Also strip ./ that might appear mid-path
+              cleanPath = cleanPath.replace(/\.\//g, '')
+              const pathPrefix = `${cleanPath}/`
               const seen = new Set<string>()
               for (const file of normalizedFiles) {
                 if (!file.path) continue
