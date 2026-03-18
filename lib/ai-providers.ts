@@ -353,6 +353,10 @@ function createModelInstance(modelId: string): any {
 
     // Ollama Cloud models
     case 'ollama/devstral-2:123b':
+    case 'ollama/qwen3-coder:480b':
+    case 'ollama/qwen3-coder-next':
+    case 'ollama/qwen3.5:397b':
+    case 'ollama/deepseek-v3.1:671b':
     case 'ollama/deepseek-v3.2':
     case 'ollama/glm-4.6':
     case 'ollama/glm-4.7':

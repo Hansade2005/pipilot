@@ -27,6 +27,10 @@ const shortNameMap = new Map<string, string>([
   ['xai/grok-code-fast-1', 'Grok Fast'],
   // Ollama Cloud models
   ['ollama/devstral-2:123b', 'Devstral 123B'],
+  ['ollama/qwen3-coder:480b', 'Qwen3 Coder'],
+  ['ollama/qwen3-coder-next', 'Qwen3 Coder Next'],
+  ['ollama/qwen3.5:397b', 'Qwen3.5 397B'],
+  ['ollama/deepseek-v3.1:671b', 'DeepSeek V3.1'],
   ['ollama/deepseek-v3.2', 'DeepSeek V3.2'],
   ['ollama/glm-4.6', 'GLM 4.6'],
   ['ollama/glm-4.7', 'GLM 4.7'],
@@ -51,6 +55,10 @@ const descriptionMap = new Map<string, string>([
   ['xai/grok-code-fast-1', 'Fast code with xAI'],
   // Ollama Cloud models
   ['ollama/devstral-2:123b', 'Devstral 123B via Ollama Cloud'],
+  ['ollama/qwen3-coder:480b', 'Qwen3 Coder 480B - Purpose-built for code'],
+  ['ollama/qwen3-coder-next', 'Next-gen Qwen coding model'],
+  ['ollama/qwen3.5:397b', 'Qwen3.5 flagship - Reasoning + code'],
+  ['ollama/deepseek-v3.1:671b', 'DeepSeek V3.1 671B - Proven for code'],
   ['ollama/deepseek-v3.2', 'DeepSeek V3.2 via Ollama Cloud'],
   ['ollama/glm-4.6', 'GLM 4.6 via Ollama Cloud'],
   ['ollama/glm-4.7', 'GLM 4.7 via Ollama Cloud'],
@@ -159,13 +167,17 @@ export function ModelSelector({
     allowedModels = [
       'xai/grok-code-fast-1', 'mistral/devstral-2', 'mistral/devstral-small-2',
       'ollama/minimax-m2.5', 'ollama/minimax-m2.1',
+      'ollama/devstral-2:123b', 'ollama/qwen3-coder:480b', 'ollama/qwen3-coder-next', 'ollama/qwen3.5:397b',
+      'ollama/deepseek-v3.1:671b', 'ollama/deepseek-v3.2', 'ollama/glm-4.6', 'ollama/glm-4.7',
+      'ollama/kimi-k2.5', 'ollama/kimi-k2-thinking', 'ollama/kimi-k2:1t',
       'kilo/auto-free', 'kilo/minimax-m2.5-free', 'kilo/kimi-k2.5-free',
       'kilo/giga-potato', 'kilo/step-3.5-flash-free'
     ]
   } else if (isPremium && effectiveStatus === 'active') {
     allowedModels = [
       'auto', 'mistral/devstral-2', 'mistral/devstral-small-2', 'xai/grok-code-fast-1',
-      'ollama/devstral-2:123b', 'ollama/deepseek-v3.2', 'ollama/glm-4.6', 'ollama/glm-4.7',
+      'ollama/devstral-2:123b', 'ollama/qwen3-coder:480b', 'ollama/qwen3-coder-next', 'ollama/qwen3.5:397b',
+      'ollama/deepseek-v3.1:671b', 'ollama/deepseek-v3.2', 'ollama/glm-4.6', 'ollama/glm-4.7',
       'ollama/kimi-k2.5', 'ollama/kimi-k2-thinking', 'ollama/minimax-m2.5', 'ollama/minimax-m2.1',
       'ollama/kimi-k2:1t',
       'kilo/auto-free', 'kilo/minimax-m2.5-free', 'kilo/kimi-k2.5-free',
@@ -217,7 +229,8 @@ export function ModelSelector({
     'ollama/minimax-m2.5', 'ollama/minimax-m2.1',
     'mistral/devstral-2', 'mistral/devstral-small-2',
     'xai/grok-code-fast-1',
-    'ollama/devstral-2:123b', 'ollama/deepseek-v3.2', 'ollama/kimi-k2.5', 'ollama/kimi-k2-thinking',
+    'ollama/devstral-2:123b', 'ollama/qwen3-coder:480b', 'ollama/qwen3-coder-next', 'ollama/qwen3.5:397b',
+    'ollama/deepseek-v3.1:671b', 'ollama/deepseek-v3.2', 'ollama/kimi-k2.5', 'ollama/kimi-k2-thinking',
     'ollama/kimi-k2:1t', 'ollama/glm-4.6', 'ollama/glm-4.7',
     'kilo/auto-free', 'kilo/minimax-m2.5-free', 'kilo/kimi-k2.5-free',
     'kilo/giga-potato', 'kilo/step-3.5-flash-free',
@@ -243,7 +256,7 @@ export function ModelSelector({
       {/* Dropdown */}
       {isOpen && (
         <div className={`absolute ${dropdownDirection === 'down' ? 'top-8' : 'bottom-8'} ${dropdownAlign === 'left' ? 'left-0' : 'right-0'} w-[240px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[100] overflow-hidden ${dropdownClassName}`}>
-          <div className="max-h-[380px] overflow-y-auto py-1">
+          <div className="max-h-[480px] overflow-y-auto py-1">
             {/* Platform models */}
             {orderedModels.map((modelId) => {
               const allowed = isModelAllowed(modelId)
