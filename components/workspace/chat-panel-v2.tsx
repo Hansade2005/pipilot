@@ -2926,6 +2926,33 @@ export function ChatPanelV2({
                     : msg
                 ))
               }
+            } else if (parsed.type === 'tool-input-start') {
+              // AI SDK v5: Tool call STARTING — show pill immediately before args arrive
+              // (Same handling as regular stream for accurate pill positioning)
+              const toolId = parsed.toolCallId || parsed.id
+              const toolName = parsed.toolName
+              if (toolId && toolName && !continuationLocalToolCalls.find(tc => tc.toolCallId === toolId)) {
+                const toolCallEntry = {
+                  toolName,
+                  toolCallId: toolId,
+                  input: undefined as any, // Args not yet available
+                  status: 'executing' as 'executing' | 'completed' | 'failed',
+                  // Position relative to FULL content (original + continuation)
+                  textPosition: accumulatedContent.length + continuationAccumulatedContent.length,
+                  reasoningPosition: accumulatedReasoning.length + continuationAccumulatedReasoning.length
+                }
+                continuationLocalToolCalls.push(toolCallEntry)
+                setStreamingToolCalls(prev => [...prev, toolCallEntry])
+                setActiveToolCalls(prev => {
+                  const newMap = new Map(prev)
+                  const messageCalls = newMap.get(originalAssistantMessageId) || []
+                  if (!messageCalls.some(tc => tc.toolCallId === toolId)) {
+                    messageCalls.push(toolCallEntry)
+                    newMap.set(originalAssistantMessageId, messageCalls)
+                  }
+                  return newMap
+                })
+              }
             } else if (parsed.type === 'tool-call') {
               // Handle tool calls in continuation (same logic as main stream)
               const toolCall = {
@@ -2937,36 +2964,47 @@ export function ChatPanelV2({
 
               console.log('[ChatPanelV2][Continuation][ClientTool] 🔧 Continuation tool call:', toolCall.toolName)
 
-              // DEDUPLICATION: Check if this toolCallId already exists to prevent duplicates
+              // Check if pill already created by tool-input-start
               const existingToolCall = continuationLocalToolCalls.find(tc => tc.toolCallId === toolCall.toolCallId)
               if (existingToolCall) {
-                console.log('[ChatPanelV2][Continuation][ClientTool] Skipping duplicate tool call:', toolCall.toolCallId)
-                continue // Skip duplicate tool calls
-              }
-
-              // Track tool call inline with executing status (both local and state)
-              // Calculate positions relative to FULL content (original + continuation)
-              const toolCallEntry = {
-                toolName: toolCall.toolName,
-                toolCallId: toolCall.toolCallId,
-                input: toolCall.args,
-                status: 'executing' as 'executing' | 'completed' | 'failed',
-                textPosition: accumulatedContent.length + continuationAccumulatedContent.length,
-                reasoningPosition: accumulatedReasoning.length + continuationAccumulatedReasoning.length
-              }
-
-              continuationLocalToolCalls.push(toolCallEntry)
-
-              setActiveToolCalls(prev => {
-                const newMap = new Map(prev)
-                const messageCalls = newMap.get(originalAssistantMessageId) || []
-                // DEDUPLICATION: Check before adding to prevent duplicates
-                if (!messageCalls.some(tc => tc.toolCallId === toolCall.toolCallId)) {
-                  messageCalls.push(toolCallEntry)
-                  newMap.set(originalAssistantMessageId, messageCalls)
+                // Update args on the existing pill (was created without args by tool-input-start)
+                existingToolCall.input = toolCall.args
+                setStreamingToolCalls(prev => prev.map(tc =>
+                  tc.toolCallId === toolCall.toolCallId ? { ...tc, input: toolCall.args } : tc
+                ))
+                setActiveToolCalls(prev => {
+                  const newMap = new Map(prev)
+                  const messageCalls = newMap.get(originalAssistantMessageId) || []
+                  const updatedCalls = messageCalls.map(tc =>
+                    tc.toolCallId === toolCall.toolCallId ? { ...tc, input: toolCall.args } : tc
+                  )
+                  newMap.set(originalAssistantMessageId, updatedCalls)
+                  return newMap
+                })
+              } else {
+                // No tool-input-start received — create pill now (fallback)
+                const toolCallEntry = {
+                  toolName: toolCall.toolName,
+                  toolCallId: toolCall.toolCallId,
+                  input: toolCall.args,
+                  status: 'executing' as 'executing' | 'completed' | 'failed',
+                  // Position relative to FULL content (original + continuation)
+                  textPosition: accumulatedContent.length + continuationAccumulatedContent.length,
+                  reasoningPosition: accumulatedReasoning.length + continuationAccumulatedReasoning.length
                 }
-                return newMap
-              })
+
+                continuationLocalToolCalls.push(toolCallEntry)
+                setStreamingToolCalls(prev => [...prev, toolCallEntry])
+                setActiveToolCalls(prev => {
+                  const newMap = new Map(prev)
+                  const messageCalls = newMap.get(originalAssistantMessageId) || []
+                  if (!messageCalls.some(tc => tc.toolCallId === toolCall.toolCallId)) {
+                    messageCalls.push(toolCallEntry)
+                    newMap.set(originalAssistantMessageId, messageCalls)
+                  }
+                  return newMap
+                })
+              }
 
 
               const clientSideTools = [
@@ -3002,6 +3040,13 @@ export function ChatPanelV2({
                     localTool.status = newStatus
                   }
 
+                  // Update streaming tool calls state (for real-time pill rendering)
+                  setStreamingToolCalls(prev => prev.map(tc =>
+                    tc.toolCallId === toolCall.toolCallId
+                      ? { ...tc, status: newStatus as 'executing' | 'completed' | 'failed' }
+                      : tc
+                  ))
+
                   // Update tool status in state for UI
                   setActiveToolCalls(prev => {
                     const newMap = new Map(prev)
@@ -3025,6 +3070,13 @@ export function ChatPanelV2({
                     if (localTool) {
                       localTool.status = 'failed'
                     }
+
+                    // Update streaming tool calls (for real-time pill rendering)
+                    setStreamingToolCalls(prev => prev.map(tc =>
+                      tc.toolCallId === toolCall.toolCallId
+                        ? { ...tc, status: 'failed' as 'executing' | 'completed' | 'failed' }
+                        : tc
+                    ))
 
                     // Update tool status to failed in state
                     setActiveToolCalls(prev => {
@@ -3050,6 +3102,13 @@ export function ChatPanelV2({
               if (localTool) {
                 localTool.status = resultStatus
               }
+
+              // Update streaming tool calls (for real-time pill rendering)
+              setStreamingToolCalls(prev => prev.map(tc =>
+                tc.toolCallId === parsed.toolCallId
+                  ? { ...tc, status: resultStatus as 'executing' | 'completed' | 'failed' }
+                  : tc
+              ))
 
               // Update tool status to completed or failed for server-side tools
               setActiveToolCalls(prev => {
