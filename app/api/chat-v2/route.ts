@@ -2253,25 +2253,84 @@ export async function POST(req: Request) {
 
     // For binary requests, extract metadata from compressed data
     if (contentType.includes('application/octet-stream')) {
-      // Use metadata extracted from compressed data
-      const metadata = extractedMetadata as any
-      messages = metadata.messages || []
-      projectId = metadata.project?.id || projectId
-      project = metadata.project || project
-      databaseId = metadata.databaseId || databaseId
-      modelId = req.headers.get('x-model-id') || modelId
-      aiMode = req.headers.get('x-ai-mode') || aiMode
-      chatMode = req.headers.get('x-chat-mode') || chatMode
-      isInitialPrompt = metadata.isInitialPrompt || req.headers.get('x-is-initial-prompt') === 'true' || false
-      supabaseAccessToken = metadata.supabaseAccessToken || supabaseAccessToken
-      supabaseProjectDetails = metadata.supabaseProjectDetails || supabaseProjectDetails
-      supabase_projectId = metadata.supabase_projectId || supabase_projectId
-      supabaseUserId = metadata.supabaseUserId || supabaseUserId
-      stripeApiKey = metadata.stripeApiKey || stripeApiKey
-      mcpServers = metadata.mcpServers || mcpServers
-      disabledToolCategories = metadata.disabledToolCategories || disabledToolCategories
-      disabledTools = metadata.disabledTools || disabledTools
-      customPersona = metadata.customPersona || customPersona
+      // Check if this is a compressed CONTINUATION request
+      const isContinuationBinary = req.headers.get('x-continuation') === 'true'
+
+      if (isContinuationBinary) {
+        // ═══════════════════════════════════════════════════════════════
+        // COMPRESSED CONTINUATION: Files are LZ4+Zip compressed session
+        // storage. Continuation metadata is in x-continuation-meta header.
+        // This is much more efficient than sending raw JSON with all files.
+        // ═══════════════════════════════════════════════════════════════
+        console.log('[Chat-V2] 📦 Received compressed continuation request')
+
+        // Parse continuation metadata from header
+        const continuationMetaHeader = req.headers.get('x-continuation-meta')
+        let continuationMeta: any = {}
+        if (continuationMetaHeader) {
+          try {
+            continuationMeta = JSON.parse(decodeURIComponent(continuationMetaHeader))
+          } catch (e) {
+            console.warn('[Chat-V2] Failed to parse x-continuation-meta header:', e)
+          }
+        }
+
+        // Reconstruct continuationState with sessionStorage from compressed files
+        const metadata = extractedMetadata as any
+        continuationState = continuationMeta.continuationState || {}
+        continuationState.sessionStorage = {
+          fileTree: clientFileTree,
+          files: clientFiles.map((f: any) => ({
+            path: f.path,
+            data: {
+              workspaceId: metadata.project?.id || '',
+              name: f.name || f.path.split('/').pop() || f.path,
+              content: f.content || '',
+              fileType: f.type || 'text',
+              type: f.type || 'text',
+              size: (f.content || '').length,
+              isDirectory: false
+            }
+          }))
+        }
+
+        // Set other fields from metadata
+        partialResponse = continuationMeta.partialResponse
+        projectId = metadata.project?.id
+        project = metadata.project
+        databaseId = metadata.databaseId
+        modelId = req.headers.get('x-model-id') || modelId
+        aiMode = req.headers.get('x-ai-mode') || aiMode
+        chatMode = req.headers.get('x-chat-mode') || chatMode
+        supabaseAccessToken = metadata.supabaseAccessToken
+        supabaseProjectDetails = metadata.supabaseProjectDetails
+        supabase_projectId = metadata.supabase_projectId
+        supabaseUserId = metadata.supabaseUserId
+        stripeApiKey = metadata.stripeApiKey
+        customPersona = metadata.customPersona
+
+        console.log(`[Chat-V2] 📦 Reconstructed continuation with ${clientFiles.length} compressed files`)
+      } else {
+        // Regular binary request (non-continuation)
+        const metadata = extractedMetadata as any
+        messages = metadata.messages || []
+        projectId = metadata.project?.id || projectId
+        project = metadata.project || project
+        databaseId = metadata.databaseId || databaseId
+        modelId = req.headers.get('x-model-id') || modelId
+        aiMode = req.headers.get('x-ai-mode') || aiMode
+        chatMode = req.headers.get('x-chat-mode') || chatMode
+        isInitialPrompt = metadata.isInitialPrompt || req.headers.get('x-is-initial-prompt') === 'true' || false
+        supabaseAccessToken = metadata.supabaseAccessToken || supabaseAccessToken
+        supabaseProjectDetails = metadata.supabaseProjectDetails || supabaseProjectDetails
+        supabase_projectId = metadata.supabase_projectId || supabase_projectId
+        supabaseUserId = metadata.supabaseUserId || supabaseUserId
+        stripeApiKey = metadata.stripeApiKey || stripeApiKey
+        mcpServers = metadata.mcpServers || mcpServers
+        disabledToolCategories = metadata.disabledToolCategories || disabledToolCategories
+        disabledTools = metadata.disabledTools || disabledTools
+        customPersona = metadata.customPersona || customPersona
+      }
     }
 
     // Use fileTree from binary metadata if available, otherwise from JSON

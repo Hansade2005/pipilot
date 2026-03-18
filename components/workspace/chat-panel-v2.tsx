@@ -2691,16 +2691,12 @@ export function ChatPanelV2({
     setIsContinuationInProgress(true)
 
     try {
-      // During continuation, the message will continue streaming seamlessly
-      // No need to modify the message content - the existing streaming indicator will show
-
-      // Continue appending to the original assistant message instead of creating new one
-      // Remove the thinking indicator and continue with content
+      // Show "Compacting conversation..." status in the message while preparing
       setMessages(prev => prev.map(msg =>
         msg.id === originalAssistantMessageId
           ? {
             ...msg,
-            content: accumulatedContent, // Remove thinking indicator
+            content: accumulatedContent + '\n\n⏳ *Compacting conversation to continue...*',
             reasoning: accumulatedReasoning,
             reasoningBlocks: [...reasoningBlocks]
           }
@@ -2711,33 +2707,112 @@ export function ChatPanelV2({
       const continuationController = new AbortController()
       setAbortController(continuationController)
 
-      // Prepare continuation request payload
-      // Include accumulated content so AI knows where it left off and can continue seamlessly
-      const continuationPayload = {
-        messages: [], // Don't send messages - full history is in continuationState
-        projectId: project.id,
+      // ═══════════════════════════════════════════════════════════════
+      // COMPRESSED CONTINUATION PAYLOAD
+      // Extract sessionStorage files and compress them using LZ4+Zip
+      // (same format as regular messages). This avoids sending potentially
+      // megabytes of raw JSON file contents over the wire.
+      // Non-file metadata (continuationState without sessionStorage,
+      // partialResponse, etc.) is sent via headers as compact JSON.
+      // ═══════════════════════════════════════════════════════════════
+      const sessionStorageFiles = continuationState.sessionStorage?.files || []
+      const sessionStorageFileTree = continuationState.sessionStorage?.fileTree || []
+
+      // Convert sessionStorage files to the format compressProjectFiles expects
+      const filesToCompress = sessionStorageFiles.map((f: any) => ({
+        path: f.path,
+        name: f.data?.name || f.path.split('/').pop() || f.path,
+        content: f.data?.content || '',
+        type: f.data?.type || f.data?.fileType || 'text'
+      }))
+
+      // Build continuation metadata (everything except the bulky file contents)
+      const continuationMeta = {
+        ...continuationState,
+        sessionStorage: null, // Files are in the compressed binary payload
+        sessionData: {
+          ...continuationState.sessionData,
+          files: [] // Files are in the compressed payload
+        }
+      }
+
+      const continuationMetadata = {
         project,
-        databaseId, // Pass database ID from state (loaded from workspace)
-        // Don't send files/fileTree - they're already in continuationState.sessionStorage
-        modelId: selectedModel,
-        aiMode,
-        chatMode: isAskMode ? 'ask' : 'agent', // Pass the chat mode to the API
-        continuationState, // Include the continuation state
-        // Include accumulated content so AI can continue from where it stopped
+        databaseId,
+        continuationState: continuationMeta,
         partialResponse: {
           content: accumulatedContent,
           reasoning: accumulatedReasoning
         }
       }
 
-      console.log('[ChatPanelV2][Continuation] 📤 Sending continuation request with token:', continuationState.continuationToken)
+      let response: Response
 
-      const response = await fetch('/api/chat-v2', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(continuationPayload),
-        signal: continuationController.signal
-      })
+      if (filesToCompress.length > 0) {
+        // Compress files using the same LZ4+Zip pipeline as regular messages
+        console.log(`[ChatPanelV2][Continuation] 📦 Compressing ${filesToCompress.length} session files for continuation`)
+        const compressedData = await compressProjectFiles(
+          filesToCompress,
+          sessionStorageFileTree,
+          [], // No messages to send — history is in continuationState
+          continuationMetadata
+        )
+
+        console.log(`[ChatPanelV2][Continuation] 📤 Sending compressed continuation (${(compressedData.byteLength / 1024).toFixed(1)}KB) with token:`, continuationState.continuationToken)
+
+        response = await fetch('/api/chat-v2', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/octet-stream',
+            'x-model-id': selectedModel,
+            'x-ai-mode': aiMode || '',
+            'x-chat-mode': isAskMode ? 'ask' : 'agent',
+            'x-continuation': 'true',
+            'x-continuation-meta': encodeURIComponent(JSON.stringify({
+              continuationState: continuationMeta,
+              partialResponse: { content: accumulatedContent, reasoning: accumulatedReasoning }
+            }))
+          },
+          body: compressedData,
+          signal: continuationController.signal
+        })
+      } else {
+        // No files to compress — send as plain JSON (fallback for edge cases)
+        console.log('[ChatPanelV2][Continuation] 📤 Sending JSON continuation (no session files)')
+        const continuationPayload = {
+          messages: [],
+          projectId: project.id,
+          project,
+          databaseId,
+          modelId: selectedModel,
+          aiMode,
+          chatMode: isAskMode ? 'ask' : 'agent',
+          continuationState,
+          partialResponse: {
+            content: accumulatedContent,
+            reasoning: accumulatedReasoning
+          }
+        }
+
+        response = await fetch('/api/chat-v2', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(continuationPayload),
+          signal: continuationController.signal
+        })
+      }
+
+      // Remove the "Compacting..." status now that stream is starting
+      setMessages(prev => prev.map(msg =>
+        msg.id === originalAssistantMessageId
+          ? {
+            ...msg,
+            content: accumulatedContent,
+            reasoning: accumulatedReasoning,
+            reasoningBlocks: [...reasoningBlocks]
+          }
+          : msg
+      ))
 
       if (!response.ok) {
         throw new Error('Continuation request failed')
@@ -5475,9 +5550,9 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
 
               // Show continuation message to user
               toast({
-                title: "Continuing conversation...",
-                description: "Stream will continue seamlessly due to time constraints.",
-                duration: 3000
+                title: "Compacting conversation to continue...",
+                description: "Synthesizing session context for seamless handoff.",
+                duration: 4000
               })
 
               // Automatically trigger continuation after a brief delay
