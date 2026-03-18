@@ -6,7 +6,7 @@
 
 ---
 
-## Current State (as of 2026-03-18)
+## Current State (as of 2026-03-18, session 2)
 
 - **Production URL:** https://pipilot.dev
 - **Framework:** Next.js 14+ (App Router) / Tailwind / shadcn/ui
@@ -96,7 +96,32 @@ Cloud-based AI coding agent with E2B sandboxes.
 
 ## Recent Changes (Chronological)
 
-### 2026-03-18 — Session Summary
+### 2026-03-18 (Session 2) — AI Agent Speed & Output Discipline
+Overhauled the workspace AI system prompt to eliminate verbose narration between tool calls, making the agent build apps significantly faster.
+
+#### TOOL-ONLY MODE — Core Change
+- **Added "TOOL-ONLY MODE" rule** across all three system prompts (Plan & Build, Web Architect, UI Prototyping)
+- **New behavior:** After `generate_plan`, AI calls tools back-to-back with ZERO text explanations between them. Text summary only output AFTER all steps are completed.
+- **Before:** Plan → "Let me create the config..." → write_file → "Now I'll set up routing..." → write_file → ...
+- **After:** Plan → write_file → write_file → write_file → ... → "Here's what was built: ..."
+
+#### System Prompt Changes (all in `app/api/chat-v2/route.ts`)
+- **Plan & Build mode (~line 2704):** Added 4-phase flow: Recon → Plan → Tool-Only Build → Summary. Added OUTPUT DISCIPLINE section with explicit anti-narration rules.
+- **Response Format (~line 2754):** Step 4 now says "TOOL-ONLY MODE" — zero text between tool calls.
+- **Critical instruction (~line 2771):** Changed "keep it minimal" to "enter TOOL-ONLY MODE...only output text summary after all steps completed."
+- **Web Architect mode (~line 2921):** Added tool-only build principle.
+- **UI Prototyping mode (~line 121):** Replaced old 5-step WORKFLOW with "PLAN THEN TOOL-ONLY BUILD" + OUTPUT DISCIPLINE.
+- **Continuation mode (~line 3251):** Added "switch to TOOL-ONLY MODE" after re-reading context files. Kept file re-reads (needed since tool results aren't sent in continuations).
+- **Recovery mode (~line 3314):** Same tool-only mode addition after re-reads.
+
+#### What Was Preserved
+- Step limit: 2-10 (unchanged)
+- Continuation file re-reads: kept (AI needs them since tool results aren't sent)
+- Recovery file re-reads: kept
+- Persistence rules (always read plan.md/project.md): kept
+- update_plan_progress per step: kept
+
+### 2026-03-18 (Session 1) — Session Summary
 Major model catalog expansion + Ollama DB rotation + tool fixes + pill accuracy.
 
 #### Ollama Cloud Model Catalog Expansion
