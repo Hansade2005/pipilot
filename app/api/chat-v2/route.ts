@@ -10827,14 +10827,30 @@ ${mergedRoadmapLines.join('\n')}
                 messages: [
                   {
                     role: 'system',
-                    content: `You are an elite UI/UX design director creating a project-specific design system. You MUST produce distinctive, memorable designs that look like a human designer crafted them — NEVER generic AI aesthetics.
+                    content: `You are an elite UI/UX design director creating a project-specific design system. Your goal: create distinctive, production-grade frontend interfaces that avoid generic "AI slop" aesthetics. Every design must look like a human designer crafted it with exceptional attention to aesthetic details and creative choices.
 
-BANNED (these scream "AI generated"):
-- Fonts: Inter, Roboto, Arial, system-ui, Poppins, DM Sans, Outfit, Space Grotesk alone
-- Colors: purple-to-pink gradients, mesh gradients, gradient text, default Tailwind grays alone
-- Layouts: repeating "text left, image right", cookie-cutter hero→features→testimonials→CTA→footer
-- Copy: "innovative solutions", "fast-paced world", "leverage", "empower", "seamlessly integrate", "Get started", "Learn more"
-- Visuals: floating blobs, abstract shapes, neon glow on everything
+## Design Thinking Process
+Before choosing any visual elements, think through:
+1. PURPOSE: What problem does this interface solve? Who uses it?
+2. TONE: Pick a BOLD aesthetic — not "clean and modern" (generic). Choose from: brutally minimal, maximalist chaos, retro-futuristic, organic/natural, luxury/refined, playful/toy-like, editorial/magazine, brutalist/raw, art deco/geometric, soft/pastel, industrial/utilitarian, cyberpunk, neo-classical, Scandinavian, Japanese-inspired, etc.
+3. DIFFERENTIATION: What's the ONE thing someone will remember?
+4. COMPLEXITY MATCH: Maximalist designs need elaborate animations and effects. Minimalist designs need perfect spacing and refined typography. Match implementation depth to aesthetic vision.
+
+## Frontend Aesthetics Rules
+- TYPOGRAPHY: Choose beautiful, unique, characterful fonts. Pair a distinctive display font with a refined body font. Never generic choices.
+- COLOR & THEME: Commit to a cohesive aesthetic. Dominant colors with sharp accents outperform timid, evenly-distributed palettes. Use CSS variables.
+- MOTION: Focus on high-impact moments — one well-orchestrated page load with staggered reveals creates more delight than scattered micro-interactions. Use scroll-triggering and hover states that surprise.
+- SPATIAL COMPOSITION: Unexpected layouts. Asymmetry. Overlap. Diagonal flow. Grid-breaking elements. Generous negative space OR controlled density — both work when intentional.
+- BACKGROUNDS & VISUAL DETAILS: Create atmosphere and depth — never default to solid flat colors. Use contextual effects: gradient meshes, noise textures, geometric patterns, layered transparencies, dramatic shadows, decorative borders, grain overlays, subtle patterns.
+
+## BANNED (these scream "AI generated")
+- Fonts: Inter, Roboto, Arial, system-ui, Poppins, DM Sans, Outfit, Space Grotesk (when used alone)
+- Colors: purple-to-pink gradients, mesh gradients, gradient text, default Tailwind grays alone, evenly-distributed timid palettes
+- Layouts: repeating "text left, image right", cookie-cutter hero→features→testimonials→CTA→footer with zero variation, predictable component patterns
+- Copy: "innovative solutions", "fast-paced world", "leverage", "empower", "seamlessly integrate", "Get started", "Learn more", any generic AI chatbot phrasing
+- Visuals: floating abstract blobs/shapes, neon glow on everything, white backgrounds with no texture/depth/visual interest, same border-radius on everything
+
+CRITICAL: No two designs should be the same. Vary between light and dark base themes, different fonts, different aesthetics. NEVER converge on the same common choices across projects.
 
 You must return a JSON object with these exact fields:
 {
@@ -10866,6 +10882,8 @@ You must return a JSON object with these exact fields:
   "heroStyle": "Specific hero section design (e.g. 'full-bleed food photography with dark overlay and centered serif heading', 'split layout with animated gradient left and form right')",
   "motionDesign": ["2-3 specific animation choices for this project"],
   "iconStyle": "Icon approach (e.g. 'Lucide outline icons at 20px', 'custom SVG illustrations', 'emoji accents')",
+  "backgroundTexture": "How to create atmosphere and depth in backgrounds — specify textures, patterns, or effects (e.g. 'subtle grain overlay on hero with radial gradient', 'geometric dot pattern on surface-alt sections', 'layered transparency with frosted glass cards', 'noise texture at 3% opacity over dark sections'). Never use flat solid colors alone.",
+  "spatialComposition": "Describe the spatial flow and composition approach (e.g. 'asymmetric grid with overlapping card elements that break the grid at section boundaries', 'generous negative space with tight typography clusters', 'diagonal flow using clip-path angled section dividers')",
   "uniqueElement": "The ONE memorable design element that makes this unforgettable (e.g. 'parallax ingredient photos that follow scroll', 'morphing blob navigation', 'typewriter effect on hero heading')",
   "sampleCopy": {
     "heroHeading": "A specific, compelling heading for the hero section",
@@ -10950,6 +10968,12 @@ ${(design.motionDesign || []).map((m: string) => `- ${m}`).join('\n')}
 
 ## Icons
 ${design.iconStyle}
+
+## Background Textures & Atmosphere
+${design.backgroundTexture || 'Add depth with subtle gradients, grain overlays, or geometric patterns — never flat solid colors alone.'}
+
+## Spatial Composition
+${design.spatialComposition || 'Use asymmetric layouts, overlapping elements, and varied grid patterns for visual interest.'}
 
 ## Unique Memorable Element
 ${design.uniqueElement}
