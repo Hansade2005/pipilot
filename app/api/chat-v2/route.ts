@@ -281,11 +281,12 @@ async function synthesizeContinuationContext(data: ContinuationData): Promise<st
     const otherActions: string[] = []
 
     for (const tr of data.toolResults) {
+      // Skip tool-result entries — they're redundant with tool-call entries
+      // and don't have args (file paths). Only process tool-call entries.
+      if (tr.type === 'tool-result') continue
+
       const name = tr.toolName || tr.name || 'unknown'
       const args = tr.args || tr.input || {}
-      const resultPreview = typeof tr.result === 'string'
-        ? tr.result.slice(0, 100)
-        : JSON.stringify(tr.result || {}).slice(0, 100)
 
       if (name === 'write_file') {
         filesWritten.push(args.path || 'unknown')
