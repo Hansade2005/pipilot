@@ -6101,9 +6101,11 @@ Present results using this markdown structure:
               path: f.path?.startsWith('/') ? f.path.slice(1) : f.path
             }))
 
-            if (path) {
+            // Treat ".", "./", "/", and empty string as root directory
+            const isRootPath = !path || path === '.' || path === './' || path === '/'
+            if (!isRootPath) {
               // Normalize the requested path too
-              const cleanPath = path.startsWith('/') ? path.slice(1) : path
+              const cleanPath = path!.startsWith('/') ? path!.slice(1) : path!
               const pathPrefix = cleanPath.endsWith('/') ? cleanPath : `${cleanPath}/`
               const seen = new Set<string>()
               for (const file of normalizedFiles) {
