@@ -2,7 +2,7 @@ import { streamText, tool, stepCountIs, smoothStream, extractReasoningMiddleware
 import { experimental_createMCPClient as createMCPClient } from '@ai-sdk/mcp'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { getModel, needsMistralVisionProvider, getDevstralVisionModel, getFallbackModel, isProviderError, FALLBACK_MODEL_ID, parseByokKeysFromHeader, createByokModel, resolveByokProvider } from '@/lib/ai-providers'
+import { getModel, getOllamaModel, releaseOllamaKey, needsMistralVisionProvider, getDevstralVisionModel, getFallbackModel, isProviderError, FALLBACK_MODEL_ID, parseByokKeysFromHeader, createByokModel, resolveByokProvider } from '@/lib/ai-providers'
 import { DEFAULT_CHAT_MODEL, getModelById, modelSupportsVision, chatModels } from '@/lib/ai-models'
 import { NextResponse } from 'next/server'
 import { getWorkspaceDatabaseId, workspaceHasDatabase, setWorkspaceDatabase } from '@/lib/get-current-workspace'
@@ -23,23 +23,30 @@ export const config = {
 }
 
 // Get AI model by ID with fallback to default
-const getAIModel = (modelId?: string) => {
+// Returns { model, ollamaKeyId } — ollamaKeyId is non-null when using DB-backed Ollama rotation
+const getAIModel = async (modelId?: string): Promise<{ model: any, ollamaKeyId: number | null }> => {
   try {
     const selectedModelId = modelId || DEFAULT_CHAT_MODEL
     const modelInfo = getModelById(selectedModelId)
 
     if (!modelInfo) {
       console.warn(`Model ${selectedModelId} not found, using default: ${DEFAULT_CHAT_MODEL}`)
-      return getModel(DEFAULT_CHAT_MODEL)
+      return { model: getModel(DEFAULT_CHAT_MODEL), ollamaKeyId: null }
     }
 
     console.log(`[Chat-V2] Using AI model: ${modelInfo.name} (${modelInfo.provider})`)
 
-    return getModel(selectedModelId)
+    // Use DB-backed rotation for Ollama models
+    if (selectedModelId.startsWith('ollama/')) {
+      const result = await getOllamaModel(selectedModelId)
+      return { model: result.model, ollamaKeyId: result.keyId }
+    }
+
+    return { model: getModel(selectedModelId), ollamaKeyId: null }
   } catch (error) {
     console.error('[Chat-V2] Failed to get AI model:', error)
     console.log(`[Chat-V2] Falling back to default model: ${DEFAULT_CHAT_MODEL}`)
-    return getModel(DEFAULT_CHAT_MODEL)
+    return { model: getModel(DEFAULT_CHAT_MODEL), ollamaKeyId: null }
   }
 }
 
@@ -11472,6 +11479,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
     // and cap reasoning output to 800 tokens via maxTokens on the wrapped model
     const isQwenThinking = modelId === 'alibaba/qwen3-vl-thinking'
     let baseModel: any
+    let ollamaKeyId: number | null = null
     if (isByokMode && byokKeys) {
       // BYOK: create model with user's own API key
       const byokModel = createByokModel(modelId, byokKeys)
@@ -11481,10 +11489,22 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
       } else {
         // No matching BYOK key for this model - fall back to platform key
         console.log(`[Chat-V2] BYOK: No matching key for model ${modelId}, falling back to platform key`)
-        baseModel = useDevstralVision ? getDevstralVisionModel(modelId) : getAIModel(modelId)
+        if (useDevstralVision) {
+          baseModel = getDevstralVisionModel(modelId)
+        } else {
+          const aiModelResult = await getAIModel(modelId)
+          baseModel = aiModelResult.model
+          ollamaKeyId = aiModelResult.ollamaKeyId
+        }
       }
     } else {
-      baseModel = useDevstralVision ? getDevstralVisionModel(modelId) : getAIModel(modelId)
+      if (useDevstralVision) {
+        baseModel = getDevstralVisionModel(modelId)
+      } else {
+        const aiModelResult = await getAIModel(modelId)
+        baseModel = aiModelResult.model
+        ollamaKeyId = aiModelResult.ollamaKeyId
+      }
     }
     const model = isQwenThinking
       ? wrapLanguageModel({
@@ -12187,6 +12207,12 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
               }
             }
           } finally {
+            // Release Ollama DB key if one was acquired
+            if (ollamaKeyId !== null) {
+              releaseOllamaKey(ollamaKeyId, !streamErrored, streamErrored ? 'Stream error' : undefined)
+                .catch(err => console.error('[Chat-V2] Failed to release Ollama key:', err))
+            }
+
             // ============================================================================
             // ABE BILLING - Token-based credit deduction with AI SDK usage
             // ============================================================================
