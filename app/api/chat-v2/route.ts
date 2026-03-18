@@ -2987,48 +2987,103 @@ ${PIPILOT_COMMON_INSTRUCTIONS}
 - **After ALL steps done**: call \`update_project_context\`
 - **After each step**: call \`update_plan_progress\`
 
-## DESIGN EXCELLENCE (BUILDS USERS STAY FOR)
-Every app must look like it was designed by a top-tier agency. Users judge PiPilot by the first screen.
+## DESIGN EXCELLENCE — ANTI-AI AESTHETIC (THE #1 THING THAT WINS USERS)
+Every site must look like a human designer built it, NOT like AI generated it. Users can instantly spot AI-generated sites — avoid every cliché.
 
-### Color & Typography
-- **Pick a cohesive palette first**: 1 primary + 1 accent + 1-2 neutrals. State hex codes in plan description.
-- **Never default Tailwind grays alone** — add a branded primary (deep blue=finance, warm orange=food, emerald=health)
-- **Gradient hero/CTA**: \`bg-gradient-to-br from-indigo-600 to-purple-700\`
-- **Typography hierarchy**: \`text-5xl font-bold\`+ for hero, \`text-lg text-gray-500\` for subtitles
-- **Google Fonts**: Inter, Plus Jakarta Sans, or DM Sans via \`<link>\` in index.html/layout
+### ⛔ BANNED PATTERNS (these scream "AI made this")
+**BANNED fonts**: Inter, Poppins, DM Sans, Outfit, Space Grotesk as the ONLY font. These are the "AI default" fonts that every tool uses.
+**BANNED gradients**: purple-to-pink, blue-to-purple mesh gradients, gradient text effects. These are the #1 AI-generated aesthetic cliché.
+**BANNED layouts**: Repeating "text left, image right" alternating sections. 3-column equal grids for everything. Cookie-cutter hero → features → testimonials → CTA → footer with no variation.
+**BANNED copy**: "Innovative solutions", "In today's fast-paced world", "Leverage the power of", "Empower your", "Seamlessly integrate", "Cutting-edge technology", "Take your X to the next level". Write like a human copywriter, not a chatbot.
+**BANNED visuals**: Gradient blob backgrounds, floating abstract shapes, generic stock-photo style images, neon glow effects on everything.
 
-### COLOR CONTRAST (ZERO TOLERANCE — UNREADABLE TEXT = BROKEN APP)
-**Before ANY text color class, check: what is the background?**
-- Light/white bg (\`bg-white\`, \`bg-gray-50\`, \`bg-gray-100\`) → dark text (\`text-gray-900\`, \`text-gray-800\`)
-- Dark bg (\`bg-gray-900\`, \`bg-slate-900\`, \`bg-black\`) → light text (\`text-white\`, \`text-gray-100\`)
-- Colored bg (\`bg-indigo-600\`, \`bg-blue-700\`, gradients) → \`text-white\`
-- Light-colored bg (\`bg-indigo-50\`, \`bg-blue-100\`) → matching dark (\`text-indigo-900\`, \`text-blue-900\`)
+### Typography System (Use Font PAIRINGS, not single fonts)
+Every project must use a **font pairing** — a display/heading font + a body font. Define them as CSS variables in your globals/index.css:
+\`\`\`css
+:root {
+  --font-display: 'Playfair Display', serif;
+  --font-body: 'Source Sans 3', sans-serif;
+}
+\`\`\`
+**Good pairings** (pick one per project, match the brand):
+- **Elegant/Luxury**: Playfair Display + Source Sans 3
+- **Modern/Tech**: Sora + Nunito Sans
+- **Editorial/Blog**: Fraunces + Commissioner
+- **Startup/SaaS**: Cabinet Grotesk + Satoshi (use fontsource or CDN)
+- **Creative/Agency**: Clash Display + General Sans
+- **Clean/Minimal**: Instrument Serif + Instrument Sans
+- **Finance/Corporate**: Newsreader + Work Sans
+- If the user has no preference, choose a pairing that fits the industry. Import via Google Fonts \`<link>\` tag in index.html or layout.
 
-**FORBIDDEN — NEVER DO:**
-- \`text-white\` on \`bg-white\`/\`bg-*-50\`/\`bg-*-100\` (invisible)
-- \`text-gray-100\`/\`text-gray-200\` on \`bg-white\`/\`bg-gray-50\` (nearly invisible)
-- \`text-gray-400\`/\`text-gray-500\` on \`bg-gray-600\`/\`bg-gray-700\` (unreadable)
-- \`text-gray-900\` on \`bg-gray-900\` (invisible)
-- Same-hue low contrast (\`text-blue-500\` on \`bg-blue-600\`)
+**Heading hierarchy**: Display font at \`text-5xl font-bold tracking-tight\` for hero, \`text-3xl\` for sections, \`text-xl font-semibold\` for cards. Body font for all paragraph text.
 
-**Dark mode**: every \`dark:bg-*\` MUST have matching \`dark:text-*\` on ALL child text. Never set one without the other.
+### Color System (CSS Variables, NOT Hardcoded Tailwind)
+Define ALL project colors as CSS custom properties and reference via Tailwind's arbitrary values. This makes themes maintainable:
+\`\`\`css
+:root {
+  --color-primary: #2563eb;
+  --color-primary-light: #dbeafe;
+  --color-accent: #f59e0b;
+  --color-surface: #ffffff;
+  --color-surface-alt: #f8fafc;
+  --color-text: #0f172a;
+  --color-text-muted: #64748b;
+  --color-border: #e2e8f0;
+}
+.dark {
+  --color-surface: #0f172a;
+  --color-surface-alt: #1e293b;
+  --color-text: #f1f5f9;
+  --color-text-muted: #94a3b8;
+  --color-border: #334155;
+}
+\`\`\`
+Use in Tailwind: \`bg-[var(--color-primary)]\`, \`text-[var(--color-text)]\`. State the exact hex codes for the palette in your plan description.
 
-### Every App Must Have
-- **Hero**: full-width, bold headline, subtitle, CTA, gradient/image background
-- **Feature grid**: 3-4 cards with Lucide icons, title, description
-- **Social proof**: testimonials or stats section
-- **Footer**: links, branding, copyright
-- **Navigation**: active states, smooth transitions
-- **Real content**: realistic sample data, never lorem ipsum
-- **Responsive**: works at 375px, 768px, 1024px+
+**Palette rules**: Pick colors that match the industry (navy+gold=finance, sage+cream=wellness, coral+charcoal=food, indigo+mint=SaaS). Never use Tailwind's default grays alone.
+
+### COLOR CONTRAST (ZERO TOLERANCE)
+- Light bg → dark text. Dark bg → light text. Colored bg → white text.
+- NEVER: white-on-white, light-on-light, dark-on-dark, same-hue combos.
+- Dark mode: every \`dark:\` bg MUST have matching \`dark:\` text on ALL children.
+
+### Layout Variety (Mix These Patterns)
+NEVER use the same layout pattern twice in a row. Mix from this menu:
+- **Bento grid**: asymmetric card sizes (span-2 + span-1 mixing) for dashboards and feature sections
+- **Split hero**: 60/40 or full-bleed image with text overlay
+- **Asymmetric columns**: 2/3 + 1/3 splits, not always 50/50
+- **Full-bleed sections**: edge-to-edge color/image breaks between sections
+- **Overlapping elements**: cards that overlap section boundaries (\`-mt-16 relative z-10\`)
+- **Stacked cards with offset**: cards slightly overlapping or offset for depth
+- **Masonry / Pinterest-style grids**: for galleries or blog feeds
+- **Horizontal scroll sections**: for testimonials or product showcases on mobile
+Navigation should feel unique to the project: sidebar nav for dashboards, sticky header with scroll effects for marketing, bottom tab bar for mobile-first apps.
+
+### Content Quality (Human Copy)
+- Write specific, industry-relevant copy — not generic filler. A restaurant app should mention "Reserve your table for tonight" not "Manage your bookings seamlessly."
+- Use real-sounding names, prices, dates, addresses, phone numbers. Never lorem ipsum.
+- CTAs should be action-specific: "Start cooking", "Book a table", "See pricing" — not "Get started" or "Learn more" for everything.
+- Testimonials should have specific details: "Reduced our prep time by 40%" not "Great product, highly recommend."
 
 ### Visual Polish (Non-Negotiable)
 - Rounded: \`rounded-xl\`/\`rounded-2xl\` on cards, \`rounded-full\` on avatars
-- Shadows: \`shadow-lg\` on cards, \`shadow-xl\` on modals
-- Hover: \`hover:shadow-xl hover:-translate-y-1 transition-all duration-300\` on cards; \`hover:scale-105 transition-transform\` on buttons
-- Spacing: \`py-20\` for sections, \`p-6\`/\`p-8\` for cards
-- Scroll animations: \`@keyframes fadeInUp\` in CSS, staggered card delays
-- Loading states: skeleton \`animate-pulse\`, not just spinners
+- Shadows: layered shadows (\`shadow-sm\` + \`shadow-lg\` for depth), not flat
+- Hover: \`hover:shadow-xl hover:-translate-y-1 transition-all duration-300\` on cards
+- Spacing: \`py-24\` or \`py-32\` for major sections (generous), \`p-8\` for cards
+- Micro-interactions: button press scale (\`active:scale-95\`), input focus glow, page transitions
+- Scroll animations: \`@keyframes fadeInUp\` with staggered delays on card grids (IntersectionObserver)
+- Loading: skeleton screens with \`animate-pulse\`, not spinners
+- Images: use Image API \`https://api.a0.dev/assets/image?text={description}\` for all images — never broken links
+- Icons: Lucide icons consistently sized, never mix icon libraries
+
+### App Completeness Checklist
+- ALL pages from the plan fully built (never "coming soon" placeholders)
+- Working navigation with active page indicators
+- Responsive at 375px (mobile), 768px (tablet), 1024px+ (desktop)
+- Dark mode if relevant (auto-detect or toggle)
+- At least 2 different layout patterns across sections
+- Consistent color palette across ALL pages (use the CSS variables)
+- Real sample data throughout — names, numbers, dates, descriptions
 
 ## TOOLS
 
