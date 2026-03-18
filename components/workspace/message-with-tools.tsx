@@ -365,72 +365,78 @@ const InterleavedContent = ({
     return positionKey === 'reasoningPosition' ? tc.reasoningPosition : tc.textPosition
   }
 
-  // Filter out failed tool calls and require valid positions
-  const toolsWithPositions = toolCalls.filter(tc => tc.status !== 'failed' && typeof getPosition(tc) === 'number')
+  // Filter out failed tool calls, require valid positions, and deduplicate by toolCallId
+  const seen = new Set<string>()
+  const toolsWithPositions = toolCalls.filter(tc => {
+    if (tc.status === 'failed') return false
+    if (typeof getPosition(tc) !== 'number') return false
+    if (seen.has(tc.toolCallId)) return false
+    seen.add(tc.toolCallId)
+    return true
+  })
 
   if (toolsWithPositions.length === 0) {
     return <>{children(content)}</>
   }
 
-  // Sort by position, clamp to valid content range
   const contentLen = content.length
+
+  // Clamp positions to valid range and sort
   const sortedTools = [...toolsWithPositions]
     .map(tc => ({ ...tc, _pos: Math.min(Math.max(getPosition(tc) || 0, 0), contentLen) }))
     .sort((a, b) => a._pos - b._pos)
 
   // Build segments: text chunks interleaved with tool pills
-  // Snap positions to nearest paragraph/sentence boundary for cleaner rendering
+  // Snap to nearest FORWARD paragraph break (newline) within 30 chars — never snap backward
+  // This ensures pills appear AFTER the text that was written before the tool ran
   const segments: Array<{ type: 'text' | 'tool', content?: string, tool?: InlineToolCall }> = []
   let lastPosition = 0
 
   for (const tool of sortedTools) {
     let position = tool._pos
 
-    // Snap to nearest line break or sentence end for cleaner pill placement
+    // Only snap forward to the next newline within 30 chars (not backward)
     if (position > lastPosition && position < contentLen) {
-      // Look for nearest newline within ±50 chars
-      const searchStart = Math.max(lastPosition, position - 50)
-      const searchEnd = Math.min(contentLen, position + 50)
-      const nearby = content.slice(searchStart, searchEnd)
-      const relativePos = position - searchStart
-
-      // Find closest newline
-      let bestSnap = relativePos
-      for (let i = 0; i < nearby.length; i++) {
-        if (nearby[i] === '\n') {
-          if (Math.abs(i - relativePos) < Math.abs(bestSnap - relativePos)) {
-            bestSnap = i
-          }
+      const forwardSearch = content.slice(position, Math.min(contentLen, position + 30))
+      const nextNewline = forwardSearch.indexOf('\n')
+      if (nextNewline !== -1) {
+        // Snap to right after the newline
+        position = position + nextNewline + 1
+      } else {
+        // No newline nearby — try to snap to end of current sentence (. ! ?)
+        const sentenceEnd = forwardSearch.search(/[.!?]\s/)
+        if (sentenceEnd !== -1) {
+          position = position + sentenceEnd + 1
         }
+        // Otherwise keep the raw position — don't shift it arbitrarily
       }
-      position = Math.max(lastPosition, searchStart + bestSnap)
     }
 
-    // Add text segment before this tool (if any)
+    // Ensure we don't go backward past the last position
+    position = Math.max(lastPosition, Math.min(position, contentLen))
+
+    // Add text segment before this tool
     if (position > lastPosition) {
-      const textSegment = content.slice(lastPosition, position)
-      if (textSegment.trim()) {
-        segments.push({ type: 'text', content: textSegment })
-      }
+      segments.push({ type: 'text', content: content.slice(lastPosition, position) })
     }
 
-    // Add the tool pill
+    // Group consecutive tools at the same position into a single batch
     segments.push({ type: 'tool', tool })
-    lastPosition = Math.max(lastPosition, position)
+    lastPosition = position
   }
 
   // Add remaining text after the last tool
   if (lastPosition < contentLen) {
-    const remaining = content.slice(lastPosition)
-    if (remaining.trim()) {
-      segments.push({ type: 'text', content: remaining })
-    }
+    segments.push({ type: 'text', content: content.slice(lastPosition) })
   }
 
   return (
-    <div className="interleaved-content space-y-2">
+    <div className="interleaved-content space-y-1">
       {segments.map((segment, index) => {
         if (segment.type === 'text' && segment.content) {
+          // Skip segments that are only whitespace but preserve them if they're just newlines
+          // between meaningful content — avoids collapsing spacing
+          if (!segment.content.trim()) return null
           return (
             <div key={`text-${index}`}>
               {children(segment.content)}
@@ -439,7 +445,7 @@ const InterleavedContent = ({
         }
         if (segment.type === 'tool' && segment.tool) {
           return (
-            <div key={`tool-${segment.tool.toolCallId}`} className="my-2">
+            <div key={`tool-${segment.tool.toolCallId}`} className="my-1">
               <InlineToolPill
                 toolName={segment.tool.toolName}
                 input={segment.tool.input}
@@ -452,7 +458,7 @@ const InterleavedContent = ({
       })}
       {/* Show streaming indicator after last tool if streaming and last tool is executing */}
       {isStreaming && sortedTools.length > 0 && sortedTools[sortedTools.length - 1].status === 'executing' && (
-        <div className="flex items-center gap-2 text-muted-foreground text-sm mt-2">
+        <div className="flex items-center gap-2 text-muted-foreground text-sm mt-1">
           <Loader2 className="w-3 h-3 animate-spin" />
           <span>Executing...</span>
         </div>
@@ -678,11 +684,18 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
   )
 
   // Filter text-stream tool calls (used by both old and new rendering)
+  // A tool belongs to the text stream if:
+  //   1. It has a textPosition > 0 (was recorded during text output), OR
+  //   2. Both positions are 0 AND there is no reasoning content (tool fired before any output)
+  // Tools with textPosition === 0 but reasoningPosition > 0 belong to reasoning only
   const textStreamToolCalls = inlineToolCalls?.filter(tc => {
     if (tc.status === 'failed') return false
     const textPos = tc.textPosition ?? 0
     const reasoningPos = tc.reasoningPosition ?? 0
-    return textPos > 0 || (textPos === 0 && reasoningPos === 0)
+    if (textPos > 0) return true
+    // Only include pos-0 tools if there's no reasoning (they're pre-output tools, not reasoning tools)
+    if (textPos === 0 && reasoningPos === 0 && !hasReasoning) return true
+    return false
   }) || []
 
   return (
@@ -823,18 +836,24 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
                     status={isStreaming && !hasResponse ? "active" : "complete"}
                   >
                     <div className={reasoningWrapperClasses}>
-                      {inlineToolCalls && inlineToolCalls.length > 0 ? (
-                        <InterleavedContent
-                          content={reasoningContent}
-                          toolCalls={inlineToolCalls}
-                          isStreaming={isStreaming}
-                          positionKey="reasoningPosition"
-                        >
-                          {(text) => <Response className={reasoningResponseClasses}>{text}</Response>}
-                        </InterleavedContent>
-                      ) : (
-                        <Response className={reasoningResponseClasses}>{reasoningContent}</Response>
-                      )}
+                      {(() => {
+                        // Only include tools that actually have a reasoning position > 0
+                        const reasoningToolCalls = inlineToolCalls?.filter(tc =>
+                          tc.status !== 'failed' && (tc.reasoningPosition ?? 0) > 0
+                        ) || []
+                        return reasoningToolCalls.length > 0 ? (
+                          <InterleavedContent
+                            content={reasoningContent}
+                            toolCalls={reasoningToolCalls}
+                            isStreaming={isStreaming}
+                            positionKey="reasoningPosition"
+                          >
+                            {(text) => <Response className={reasoningResponseClasses}>{text}</Response>}
+                          </InterleavedContent>
+                        ) : (
+                          <Response className={reasoningResponseClasses}>{reasoningContent}</Response>
+                        )
+                      })()}
                     </div>
                   </ChainOfThoughtStep>
                 )}
