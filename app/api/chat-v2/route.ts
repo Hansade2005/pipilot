@@ -358,6 +358,8 @@ const CORE_TOOLS = new Set([
   'generate_plan', 'update_plan_progress', 'update_project_context', 'suggest_next_steps',
   // Build mode toggle (AI controls its own tool-only enforcement)
   'start_build_mode', 'finish_build_mode',
+  // Frontend design skill (AI reads before creating any UI)
+  'frontend_design_guide',
   // Deploy (1 param)
   'deploy_preview',
   // Gateway to everything else
@@ -2846,22 +2848,24 @@ ${PIPILOT_COMMON_INSTRUCTIONS}
 ## How You Respond (MANDATORY FLOW)
 Your response follows this exact sequence every time:
 
-**Step 1 — Context**: If .pipilot/plan.md or .pipilot/project.md exist, read them first to understand prior state. For modifications to existing code, read up to 2 key files for context. For new projects, skip straight to planning.
+**Step 1 — Context**: If .pipilot/plan.md or .pipilot/project.md exist, read them first to understand prior state. For modifications, read up to 2 key files for context.
 
-**Step 2 — Plan**: Call generate_plan with a title, description (1-3 sentences with design direction and hex color codes), 2-10 ordered steps, techStack array, and estimatedFiles count. This is always your first tool call. Do not output any text before calling generate_plan.
+**Step 2 — Design skill**: Call frontend_design_guide with a brief projectType (e.g. "restaurant landing page"). Read the returned guide — it contains font pairings, color strategies, layout patterns, and banned AI aesthetics.
 
-**Step 3 — Enter build mode**: Immediately after generate_plan, call the start_build_mode tool. This locks you into tool-only mode — you will only be able to make tool calls and cannot output any text. This is intentional and makes you faster.
+**Step 3 — Plan**: Call generate_plan with a title, description (include the specific font pairing, hex color palette, and aesthetic direction from the design guide), 2-10 ordered steps, techStack, and estimatedFiles. No text before this.
 
-**Step 4 — Build**: Now call write_file, edit_file, and other file tools to implement every step. Call update_plan_progress after completing each step. Build every page fully with real content (never "coming soon" placeholders). Continue calling tools until every step in the plan is done.
+**Step 4 — Enter build mode**: Call start_build_mode. This locks you into tool-only mode — you can only call tools, not output text.
 
-**Step 5 — Finish build**: After all steps are complete, call update_project_context to persist what was built. Then call finish_build_mode to unlock text output.
+**Step 5 — Build**: Call write_file, edit_file, etc. to implement every step. Call update_plan_progress after each step. Build every page fully with real content (never "coming soon").
 
-**Step 6 — Summary**: Now output a brief 2-5 sentence summary of what you built. Then call suggest_next_steps with 3-4 actionable follow-up options as your final action.
+**Step 6 — Finish build**: Call update_project_context. Then call finish_build_mode to unlock text output.
 
-**For Vite/React projects** (not Next.js/Expo): before the summary, verify vite.config has E2B sandbox settings, run check_dev_errors in build mode, fix any errors, then call deploy_preview.
+**Step 7 — Summary**: Output a brief 2-5 sentence summary. Then call suggest_next_steps with 3-4 options as your final action.
+
+**For Vite/React projects** (not Next.js/Expo): before the summary, verify vite.config has E2B sandbox settings, run check_dev_errors in build mode, fix errors, then call deploy_preview.
 
 ## Output Rules
-- During Step 3 (Build), output ZERO text. No "Let me create...", no "Now I'll...", no "Good, I can see...", no "I understand...", no "The X is done, now...". The plan card already told the user what you're doing.
+- During Step 5 (Build), output ZERO text. The plan card already told the user what you're doing.
 - Never re-read a file you just wrote — you know its contents.
 - Never read the same file twice in one session.
 - Never output placeholder pages like "coming soon" — build every page fully.
@@ -2889,22 +2893,24 @@ ${PIPILOT_COMMON_INSTRUCTIONS}
 ## How You Respond (MANDATORY FLOW)
 Your response follows this exact sequence every time:
 
-**Step 1 — Context**: If .pipilot/plan.md or .pipilot/project.md exist, read them first. For modifications, read up to 2 key files. For new projects, skip to planning.
+**Step 1 — Context**: If .pipilot/plan.md or .pipilot/project.md exist, read them first. For modifications, read up to 2 key files.
 
-**Step 2 — Plan**: Call generate_plan with title, description (include design direction and hex color codes), 2-10 steps, techStack, and estimatedFiles. Always your first tool call. No text before it.
+**Step 2 — Design skill**: Call frontend_design_guide with a brief projectType. Read the returned guide — it has font pairings, color strategies, layout patterns, and banned AI aesthetics.
 
-**Step 3 — Enter build mode**: Immediately after generate_plan, call start_build_mode. This locks you into tool-only mode — you can only make tool calls and cannot output text. This makes you faster.
+**Step 3 — Plan**: Call generate_plan with title, description (include the specific font pairing, hex color palette, and aesthetic direction from the design guide), 2-10 steps, techStack, and estimatedFiles. No text before this.
 
-**Step 4 — Build**: Call write_file, edit_file, and other tools to implement every step. Call update_plan_progress after each step. Build every page fully with real content. Never deliver "coming soon" placeholders.
+**Step 4 — Enter build mode**: Call start_build_mode. Locks you into tool-only mode.
 
-**Step 5 — Finish build**: After all steps, call update_project_context. Then call finish_build_mode to unlock text output.
+**Step 5 — Build**: Call write_file, edit_file, etc. to implement every step. Call update_plan_progress after each. Build every page fully with real content. Never "coming soon".
 
-**Step 6 — Summary**: Output a 2-5 sentence summary. Then call suggest_next_steps with 3-4 options as your final tool call.
+**Step 6 — Finish build**: Call update_project_context. Then call finish_build_mode.
 
-**For Vite/React projects** (not Next.js/Expo): before the summary, verify vite.config E2B settings, run check_dev_errors in build mode, fix errors, then call deploy_preview.
+**Step 7 — Summary**: Output a 2-5 sentence summary. Then call suggest_next_steps with 3-4 options.
+
+**For Vite/React projects** (not Next.js/Expo): before summary, verify vite.config E2B settings, run check_dev_errors, fix errors, then deploy_preview.
 
 ## Output Rules
-- During Step 3, output ZERO text. The plan card already told the user what you're doing. Every sentence between tools wastes 1-2 seconds.
+- During Step 5 (Build), output ZERO text. The plan card already told the user what you're doing.
 - Never re-read a file you just wrote. Never read the same file twice.
 - Files over 150 lines: always use startLine/endLine or lineRange params.
 - If edit_file fails 3 times on the same file, switch to client_replace_string_in_file or write_file.
@@ -10800,6 +10806,115 @@ ${mergedRoadmapLines.join('\n')}
             suggestions,
             toolCallId
           }
+        }
+      }),
+
+      // ── FRONTEND DESIGN SKILL ──
+      // AI calls this before creating any frontend to load the design guide.
+      // Returns a comprehensive design thinking framework that prevents generic AI aesthetics.
+      frontend_design_guide: tool({
+        description: 'IMPORTANT: Call this tool BEFORE writing any frontend code (HTML, CSS, React components, pages, layouts). It returns a comprehensive design skill guide that helps you create distinctive, production-grade interfaces that avoid generic AI aesthetics. Call it once at the start of any build that involves UI.',
+        inputSchema: z.object({
+          projectType: z.string().optional().describe('Brief description of what is being built (e.g. "restaurant landing page", "SaaS dashboard", "portfolio site")'),
+        }),
+        execute: async ({ projectType }) => {
+          const guide = `# Frontend Design Skill — Loaded
+
+## Design Thinking (do this BEFORE writing any code)
+
+1. **Purpose**: What problem does this interface solve? Who uses it?
+2. **Tone**: Pick a BOLD aesthetic direction — not "clean and modern" (that's generic). Choose from: brutally minimal, maximalist, retro-futuristic, organic/natural, luxury/refined, playful/toy-like, editorial/magazine, brutalist/raw, art deco/geometric, soft/pastel, industrial/utilitarian, cyberpunk, neo-classical, Scandinavian, Japanese-inspired, etc.
+3. **Differentiation**: What's the ONE thing someone will remember about this design?
+4. **Color Strategy**: Dominant color with sharp accents. Never evenly-distributed timid palettes. Define as CSS variables.
+
+## Typography Rules
+
+BANNED fonts (these scream "AI made this"): Inter, Roboto, Arial, system-ui, Poppins, DM Sans, Outfit, Space Grotesk (when used alone).
+
+Instead, use FONT PAIRINGS — a display/heading font + a body font:
+- **Elegant**: Playfair Display + Source Sans 3
+- **Modern Tech**: Sora + Nunito Sans
+- **Editorial**: Fraunces + Commissioner
+- **Startup**: Cabinet Grotesk + Satoshi
+- **Creative**: Clash Display + General Sans
+- **Minimal**: Instrument Serif + Instrument Sans
+- **Corporate**: Newsreader + Work Sans
+- **Playful**: Bricolage Grotesque + Outfit
+- **Luxury**: Cormorant Garamond + Lato
+- **Bold**: Plus Jakarta Sans + IBM Plex Sans
+Import via Google Fonts <link> tag. Use CSS variables: --font-display and --font-body.
+
+## Color System
+
+Define ALL colors as CSS custom properties:
+\`\`\`css
+:root {
+  --color-primary: #hex;
+  --color-primary-light: #hex;
+  --color-accent: #hex;
+  --color-surface: #hex;
+  --color-surface-alt: #hex;
+  --color-text: #hex;
+  --color-text-muted: #hex;
+  --color-border: #hex;
+}
+\`\`\`
+Match palette to industry: navy+gold=finance, sage+cream=wellness, coral+charcoal=food, indigo+mint=SaaS, emerald+sand=eco, crimson+slate=news.
+
+## Layout Variety (NEVER repeat the same pattern)
+
+Mix from this menu — never use the same layout twice in a row:
+- Bento grid (asymmetric card sizes: span-2 + span-1)
+- Split hero (60/40 or full-bleed image with text overlay)
+- Asymmetric columns (2/3 + 1/3, not always 50/50)
+- Full-bleed sections (edge-to-edge color/image breaks)
+- Overlapping elements (cards crossing section boundaries: -mt-16 relative z-10)
+- Masonry / Pinterest-style grids
+- Horizontal scroll sections (for testimonials, products on mobile)
+- Diagonal or angled section dividers (clip-path or skew transforms)
+
+## Motion & Micro-interactions
+
+- Page load: staggered fadeInUp with animation-delay per element
+- Scroll: IntersectionObserver triggers .animate-fade-in-up
+- Cards: hover:shadow-xl hover:-translate-y-2 transition-all duration-300
+- Buttons: active:scale-95 transition-transform
+- Input focus: ring glow with brand color
+- Page transitions: opacity + translateY on route change
+
+## Visual Polish Checklist
+
+- Rounded: rounded-xl/rounded-2xl on cards, rounded-full on avatars
+- Shadows: layered (shadow-sm + shadow-lg for depth)
+- Spacing: py-24 or py-32 for major sections (generous), p-8 for cards
+- Images: use Image API https://api.a0.dev/assets/image?text={description}&aspect=16:9
+- Icons: Lucide icons, consistently sized, never mix libraries
+- Loading: skeleton animate-pulse screens, not spinners
+- Real content: specific names, prices, dates — never lorem ipsum or "coming soon"
+- CTAs: action-specific ("Book a table", "Start cooking") not generic ("Get started", "Learn more")
+
+## BANNED Patterns (these make sites look AI-generated)
+
+- Purple-to-pink gradients, mesh gradients, gradient text
+- Floating abstract blobs/shapes as decoration
+- Repeating "text left, image right" alternating sections
+- Generic copy: "innovative solutions", "fast-paced world", "leverage", "empower", "seamlessly integrate"
+- Cookie-cutter hero → features → testimonials → CTA → footer with zero variation
+- White backgrounds with no texture, depth, or visual interest
+- Same border-radius on everything with no variation
+
+## Dark Mode
+
+When implementing dark mode, ALWAYS pair backgrounds and text:
+- bg-white dark:bg-gray-900 → text-gray-900 dark:text-white
+- Every dark:bg-* MUST have matching dark:text-* on ALL children
+- Use the CSS variable system: swap variable values in .dark class
+
+${projectType ? `\n## Context: Building "${projectType}"\nDesign choices should be appropriate for this specific project type. Think about who uses this and what feeling the interface should evoke.` : ''}
+
+Guide loaded. Now proceed with design thinking, then start building.`
+
+          return { success: true, guide, projectType: projectType || 'general' }
         }
       }),
 
