@@ -256,7 +256,7 @@ export function ModelSelector({
       {/* Dropdown */}
       {isOpen && (
         <div className={`absolute ${dropdownDirection === 'down' ? 'top-8' : 'bottom-8'} ${dropdownAlign === 'left' ? 'left-0' : 'right-0'} w-[240px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[100] overflow-hidden ${dropdownClassName}`}>
-          <div className="max-h-[480px] overflow-y-auto py-1">
+          <div className="max-h-[380px] overflow-y-auto py-1">
             {/* Platform models */}
             {orderedModels.map((modelId) => {
               const allowed = isModelAllowed(modelId)
