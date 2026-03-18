@@ -1333,9 +1333,18 @@ async function handleStreamingPreview(req: Request) {
               timeoutMs: 300000, // 5 minutes for build
               envVars,
               onStdout: (data) => send({ type: "log", message: data.trim() }),
-              onStderr: (data) => send({ type: "error", message: data.trim() })
+              onStderr: (data) => {
+                const msg = data.trim()
+                // Vite/npm/pnpm output warnings and notices to stderr that aren't errors
+                const isHarmless = msg.includes('npm notice') || msg.includes('chunks are larger than') ||
+                  msg.includes('DeprecationWarning') || msg.includes('DEP0') || msg.includes('Consider:') ||
+                  msg.includes('dynamic import()') || msg.includes('manualChunks') || msg.includes('chunkSizeWarningLimit') ||
+                  msg.includes('rollupOptions') || msg.includes('npm install -g') || msg.includes('New minor version') ||
+                  msg.includes('Changelog:') || msg.includes('To update run:')
+                send({ type: isHarmless ? "warning" : "error", message: msg })
+              }
             })
-            
+
             if (buildResult.exitCode !== 0) {
               send({ type: "error", message: `Vite build failed: ${buildResult.stderr}` })
               throw new Error(`Vite build failed: ${buildResult.stderr}`)
@@ -2035,7 +2044,19 @@ devDependencies:
           timeoutMs: 300000, // 5 minutes for build
           envVars,
           onStdout: (data) => console.log(`[Preview] Build stdout: ${data.trim()}`),
-          onStderr: (data) => console.error(`[Preview] Build stderr: ${data.trim()}`)
+          onStderr: (data) => {
+            const msg = data.trim()
+            const isHarmless = msg.includes('npm notice') || msg.includes('chunks are larger than') ||
+              msg.includes('DeprecationWarning') || msg.includes('DEP0') || msg.includes('Consider:') ||
+              msg.includes('dynamic import()') || msg.includes('manualChunks') || msg.includes('chunkSizeWarningLimit') ||
+              msg.includes('rollupOptions') || msg.includes('npm install -g') || msg.includes('New minor version') ||
+              msg.includes('Changelog:') || msg.includes('To update run:')
+            if (isHarmless) {
+              console.log(`[Preview] Build warning (harmless): ${msg}`)
+            } else {
+              console.error(`[Preview] Build stderr: ${msg}`)
+            }
+          }
         })
         
         if (buildResult.exitCode !== 0) {
