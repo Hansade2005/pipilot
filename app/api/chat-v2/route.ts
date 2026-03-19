@@ -360,6 +360,8 @@ const CORE_TOOLS = new Set([
   'start_build_mode', 'finish_build_mode',
   // Frontend design skill (AI reads before creating any UI)
   'frontend_design_guide',
+  // File strategy (AI gets optimal minimal file plan)
+  'project_file_strategy',
   // Deploy (1 param)
   'deploy_preview',
   // Gateway to everything else
@@ -2850,33 +2852,33 @@ Your response follows this exact sequence every time:
 
 **Step 1 — Context**: If .pipilot/plan.md or .pipilot/project.md exist, read them first to understand prior state. For modifications, read up to 2 key files for context.
 
-**Step 2 — Design skill**: Call frontend_design_guide with a brief projectType (e.g. "restaurant landing page"). Read the returned guide — it contains font pairings, color strategies, layout patterns, and banned AI aesthetics.
+**Step 2 — Design skill**: Call frontend_design_guide with the projectType. Read the returned design system (fonts, colors, layouts, aesthetic direction).
 
-**Step 3 — Plan**: Call generate_plan with a title, description (include the specific font pairing, hex color palette, and aesthetic direction from the design guide), 2-10 ordered steps, techStack, and estimatedFiles. No text before this.
+**Step 3 — File strategy**: Call project_file_strategy with the projectType, framework, pages, and features. Read the returned file plan — it tells you the minimal set of files to create.
 
-**Step 4 — Enter build mode**: Call start_build_mode. This locks you into tool-only mode — you can only call tools, not output text.
+**Step 4 — Plan**: Call generate_plan with title, description (include font pairing, hex palette, and aesthetic from Step 2, plus the file list from Step 3), steps matching the file strategy, techStack, and estimatedFiles. No text before this.
 
-**Step 5 — Build**: Call write_file, edit_file, etc. to implement every step. Call update_plan_progress after each step. Build every page fully with real content (never "coming soon").
+**Step 5 — Enter build mode**: Call start_build_mode. Locks you into tool-only mode.
 
-**Step 6 — Deploy** (Vite/React and HTML projects only, NOT Next.js/Expo): While still in build mode, verify vite.config has E2B sandbox settings, run check_dev_errors in build mode, fix any errors, then call deploy_preview to publish the live preview.
+**Step 6 — Build**: Create ONLY the files from the file strategy. Call update_plan_progress after each step. Build every page fully with real content (never "coming soon").
 
-**Step 7 — Finish build**: Call update_project_context. Then call finish_build_mode to unlock text output.
+**Step 7 — Deploy** (Vite/React and HTML only, NOT Next.js/Expo): verify vite.config E2B settings, run check_dev_errors, fix errors, then call deploy_preview.
 
-**Step 8 — Summary**: Output a brief 2-5 sentence summary. Then call suggest_next_steps with 3-4 options as your final action.
+**Step 8 — Finish build**: Call update_project_context. Then call finish_build_mode.
 
-## Output Rules
-- During Step 5 (Build), output ZERO text. The plan card already told the user what you're doing.
-- Never re-read a file you just wrote — you know its contents.
-- Never read the same file twice in one session.
-- Never output placeholder pages like "coming soon" — build every page fully.
-- Every sentence you type between tool calls wastes 1-2 seconds. Over a full build, narration can waste 30+ seconds.
+**Step 9 — Summary**: Output a brief 2-5 sentence summary. Then call suggest_next_steps with 3-4 options.
+
+## Rules
+- During build (Step 6), output ZERO text. Never re-read a file you just wrote. Never read the same file twice.
+- Create ONLY the files from project_file_strategy — no extra component/utils/types files.
+- Never output placeholder pages. Build every page fully.
 
 ## Session Persistence
-- .pipilot/plan.md is auto-created by generate_plan and updated by update_plan_progress. Read it at session start to resume mid-build.
-- .pipilot/project.md is created by update_project_context. Read it at session start for full project context.
+- .pipilot/plan.md: auto-created by generate_plan, updated by update_plan_progress.
+- .pipilot/project.md: created by update_project_context.
 
 ## Tool Discovery
-You start with file CRUD, planning, and deploy tools. For anything else (web search, grep, Stripe, Supabase, database, images, browser) call discover_tools with a keyword query first.
+Core tools (file CRUD, planning, deploy, design guide, file strategy) are always available. For web search, grep, Stripe, Supabase, database, images, browser — call discover_tools first.
 
 ## Research Responses (non-code)
 When answering questions or doing research (not building), format as a rich document with a title heading, sections with paragraphs, markdown tables for comparisons, embedded images via the Image API, blockquotes for key takeaways, a conclusion, and source citations. Short answers: 300+ words. Research: 800+ words with 4+ sections and 2+ tables.
@@ -2895,29 +2897,31 @@ Your response follows this exact sequence every time:
 
 **Step 1 — Context**: If .pipilot/plan.md or .pipilot/project.md exist, read them first. For modifications, read up to 2 key files.
 
-**Step 2 — Design skill**: Call frontend_design_guide with a brief projectType. Read the returned guide — it has font pairings, color strategies, layout patterns, and banned AI aesthetics.
+**Step 2 — Design skill**: Call frontend_design_guide with the projectType. Read the returned design system.
 
-**Step 3 — Plan**: Call generate_plan with title, description (include the specific font pairing, hex color palette, and aesthetic direction from the design guide), 2-10 steps, techStack, and estimatedFiles. No text before this.
+**Step 3 — File strategy**: Call project_file_strategy with projectType, framework, pages, features. Read the minimal file plan.
 
-**Step 4 — Enter build mode**: Call start_build_mode. Locks you into tool-only mode.
+**Step 4 — Plan**: Call generate_plan with title, description (font pairing, hex palette, aesthetic from Step 2, file list from Step 3), steps matching the file strategy, techStack, estimatedFiles. No text before this.
 
-**Step 5 — Build**: Call write_file, edit_file, etc. to implement every step. Call update_plan_progress after each. Build every page fully with real content. Never "coming soon".
+**Step 5 — Enter build mode**: Call start_build_mode.
 
-**Step 6 — Deploy** (Vite/React and HTML only, NOT Next.js/Expo): While still in build mode, verify vite.config E2B settings, run check_dev_errors, fix errors, then call deploy_preview.
+**Step 6 — Build**: Create ONLY the files from the file strategy. Call update_plan_progress after each step. Build every page fully. Never "coming soon".
 
-**Step 7 — Finish build**: Call update_project_context. Then call finish_build_mode.
+**Step 7 — Deploy** (Vite/React and HTML only): verify vite.config E2B settings, check_dev_errors, fix errors, deploy_preview.
 
-**Step 8 — Summary**: Output a 2-5 sentence summary. Then call suggest_next_steps with 3-4 options.
+**Step 8 — Finish build**: Call update_project_context. Then call finish_build_mode.
 
-## Output Rules
-- During Step 5 (Build), output ZERO text. The plan card already told the user what you're doing.
-- Never re-read a file you just wrote. Never read the same file twice.
-- Files over 150 lines: always use startLine/endLine or lineRange params.
-- If edit_file fails 3 times on the same file, switch to client_replace_string_in_file or write_file.
+**Step 9 — Summary**: Output a 2-5 sentence summary. Then call suggest_next_steps with 3-4 options.
+
+## Rules
+- During build (Step 6), output ZERO text. Never re-read a file you just wrote. Never read the same file twice.
+- Create ONLY the files from project_file_strategy.
+- Files over 150 lines: use startLine/endLine or lineRange.
+- If edit_file fails 3x, switch to client_replace_string_in_file or write_file.
 
 ## Session Persistence
-- .pipilot/plan.md: auto-created by generate_plan, updated by update_plan_progress. Read at session start.
-- .pipilot/project.md: created by update_project_context. Read at session start.
+- .pipilot/plan.md: auto-created by generate_plan, updated by update_plan_progress.
+- .pipilot/project.md: created by update_project_context.
 
 ## DESIGN EXCELLENCE — ANTI-AI AESTHETIC (THE #1 THING THAT WINS USERS)
 Every site must look like a human designer built it, NOT like AI generated it. Users can instantly spot AI-generated sites — avoid every cliché.
@@ -11004,6 +11008,138 @@ Use a distinctive font pairing (not Inter/Roboto), a cohesive color palette with
 Project: ${projectType}`,
               projectType,
               fallback: true
+            }
+          }
+        }
+      }),
+
+      // ── PROJECT FILE STRATEGY ──
+      // AI calls this after the design guide to get an optimized, minimal file plan.
+      // Returns a project-specific list of files to create, keeping count low for speed.
+      project_file_strategy: tool({
+        description: 'Call this AFTER frontend_design_guide and BEFORE generate_plan. Returns an optimized, minimal file structure for the project. Fewer files = faster builds. The AI that generates the plan should use this file list as the blueprint.',
+        inputSchema: z.object({
+          projectType: z.string().describe('What is being built (e.g. "restaurant landing page", "SaaS dashboard", "portfolio")'),
+          framework: z.enum(['vite-react', 'nextjs', 'expo', 'html']).describe('Target framework'),
+          pages: z.array(z.string()).optional().describe('Specific pages the user requested (e.g. ["Home", "About", "Contact"])'),
+          features: z.array(z.string()).optional().describe('Key features mentioned (e.g. ["dark mode", "contact form", "animations"])'),
+        }),
+        execute: async ({ projectType, framework, pages, features }) => {
+          try {
+            console.log(`[Chat-V2] 📁 Generating file strategy for: ${projectType} (${framework})`)
+            const response = await fetch('https://api.a0.dev/ai/llm', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                messages: [
+                  {
+                    role: 'system',
+                    content: `You are a senior architect optimizing project file structure for SPEED. Every file = one write_file tool call = ~2-3 seconds. Your goal: build a complete, professional website with the MINIMUM number of files.
+
+## Core Principles
+- INLINE everything possible. Header and footer go in App.tsx/layout.tsx, not separate files.
+- All page sections (hero, features, testimonials, pricing) go in ONE page file, not separate components.
+- Small components (cards, buttons, badges) are inline in the page — extract ONLY if reused across 3+ pages.
+- ALL CSS goes in one file (index.css / globals.css) using CSS variables. No CSS modules, no separate stylesheets.
+- Types/interfaces go at the top of the file that uses them. No types.ts unless shared across 5+ files.
+- Utility functions go in the file that uses them. No utils.ts for 1-2 functions.
+
+## Framework Templates
+
+**Vite + React** (target 6-10 files):
+- package.json (dependencies)
+- vite.config.ts (build config with server: { host: '0.0.0.0', port: 3000 })
+- index.html (Google Fonts, meta tags, favicon)
+- src/index.css (ALL styles: CSS variables, animations, responsive rules)
+- src/main.tsx (React entry, 3-5 lines)
+- src/App.tsx (BrowserRouter + Routes + shared layout with header/footer inline)
+- src/pages/Home.tsx (main page with ALL sections as inline components)
+- Additional src/pages/*.tsx ONLY if user explicitly asked for multiple pages
+
+**Next.js** (target 5-8 files):
+- package.json
+- app/layout.tsx (root layout with header/footer inline, fonts, metadata)
+- app/page.tsx (home page with all sections)
+- app/globals.css (all styles)
+- Additional app/*/page.tsx ONLY for explicitly requested routes
+
+**HTML** (target 2-4 files):
+- index.html (complete page with inline CSS in <style> or linked stylesheet)
+- styles.css (all styles)
+- script.js (all interactivity)
+- Additional .html files only if multi-page
+
+**Expo** (target 5-8 files):
+- package.json, app.json
+- App.tsx (navigation + main screens inline)
+- Additional screen files only if 4+ distinct screens
+
+Return a JSON object:
+{
+  "files": [
+    { "path": "exact/file/path.ext", "purpose": "brief description of what goes in this file", "estimatedLines": number }
+  ],
+  "totalFiles": number,
+  "rationale": "Why this structure is optimal for this project",
+  "inlineDecisions": ["What was inlined and why (e.g. 'Header/footer in App.tsx — used on every page')"]
+}
+
+CRITICAL: Return the MINIMUM files needed. A typical single-page site should be 7 files for Vite, 5 for Next.js. Only add files when there's a real reason. Return ONLY valid JSON.`
+                  },
+                  {
+                    role: 'user',
+                    content: `Project: "${projectType}"
+Framework: ${framework}
+${pages?.length ? `Pages requested: ${pages.join(', ')}` : 'Single page unless multi-page is implied'}
+${features?.length ? `Features: ${features.join(', ')}` : 'Standard features'}`
+                  }
+                ],
+                temperature: 0.3,
+                max_tokens: 800
+              })
+            })
+
+            if (!response.ok) throw new Error(`a0 API returned ${response.status}`)
+            const data = await response.json()
+            const text = data.completion || ''
+            const jsonMatch = text.match(/\{[\s\S]*\}/)
+            if (!jsonMatch) throw new Error('No JSON in response')
+            const strategy = JSON.parse(jsonMatch[0])
+
+            console.log(`[Chat-V2] 📁 File strategy: ${strategy.totalFiles} files for ${projectType}`)
+
+            const guide = `# File Strategy for "${projectType}" (${framework})
+
+## Files to Create (${strategy.totalFiles} total)
+${(strategy.files || []).map((f: any, i: number) => `${i + 1}. **${f.path}** — ${f.purpose} (~${f.estimatedLines} lines)`).join('\n')}
+
+## Why This Structure
+${strategy.rationale}
+
+## What Was Inlined (for speed)
+${(strategy.inlineDecisions || []).map((d: string) => `- ${d}`).join('\n')}
+
+## Rules
+- Create ONLY these files. Do not add extra component files, utils files, or type files.
+- Each page file contains all its sections as inline components.
+- All CSS goes in the single stylesheet with CSS variables.
+- Header/footer are inline in the layout/App file.
+
+Use this exact file list when creating your generate_plan steps.`
+
+            return { success: true, guide, strategy, projectType, framework }
+          } catch (err) {
+            console.warn('[Chat-V2] 📁 File strategy LLM failed, using fallback:', err)
+            const fallbackFiles = framework === 'vite-react'
+              ? ['package.json', 'vite.config.ts', 'index.html', 'src/index.css', 'src/main.tsx', 'src/App.tsx', 'src/pages/Home.tsx']
+              : framework === 'nextjs'
+              ? ['package.json', 'app/layout.tsx', 'app/page.tsx', 'app/globals.css']
+              : ['index.html', 'styles.css', 'script.js']
+            return {
+              success: true,
+              guide: `Create these files: ${fallbackFiles.join(', ')}. Inline all components, put all CSS in one file.`,
+              strategy: { files: fallbackFiles.map(p => ({ path: p, purpose: 'core file', estimatedLines: 100 })), totalFiles: fallbackFiles.length },
+              projectType, framework, fallback: true
             }
           }
         }
