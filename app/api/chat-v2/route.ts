@@ -10824,6 +10824,9 @@ ${mergedRoadmapLines.join('\n')}
         execute: async ({ projectType }) => {
           try {
             console.log(`[Chat-V2] 🎨 Generating design guide for: ${projectType}`)
+            // ── COMPACT JSON SCHEMA ──
+            // a0 LLM blocks large JSON responses (~150 line limit).
+            // Solution: flat schema with 10 short fields, detailed guide built server-side.
             const response = await fetch('https://api.a0.dev/ai/llm', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -10831,103 +10834,16 @@ ${mergedRoadmapLines.join('\n')}
                 messages: [
                   {
                     role: 'system',
-                    content: `You are an elite UI/UX design director creating a project-specific design system. Your goal: create distinctive, production-grade frontend interfaces that avoid generic "AI slop" aesthetics. Every design must look like a human designer crafted it with exceptional attention to aesthetic details and creative choices.
-
-## Design Thinking Process
-Before choosing any visual elements, think through:
-1. PURPOSE: What problem does this interface solve? Who uses it?
-2. TONE: Pick a BOLD aesthetic — not "clean and modern" (generic). Choose from: brutally minimal, maximalist chaos, retro-futuristic, organic/natural, luxury/refined, playful/toy-like, editorial/magazine, brutalist/raw, art deco/geometric, soft/pastel, industrial/utilitarian, cyberpunk, neo-classical, Scandinavian, Japanese-inspired, etc.
-3. DIFFERENTIATION: What's the ONE thing someone will remember?
-4. COMPLEXITY MATCH: Maximalist designs need elaborate animations and effects. Minimalist designs need perfect spacing and refined typography. Match implementation depth to aesthetic vision.
-
-## Frontend Aesthetics Rules
-- TYPOGRAPHY: Choose beautiful, unique, characterful fonts. Pair a distinctive display font with a refined body font. Never generic choices.
-- COLOR & THEME: Commit to a cohesive aesthetic. Dominant colors with sharp accents outperform timid, evenly-distributed palettes. Use CSS variables.
-- MOTION: Focus on high-impact moments — one well-orchestrated page load with staggered reveals creates more delight than scattered micro-interactions. Use scroll-triggering and hover states that surprise.
-- SPATIAL COMPOSITION: Unexpected layouts. Asymmetry. Overlap. Diagonal flow. Grid-breaking elements. Generous negative space OR controlled density — both work when intentional.
-- BACKGROUNDS & VISUAL DETAILS: Create atmosphere and depth — never default to solid flat colors. Use contextual effects: gradient meshes, noise textures, geometric patterns, layered transparencies, dramatic shadows, decorative borders, grain overlays, subtle patterns.
-
-## BANNED (these scream "AI generated")
-- Fonts: Inter, Roboto, Arial, system-ui, Poppins, DM Sans, Outfit, Space Grotesk (when used alone)
-- Colors: purple-to-pink gradients, mesh gradients, gradient text, default Tailwind grays alone, evenly-distributed timid palettes
-- Layouts: repeating "text left, image right", cookie-cutter hero→features→testimonials→CTA→footer with zero variation, predictable component patterns
-- Copy: "innovative solutions", "fast-paced world", "leverage", "empower", "seamlessly integrate", "Get started", "Learn more", any generic AI chatbot phrasing
-- Visuals: floating abstract blobs/shapes, neon glow on everything, white backgrounds with no texture/depth/visual interest, same border-radius on everything
-- Icons: NEVER use emojis (🚀 📊 💡 ✨) as icons in professional websites — they scream AI-generated. Use Lucide React icons or Material Design icons instead. Emojis are only acceptable in chat UIs or playful/casual apps when explicitly requested.
-
-## MOBILE-FIRST RESPONSIVE (NON-NEGOTIABLE)
-Every website MUST be fully responsive and mobile-first. This is not optional.
-- RESPONSIVE NAV: Desktop = horizontal nav bar with links. Mobile = hamburger menu (☰) that opens a slide-out or dropdown menu. Never show a desktop nav on mobile — it breaks.
-- BREAKPOINTS: Design for mobile first (375px), then tablet (768px), then desktop (1024px+). Use Tailwind responsive prefixes: base = mobile, md: = tablet, lg: = desktop.
-- TOUCH TARGETS: All buttons/links minimum 44x44px on mobile. Never tiny clickable elements.
-- TYPOGRAPHY SCALING: Hero headings text-3xl on mobile → text-5xl md:text-6xl on desktop. Body text-sm on mobile → text-base on desktop.
-- GRID LAYOUTS: Single column on mobile, 2 columns on tablet, 3-4 on desktop. Use grid-cols-1 md:grid-cols-2 lg:grid-cols-3.
-- IMAGES: Full-width on mobile, constrained on desktop. Use object-cover and aspect ratios.
-- SPACING: Reduce padding on mobile (px-4 py-12) vs desktop (px-8 py-24). Never cramped on small screens.
-- HORIZONTAL SCROLL: Never allow horizontal overflow on mobile. Use overflow-hidden or overflow-x-auto with snap scrolling.
-- FOOTER: Stack columns vertically on mobile, horizontal grid on desktop.
-- TEST MENTALLY: Before writing any component, imagine it at 375px width. If it breaks, fix it.
-
-CRITICAL: No two designs should be the same. Vary between light and dark base themes, different fonts, different aesthetics. NEVER converge on the same common choices across projects.
-
-You must return a JSON object with these exact fields:
-{
-  "aesthetic": "One bold aesthetic direction (e.g. 'Japanese minimalism meets warm hospitality', 'brutalist editorial with soft color accents', 'retro-futuristic neon dashboard')",
-  "fontPairing": {
-    "display": "Exact Google Font name for headings",
-    "body": "Exact Google Font name for body text",
-    "rationale": "Why this pairing fits the project"
-  },
-  "colorPalette": {
-    "primary": "#hex",
-    "primaryLight": "#hex",
-    "accent": "#hex",
-    "surface": "#hex",
-    "surfaceAlt": "#hex",
-    "text": "#hex",
-    "textMuted": "#hex",
-    "border": "#hex",
-    "rationale": "Why these colors fit"
-  },
-  "darkMode": {
-    "surface": "#hex",
-    "surfaceAlt": "#hex",
-    "text": "#hex",
-    "textMuted": "#hex",
-    "border": "#hex"
-  },
-  "layoutStrategy": ["3-4 specific layout patterns to use for different sections, picked from: bento grid, split hero 60/40, asymmetric columns, full-bleed sections, overlapping elements, masonry grid, horizontal scroll, diagonal dividers, card stack with offset"],
-  "heroStyle": "Specific hero section design (e.g. 'full-bleed food photography with dark overlay and centered serif heading', 'split layout with animated gradient left and form right')",
-  "motionDesign": ["2-3 specific animation choices for this project"],
-  "iconStyle": "Icon library and style to use. MUST be Lucide React or Material Design icons — NEVER emojis. Specify size, stroke width, and style (e.g. 'Lucide outline icons at 20px, stroke-width 1.5' or 'Material Symbols rounded at 24px')",
-  "responsiveStrategy": "Describe the mobile-first responsive approach: what the nav looks like on mobile (hamburger menu with slide-out/dropdown), how grids collapse (3-col → 1-col), how hero text scales (text-3xl → text-6xl), how spacing adjusts (px-4 py-12 on mobile vs px-8 py-24 on desktop). Every site must work perfectly at 375px.",
-  "backgroundTexture": "How to create atmosphere and depth in backgrounds — specify textures, patterns, or effects (e.g. 'subtle grain overlay on hero with radial gradient', 'geometric dot pattern on surface-alt sections', 'layered transparency with frosted glass cards', 'noise texture at 3% opacity over dark sections'). Never use flat solid colors alone.",
-  "spatialComposition": "Describe the spatial flow and composition approach (e.g. 'asymmetric grid with overlapping card elements that break the grid at section boundaries', 'generous negative space with tight typography clusters', 'diagonal flow using clip-path angled section dividers')",
-  "uniqueElement": "The ONE memorable design element that makes this unforgettable (e.g. 'parallax ingredient photos that follow scroll', 'morphing blob navigation', 'typewriter effect on hero heading')",
-  "sampleCopy": {
-    "heroHeading": "A specific, compelling heading for the hero section",
-    "heroSubtext": "Supporting text under the hero",
-    "cta": "A specific, action-oriented CTA button text (NOT generic)",
-    "sectionHeadings": ["3-4 section heading examples"]
-  },
-  "cssVariables": "Complete :root CSS block with all custom properties including fonts"
-}
-
-CRITICAL RULES:
-- Every project gets a UNIQUE design. Never repeat the same recommendations.
-- Choose fonts available on Google Fonts that are distinctive and match the aesthetic.
-- All hex colors must be real, valid hex codes that work together as a cohesive palette.
-- The heroHeading and CTA must be specific to the project, not generic.
-- Vary between light and dark base themes. Not everything should be dark mode first.
-- Return ONLY valid JSON. No markdown, no explanation.`
+                    content: `You are a UI design director. Return a compact JSON design system. BANNED: Inter, Roboto, Arial, Poppins fonts. BANNED: purple gradients, floating blobs, emojis as icons. Every project gets unique fonts, colors, aesthetic. Vary light/dark themes. Return ONLY valid JSON, no markdown.`
                   },
                   {
                     role: 'user',
-                    content: `Generate a unique, project-specific design system for: "${projectType}"`
+                    content: `Design system for "${projectType}". Return JSON:
+{"a":"aesthetic direction","df":"Google Font for headings","bf":"Google Font for body","p":"#primary","pl":"#primaryLight","ac":"#accent","s":"#surface","sa":"#surfaceAlt","t":"#text","tm":"#textMuted","bd":"#border","ds":"#darkSurface","dt":"#darkText","hero":"hero section style","layouts":"3 layout patterns comma-separated","motion":"2 animation choices comma-separated","texture":"background texture approach","unique":"one memorable design element","heading":"hero heading text","sub":"hero subtext","cta":"CTA button text","sections":"3 section headings comma-separated"}`
                   }
                 ],
                 temperature: 0.9,
-                max_tokens: 1200
+                max_tokens: 500
               })
             })
 
@@ -10935,98 +10851,111 @@ CRITICAL RULES:
             const data = await response.json()
             const text = data.completion || ''
 
-            // Parse the JSON response
             const jsonMatch = text.match(/\{[\s\S]*\}/)
             if (!jsonMatch) throw new Error('No JSON in response')
-            const design = JSON.parse(jsonMatch[0])
+            const d = JSON.parse(jsonMatch[0])
 
-            console.log(`[Chat-V2] 🎨 Design guide generated: aesthetic="${design.aesthetic}", fonts="${design.fontPairing?.display} + ${design.fontPairing?.body}"`)
+            console.log(`[Chat-V2] 🎨 Design guide generated: aesthetic="${d.a}", fonts="${d.df} + ${d.bf}"`)
 
-            // Build a readable guide from the structured data
+            // ── BUILD DETAILED GUIDE SERVER-SIDE from compact LLM response ──
+            const layouts = (d.layouts || '').split(',').map((l: string) => l.trim()).filter(Boolean)
+            const motions = (d.motion || '').split(',').map((m: string) => m.trim()).filter(Boolean)
+            const sections = (d.sections || '').split(',').map((s: string) => s.trim()).filter(Boolean)
+
             const guide = `# Design System for "${projectType}"
 
 ## Aesthetic Direction
-${design.aesthetic}
+${d.a}
 
 ## Typography
-- **Display font**: ${design.fontPairing?.display} (headings, hero text)
-- **Body font**: ${design.fontPairing?.body} (paragraphs, UI text)
-- **Why**: ${design.fontPairing?.rationale || 'Chosen for this project type'}
-- Import both via Google Fonts \`<link>\` tag in index.html
-- Define as CSS variables: \`--font-display\` and \`--font-body\`
+- **Display font**: ${d.df} (headings, hero text)
+- **Body font**: ${d.bf} (paragraphs, UI text)
+- Import via Google Fonts \`<link>\` tag in index.html
+- CSS variables: \`--font-display: '${d.df}', serif;\` and \`--font-body: '${d.bf}', sans-serif;\`
 
 ## Color Palette
-- Primary: ${design.colorPalette?.primary}
-- Primary Light: ${design.colorPalette?.primaryLight}
-- Accent: ${design.colorPalette?.accent}
-- Surface: ${design.colorPalette?.surface}
-- Surface Alt: ${design.colorPalette?.surfaceAlt}
-- Text: ${design.colorPalette?.text}
-- Text Muted: ${design.colorPalette?.textMuted}
-- Border: ${design.colorPalette?.border}
-- **Why**: ${design.colorPalette?.rationale || 'Industry-matched palette'}
+- Primary: ${d.p} | Primary Light: ${d.pl} | Accent: ${d.ac}
+- Surface: ${d.s} | Surface Alt: ${d.sa}
+- Text: ${d.t} | Text Muted: ${d.tm} | Border: ${d.bd}
+- Dark mode surface: ${d.ds || '#111'} | Dark mode text: ${d.dt || '#f5f5f5'}
 
-## Dark Mode Colors
-- Surface: ${design.darkMode?.surface}
-- Surface Alt: ${design.darkMode?.surfaceAlt}
-- Text: ${design.darkMode?.text}
-- Text Muted: ${design.darkMode?.textMuted}
-- Border: ${design.darkMode?.border}
-
-## CSS Variables (paste this into your globals/index.css)
-${design.cssVariables || `\`:root { --color-primary: ${design.colorPalette?.primary}; --color-accent: ${design.colorPalette?.accent}; --color-surface: ${design.colorPalette?.surface}; --color-text: ${design.colorPalette?.text}; }\``}
+## CSS Variables (paste into index.css)
+:root { --font-display: '${d.df}', serif; --font-body: '${d.bf}', sans-serif; --color-primary: ${d.p}; --color-primary-light: ${d.pl}; --color-accent: ${d.ac}; --color-surface: ${d.s}; --color-surface-alt: ${d.sa}; --color-text: ${d.t}; --color-text-muted: ${d.tm}; --color-border: ${d.bd}; }
 
 ## Layout Strategy
-${(design.layoutStrategy || []).map((l: string, i: number) => `${i + 1}. ${l}`).join('\n')}
+${layouts.map((l: string, i: number) => `${i + 1}. ${l}`).join('\n')}
 
 ## Hero Section
-${design.heroStyle}
+${d.hero}
 
 ## Motion & Animations
-${(design.motionDesign || []).map((m: string) => `- ${m}`).join('\n')}
+${motions.map((m: string) => `- ${m}`).join('\n')}
+- Page load: staggered fadeInUp with animation-delay per element
+- Cards: hover:shadow-xl hover:-translate-y-2 transition-all duration-300
+- Buttons: active:scale-95 transition-transform
 
-## Icons
-${design.iconStyle}
-
-## Responsive Strategy
-${design.responsiveStrategy || 'Mobile-first: hamburger nav on mobile, horizontal nav on desktop. Grids collapse from 3-col to 1-col. Hero text scales from text-3xl to text-6xl. All touch targets 44x44px minimum.'}
-
-## Background Textures & Atmosphere
-${design.backgroundTexture || 'Add depth with subtle gradients, grain overlays, or geometric patterns — never flat solid colors alone.'}
-
-## Spatial Composition
-${design.spatialComposition || 'Use asymmetric layouts, overlapping elements, and varied grid patterns for visual interest.'}
+## Background & Texture
+${d.texture || 'Subtle gradient or grain overlay for depth — never flat solid colors alone.'}
 
 ## Unique Memorable Element
-${design.uniqueElement}
+${d.unique}
 
-## Sample Copy (use these or similar — NOT generic text)
-- **Hero heading**: "${design.sampleCopy?.heroHeading}"
-- **Hero subtext**: "${design.sampleCopy?.heroSubtext}"
-- **CTA button**: "${design.sampleCopy?.cta}"
-- **Section headings**: ${(design.sampleCopy?.sectionHeadings || []).map((h: string) => `"${h}"`).join(', ')}
+## Icons
+Use Lucide React icons consistently (20px, stroke-width 1.5). NEVER use emojis as icons.
+
+## Mobile-First Responsive (mandatory)
+- Nav: hamburger menu (☰) on mobile → horizontal nav on desktop
+- Grids: grid-cols-1 → md:grid-cols-2 → lg:grid-cols-3
+- Hero text: text-3xl → md:text-5xl lg:text-6xl
+- Spacing: px-4 py-12 mobile → px-8 py-24 desktop
+- Touch targets: min 44x44px. No horizontal overflow.
+- Footer: stack vertically on mobile, grid on desktop
+
+## Sample Copy
+- **Hero heading**: "${d.heading}"
+- **Hero subtext**: "${d.sub}"
+- **CTA button**: "${d.cta}"
+- **Section headings**: ${sections.map((s: string) => `"${s}"`).join(', ')}
 
 ## Reminders
-- Use Image API for all images: https://api.a0.dev/assets/image?text={description}&aspect=16:9
-- Use Lucide icons consistently
-- Build ALL pages fully — never "coming soon" placeholders
-- Real content: specific names, prices, dates
+- Images: https://api.a0.dev/assets/image?text={description}&aspect=16:9
+- Real content: specific names, prices, dates — never lorem ipsum
 - Every dark:bg-* needs matching dark:text-* on all children
+- Build ALL pages fully — never "coming soon" placeholders
 
 Apply this design system to every file you create.`
 
-            return { success: true, guide, design, projectType }
+            return { success: true, guide, design: d, projectType }
           } catch (err) {
-            // Fallback: return a minimal static guide if LLM fails
             console.warn('[Chat-V2] 🎨 Design guide LLM failed, using fallback:', err)
             return {
               success: true,
-              guide: `# Design Guide (fallback)
-Use a distinctive font pairing (not Inter/Roboto), a cohesive color palette with CSS variables, varied layout patterns (bento grids, asymmetric splits), and real content. Avoid purple gradients, floating blobs, generic copy ("innovative solutions"), and emojis as icons (use Lucide React or Material icons).
+              guide: `# Design Guide (fallback for "${projectType}")
 
-MOBILE-FIRST RESPONSIVE (mandatory): Hamburger menu on mobile, horizontal nav on desktop. Grids collapse from 3-col to 1-col. Hero text scales text-3xl → text-5xl md:text-6xl. All touch targets 44x44px. Reduce spacing on mobile (px-4 py-12 vs px-8 py-24). Never allow horizontal overflow. Footer stacks vertically on mobile. Test mentally at 375px before writing any component.
+## Typography
+Pick a distinctive Google Font pairing (NOT Inter/Roboto/Arial). Example: Playfair Display + Source Sans 3. Import via <link> tag. Define --font-display and --font-body CSS variables.
 
-Project: ${projectType}`,
+## Colors
+Choose a dominant color with sharp accent. Define as CSS variables: --color-primary, --color-accent, --color-surface, --color-text, --color-border. Match palette to industry.
+
+## Layout
+Mix layout patterns: bento grid, split hero 60/40, asymmetric columns, overlapping elements. Never repeat "text left, image right".
+
+## Mobile-First Responsive (mandatory)
+- Hamburger menu on mobile, horizontal nav on desktop
+- grid-cols-1 → md:grid-cols-2 → lg:grid-cols-3
+- Hero text: text-3xl → md:text-5xl lg:text-6xl
+- Spacing: px-4 py-12 mobile → px-8 py-24 desktop
+- Touch targets: min 44x44px. No horizontal overflow.
+
+## Icons
+Use Lucide React icons (20px, stroke-width 1.5). NEVER use emojis as icons.
+
+## BANNED
+Purple gradients, floating blobs, generic copy ("innovative solutions"), emojis as icons, cookie-cutter layouts, white backgrounds with no texture.
+
+## Images
+Use https://api.a0.dev/assets/image?text={description}&aspect=16:9 for all images.`,
               projectType,
               fallback: true
             }
