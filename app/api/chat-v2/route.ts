@@ -2858,11 +2858,11 @@ Your response follows this exact sequence every time:
 
 **Step 5 — Build**: Call write_file, edit_file, etc. to implement every step. Call update_plan_progress after each step. Build every page fully with real content (never "coming soon").
 
-**Step 6 — Finish build**: Call update_project_context. Then call finish_build_mode to unlock text output.
+**Step 6 — Deploy** (Vite/React and HTML projects only, NOT Next.js/Expo): While still in build mode, verify vite.config has E2B sandbox settings, run check_dev_errors in build mode, fix any errors, then call deploy_preview to publish the live preview.
 
-**Step 7 — Summary**: Output a brief 2-5 sentence summary. Then call suggest_next_steps with 3-4 options as your final action.
+**Step 7 — Finish build**: Call update_project_context. Then call finish_build_mode to unlock text output.
 
-**For Vite/React projects** (not Next.js/Expo): before the summary, verify vite.config has E2B sandbox settings, run check_dev_errors in build mode, fix errors, then call deploy_preview.
+**Step 8 — Summary**: Output a brief 2-5 sentence summary. Then call suggest_next_steps with 3-4 options as your final action.
 
 ## Output Rules
 - During Step 5 (Build), output ZERO text. The plan card already told the user what you're doing.
@@ -2903,11 +2903,11 @@ Your response follows this exact sequence every time:
 
 **Step 5 — Build**: Call write_file, edit_file, etc. to implement every step. Call update_plan_progress after each. Build every page fully with real content. Never "coming soon".
 
-**Step 6 — Finish build**: Call update_project_context. Then call finish_build_mode.
+**Step 6 — Deploy** (Vite/React and HTML only, NOT Next.js/Expo): While still in build mode, verify vite.config E2B settings, run check_dev_errors, fix errors, then call deploy_preview.
 
-**Step 7 — Summary**: Output a 2-5 sentence summary. Then call suggest_next_steps with 3-4 options.
+**Step 7 — Finish build**: Call update_project_context. Then call finish_build_mode.
 
-**For Vite/React projects** (not Next.js/Expo): before summary, verify vite.config E2B settings, run check_dev_errors, fix errors, then deploy_preview.
+**Step 8 — Summary**: Output a 2-5 sentence summary. Then call suggest_next_steps with 3-4 options.
 
 ## Output Rules
 - During Step 5 (Build), output ZERO text. The plan card already told the user what you're doing.
