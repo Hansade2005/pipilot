@@ -10855,6 +10855,19 @@ Before choosing any visual elements, think through:
 - Visuals: floating abstract blobs/shapes, neon glow on everything, white backgrounds with no texture/depth/visual interest, same border-radius on everything
 - Icons: NEVER use emojis (🚀 📊 💡 ✨) as icons in professional websites — they scream AI-generated. Use Lucide React icons or Material Design icons instead. Emojis are only acceptable in chat UIs or playful/casual apps when explicitly requested.
 
+## MOBILE-FIRST RESPONSIVE (NON-NEGOTIABLE)
+Every website MUST be fully responsive and mobile-first. This is not optional.
+- RESPONSIVE NAV: Desktop = horizontal nav bar with links. Mobile = hamburger menu (☰) that opens a slide-out or dropdown menu. Never show a desktop nav on mobile — it breaks.
+- BREAKPOINTS: Design for mobile first (375px), then tablet (768px), then desktop (1024px+). Use Tailwind responsive prefixes: base = mobile, md: = tablet, lg: = desktop.
+- TOUCH TARGETS: All buttons/links minimum 44x44px on mobile. Never tiny clickable elements.
+- TYPOGRAPHY SCALING: Hero headings text-3xl on mobile → text-5xl md:text-6xl on desktop. Body text-sm on mobile → text-base on desktop.
+- GRID LAYOUTS: Single column on mobile, 2 columns on tablet, 3-4 on desktop. Use grid-cols-1 md:grid-cols-2 lg:grid-cols-3.
+- IMAGES: Full-width on mobile, constrained on desktop. Use object-cover and aspect ratios.
+- SPACING: Reduce padding on mobile (px-4 py-12) vs desktop (px-8 py-24). Never cramped on small screens.
+- HORIZONTAL SCROLL: Never allow horizontal overflow on mobile. Use overflow-hidden or overflow-x-auto with snap scrolling.
+- FOOTER: Stack columns vertically on mobile, horizontal grid on desktop.
+- TEST MENTALLY: Before writing any component, imagine it at 375px width. If it breaks, fix it.
+
 CRITICAL: No two designs should be the same. Vary between light and dark base themes, different fonts, different aesthetics. NEVER converge on the same common choices across projects.
 
 You must return a JSON object with these exact fields:
@@ -10887,6 +10900,7 @@ You must return a JSON object with these exact fields:
   "heroStyle": "Specific hero section design (e.g. 'full-bleed food photography with dark overlay and centered serif heading', 'split layout with animated gradient left and form right')",
   "motionDesign": ["2-3 specific animation choices for this project"],
   "iconStyle": "Icon library and style to use. MUST be Lucide React or Material Design icons — NEVER emojis. Specify size, stroke width, and style (e.g. 'Lucide outline icons at 20px, stroke-width 1.5' or 'Material Symbols rounded at 24px')",
+  "responsiveStrategy": "Describe the mobile-first responsive approach: what the nav looks like on mobile (hamburger menu with slide-out/dropdown), how grids collapse (3-col → 1-col), how hero text scales (text-3xl → text-6xl), how spacing adjusts (px-4 py-12 on mobile vs px-8 py-24 on desktop). Every site must work perfectly at 375px.",
   "backgroundTexture": "How to create atmosphere and depth in backgrounds — specify textures, patterns, or effects (e.g. 'subtle grain overlay on hero with radial gradient', 'geometric dot pattern on surface-alt sections', 'layered transparency with frosted glass cards', 'noise texture at 3% opacity over dark sections'). Never use flat solid colors alone.",
   "spatialComposition": "Describe the spatial flow and composition approach (e.g. 'asymmetric grid with overlapping card elements that break the grid at section boundaries', 'generous negative space with tight typography clusters', 'diagonal flow using clip-path angled section dividers')",
   "uniqueElement": "The ONE memorable design element that makes this unforgettable (e.g. 'parallax ingredient photos that follow scroll', 'morphing blob navigation', 'typewriter effect on hero heading')",
@@ -10974,6 +10988,9 @@ ${(design.motionDesign || []).map((m: string) => `- ${m}`).join('\n')}
 ## Icons
 ${design.iconStyle}
 
+## Responsive Strategy
+${design.responsiveStrategy || 'Mobile-first: hamburger nav on mobile, horizontal nav on desktop. Grids collapse from 3-col to 1-col. Hero text scales from text-3xl to text-6xl. All touch targets 44x44px minimum.'}
+
 ## Background Textures & Atmosphere
 ${design.backgroundTexture || 'Add depth with subtle gradients, grain overlays, or geometric patterns — never flat solid colors alone.'}
 
@@ -11005,7 +11022,10 @@ Apply this design system to every file you create.`
             return {
               success: true,
               guide: `# Design Guide (fallback)
-Use a distinctive font pairing (not Inter/Roboto), a cohesive color palette with CSS variables, varied layout patterns (bento grids, asymmetric splits), and real content. Avoid purple gradients, floating blobs, and generic copy like "innovative solutions". Make it memorable.
+Use a distinctive font pairing (not Inter/Roboto), a cohesive color palette with CSS variables, varied layout patterns (bento grids, asymmetric splits), and real content. Avoid purple gradients, floating blobs, generic copy ("innovative solutions"), and emojis as icons (use Lucide React or Material icons).
+
+MOBILE-FIRST RESPONSIVE (mandatory): Hamburger menu on mobile, horizontal nav on desktop. Grids collapse from 3-col to 1-col. Hero text scales text-3xl → text-5xl md:text-6xl. All touch targets 44x44px. Reduce spacing on mobile (px-4 py-12 vs px-8 py-24). Never allow horizontal overflow. Footer stacks vertically on mobile. Test mentally at 375px before writing any component.
+
 Project: ${projectType}`,
               projectType,
               fallback: true
