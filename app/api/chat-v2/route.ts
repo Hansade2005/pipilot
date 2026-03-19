@@ -12017,12 +12017,26 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
           }
 
           // ── TOOL-ONLY MODE: AI toggles this via start_build_mode / finish_build_mode ──
-          // When build mode is active, toolChoice: 'required' forces the model to
-          // call a tool every step — physically preventing text narration.
-          // Safety valve: release to 'auto' near step limit so it can finish gracefully.
           const inBuildMode = sessionBuildMode.get(projectId) === true
           const nearLimit = steps.length >= (maxStepsAllowed - 3)
-          const toolChoice = (inBuildMode && !nearLimit) ? 'required' as const : 'auto' as const
+          const finishBuildCalled = steps.some(s => s.toolCalls?.some((tc: any) => tc.toolName === 'finish_build_mode'))
+          const suggestCalled = steps.some(s => s.toolCalls?.some((tc: any) => tc.toolName === 'suggest_next_steps'))
+
+          // After finish_build_mode: allow one auto step (for summary text),
+          // then force suggest_next_steps on the next step to prevent text looping
+          let toolChoice: 'auto' | 'required' | { type: 'tool'; toolName: string } = 'auto'
+          if (inBuildMode && !nearLimit) {
+            toolChoice = 'required' as const
+          } else if (finishBuildCalled && !suggestCalled) {
+            // Check if AI already output text in a step after finish_build_mode
+            const finishBuildStepIndex = steps.findIndex(s => s.toolCalls?.some((tc: any) => tc.toolName === 'finish_build_mode'))
+            const stepsAfterFinish = steps.slice(finishBuildStepIndex + 1)
+            const hasOutputText = stepsAfterFinish.some(s => s.text && s.text.trim().length > 20)
+            if (hasOutputText) {
+              // AI already wrote its summary — force it to call suggest_next_steps
+              toolChoice = { type: 'tool', toolName: 'suggest_next_steps' }
+            }
+          }
 
           return {
             toolChoice,
@@ -12083,7 +12097,20 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
             // ── TOOL-ONLY MODE (same logic as primary model) ──
             const inBuildMode = sessionBuildMode.get(projectId) === true
             const nearLimit = steps.length >= (maxStepsAllowed - 3)
-            const toolChoice = (inBuildMode && !nearLimit) ? 'required' as const : 'auto' as const
+            const finishBuildCalled = steps.some(s => s.toolCalls?.some((tc: any) => tc.toolName === 'finish_build_mode'))
+            const suggestCalled = steps.some(s => s.toolCalls?.some((tc: any) => tc.toolName === 'suggest_next_steps'))
+
+            let toolChoice: 'auto' | 'required' | { type: 'tool'; toolName: string } = 'auto'
+            if (inBuildMode && !nearLimit) {
+              toolChoice = 'required' as const
+            } else if (finishBuildCalled && !suggestCalled) {
+              const finishBuildStepIndex = steps.findIndex(s => s.toolCalls?.some((tc: any) => tc.toolName === 'finish_build_mode'))
+              const stepsAfterFinish = steps.slice(finishBuildStepIndex + 1)
+              const hasOutputText = stepsAfterFinish.some(s => s.text && s.text.trim().length > 20)
+              if (hasOutputText) {
+                toolChoice = { type: 'tool', toolName: 'suggest_next_steps' }
+              }
+            }
 
             return { toolChoice, activeTools: [...new Set(activeToolNames)] as any }
           },
