@@ -1284,30 +1284,110 @@ ${roadmap.map((r: string) => `- [ ] ${r}`).join('\n')}
       }
 
       case 'frontend_design_guide': {
-        // Architecture: Server execute() runs constructToolResult for the AI's result.
-        // Client handler runs in parallel for persistence/display.
-        // For "read": read from storageManager (persistent storage)
-        // For "generate": no-op — server's constructToolResult('write_file') triggers
-        //   the client's write_file handler which persists .pipilot/design.md automatically
-        const { action } = toolCall.args;
+        const { action, projectType } = toolCall.args;
         const designPath = '.pipilot/design.md';
         console.log(`[ClientFileTool] frontend_design_guide: action=${action}`);
 
         if (action === 'read') {
+          // Read existing design scheme from persistent storage
           try {
             const existingFile = await storageManager.getFile(projectId, designPath);
             if (existingFile?.content) {
               console.log(`[ClientFileTool] Read design guide from ${designPath} (${existingFile.content.length} chars)`);
+              addToolResult({
+                tool: 'frontend_design_guide',
+                toolCallId: toolCall.toolCallId,
+                output: {
+                  success: true,
+                  guide: existingFile.content,
+                  action: 'read',
+                  cached: true
+                }
+              });
             } else {
               console.log(`[ClientFileTool] No design guide found at ${designPath}`);
+              addToolResult({
+                tool: 'frontend_design_guide',
+                toolCallId: toolCall.toolCallId,
+                output: {
+                  success: false,
+                  guide: null,
+                  action: 'read',
+                  message: 'No design scheme found. Call frontend_design_guide with action: "generate" and projectType to create one.'
+                }
+              });
             }
           } catch (error) {
-            console.log(`[ClientFileTool] Could not read design guide: ${error}`);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            addToolResult({
+              tool: 'frontend_design_guide',
+              toolCallId: toolCall.toolCallId,
+              state: 'output-error',
+              errorText: `Failed to read design guide: ${errorMessage}`
+            });
           }
         } else {
-          // "generate" — server handles a0 LLM call + constructToolResult('write_file')
-          // The write_file result flows through stream → client write_file handler persists it
-          console.log(`[ClientFileTool] frontend_design_guide: generate handled server-side, write_file syncs to client`);
+          // "generate" — call /api/design-guide to get the guide, then persist
+          try {
+            const response = await fetch('/api/design-guide', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ projectType: projectType || 'web application' })
+            });
+            const data = await response.json();
+            const guide = data.guide || '';
+
+            if (guide) {
+              // Persist to storageManager (same pattern as update_project_context)
+              const existingFile = await storageManager.getFile(projectId, designPath);
+              if (existingFile) {
+                await storageManager.updateFile(projectId, designPath, { content: guide });
+              } else {
+                await storageManager.createFile({
+                  workspaceId: projectId,
+                  name: 'design.md',
+                  path: designPath,
+                  content: guide,
+                  fileType: 'md',
+                  type: 'md',
+                  size: guide.length,
+                  isDirectory: false,
+                  metadata: { createdBy: 'ai' }
+                });
+              }
+
+              console.log(`[ClientFileTool] Persisted design guide to ${designPath}`);
+
+              addToolResult({
+                tool: 'frontend_design_guide',
+                toolCallId: toolCall.toolCallId,
+                output: {
+                  success: true,
+                  guide,
+                  action: 'generate',
+                  projectType,
+                  persisted: true
+                }
+              });
+
+              dispatchFileChanged(projectId, designPath);
+            } else {
+              addToolResult({
+                tool: 'frontend_design_guide',
+                toolCallId: toolCall.toolCallId,
+                state: 'output-error',
+                errorText: 'Failed to generate design guide: empty response from API'
+              });
+            }
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            addToolResult({
+              tool: 'frontend_design_guide',
+              toolCallId: toolCall.toolCallId,
+              state: 'output-error',
+              errorText: `Failed to generate design guide: ${errorMessage}`
+            });
+          }
         }
         break;
       }
