@@ -10826,13 +10826,15 @@ ${mergedRoadmapLines.join('\n')}
           const designPath = '.pipilot/design.md'
           const sessionData = sessionProjectStorage.get(projectId)
 
-          // ── READ: return existing design scheme from session storage ──
+          // ── READ: return existing design scheme via read_file (same as project.md) ──
           if (action === 'read') {
-            const existing = sessionData?.files?.get(designPath)
-            if (existing?.content) {
-              console.log(`[Chat-V2] 🎨 Design guide READ from .pipilot/design.md (${existing.content.length} chars)`)
-              return { success: true, guide: existing.content, action: 'read', cached: true }
-            }
+            try {
+              const readResult = await constructToolResult('read_file', { path: designPath }, projectId, `design-read-${Date.now()}`)
+              if (readResult.success && readResult.content) {
+                console.log(`[Chat-V2] 🎨 Design guide READ from .pipilot/design.md (${(readResult.content as string).length} chars)`)
+                return { success: true, guide: readResult.content, action: 'read', cached: true }
+              }
+            } catch (_) { /* file doesn't exist */ }
             console.log('[Chat-V2] 🎨 No existing design scheme found — call with action: "generate"')
             return { success: false, guide: null, action: 'read', message: 'No design scheme found. Call frontend_design_guide with action: "generate" and projectType to create one.' }
           }
@@ -10973,15 +10975,9 @@ Purple gradients, floating blobs, generic copy ("innovative solutions"), emojis 
 Use https://api.a0.dev/assets/image?text={description}&aspect=16:9 for all images.`
           }
 
-          // ── PERSIST to .pipilot/design.md in session storage ──
-          if (sessionData?.files) {
-            sessionData.files.set(designPath, { content: guide, isDirectory: false })
-            // Also add to file tree if not already there
-            if (!sessionData.fileTree.includes(designPath)) {
-              sessionData.fileTree.push(designPath)
-            }
-            console.log(`[Chat-V2] 🎨 Design guide SAVED to .pipilot/design.md (${guide.length} chars)`)
-          }
+          // ── PERSIST to .pipilot/design.md via write_file (same as project.md) ──
+          await constructToolResult('write_file', { path: designPath, content: guide }, projectId, `design-write-${Date.now()}`)
+          console.log(`[Chat-V2] 🎨 Design guide SAVED to .pipilot/design.md (${guide.length} chars)`)
 
           return { success: true, guide, design, action: 'generate', projectType, persisted: true }
         }
