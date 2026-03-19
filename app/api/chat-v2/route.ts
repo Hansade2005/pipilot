@@ -11017,16 +11017,24 @@ Project: ${projectType}`,
       // AI calls this after the design guide to get an optimized, minimal file plan.
       // Returns a project-specific list of files to create, keeping count low for speed.
       project_file_strategy: tool({
-        description: 'Call this AFTER frontend_design_guide and BEFORE generate_plan. Returns an optimized, minimal file structure for the project. Fewer files = faster builds. The AI that generates the plan should use this file list as the blueprint.',
+        description: 'Call this AFTER frontend_design_guide and BEFORE generate_plan. Returns an optimized, minimal file structure for the project. Fewer files = faster builds. Pass the current file tree so the strategy accounts for existing files.',
         inputSchema: z.object({
           projectType: z.string().describe('What is being built (e.g. "restaurant landing page", "SaaS dashboard", "portfolio")'),
           framework: z.enum(['vite-react', 'nextjs', 'expo', 'html']).describe('Target framework'),
+          isNewProject: z.boolean().optional().describe('True if starting from scratch, false if modifying existing project'),
           pages: z.array(z.string()).optional().describe('Specific pages the user requested (e.g. ["Home", "About", "Contact"])'),
           features: z.array(z.string()).optional().describe('Key features mentioned (e.g. ["dark mode", "contact form", "animations"])'),
         }),
-        execute: async ({ projectType, framework, pages, features }) => {
+        execute: async ({ projectType, framework, isNewProject, pages, features }) => {
+          // Get the current file tree from session storage for context
+          const sessionData = sessionProjectStorage.get(projectId)
+          const currentFiles = sessionData?.fileTree || []
+          const existingFilePaths = sessionData?.files
+            ? Array.from(sessionData.files.keys()).filter(k => !sessionData.files.get(k)?.isDirectory)
+            : []
+
           try {
-            console.log(`[Chat-V2] 📁 Generating file strategy for: ${projectType} (${framework})`)
+            console.log(`[Chat-V2] 📁 Generating file strategy for: ${projectType} (${framework}), existing files: ${existingFilePaths.length}`)
             const response = await fetch('https://api.a0.dev/ai/llm', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -11034,64 +11042,66 @@ Project: ${projectType}`,
                 messages: [
                   {
                     role: 'system',
-                    content: `You are a senior architect optimizing project file structure for SPEED. Every file = one write_file tool call = ~2-3 seconds. Your goal: build a complete, professional website with the MINIMUM number of files.
+                    content: `You are a senior architect optimizing project file structure for SPEED. Every file = one write_file tool call = ~2-3 seconds. Your goal: build a complete, professional app with the MINIMUM number of files.
 
 ## Core Principles
-- INLINE everything possible. Header and footer go in App.tsx/layout.tsx, not separate files.
+- INLINE everything possible. Header/footer go in the layout/App file, not separate files.
 - All page sections (hero, features, testimonials, pricing) go in ONE page file, not separate components.
-- Small components (cards, buttons, badges) are inline in the page — extract ONLY if reused across 3+ pages.
-- ALL CSS goes in one file (index.css / globals.css) using CSS variables. No CSS modules, no separate stylesheets.
+- Small components (cards, buttons, badges) are inline — extract ONLY if reused across 3+ pages.
+- ALL CSS goes in one stylesheet using CSS variables. No CSS modules, no separate stylesheets.
 - Types/interfaces go at the top of the file that uses them. No types.ts unless shared across 5+ files.
 - Utility functions go in the file that uses them. No utils.ts for 1-2 functions.
+- For EXISTING projects (non-empty file tree), prefer editing existing files over creating new ones.
 
-## Framework Templates
+## Framework-Specific Templates
 
-**Vite + React** (target 6-10 files):
-- package.json (dependencies)
-- vite.config.ts (build config with server: { host: '0.0.0.0', port: 3000 })
-- index.html (Google Fonts, meta tags, favicon)
-- src/index.css (ALL styles: CSS variables, animations, responsive rules)
-- src/main.tsx (React entry, 3-5 lines)
-- src/App.tsx (BrowserRouter + Routes + shared layout with header/footer inline)
-- src/pages/Home.tsx (main page with ALL sections as inline components)
-- Additional src/pages/*.tsx ONLY if user explicitly asked for multiple pages
+**Vite + React** (target 6-10 files for new, fewer edits for existing):
+- package.json, vite.config.ts, index.html
+- src/index.css (ALL styles), src/main.tsx, src/App.tsx (router + header/footer inline)
+- src/pages/Home.tsx (all sections inline), additional pages only if requested
 
 **Next.js** (target 5-8 files):
-- package.json
-- app/layout.tsx (root layout with header/footer inline, fonts, metadata)
-- app/page.tsx (home page with all sections)
-- app/globals.css (all styles)
-- Additional app/*/page.tsx ONLY for explicitly requested routes
-
-**HTML** (target 2-4 files):
-- index.html (complete page with inline CSS in <style> or linked stylesheet)
-- styles.css (all styles)
-- script.js (all interactivity)
-- Additional .html files only if multi-page
+- package.json, next.config.ts, app/layout.tsx (header/footer inline, fonts, metadata)
+- app/page.tsx (all sections), app/globals.css, additional app/*/page.tsx only if requested
 
 **Expo** (target 5-8 files):
-- package.json, app.json
-- App.tsx (navigation + main screens inline)
-- Additional screen files only if 4+ distinct screens
+- package.json, app.json, App.tsx (navigation + screens inline)
+- constants/index.ts (theme), additional screen files only if 4+ distinct screens
+
+**HTML** (target 2-4 files):
+- index.html (with <style> or linked stylesheet), styles.css, script.js
+
+## For EXISTING Projects
+When a file tree is provided, your strategy should:
+- Identify which EXISTING files need to be MODIFIED (edit_file/write_file) vs which NEW files to CREATE
+- Mark each file as "create" or "modify" in the action field
+- Prefer modifying existing files over creating new ones (modifying is faster — no new file overhead)
+- Keep the same directory structure conventions the project already uses
 
 Return a JSON object:
 {
   "files": [
-    { "path": "exact/file/path.ext", "purpose": "brief description of what goes in this file", "estimatedLines": number }
+    { "path": "exact/file/path.ext", "action": "create" | "modify", "purpose": "what goes in this file", "estimatedLines": number }
   ],
   "totalFiles": number,
-  "rationale": "Why this structure is optimal for this project",
-  "inlineDecisions": ["What was inlined and why (e.g. 'Header/footer in App.tsx — used on every page')"]
+  "newFiles": number,
+  "modifiedFiles": number,
+  "rationale": "Why this structure is optimal",
+  "inlineDecisions": ["What was inlined and why"]
 }
 
-CRITICAL: Return the MINIMUM files needed. A typical single-page site should be 7 files for Vite, 5 for Next.js. Only add files when there's a real reason. Return ONLY valid JSON.`
+CRITICAL: Return the MINIMUM files needed. Return ONLY valid JSON.`
                   },
                   {
                     role: 'user',
                     content: `Project: "${projectType}"
 Framework: ${framework}
+New project: ${isNewProject !== false ? 'Yes (starting fresh)' : 'No (modifying existing)'}
 ${pages?.length ? `Pages requested: ${pages.join(', ')}` : 'Single page unless multi-page is implied'}
-${features?.length ? `Features: ${features.join(', ')}` : 'Standard features'}`
+${features?.length ? `Features: ${features.join(', ')}` : 'Standard features'}
+
+Current file tree (${existingFilePaths.length} files):
+${existingFilePaths.length > 0 ? existingFilePaths.join('\n') : '(empty — new project)'}`
                   }
                 ],
                 temperature: 0.3,
@@ -11108,22 +11118,25 @@ ${features?.length ? `Features: ${features.join(', ')}` : 'Standard features'}`
 
             console.log(`[Chat-V2] 📁 File strategy: ${strategy.totalFiles} files for ${projectType}`)
 
+            const newCount = strategy.newFiles || strategy.files?.filter((f: any) => f.action === 'create').length || strategy.totalFiles
+            const modCount = strategy.modifiedFiles || strategy.files?.filter((f: any) => f.action === 'modify').length || 0
+
             const guide = `# File Strategy for "${projectType}" (${framework})
 
-## Files to Create (${strategy.totalFiles} total)
-${(strategy.files || []).map((f: any, i: number) => `${i + 1}. **${f.path}** — ${f.purpose} (~${f.estimatedLines} lines)`).join('\n')}
+## Files (${strategy.totalFiles} total — ${newCount} new, ${modCount} modified)
+${(strategy.files || []).map((f: any, i: number) => `${i + 1}. [${f.action || 'create'}] **${f.path}** — ${f.purpose} (~${f.estimatedLines} lines)`).join('\n')}
 
 ## Why This Structure
 ${strategy.rationale}
 
-## What Was Inlined (for speed)
+## Inlined for Speed
 ${(strategy.inlineDecisions || []).map((d: string) => `- ${d}`).join('\n')}
 
 ## Rules
-- Create ONLY these files. Do not add extra component files, utils files, or type files.
+- Create/modify ONLY these files. No extra component, utils, or type files.
 - Each page file contains all its sections as inline components.
-- All CSS goes in the single stylesheet with CSS variables.
-- Header/footer are inline in the layout/App file.
+- All CSS in the single stylesheet with CSS variables.
+- Header/footer inline in the layout/App file.
 
 Use this exact file list when creating your generate_plan steps.`
 
@@ -11134,6 +11147,8 @@ Use this exact file list when creating your generate_plan steps.`
               ? ['package.json', 'vite.config.ts', 'index.html', 'src/index.css', 'src/main.tsx', 'src/App.tsx', 'src/pages/Home.tsx']
               : framework === 'nextjs'
               ? ['package.json', 'app/layout.tsx', 'app/page.tsx', 'app/globals.css']
+              : framework === 'expo'
+              ? ['package.json', 'app.json', 'App.tsx', 'constants/index.ts']
               : ['index.html', 'styles.css', 'script.js']
             return {
               success: true,
