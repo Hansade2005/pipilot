@@ -3039,7 +3039,8 @@ export function ChatPanelV2({
                 'request_supabase_connection',
                 'generate_plan',
                 'update_plan_progress',
-                'update_project_context'
+                'update_project_context',
+                'frontend_design_guide'
               ]
 
               if (clientSideTools.includes(toolCall.toolName)) {
@@ -3871,7 +3872,8 @@ export function ChatPanelV2({
                 'request_supabase_connection',
                 'generate_plan',
                 'update_plan_progress',
-                'update_project_context'
+                'update_project_context',
+                'frontend_design_guide'
               ]
 
               if (clientSideTools.includes(toolCall.toolName)) {
@@ -4340,7 +4342,8 @@ export function ChatPanelV2({
                   'delete_file', 'delete_folder', 'remove_package',
                   'read_file', 'list_files', 'grep_search', 'semantic_code_navigator',
                   'create_database', 'pipilotdb_create_database', 'request_supabase_connection',
-                  'generate_plan', 'update_plan_progress', 'update_project_context'
+                  'generate_plan', 'update_plan_progress', 'update_project_context',
+                  'frontend_design_guide'
                 ]
 
                 if (clientSideTools.includes(parsed.toolName)) {
@@ -5734,7 +5737,8 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 'request_supabase_connection',
                 'generate_plan',
                 'update_plan_progress',
-                'update_project_context'
+                'update_project_context',
+                'frontend_design_guide'
               ]
 
               if (clientSideTools.includes(toolCall.toolName)) {

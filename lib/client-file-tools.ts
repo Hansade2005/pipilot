@@ -1283,12 +1283,34 @@ ${roadmap.map((r: string) => `- [ ] ${r}`).join('\n')}
         break;
       }
 
-      // NOTE: frontend_design_guide is NOT handled client-side.
-      // Both "read" and "generate" run server-side via execute() in route.ts.
-      // Server read: constructToolResult('read_file', '.pipilot/design.md')
-      // Server generate: a0 LLM → constructToolResult('write_file', '.pipilot/design.md')
-      // The write_file flows through the stream and the client's write_file handler
-      // persists it to storageManager automatically.
+      case 'frontend_design_guide': {
+        // Architecture: Server execute() runs constructToolResult for the AI's result.
+        // Client handler runs in parallel for persistence/display.
+        // For "read": read from storageManager (persistent storage)
+        // For "generate": no-op — server's constructToolResult('write_file') triggers
+        //   the client's write_file handler which persists .pipilot/design.md automatically
+        const { action } = toolCall.args;
+        const designPath = '.pipilot/design.md';
+        console.log(`[ClientFileTool] frontend_design_guide: action=${action}`);
+
+        if (action === 'read') {
+          try {
+            const existingFile = await storageManager.getFile(projectId, designPath);
+            if (existingFile?.content) {
+              console.log(`[ClientFileTool] Read design guide from ${designPath} (${existingFile.content.length} chars)`);
+            } else {
+              console.log(`[ClientFileTool] No design guide found at ${designPath}`);
+            }
+          } catch (error) {
+            console.log(`[ClientFileTool] Could not read design guide: ${error}`);
+          }
+        } else {
+          // "generate" — server handles a0 LLM call + constructToolResult('write_file')
+          // The write_file result flows through stream → client write_file handler persists it
+          console.log(`[ClientFileTool] frontend_design_guide: generate handled server-side, write_file syncs to client`);
+        }
+        break;
+      }
 
       case 'request_supabase_connection': {
         const { title, description, labels } = toolCall.args;
