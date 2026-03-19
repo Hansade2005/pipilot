@@ -53,6 +53,37 @@ PiPilot uses multiple AI models for different purposes:
 - Real-time documentation search (search_docs tool)
 - Tawk.to live chat fallback
 
+### HTML-to-React Converter (Planned Feature)
+PiPilot will offer an HTML/CSS/JS to Vite+React conversion tool — a feature with proven market demand and no fully automated competitor.
+
+**Input Methods (upload first, then convert):**
+1. **Upload ZIP** — user uploads a `.zip` containing their HTML/CSS/JS project
+2. **GitHub repo** — connect to a repo containing the HTML site
+3. **Import folder** — select a local folder with the HTML project files
+4. **Paste URL** — enter a live site URL, PiPilot pulls the HTML, CSS, JS, and image assets
+
+All four methods load the raw HTML/CSS/JS files into the workspace. Then the AI conversion pipeline transforms them into a Vite+React project.
+
+**Conversion Pipeline (AI-powered via chat-v2):**
+1. Analyze the uploaded project structure
+2. Split HTML into React components (header, footer, nav, sections, etc.)
+3. Convert vanilla JS (DOM manipulation, event listeners) to React hooks/state (`useState`, `useEffect`)
+4. Convert CSS to Tailwind or CSS modules
+5. Replace CDN dependencies with npm packages
+6. Scaffold a proper Vite+React project structure
+
+**Existing Infrastructure (in `components/chat-input.tsx`):**
+- ZIP import handler (`handleZipImport`) — already built
+- Folder import handler (`handleFolderImport`) — already built
+- GitHub import handler (`handleGithubImport`) — already built
+- URL scraper — needs to be built (new API route to fetch & extract site assets)
+
+**Market Context:**
+- No existing tool does full end-to-end HTML project to Vite+React conversion
+- Funded competitors (Kombai $4.5M, Locofy $7.3M) convert from Figma, not HTML
+- Active freelance market on Fiverr/Upwork for manual HTML-to-React conversion ($5-$75/hr)
+- `html-react-parser` npm package has ~2.8M weekly downloads showing demand at the HTML-React boundary
+
 ---
 
 ## Important Files & Architecture
