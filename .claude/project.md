@@ -6,7 +6,7 @@
 
 ---
 
-## Current State (as of 2026-03-18, session 2)
+## Current State (as of 2026-03-19, session 3)
 
 - **Production URL:** https://pipilot.dev
 - **Framework:** Next.js 14+ (App Router) / Tailwind / shadcn/ui
@@ -95,6 +95,77 @@ Cloud-based AI coding agent with E2B sandboxes.
 ---
 
 ## Recent Changes (Chronological)
+
+### 2026-03-19 (Session 3) — Agent Architecture Overhaul: Build Mode, Design System, Speed
+
+Complete revamp of the AI agent's build pipeline — from system prompts to API-level enforcement.
+
+#### System Prompt Rewrite
+- **Removed UI prototyping prompt** (`getUISystemPrompt`) — agent mode now handles all UI design
+- **Rewrote both ask/agent mode prompts** as prose-based flows (removed code-block examples that AI was mimicking as text)
+- **9-step mandatory flow:** Context → Design Guide → File Strategy → Plan → Build Mode → Build → Deploy → Finish → Summary
+- **Removed all static design rules** from system prompts — replaced with LLM-backed tools
+
+#### Build Mode System (toolChoice enforcement via AI SDK)
+- **`start_build_mode` tool** — AI calls after planning, sets `toolChoice: 'required'` (physically blocks text output)
+- **`finish_build_mode` tool** — AI calls when done, sets `toolChoice: 'auto'` (allows summary text)
+- **`sessionBuildMode` Map** — per-project state tracked server-side, read in `prepareStep`
+- **Forced `suggest_next_steps`** — after summary text detected, `prepareStep` forces `toolChoice: { type: 'tool', toolName: 'suggest_next_steps' }`
+- **`stopWhen` condition** — stream stops immediately once `suggest_next_steps` is called (prevents looping)
+- Safety valve: releases to `'auto'` within 3 steps of `maxStepsAllowed`
+
+#### LLM-Backed Design System (`frontend_design_guide` tool)
+- **a0 LLM API** generates unique, project-specific design systems per build
+- Returns: font pairings (Google Fonts), hex color palette with CSS variables, layout strategy, hero style, motion design, background textures, spatial composition, unique memorable element, sample copy
+- Full **anti-AI aesthetic** rules in LLM system prompt: banned fonts (Inter, Roboto, Poppins alone), banned gradients (purple-to-pink), banned layouts (repeating text-left/image-right), banned copy ("innovative solutions")
+- Temperature 0.9 for maximum variety — no two projects get the same design
+- Fallback to static guide if API fails
+
+#### LLM-Backed File Strategy (`project_file_strategy` tool)
+- **a0 LLM API** generates optimal minimal file plans per project
+- Reads current file tree from `sessionProjectStorage` and sends to LLM for context
+- Returns: file paths with `action: "create" | "modify"`, purposes, estimated line counts
+- Supports all 4 frameworks: vite-react, nextjs, expo, html
+- Core principle: 7-10 files for a complete site (was 30-40)
+- Inline header/footer in App.tsx, all sections in one page file, all CSS in one stylesheet
+- Temperature 0.3 for consistent, practical recommendations
+
+#### Inference Speed Optimizations
+- **`x-grok-conv-id` header** — xAI prompt caching (10x cheaper cached tokens + faster TTFT), uses `projectId` as stable conversation ID
+- **`maxRetries: 0`** — eliminates SDK retry delay (manual fallback handles provider failures)
+- Applied to both primary and fallback `streamText` calls
+
+#### Deploy Preview Fixes
+- **Harmless stderr filtering** — DeprecationWarning, npm notices, chunk size warnings logged as warnings instead of errors
+- **Deploy moved to Step 7** (inside build mode) — `check_dev_errors` + `deploy_preview` run as tool calls without narration
+
+#### Other Changes
+- **Project suggestions API** — switched from Vercel AI Gateway (credits exhausted) to a0 LLM API
+- Added `frontend_design_guide` and `project_file_strategy` to `CORE_TOOLS`
+
+#### Architecture Decisions Added
+- #15: Build mode toggle tools — AI controls its own `toolChoice` transitions
+- #16: LLM-backed design system — a0 API generates project-specific aesthetics
+- #17: LLM-backed file strategy — a0 API generates minimal file plans with file tree context
+- #18: xAI prompt caching — `x-grok-conv-id` header for 90%+ cache hit rates
+
+#### Commits This Session
+1. `9785da28` — Rewrite agent/ask mode system prompts and remove UI prototyping prompt
+2. `952b7c62` — Enforce RULE #0 across all system prompts
+3. `f0fbce92` — Revamp design system with anti-AI aesthetic philosophy
+4. `49ada96a` — Complete system prompt rewrite: prose-based, no mock tool examples
+5. `eefbb39b` — Add start_build_mode/finish_build_mode tools for AI-controlled toolChoice
+6. `2cf7ca90` — Switch project-suggestions API to a0 LLM API
+7. `fb75f2f8` — Filter harmless stderr warnings in deploy preview build step
+8. `8718e0bb` — Add frontend_design_guide tool for anti-AI aesthetic design
+9. `3cddb509` — Make frontend_design_guide LLM-backed via a0 API
+10. `06b3d111` — Enrich design guide LLM with full frontend-design skill context
+11. `a9f1a869` — Move deploy_preview before finish_build_mode in both prompts
+12. `8948bf7c` — Add LLM-backed project_file_strategy tool for minimal file builds
+13. `7190c595` — Enhance project_file_strategy with file tree context and all frameworks
+14. `1ea30a80` — Add suggest_next_steps stop condition to prevent post-build looping
+15. `aafa38aa` — Force suggest_next_steps tool call after summary text output
+16. `81cebd23` — Add xAI prompt caching and reduce retry overhead for faster inference
 
 ### 2026-03-18 (Session 2) — AI Agent Speed & Output Discipline
 Overhauled the workspace AI system prompt to eliminate verbose narration between tool calls, making the agent build apps significantly faster.
@@ -211,6 +282,27 @@ Major model catalog expansion + Ollama DB rotation + tool fixes + pill accuracy.
 10. **Tool Discovery System** - 68 tools in registry, 13 core tools always available, rest unlocked via `discover_tools` + `prepareStep`
 11. **AI-powered project detection** - `detectProjectTypeWithAI()` via a0 LLM API instead of fragile path checks
 12. **Path normalization at ingestion** - All file paths stripped of leading `/` at session storage ingestion
+13. **Prose-based system prompts** - No code-block examples (AI mimics them as text). Flows described in prose.
+14. **Build mode toggle tools** - AI calls `start_build_mode`/`finish_build_mode` to control its own `toolChoice` via `prepareStep`
+15. **LLM-backed design system** - `frontend_design_guide` tool calls a0 API for project-specific fonts, colors, layouts, aesthetics
+16. **LLM-backed file strategy** - `project_file_strategy` tool calls a0 API for minimal file plans with current file tree context
+17. **xAI prompt caching** - `x-grok-conv-id` header on all Grok model calls for 90%+ cache hit rates
+
+---
+
+## Roadmap: Future Speed & Quality Optimizations
+
+| Priority | Optimization | Impact | Status |
+|----------|-------------|--------|--------|
+| 1 | **Anthropic message caching** — cache last user message via `providerOptions` in `prepareStep` (up to 85% latency reduction) | High | Planned |
+| 2 | **Model routing in `prepareStep`** — use fast model (Grok Code Fast) for simple read/write steps, keep Claude for complex planning | High | Planned |
+| 3 | **`timeout.chunkMs`** — detect stalled streams faster (15s between chunks) instead of waiting for full timeout | Medium | Planned |
+| 4 | **Further `activeTools` reduction** — step 0 = minimal set, progressively reveal tools as needed | Medium | Planned |
+| 5 | **Reduce `thinking.budgetTokens`** on follow-up steps (12000 → 4000 for simple file writes) | Medium | Planned |
+| 6 | **System prompt compression** — shorter system prompt on tool-only steps via `prepareStep` | Medium | Planned |
+| 7 | **Message history trimming** — trim old tool results for non-Anthropic models in `prepareStep` | Medium | Planned |
+| 8 | **`parallel_function_calling: true`** — explicit xAI option for parallel tool execution | Low | Planned |
+| 9 | **`experimental_repairToolCall` audit** — log frequency, fix schemas if triggered often | Low | Planned |
 
 ---
 
