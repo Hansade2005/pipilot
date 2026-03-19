@@ -611,6 +611,14 @@ const ToolActivityPanel = ({
         return 'Updating plan progress'
       case 'update_project_context':
         return 'Documenting project'
+      case 'frontend_design_guide':
+        return 'Loading design system'
+      case 'project_file_strategy':
+        return 'Planning file structure'
+      case 'start_build_mode':
+        return 'Entering build mode'
+      case 'finish_build_mode':
+        return 'Finishing build'
       default:
         return t
     }
@@ -944,6 +952,14 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
         return 'Updating plan progress'
       case 'update_project_context':
         return 'Documenting project'
+      case 'frontend_design_guide':
+        return 'Loading design system'
+      case 'project_file_strategy':
+        return 'Planning file structure'
+      case 'start_build_mode':
+        return 'Entering build mode'
+      case 'finish_build_mode':
+        return 'Finishing build'
       default:
         return tool
     }
