@@ -1283,96 +1283,12 @@ ${roadmap.map((r: string) => `- [ ] ${r}`).join('\n')}
         break;
       }
 
-      case 'frontend_design_guide': {
-        const { action, projectType } = toolCall.args;
-        const designPath = '.pipilot/design.md';
-        console.log(`[ClientFileTool] frontend_design_guide: action=${action}`);
-
-        if (action === 'read') {
-          // Read existing design scheme from storage
-          try {
-            const existingFile = await storageManager.getFile(projectId, designPath);
-            if (existingFile?.content) {
-              console.log(`[ClientFileTool] Read design guide from ${designPath} (${existingFile.content.length} chars)`);
-              addToolResult({
-                tool: 'frontend_design_guide',
-                toolCallId: toolCall.toolCallId,
-                output: {
-                  success: true,
-                  guide: existingFile.content,
-                  action: 'read',
-                  cached: true
-                }
-              });
-            } else {
-              addToolResult({
-                tool: 'frontend_design_guide',
-                toolCallId: toolCall.toolCallId,
-                output: {
-                  success: false,
-                  guide: null,
-                  action: 'read',
-                  message: 'No design scheme found. Call frontend_design_guide with action: "generate" and projectType to create one.'
-                }
-              });
-            }
-          } catch (error) {
-            addToolResult({
-              tool: 'frontend_design_guide',
-              toolCallId: toolCall.toolCallId,
-              output: {
-                success: false,
-                guide: null,
-                action: 'read',
-                message: 'No design scheme found. Call frontend_design_guide with action: "generate" and projectType to create one.'
-              }
-            });
-          }
-        } else {
-          // Generate action — the server handles LLM call, we just persist the result
-          // The guide content comes from the server's tool result
-          const serverResult = toolCall.result || toolCall.output;
-          const guide = serverResult?.guide || '';
-
-          if (guide) {
-            try {
-              const existingFile = await storageManager.getFile(projectId, designPath);
-              if (existingFile) {
-                await storageManager.updateFile(projectId, designPath, { content: guide });
-              } else {
-                await storageManager.createFile({
-                  workspaceId: projectId,
-                  name: 'design.md',
-                  path: designPath,
-                  content: guide,
-                  fileType: 'md',
-                  type: 'md',
-                  size: guide.length,
-                  isDirectory: false,
-                  metadata: { createdBy: 'ai' }
-                });
-              }
-              console.log(`[ClientFileTool] Persisted design guide to ${designPath}`);
-              dispatchFileChanged(projectId, designPath);
-            } catch (error) {
-              console.warn(`[ClientFileTool] Failed to persist design guide:`, error);
-            }
-          }
-
-          addToolResult({
-            tool: 'frontend_design_guide',
-            toolCallId: toolCall.toolCallId,
-            output: {
-              success: true,
-              guide,
-              action: 'generate',
-              projectType,
-              persisted: true
-            }
-          });
-        }
-        break;
-      }
+      // NOTE: frontend_design_guide is NOT handled client-side.
+      // Both "read" and "generate" run server-side via execute() in route.ts.
+      // Server read: constructToolResult('read_file', '.pipilot/design.md')
+      // Server generate: a0 LLM → constructToolResult('write_file', '.pipilot/design.md')
+      // The write_file flows through the stream and the client's write_file handler
+      // persists it to storageManager automatically.
 
       case 'request_supabase_connection': {
         const { title, description, labels } = toolCall.args;
