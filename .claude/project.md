@@ -303,6 +303,8 @@ Major model catalog expansion + Ollama DB rotation + tool fixes + pill accuracy.
 | 7 | **Message history trimming** — trim old tool results for non-Anthropic models in `prepareStep` | Medium | Planned |
 | 8 | **`parallel_function_calling: true`** — explicit xAI option for parallel tool execution | Low | Planned |
 | 9 | **`experimental_repairToolCall` audit** — log frequency, fix schemas if triggered often | Low | Planned |
+| 10 | **HTML-to-Vite converter** — "Import any HTML website" feature that AI-converts to full Vite+React project (routing, components, Tailwind). No tool exists that does this end-to-end — major differentiator. Demand confirmed: multiple DEV/Medium articles, HN "Show HN" post, 300k+ users on partial tools like Fronty. Existing tools only do snippets or screenshots, not full project conversion. | High | Research |
+| 11 | **Fix `frontend_design_guide` a0 LLM failures** — a0 API blocks large JSON codeblock responses (~150 line limit). Need to either split the request, reduce JSON size, or use a different approach. | High | Planned |
 
 ---
 
