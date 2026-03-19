@@ -11988,16 +11988,24 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
           ? qwenThinkingProviderOptions
           : undefined
 
+      // ── PERFORMANCE: xAI prompt caching via x-grok-conv-id ──
+      // Routes requests to the same server for 90%+ cache hit rates.
+      // Cached tokens: $0.02/1M vs $0.20/1M (10x cheaper) + faster TTFT.
+      const isGrokModel = modelId.includes('grok') || modelId.includes('xai/')
+      const streamHeaders: Record<string, string> = {}
+      if (isGrokModel) {
+        streamHeaders['x-grok-conv-id'] = projectId
+      }
+
       result = await streamText({
         model,
         temperature: 0.7,
-        maxRetries: 1,
+        maxRetries: 0, // No retries — manual fallback handles provider failures faster
         messages: messagesWithSystem,
         tools: toolsToUse,
+        headers: Object.keys(streamHeaders).length > 0 ? streamHeaders : undefined,
         stopWhen: [
           stepCountIs(maxStepsAllowed),
-          // Stop the stream after suggest_next_steps is called — prevents the AI
-          // from looping endlessly with repeated summaries + suggest_next_steps calls
           ({ steps }: { steps: any[] }) => steps.some((s: any) => s.toolCalls?.some((tc: any) => tc.toolName === 'suggest_next_steps'))
         ],
         abortSignal: creditAbortController.signal,
@@ -12075,7 +12083,8 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
         result = await streamText({
           model: fallbackModel,
           temperature: 0.7,
-          maxRetries: 1,
+          maxRetries: 0,
+          headers: { 'x-grok-conv-id': projectId }, // xAI prompt caching
           messages: messagesWithSystem,
           tools: toolsToUse,
           stopWhen: [
