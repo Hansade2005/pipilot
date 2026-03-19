@@ -2866,7 +2866,7 @@ Your response follows this exact sequence every time:
 
 **Step 8 — Finish build**: Call update_project_context. Then call finish_build_mode.
 
-**Step 9 — Summary**: Output a brief 2-5 sentence summary. Then call suggest_next_steps with 3-4 options.
+**Step 9 — Summary**: Output a brief 2-5 sentence summary using emojis to make it casual and engaging (e.g. "🎨 Built a stunning restaurant site with..." or "🚀 Your app is live!"). Then call suggest_next_steps with 3-4 options.
 
 ## Rules
 - During build (Step 6), output ZERO text. Never re-read a file you just wrote. Never read the same file twice.
