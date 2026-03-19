@@ -266,9 +266,12 @@ export async function POST(request: NextRequest) {
       case 'direct-stream':
         return handleDirectStream(body.sandboxId, body.prompt || '', body.images || [])
 
+      case 'upload-files':
+        return handleUploadFiles(body.sandboxId, body.files, body.targetDir)
+
       default:
         return NextResponse.json(
-          { error: 'Invalid action. Use: create, run, playwright, commit, push, diff, terminate, status, list, start-stream-server, direct-stream' },
+          { error: 'Invalid action. Use: create, run, playwright, commit, push, diff, terminate, status, list, start-stream-server, direct-stream, upload-files' },
           { status: 400 }
         )
     }
@@ -2202,6 +2205,104 @@ async function handleRestore(
     success: true,
     messageCount: formattedHistory.length,
     message: `Restored ${formattedHistory.length} messages to sandbox`
+  })
+}
+
+/**
+ * Upload files to the sandbox filesystem.
+ * Used to write user-imported files (ZIP, folder, GitHub, URL) into the sandbox
+ * so Claude Code can see and work with them (e.g., HTML-to-React conversion).
+ *
+ * Files are written to targetDir (defaults to /home/user/project/imported/).
+ * Binary-safe: content is plain text (already filtered client-side).
+ */
+async function handleUploadFiles(
+  sandboxId: string,
+  files: Array<{ path: string; content: string }>,
+  targetDir?: string
+) {
+  if (!sandboxId || !files || !Array.isArray(files) || files.length === 0) {
+    return NextResponse.json(
+      { error: 'sandboxId and files array are required' },
+      { status: 400 }
+    )
+  }
+
+  // Find sandbox entry
+  let sandboxEntry: (typeof activeSandboxes extends Map<string, infer V> ? V : never) | undefined = undefined
+
+  for (const [, entry] of activeSandboxes.entries()) {
+    if (entry.sandboxId === sandboxId) {
+      sandboxEntry = entry
+      break
+    }
+  }
+
+  if (!sandboxEntry) {
+    // Try to reconnect
+    try {
+      const sandbox = await Sandbox.connect(sandboxId)
+      sandboxEntry = {
+        sandboxId,
+        sandbox,
+        createdAt: new Date(),
+        lastActivity: new Date(),
+        userId: 'reconnected',
+        conversationHistory: []
+      }
+    } catch {
+      return NextResponse.json(
+        { error: 'Sandbox not found or expired. Create a new session.' },
+        { status: 404 }
+      )
+    }
+  }
+
+  const { sandbox } = sandboxEntry
+  sandboxEntry.lastActivity = new Date()
+
+  // Default target: /home/user/project/imported/
+  const baseDir = targetDir || `${PROJECT_BASE_DIR}/imported`
+
+  let written = 0
+  let failed = 0
+  const errors: string[] = []
+
+  // Write files in parallel batches of 10 to avoid overwhelming the sandbox
+  const BATCH_SIZE = 10
+  for (let i = 0; i < files.length; i += BATCH_SIZE) {
+    const batch = files.slice(i, i + BATCH_SIZE)
+    const results = await Promise.allSettled(
+      batch.map(async (file) => {
+        // Normalize path: strip leading slashes, prevent directory traversal
+        const normalizedPath = file.path.replace(/^\/+/, '').replace(/\.\.\//g, '')
+        const fullPath = `${baseDir}/${normalizedPath}`
+
+        await sandbox.files.write(fullPath, file.content)
+        return fullPath
+      })
+    )
+
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        written++
+      } else {
+        failed++
+        errors.push(result.reason?.message || 'Unknown write error')
+      }
+    }
+  }
+
+  console.log(`[Agent Cloud] Uploaded ${written}/${files.length} files to sandbox ${sandboxId} at ${baseDir}`)
+
+  return NextResponse.json({
+    success: true,
+    written,
+    failed,
+    totalFiles: files.length,
+    targetDir: baseDir,
+    errors: errors.length > 0 ? errors.slice(0, 5) : undefined,
+    message: `Uploaded ${written} files to ${baseDir}`
   })
 }
 

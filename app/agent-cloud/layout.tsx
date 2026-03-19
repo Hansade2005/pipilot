@@ -263,7 +263,7 @@ interface AgentCloudContextType {
   setByokEnabled: React.Dispatch<React.SetStateAction<boolean>>
   byokKeys: AgentCloudByokKey[]
   setByokKeys: React.Dispatch<React.SetStateAction<AgentCloudByokKey[]>>
-  createSession: (initialPrompt: string, images?: Array<{ data: string; type: string; name: string }>, newProject?: { name: string }) => Promise<Session | null>
+  createSession: (initialPrompt: string, images?: Array<{ data: string; type: string; name: string }>, newProject?: { name: string }, importFiles?: Array<{ path: string; content: string }>) => Promise<Session | null>
   terminateSession: (sessionId: string) => Promise<void>
   deleteSession: (sessionId: string) => Promise<void>
   loadSessionMessages: (sessionId: string) => Promise<void>
@@ -715,7 +715,7 @@ function AgentCloudLayoutInner({
   }, [])
 
   // Create session
-  const createSession = async (initialPrompt: string, images?: Array<{ data: string; type: string; name: string }>, newProject?: { name: string }): Promise<Session | null> => {
+  const createSession = async (initialPrompt: string, images?: Array<{ data: string; type: string; name: string }>, newProject?: { name: string }, importFiles?: Array<{ path: string; content: string }>): Promise<Session | null> => {
     if (!newProject && !selectedRepo) {
       toast.error('Please select a repository first')
       return null
@@ -775,6 +775,30 @@ function AgentCloudLayoutInner({
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to create sandbox')
+      }
+
+      // If user provided import files, upload them to the sandbox filesystem
+      if (importFiles && importFiles.length > 0) {
+        try {
+          const uploadRes = await fetch('/api/agent-cloud', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'upload-files',
+              sandboxId: data.sandboxId,
+              files: importFiles,
+            })
+          })
+          const uploadData = await uploadRes.json()
+          if (uploadRes.ok) {
+            console.log(`[AgentCloud] Uploaded ${uploadData.written} files to sandbox`)
+          } else {
+            console.error('[AgentCloud] Failed to upload files:', uploadData.error)
+            toast.error('Failed to upload project files to sandbox')
+          }
+        } catch (e) {
+          console.error('[AgentCloud] File upload error:', e)
+        }
       }
 
       const modelInfo = MODELS.find(m => m.id === selectedModel)
