@@ -10853,6 +10853,7 @@ Before choosing any visual elements, think through:
 - Layouts: repeating "text left, image right", cookie-cutter hero→features→testimonials→CTA→footer with zero variation, predictable component patterns
 - Copy: "innovative solutions", "fast-paced world", "leverage", "empower", "seamlessly integrate", "Get started", "Learn more", any generic AI chatbot phrasing
 - Visuals: floating abstract blobs/shapes, neon glow on everything, white backgrounds with no texture/depth/visual interest, same border-radius on everything
+- Icons: NEVER use emojis (🚀 📊 💡 ✨) as icons in professional websites — they scream AI-generated. Use Lucide React icons or Material Design icons instead. Emojis are only acceptable in chat UIs or playful/casual apps when explicitly requested.
 
 CRITICAL: No two designs should be the same. Vary between light and dark base themes, different fonts, different aesthetics. NEVER converge on the same common choices across projects.
 
@@ -10885,7 +10886,7 @@ You must return a JSON object with these exact fields:
   "layoutStrategy": ["3-4 specific layout patterns to use for different sections, picked from: bento grid, split hero 60/40, asymmetric columns, full-bleed sections, overlapping elements, masonry grid, horizontal scroll, diagonal dividers, card stack with offset"],
   "heroStyle": "Specific hero section design (e.g. 'full-bleed food photography with dark overlay and centered serif heading', 'split layout with animated gradient left and form right')",
   "motionDesign": ["2-3 specific animation choices for this project"],
-  "iconStyle": "Icon approach (e.g. 'Lucide outline icons at 20px', 'custom SVG illustrations', 'emoji accents')",
+  "iconStyle": "Icon library and style to use. MUST be Lucide React or Material Design icons — NEVER emojis. Specify size, stroke width, and style (e.g. 'Lucide outline icons at 20px, stroke-width 1.5' or 'Material Symbols rounded at 24px')",
   "backgroundTexture": "How to create atmosphere and depth in backgrounds — specify textures, patterns, or effects (e.g. 'subtle grain overlay on hero with radial gradient', 'geometric dot pattern on surface-alt sections', 'layered transparency with frosted glass cards', 'noise texture at 3% opacity over dark sections'). Never use flat solid colors alone.",
   "spatialComposition": "Describe the spatial flow and composition approach (e.g. 'asymmetric grid with overlapping card elements that break the grid at section boundaries', 'generous negative space with tight typography clusters', 'diagonal flow using clip-path angled section dividers')",
   "uniqueElement": "The ONE memorable design element that makes this unforgettable (e.g. 'parallax ingredient photos that follow scroll', 'morphing blob navigation', 'typewriter effect on hero heading')",
