@@ -11994,7 +11994,12 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
         maxRetries: 1,
         messages: messagesWithSystem,
         tools: toolsToUse,
-        stopWhen: stepCountIs(maxStepsAllowed),
+        stopWhen: [
+          stepCountIs(maxStepsAllowed),
+          // Stop the stream after suggest_next_steps is called — prevents the AI
+          // from looping endlessly with repeated summaries + suggest_next_steps calls
+          ({ steps }: { steps: any[] }) => steps.some((s: any) => s.toolCalls?.some((tc: any) => tc.toolName === 'suggest_next_steps'))
+        ],
         abortSignal: creditAbortController.signal,
         experimental_repairToolCall: repairToolCall,
         experimental_transform: smoothStream({ chunking: 'word', delayInMs: 0 }),
@@ -12059,7 +12064,10 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
           maxRetries: 1,
           messages: messagesWithSystem,
           tools: toolsToUse,
-          stopWhen: stepCountIs(maxStepsAllowed),
+          stopWhen: [
+            stepCountIs(maxStepsAllowed),
+            ({ steps }: { steps: any[] }) => steps.some((s: any) => s.toolCalls?.some((tc: any) => tc.toolName === 'suggest_next_steps'))
+          ],
           abortSignal: creditAbortController.signal,
           experimental_repairToolCall: repairToolCall,
           experimental_transform: smoothStream({ chunking: 'word', delayInMs: 0 }),
@@ -12373,7 +12381,10 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                   temperature: 0.7,
                   messages: fallbackMessages,
                   tools: toolsToUse,
-                  stopWhen: stepCountIs(maxStepsAllowed),
+                  stopWhen: [
+            stepCountIs(maxStepsAllowed),
+            ({ steps }: { steps: any[] }) => steps.some((s: any) => s.toolCalls?.some((tc: any) => tc.toolName === 'suggest_next_steps'))
+          ],
                   abortSignal: creditAbortController.signal,
                   experimental_repairToolCall: repairToolCall,
                   experimental_transform: smoothStream({ chunking: 'word', delayInMs: 0 }),
