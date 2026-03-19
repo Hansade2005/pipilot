@@ -2852,7 +2852,7 @@ Your response follows this exact sequence every time:
 
 **Step 1 — Context**: If .pipilot/plan.md or .pipilot/project.md exist, read them first to understand prior state. For modifications, read up to 2 key files for context.
 
-**Step 2 — Design skill**: Call frontend_design_guide with the projectType. Read the returned design system (fonts, colors, layouts, aesthetic direction).
+**Step 2 — Design skill**: Call frontend_design_guide with action "read" first. If it returns a design scheme, use it. If not (new project), call it again with action "generate" and the projectType. The design scheme persists to .pipilot/design.md across sessions.
 
 **Step 3 — File strategy**: Call project_file_strategy with the projectType, framework, pages, and features. Read the returned file plan — it tells you the minimal set of files to create.
 
@@ -2897,7 +2897,7 @@ Your response follows this exact sequence every time:
 
 **Step 1 — Context**: If .pipilot/plan.md or .pipilot/project.md exist, read them first. For modifications, read up to 2 key files.
 
-**Step 2 — Design skill**: Call frontend_design_guide with the projectType. Read the returned design system.
+**Step 2 — Design skill**: Call frontend_design_guide with action "read" first. If it returns a design scheme, use it. If not (new project), call with action "generate" and projectType. Persists to .pipilot/design.md.
 
 **Step 3 — File strategy**: Call project_file_strategy with projectType, framework, pages, features. Read the minimal file plan.
 
@@ -10817,16 +10817,36 @@ ${mergedRoadmapLines.join('\n')}
       // AI calls this before creating any frontend to load the design guide.
       // Returns a comprehensive design thinking framework that prevents generic AI aesthetics.
       frontend_design_guide: tool({
-        description: 'IMPORTANT: Call this tool BEFORE writing any frontend code (HTML, CSS, React components, pages, layouts). It uses AI to generate a project-specific design system with unique font pairings, color palette, layout recommendations, and aesthetic direction tailored to what you are building. Call it once at the start of any build that involves UI.',
+        description: 'Design system manager. Two actions: "generate" creates a new design scheme via AI and saves to .pipilot/design.md. "read" returns the existing design scheme (fast, no AI call). Call "read" first — if it returns nothing, call "generate". On redesign requests, call "generate" to overwrite.',
         inputSchema: z.object({
-          projectType: z.string().describe('What is being built (e.g. "restaurant landing page", "SaaS dashboard", "portfolio site", "fitness tracker app")'),
+          action: z.enum(['generate', 'read']).describe('"read" to load existing design scheme, "generate" to create/overwrite via AI'),
+          projectType: z.string().optional().describe('Required for "generate": what is being built (e.g. "restaurant landing page")'),
         }),
-        execute: async ({ projectType }) => {
+        execute: async ({ action, projectType }) => {
+          const designPath = '.pipilot/design.md'
+          const sessionData = sessionProjectStorage.get(projectId)
+
+          // ── READ: return existing design scheme from session storage ──
+          if (action === 'read') {
+            const existing = sessionData?.files?.get(designPath)
+            if (existing?.content) {
+              console.log(`[Chat-V2] 🎨 Design guide READ from .pipilot/design.md (${existing.content.length} chars)`)
+              return { success: true, guide: existing.content, action: 'read', cached: true }
+            }
+            console.log('[Chat-V2] 🎨 No existing design scheme found — call with action: "generate"')
+            return { success: false, guide: null, action: 'read', message: 'No design scheme found. Call frontend_design_guide with action: "generate" and projectType to create one.' }
+          }
+
+          // ── GENERATE: call a0 LLM and persist to .pipilot/design.md ──
+          if (!projectType) {
+            return { success: false, guide: null, message: 'projectType is required for action: "generate"' }
+          }
+
+          let guide: string
+          let design: any = null
+
           try {
             console.log(`[Chat-V2] 🎨 Generating design guide for: ${projectType}`)
-            // ── COMPACT JSON SCHEMA ──
-            // a0 LLM blocks large JSON responses (~150 line limit).
-            // Solution: flat schema with 10 short fields, detailed guide built server-side.
             const response = await fetch('https://api.a0.dev/ai/llm', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -10850,19 +10870,19 @@ ${mergedRoadmapLines.join('\n')}
             if (!response.ok) throw new Error(`a0 API returned ${response.status}`)
             const data = await response.json()
             const text = data.completion || ''
-
             const jsonMatch = text.match(/\{[\s\S]*\}/)
             if (!jsonMatch) throw new Error('No JSON in response')
             const d = JSON.parse(jsonMatch[0])
+            design = d
 
             console.log(`[Chat-V2] 🎨 Design guide generated: aesthetic="${d.a}", fonts="${d.df} + ${d.bf}"`)
 
-            // ── BUILD DETAILED GUIDE SERVER-SIDE from compact LLM response ──
+            // Build detailed guide server-side from compact LLM response
             const layouts = (d.layouts || '').split(',').map((l: string) => l.trim()).filter(Boolean)
             const motions = (d.motion || '').split(',').map((m: string) => m.trim()).filter(Boolean)
             const sections = (d.sections || '').split(',').map((s: string) => s.trim()).filter(Boolean)
 
-            const guide = `# Design System for "${projectType}"
+            guide = `# Design System for "${projectType}"
 
 ## Aesthetic Direction
 ${d.a}
@@ -10904,7 +10924,7 @@ ${d.unique}
 Use Lucide React icons consistently (20px, stroke-width 1.5). NEVER use emojis as icons.
 
 ## Mobile-First Responsive (mandatory)
-- Nav: hamburger menu (☰) on mobile → horizontal nav on desktop
+- Nav: hamburger menu on mobile → horizontal nav on desktop
 - Grids: grid-cols-1 → md:grid-cols-2 → lg:grid-cols-3
 - Hero text: text-3xl → md:text-5xl lg:text-6xl
 - Spacing: px-4 py-12 mobile → px-8 py-24 desktop
@@ -10924,13 +10944,9 @@ Use Lucide React icons consistently (20px, stroke-width 1.5). NEVER use emojis a
 - Build ALL pages fully — never "coming soon" placeholders
 
 Apply this design system to every file you create.`
-
-            return { success: true, guide, design: d, projectType }
           } catch (err) {
             console.warn('[Chat-V2] 🎨 Design guide LLM failed, using fallback:', err)
-            return {
-              success: true,
-              guide: `# Design Guide (fallback for "${projectType}")
+            guide = `# Design Guide (fallback for "${projectType}")
 
 ## Typography
 Pick a distinctive Google Font pairing (NOT Inter/Roboto/Arial). Example: Playfair Display + Source Sans 3. Import via <link> tag. Define --font-display and --font-body CSS variables.
@@ -10945,7 +10961,6 @@ Mix layout patterns: bento grid, split hero 60/40, asymmetric columns, overlappi
 - Hamburger menu on mobile, horizontal nav on desktop
 - grid-cols-1 → md:grid-cols-2 → lg:grid-cols-3
 - Hero text: text-3xl → md:text-5xl lg:text-6xl
-- Spacing: px-4 py-12 mobile → px-8 py-24 desktop
 - Touch targets: min 44x44px. No horizontal overflow.
 
 ## Icons
@@ -10955,11 +10970,20 @@ Use Lucide React icons (20px, stroke-width 1.5). NEVER use emojis as icons.
 Purple gradients, floating blobs, generic copy ("innovative solutions"), emojis as icons, cookie-cutter layouts, white backgrounds with no texture.
 
 ## Images
-Use https://api.a0.dev/assets/image?text={description}&aspect=16:9 for all images.`,
-              projectType,
-              fallback: true
-            }
+Use https://api.a0.dev/assets/image?text={description}&aspect=16:9 for all images.`
           }
+
+          // ── PERSIST to .pipilot/design.md in session storage ──
+          if (sessionData?.files) {
+            sessionData.files.set(designPath, { content: guide, isDirectory: false })
+            // Also add to file tree if not already there
+            if (!sessionData.fileTree.includes(designPath)) {
+              sessionData.fileTree.push(designPath)
+            }
+            console.log(`[Chat-V2] 🎨 Design guide SAVED to .pipilot/design.md (${guide.length} chars)`)
+          }
+
+          return { success: true, guide, design, action: 'generate', projectType, persisted: true }
         }
       }),
 
