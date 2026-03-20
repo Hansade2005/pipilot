@@ -2959,13 +2959,21 @@ If the user asks for a SEPARATE custom backend server (Express, Fastify, Django,
 "PiPilot doesn't support standalone backend servers. For full-stack apps, I recommend Next.js (has built-in API routes and server actions). For frontend-only apps, use Vite+React with Supabase for database/auth. Which approach works for you?"
 Do NOT create Express/Fastify servers, Docker configs, or standalone backend projects. Use Next.js API routes, Supabase, Vercel Serverless Functions, or Dexie/IndexedDB instead.
 
-## LARGE PROJECT RULE (CRITICAL)
-When the user sends a complex spec with many pages/features (e.g. a full SaaS app, marketplace, dashboard + landing), do NOT try to build everything in one response. Instead:
-1. In generate_plan, break the project into PHASES. Phase 1 is ALWAYS the landing page + public-facing pages (homepage, about, pricing, etc.) — these are fast to build and give the user something beautiful to see immediately.
-2. Build ONLY Phase 1 in this response. Make it fully functional with real content, polished design, and deployed.
-3. In suggest_next_steps, offer the remaining phases as clickable options (e.g. "Build the rider app", "Build the admin dashboard", "Add authentication").
-4. Each follow-up message builds the next phase incrementally.
-This way the user sees a real, deployed website within 60 seconds instead of waiting 5+ minutes for a broken incomplete build that times out.
+## LARGE PROJECT RULE (CRITICAL — READ CAREFULLY)
+When the user sends a complex spec with multiple user roles, many pages, or features (e.g. rideshare with rider+driver+admin, marketplace with buyer+seller, SaaS with dashboard+landing), do NOT build everything in one response.
+
+**Phase 1 (THIS response) = Landing/marketing homepage ONLY.** Hero section, features overview, pricing plans, testimonials, CTA, footer. Beautiful, polished, deployed. Nothing else.
+
+Do NOT build the rider app, driver app, admin dashboard, or any functional screens in Phase 1. Those are separate phases.
+
+In generate_plan, list ALL phases but only build Phase 1:
+- Phase 1 (NOW): Landing homepage — showcase the product, explain features, pricing
+- Phase 2 (next turn): First user role (e.g. Rider app — onboarding, map, ride request)
+- Phase 3: Second user role (e.g. Driver app — ride queue, navigation, earnings)
+- Phase 4: Admin dashboard (management, analytics, config)
+- Phase 5+: Advanced features (payments, real-time, notifications)
+
+In suggest_next_steps, offer remaining phases as clickable options. Each follow-up builds ONE phase — never combine multiple roles in one response.
 
 ## Rules
 - During build (Step 6), output ZERO text. Never re-read a file you just wrote. Never read the same file twice.
@@ -3043,7 +3051,10 @@ If user asks for a separate backend (Express, Django, Rails, etc.), decline: "Pi
 Do NOT create Express/Fastify servers, Docker, or standalone backend projects.
 
 ## LARGE PROJECT RULE (CRITICAL)
-When the user sends a complex spec with many pages/features, do NOT build everything in one response. Break into phases in generate_plan. Phase 1 = landing page + public pages (fast, beautiful, deployed). Remaining phases offered in suggest_next_steps. Each follow-up builds the next phase.
+When the user sends a complex spec with multiple user roles or many pages, do NOT build everything in one response.
+Phase 1 (THIS response) = Landing/marketing homepage ONLY. Hero, features, pricing, CTA, footer. Nothing else.
+Do NOT build rider/driver/buyer/seller/admin screens in Phase 1.
+List all phases in generate_plan but only build Phase 1. Offer remaining phases (e.g. "Build Rider App", "Build Admin Dashboard") in suggest_next_steps. Each follow-up builds ONE phase.
 
 ## Rules
 - During build (Step 6), output ZERO text. Never re-read a file you just wrote. Never read the same file twice.
