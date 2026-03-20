@@ -70,13 +70,8 @@ export default function ShowcasePage() {
     } catch {}
   }
 
-  const handleView = async (id: string, url: string) => {
-    fetch('/api/showcase', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, action: 'view' })
-    }).catch(() => {})
-    window.open(url, '_blank')
+  const handleView = (id: string) => {
+    window.location.href = `/showcase/${id}`
   }
 
   const filtered = search
@@ -175,7 +170,7 @@ export default function ShowcasePage() {
                   {/* Thumbnail */}
                   <div
                     className="aspect-video bg-gray-800 relative overflow-hidden cursor-pointer"
-                    onClick={() => handleView(project.id, project.live_url)}
+                    onClick={() => handleView(project.id)}
                   >
                     {project.thumbnail_url ? (
                       <img
@@ -191,7 +186,7 @@ export default function ShowcasePage() {
                     {/* Hover overlay */}
                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <span className="flex items-center gap-2 text-white text-sm font-medium bg-orange-600 px-4 py-2 rounded-lg">
-                        <ExternalLink className="w-4 h-4" /> View Site
+                        <Eye className="w-4 h-4" /> View Project
                       </span>
                     </div>
                   </div>

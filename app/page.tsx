@@ -108,9 +108,7 @@ function ShowcaseSection() {
             {projects.slice(0, 8).map(project => (
               <a
                 key={project.id}
-                href={project.live_url}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={`/showcase/${project.id}`}
                 className="group rounded-xl bg-gray-900/60 border border-gray-800/50 overflow-hidden hover:border-orange-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/5"
               >
                 <div className="aspect-video bg-gray-800/50 relative overflow-hidden">
