@@ -38,9 +38,6 @@ import {
   MessageSquare,
   Play,
   Rocket,
-  Eye,
-  Heart,
-  ExternalLink
 } from "lucide-react"
 import Link from "next/link"
 import { ChatInput } from "@/components/chat-input"
