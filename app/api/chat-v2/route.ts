@@ -2943,7 +2943,7 @@ Your response follows this exact sequence every time:
 
 **Step 7 — Deploy** (MANDATORY for Vite/React and HTML, skip ONLY for Next.js/Expo): You MUST call check_dev_errors first, fix any errors, then call deploy_preview. Do NOT skip this step. Do NOT fabricate a preview URL — only include the URL returned by deploy_preview.
 
-**Step 7b — Showcase** (after deploy succeeds): Call browse_web to take a viewport screenshot of the deployed .pipilot.dev URL (NOT fullpage). Then call publish_to_showcase with the project title, description, liveUrl, screenshotUrl from browse_web, category, and techStack.
+**Step 7b — Showcase** (after deploy succeeds): Call publish_to_showcase with action "check" first. If already published, skip to Step 8. If not published yet, call browse_web to take a viewport screenshot of the deployed .pipilot.dev URL (NOT fullpage), then call publish_to_showcase with action "publish" and the title, description, liveUrl, screenshotUrl, category, techStack.
 
 **Step 8 — Finish build**: Call update_project_context. Then call finish_build_mode.
 
@@ -3008,7 +3008,7 @@ Your response follows this exact sequence every time:
 
 **Step 7 — Deploy** (MANDATORY for Vite/React and HTML, skip ONLY for Next.js/Expo): You MUST call check_dev_errors first, fix any errors, then call deploy_preview. Do NOT skip this step. Do NOT fabricate a preview URL — only include the URL returned by deploy_preview.
 
-**Step 7b — Showcase** (after deploy succeeds): Call browse_web to take a viewport screenshot of the deployed .pipilot.dev URL (NOT fullpage). Then call publish_to_showcase with the project title, description, liveUrl, screenshotUrl from browse_web, category, and techStack.
+**Step 7b — Showcase** (after deploy succeeds): Call publish_to_showcase with action "check" first. If already published, skip to Step 8. If not published yet, call browse_web to take a viewport screenshot of the deployed .pipilot.dev URL (NOT fullpage), then call publish_to_showcase with action "publish" and the title, description, liveUrl, screenshotUrl, category, techStack.
 
 **Step 8 — Finish build**: Call update_project_context. Then call finish_build_mode.
 
@@ -5996,19 +5996,18 @@ ${CONTINUATION_SAFETY_CHECKS}`
 
       // ── PROJECT SHOWCASE — Auto-publish after deploy ──
       publish_to_showcase: tool({
-        description: 'Publish the deployed project to the PiPilot Showcase gallery. Call this AFTER deploy_preview succeeds AND after using browse_web to take a viewport screenshot of the live site. The showcase displays the project on the homepage and /showcase page for community browsing.',
+        description: 'Showcase manager. Two actions: "check" returns whether this project is already in the showcase (fast, no write). "publish" publishes/updates the project. Call "check" first — if already published, skip screenshot + publish. Only publish on first deploy or when user explicitly asks to update the showcase.',
         inputSchema: z.object({
-          title: z.string().describe('Project name'),
-          description: z.string().describe('1-2 sentence description of what the project does'),
-          liveUrl: z.string().describe('The deployed .pipilot.dev URL returned by deploy_preview'),
-          screenshotUrl: z.string().describe('The screenshot URL returned by browse_web (Supabase storage URL)'),
+          action: z.enum(['check', 'publish']).describe('"check" to see if already published, "publish" to publish/update'),
+          title: z.string().optional().describe('Required for "publish": project name'),
+          description: z.string().optional().describe('Required for "publish": 1-2 sentence description'),
+          liveUrl: z.string().optional().describe('Required for "publish": the .pipilot.dev URL from deploy_preview'),
+          screenshotUrl: z.string().optional().describe('Required for "publish": screenshot URL from browse_web'),
           category: z.string().optional().describe('Project category (e.g. "landing-page", "dashboard", "portfolio", "ecommerce", "saas", "blog")'),
           techStack: z.array(z.string()).optional().describe('Technologies used (e.g. ["React", "Tailwind", "Framer Motion"])'),
         }),
-        execute: async ({ title, description, liveUrl, screenshotUrl, category, techStack }) => {
+        execute: async ({ action, title, description, liveUrl, screenshotUrl, category, techStack }) => {
           try {
-            // Get authenticated user
-            const supabaseToken = req.headers.get('x-supabase-access-token') || ''
             const { createClient: createServerClient } = await import('@/lib/supabase/server')
             const supabase = await createServerClient()
             const { data: { user } } = await supabase.auth.getUser()
@@ -6017,14 +6016,34 @@ ${CONTINUATION_SAFETY_CHECKS}`
               return { success: false, error: 'User not authenticated' }
             }
 
-            // Upsert to showcase_projects table (main DB)
+            // ── CHECK: see if project is already in showcase ──
+            if (action === 'check') {
+              const { data: existing } = await supabase
+                .from('showcase_projects')
+                .select('id, title, live_url, updated_at')
+                .eq('project_id', projectId)
+                .eq('status', 'published')
+                .maybeSingle()
+
+              if (existing) {
+                console.log(`[publish_to_showcase] Project ${projectId} already in showcase: "${existing.title}"`)
+                return { success: true, alreadyPublished: true, showcaseId: existing.id, title: existing.title, liveUrl: existing.live_url }
+              }
+              return { success: true, alreadyPublished: false, message: 'Not in showcase yet. Call with action: "publish" to add it.' }
+            }
+
+            // ── PUBLISH: add/update in showcase ──
+            if (!title || !liveUrl || !screenshotUrl) {
+              return { success: false, error: 'title, liveUrl, and screenshotUrl are required for publish' }
+            }
+
             const { data, error } = await supabase
               .from('showcase_projects')
               .upsert({
                 user_id: user.id,
                 project_id: projectId,
                 title,
-                description,
+                description: description || '',
                 category: category || 'general',
                 thumbnail_url: screenshotUrl,
                 live_url: liveUrl,
