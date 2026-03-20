@@ -1052,23 +1052,38 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
     checkProjectFramework()
   }, [project])
 
-  // Auto-load preview URL from project slug on preview tab switch
-  // Projects already have a slug field - use it to construct the preview URL directly
+  // Auto-load preview URL from the deployed slug in the sites DB (always accurate)
+  // Falls back to local project.slug if no DB record exists yet
   useEffect(() => {
     if (
       activeTab === 'preview' &&
       isViteProject &&
       !isExpoProject &&
       project?.id &&
-      project?.slug &&
       !preview.url &&
       !preview.isLoading
     ) {
-      const previewUrl = `https://${project.slug}.pipilot.dev/`
-      console.log('[CodePreviewPanel] Constructed preview URL from project slug:', previewUrl)
-      setPreview(prev => ({ ...prev, url: previewUrl }))
+      // Fetch the actual deployed slug from the sites table (agent cloud DB)
+      fetch(`/api/sites/slug?projectId=${project.id}`)
+        .then(res => res.json())
+        .then(data => {
+          const slug = data.slug || project?.slug
+          if (slug) {
+            const previewUrl = `https://${slug}.pipilot.dev/`
+            console.log('[CodePreviewPanel] Preview URL from DB slug:', previewUrl, data.slug ? '(from sites DB)' : '(fallback to local slug)')
+            setPreview(prev => ({ ...prev, url: previewUrl }))
+          }
+        })
+        .catch(() => {
+          // Fallback to local slug if API fails
+          if (project?.slug) {
+            const previewUrl = `https://${project.slug}.pipilot.dev/`
+            console.log('[CodePreviewPanel] Preview URL from local slug (API failed):', previewUrl)
+            setPreview(prev => ({ ...prev, url: previewUrl }))
+          }
+        })
     }
-  }, [activeTab, isViteProject, isExpoProject, project?.id, project?.slug, preview.url, preview.isLoading])
+  }, [activeTab, isViteProject, isExpoProject, project?.id, preview.url, preview.isLoading])
 
   // Track if files have changed since last preview was created
   const filesChangedSincePreviewRef = useRef(false)
