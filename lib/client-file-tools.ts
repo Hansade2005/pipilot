@@ -1284,7 +1284,7 @@ ${roadmap.map((r: string) => `- [ ] ${r}`).join('\n')}
       }
 
       case 'frontend_design_guide': {
-        const { action, projectType } = toolCall.args;
+        const { action, projectType, userMessage } = toolCall.args;
         const designPath = '.pipilot/design.md';
         console.log(`[ClientFileTool] frontend_design_guide: action=${action}`);
 
@@ -1332,7 +1332,7 @@ ${roadmap.map((r: string) => `- [ ] ${r}`).join('\n')}
             const response = await fetch('/api/design-guide', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ projectType: projectType || 'web application' })
+              body: JSON.stringify({ projectType: projectType || 'web application', userMessage: userMessage || undefined })
             });
             const data = await response.json();
             const guide = data.guide || '';

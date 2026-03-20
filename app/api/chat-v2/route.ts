@@ -2930,7 +2930,7 @@ Your response follows this exact sequence every time:
 
 **Step 1 — Context**: If .pipilot/plan.md or .pipilot/project.md exist, read them first to understand prior state. For modifications, read up to 2 key files for context.
 
-**Step 2 — Design skill**: Call frontend_design_guide with action "read" first. If it returns a design scheme, use it. If not (new project), call it again with action "generate" and the projectType. The design scheme persists to .pipilot/design.md across sessions.
+**Step 2 — Design skill**: Call frontend_design_guide with action "read" first. If it returns a design scheme, use it. If not (new project), call it again with action "generate", projectType, and userMessage (pass the user's exact message so the design system matches their intent). Persists to .pipilot/design.md across sessions.
 
 **Step 3 — File strategy**: Call project_file_strategy with the projectType, framework, pages, and features. Read the returned file plan — it tells you the minimal set of files to create.
 
@@ -2975,7 +2975,7 @@ Your response follows this exact sequence every time:
 
 **Step 1 — Context**: If .pipilot/plan.md or .pipilot/project.md exist, read them first. For modifications, read up to 2 key files.
 
-**Step 2 — Design skill**: Call frontend_design_guide with action "read" first. If it returns a design scheme, use it. If not (new project), call with action "generate" and projectType. Persists to .pipilot/design.md.
+**Step 2 — Design skill**: Call frontend_design_guide with action "read" first. If it returns a design scheme, use it. If not (new project), call with action "generate", projectType, and userMessage (pass the user's exact words). Persists to .pipilot/design.md.
 
 **Step 3 — File strategy**: Call project_file_strategy with projectType, framework, pages, features. Read the minimal file plan.
 
@@ -10903,8 +10903,9 @@ ${mergedRoadmapLines.join('\n')}
         inputSchema: z.object({
           action: z.enum(['generate', 'read']).describe('"read" to load existing design scheme, "generate" to create/overwrite via AI'),
           projectType: z.string().optional().describe('Required for "generate": what is being built (e.g. "restaurant landing page")'),
+          userMessage: z.string().optional().describe('Required for "generate": the user\'s original message describing what they want built. Pass their exact words so the design system matches their intent.'),
         }),
-        execute: async ({ action, projectType }) => {
+        execute: async ({ action, projectType, userMessage }) => {
           const designPath = '.pipilot/design.md'
           const sessionData = sessionProjectStorage.get(projectId)
 
@@ -10942,7 +10943,7 @@ ${mergedRoadmapLines.join('\n')}
                   },
                   {
                     role: 'user',
-                    content: `Design system for "${projectType}". Return JSON:
+                    content: `Design system for "${projectType}".${userMessage ? `\nUser's request: "${userMessage}"` : ''}\nReturn JSON:
 {"a":"aesthetic direction","df":"Google Font for headings","bf":"Google Font for body","p":"#primary","pl":"#primaryLight","ac":"#accent","s":"#surface","sa":"#surfaceAlt","t":"#text","tm":"#textMuted","bd":"#border","ds":"#darkSurface","dt":"#darkText","hero":"hero section style","layouts":"3 layout patterns comma-separated","motion":"2 animation choices comma-separated","texture":"background texture approach","unique":"one memorable design element","heading":"hero heading text","sub":"hero subtext","cta":"CTA button text","sections":"3 section headings comma-separated"}`
                   }
                 ],

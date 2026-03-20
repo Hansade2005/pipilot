@@ -5,12 +5,13 @@ const A0_LLM_URL = 'https://api.a0.dev/ai/llm'
 
 const schema = z.object({
   projectType: z.string().min(1, 'projectType is required'),
+  userMessage: z.string().optional(),
 })
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { projectType } = schema.parse(body)
+    const { projectType, userMessage } = schema.parse(body)
 
     console.log(`[design-guide] Generating design for: ${projectType}`)
 
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
           },
           {
             role: 'user',
-            content: `Design system for "${projectType}". Return JSON:
+            content: `Design system for "${projectType}".${userMessage ? `\nUser's request: "${userMessage}"` : ''}\nReturn JSON:
 {"a":"aesthetic direction","df":"Google Font for headings","bf":"Google Font for body","p":"#primary","pl":"#primaryLight","ac":"#accent","s":"#surface","sa":"#surfaceAlt","t":"#text","tm":"#textMuted","bd":"#border","ds":"#darkSurface","dt":"#darkText","hero":"hero section style","layouts":"3 layout patterns comma-separated","motion":"2 animation choices comma-separated","texture":"background texture approach","unique":"one memorable design element","heading":"hero heading text","sub":"hero subtext","cta":"CTA button text","sections":"3 section headings comma-separated"}`
           }
         ],
