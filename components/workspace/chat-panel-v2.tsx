@@ -2078,13 +2078,21 @@ export function ChatPanelV2({
         (tool: any) => ['edit_file', 'write_file', 'delete_file', 'client_replace_string_in_file'].includes(tool.toolName)
       )
 
+      // If AI called deploy_preview, it already deployed to .pipilot.dev hosting.
+      // Don't create a new E2B sandbox preview — just refresh the iframe to show the deployed site.
+      const hasDeployedPreview = accumulatedToolInvocations.some(
+        (tool: any) => tool.toolName === 'deploy_preview'
+      )
+
       if (typeof window !== 'undefined' && !isAskMode && hasFileModifications) {
-        console.log('[ChatPanelV2] Dispatching auto-preview event after streaming completion (file modifications detected)')
+        console.log(`[ChatPanelV2] Dispatching auto-preview event (fileModifications: true, deployed: ${hasDeployedPreview})`)
         window.dispatchEvent(new CustomEvent('ai-stream-complete', {
           detail: {
             projectId: project.id,
             shouldSwitchToPreview: true,
-            shouldCreatePreview: true
+            // If AI deployed via deploy_preview (Vite/HTML), just refresh — don't create E2B sandbox
+            shouldCreatePreview: !hasDeployedPreview,
+            shouldRefreshPreview: hasDeployedPreview
           }
         }))
       } else if (!isAskMode && !hasFileModifications) {

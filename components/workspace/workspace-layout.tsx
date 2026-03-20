@@ -631,7 +631,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     }
 
     const handleAiStreamComplete = (event: CustomEvent) => {
-      const { shouldSwitchToPreview, shouldCreatePreview } = event.detail
+      const { shouldSwitchToPreview, shouldCreatePreview, shouldRefreshPreview } = event.detail
 
       // Stream is complete — clear streaming state immediately so the preview panel
       // doesn't keep showing <AIRespondingView/>. Without this, on mobile there's a
@@ -646,10 +646,17 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         }
       }
 
-      if (shouldCreatePreview) {
-        // Trigger preview creation with a longer delay to ensure all file writes
-        // to IndexedDB are fully committed before we read them for preview.
-        // Users reported that auto-started previews had stale/old file states.
+      if (shouldRefreshPreview) {
+        // AI already deployed via deploy_preview (Vite/HTML projects).
+        // Just refresh the iframe to show the latest deployed version.
+        console.log('[WorkspaceLayout] AI deployed changes — refreshing preview iframe')
+        setTimeout(() => {
+          if (codePreviewRef.current) {
+            codePreviewRef.current.refreshPreview()
+          }
+        }, 500)
+      } else if (shouldCreatePreview) {
+        // Non-deployed projects (Next.js, Expo) — create E2B sandbox preview
         setTimeout(() => {
           if (codePreviewRef.current) {
             codePreviewRef.current.createPreview()
