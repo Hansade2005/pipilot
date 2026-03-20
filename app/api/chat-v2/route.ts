@@ -838,17 +838,33 @@ const MAX_TOOL_RESULT_CHARS = 12000
 function capToolResult(result: any): any {
   if (!result || typeof result !== 'object') return result
 
-  // ── WRITE/EDIT OPERATIONS: strip content entirely ──
-  // The AI already knows what it wrote — echoing it back wastes tokens.
-  // Keep only the success message, path, and action.
-  if (result.action === 'created' || result.action === 'updated' || result.action === 'edited' || result.action === 'replaced') {
+  // ── WRITE/EDIT OPERATIONS: strip all bulk fields ──
+  // The AI already knows what it wrote/edited. originalContent, newContent,
+  // backupContent, and full appliedEdits are for the revert system, not for AI.
+  // Keep only: success, message, path, action, stats (line counts + replacement count).
+  if (result.action === 'created' || result.action === 'updated' || result.action === 'edited' || result.action === 'replaced' || result.action === 'modified') {
     delete result.content
     delete result.newContent
+    delete result.originalContent
     delete result.updatedContent
     delete result.backupContent
-    // Also strip large diff/search fields from edit results
+    delete result.backupAvailable
+    delete result.name
+    delete result.type
+    delete result.size
+    delete result.fileType
+    delete result.metadata
+    // Strip full search/replace strings from appliedEdits — just keep status + count
     if (result.appliedEdits && Array.isArray(result.appliedEdits)) {
-      result.appliedEdits = result.appliedEdits.map((e: any) => typeof e === 'string' ? e.substring(0, 100) : e)
+      result.editCount = result.appliedEdits.length
+      delete result.appliedEdits
+    }
+    if (result.failedEdits && Array.isArray(result.failedEdits)) {
+      result.failedCount = result.failedEdits.length
+      if (result.failedEdits.length > 0) {
+        result.failedReason = result.failedEdits[0]?.reason || 'Unknown'
+      }
+      delete result.failedEdits
     }
     return result
   }
