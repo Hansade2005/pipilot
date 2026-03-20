@@ -830,10 +830,46 @@ Unable to load project structure. Use list_files tool to explore the project.`
   }
 }
 
+// ── TOOL RESULT SIZE CAP ──
+// Prevents context overflow on smaller models (Ollama 4K-8K context).
+// Truncates the `content` field of any tool result to stay within token budget.
+// 12000 chars ≈ 3000 tokens — leaves room for system prompt + history + other results.
+const MAX_TOOL_RESULT_CHARS = 12000
+function capToolResult(result: any): any {
+  if (!result || typeof result !== 'object') return result
+  // Cap the content field (read_file, grep_search, etc.)
+  if (result.content && typeof result.content === 'string' && result.content.length > MAX_TOOL_RESULT_CHARS) {
+    const originalLength = result.content.length
+    result.content = result.content.substring(0, MAX_TOOL_RESULT_CHARS) + `\n\n... [TRUNCATED: ${originalLength} chars → ${MAX_TOOL_RESULT_CHARS} chars. Use startLine/endLine for specific sections.]`
+    result.truncatedByContextCap = true
+    result.originalLength = originalLength
+  }
+  // Cap search results arrays
+  if (result.results && Array.isArray(result.results) && result.results.length > 15) {
+    result.results = result.results.slice(0, 15)
+    result.resultsTruncated = true
+  }
+  // Cap the entire serialized result if it's still too large
+  const serialized = JSON.stringify(result)
+  if (serialized.length > MAX_TOOL_RESULT_CHARS * 1.5) {
+    // Strip non-essential fields to reduce size
+    delete result.fileTree
+    delete result.allPaths
+    delete result.suggestions
+  }
+  return result
+}
+
 // Powerful function to construct proper tool result messages using in-memory storage
 const constructToolResult = async (toolName: string, input: any, projectId: string, toolCallId: string) => {
   console.log(`[CONSTRUCT_TOOL_RESULT] Starting ${toolName} operation with input:`, JSON.stringify(input, null, 2).substring(0, 200) + '...')
 
+  // Wrap the inner logic so we can cap all results before returning
+  const rawResult = await _constructToolResultInner(toolName, input, projectId, toolCallId)
+  return capToolResult(rawResult)
+}
+
+const _constructToolResultInner = async (toolName: string, input: any, projectId: string, toolCallId: string) => {
   try {
     // Get session storage
     const sessionData = sessionProjectStorage.get(projectId)
