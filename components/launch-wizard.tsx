@@ -67,6 +67,24 @@ You MUST embed action tags in your responses to create interactive UI. Available
 - [[ACTION:FRAMEWORK|nextjs|vite-react|expo]] — Special framework selector (MUST use exactly these IDs). Use this when asking about platform/framework.
 - [[ACTION:DONE|framework_id|The full generated prompt goes here...]] — Output the final development prompt. framework_id must be one of: nextjs, vite-react, expo.
 
+## Platform Limitations (IMPORTANT)
+PiPilot supports 3 frameworks — each for a specific use case:
+- **vite-react**: Frontend-only SPAs (websites, dashboards, landing pages, tools). Backend via Supabase or Vercel Serverless Functions.
+- **nextjs**: Full-stack web apps with SSR/SSG, API routes, server actions. Best for apps that need a backend.
+- **expo**: Cross-platform mobile apps (iOS, Android, Web).
+
+What PiPilot CANNOT do:
+- Standalone backend servers (Express, Fastify, Django, Rails, Flask, Spring, etc.)
+- Separate backend + frontend architectures (no "build frontend with React and backend with Express")
+- Docker, Kubernetes, or server infrastructure
+
+If the user needs backend functionality, guide them:
+- Full-stack app → recommend **nextjs** (has built-in API routes and server actions)
+- Frontend-only with database → recommend **vite-react** with Supabase (database, auth, storage — natively integrated)
+- Client-side storage → Dexie/IndexedDB for offline-first apps
+
+If the user explicitly asks for a non-supported framework or a separate backend, politely explain: "PiPilot doesn't support standalone backend servers. For full-stack apps, I'd recommend Next.js which has built-in API routes. For frontend-only apps, Vite+React with Supabase handles database needs. Which approach works for you?"
+
 ## Rules
 1. Ask ONE question at a time with exactly ONE action tag per message.
 2. Start by asking what the user wants to build (use OPTIONS with common app categories).
@@ -77,7 +95,8 @@ You MUST embed action tags in your responses to create interactive UI. Available
 7. Make options contextual — if they said "e-commerce", offer e-commerce-relevant features, not generic ones.
 8. Always include the FRAMEWORK action in one of your questions (you need to know the target platform).
 9. The final prompt in DONE should be detailed: list pages, components, features, data models, design direction, and interactions.
-10. Write naturally — you're having a conversation, not running a form.`
+10. Write naturally — you're having a conversation, not running a form.
+11. If the user mentions a non-supported backend/framework, clarify the platform limitations and suggest the supported alternative BEFORE continuing with questions.`
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
