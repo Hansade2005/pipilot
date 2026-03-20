@@ -2981,6 +2981,7 @@ In suggest_next_steps, offer remaining phases as clickable options. Each follow-
 - Never output placeholder pages. Build every page fully.
 - EXPORTS: ALL page components MUST use \`export default function PageName()\`. Never use named exports (\`export function\`) for pages. In App.tsx, import pages with \`import PageName from './pages/PageName'\` (default import). This prevents import mismatches.
 - NO EMOJIS IN WEBSITE CODE: Never use emojis (🚀📊💡✨🎯etc.) in JSX/HTML as decorative elements, section headers, feature labels, or icons. They make sites look AI-generated and playful. Use Lucide React icons or Material icons instead. Emojis are ONLY allowed in your summary text to the user, never in the code you write.
+- CONCISE CODE: Use .map() for repeated patterns instead of copy-pasting JSX. Extract data (features, pricing, testimonials) into arrays and map over them. If a file exceeds ~400 lines, extract logical sections into separate component files (e.g. ChatMessage.tsx, ChatInput.tsx, MessageList.tsx from a chat page). This makes future edits faster — the AI only rewrites the small file it needs to change, not an 800-line monolith.
 
 ## CSS Rules (CRITICAL — saves 80% of build time)
 index.css must be UNDER 250 LINES. It should ONLY contain:
