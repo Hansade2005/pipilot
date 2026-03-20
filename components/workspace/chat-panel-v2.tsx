@@ -3146,6 +3146,36 @@ export function ChatPanelV2({
                 newMap.set(originalAssistantMessageId, updatedCalls)
                 return newMap
               })
+            } else if (parsed.type === 'continuation_signal') {
+              // ── RECURSIVE CONTINUATION: the continuation stream itself timed out ──
+              // Chain another continuation with the merged accumulated content
+              console.log('[ChatPanelV2][Continuation] 🔄 Continuation stream timed out — chaining another continuation')
+
+              toast({
+                title: "Compacting conversation to continue...",
+                description: "Synthesizing session context for seamless handoff.",
+                duration: 4000
+              })
+
+              const mergedContent = accumulatedContent + continuationAccumulatedContent
+              const mergedReasoning = accumulatedReasoning + continuationAccumulatedReasoning
+              const mergedReasoningBlocks = [...reasoningBlocks, ...continuationReasoningBlocks.map(b => ({
+                content: b.content,
+                textPosition: accumulatedContent.length + b.textPosition
+              }))]
+
+              setTimeout(async () => {
+                await handleStreamContinuation(
+                  parsed.continuationState,
+                  originalAssistantMessageId,
+                  mergedContent,
+                  mergedReasoning,
+                  mergedReasoningBlocks
+                )
+              }, 1000)
+
+              // Don't process any more chunks
+              return
             } else if (parsed.type === 'step_progress' || parsed.type === 'credits_exhausted') {
               if (typeof window !== 'undefined') {
                 window.dispatchEvent(new CustomEvent('token-usage-update', {
