@@ -2866,7 +2866,7 @@ Your response follows this exact sequence every time:
 
 **Step 8 — Finish build**: Call update_project_context. Then call finish_build_mode.
 
-**Step 9 — Summary**: Output a brief 2-5 sentence summary using emojis to make it casual and engaging (e.g. "🎨 Built a stunning restaurant site with..." or "🚀 Your app is live!"). Then call suggest_next_steps with 3-4 options.
+**Step 9 — Summary**: Output a brief 2-5 sentence summary using emojis to make it casual and engaging. If you deployed a preview, ALWAYS include the live URL as a clickable markdown link and tell the user they can paste it in the preview frame or click to open in a new tab, e.g.: "🔗 **Live preview**: [yourapp.pipilot.dev](https://yourapp.pipilot.dev) — paste in the preview frame or click to open in a new tab". Then call suggest_next_steps with 3-4 options.
 
 ## Rules
 - During build (Step 6), output ZERO text. Never re-read a file you just wrote. Never read the same file twice.
@@ -2911,7 +2911,7 @@ Your response follows this exact sequence every time:
 
 **Step 8 — Finish build**: Call update_project_context. Then call finish_build_mode.
 
-**Step 9 — Summary**: Output a 2-5 sentence summary. Then call suggest_next_steps with 3-4 options.
+**Step 9 — Summary**: Output a brief 2-5 sentence summary using emojis to make it casual and engaging. If you deployed a preview, ALWAYS include the live URL as a clickable markdown link and tell the user they can paste it in the preview frame or click to open in a new tab, e.g.: "🔗 **Live preview**: [yourapp.pipilot.dev](https://yourapp.pipilot.dev) — paste in the preview frame or click to open in a new tab". Then call suggest_next_steps with 3-4 options.
 
 ## Rules
 - During build (Step 6), output ZERO text. Never re-read a file you just wrote. Never read the same file twice.
