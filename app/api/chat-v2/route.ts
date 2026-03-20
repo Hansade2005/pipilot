@@ -50,6 +50,17 @@ const getAIModel = async (modelId?: string): Promise<{ model: any, ollamaKeyId: 
   }
 }
 
+// Shared safety checks appended to ALL continuation/recovery prompts
+const CONTINUATION_SAFETY_CHECKS = `
+
+## CONTINUATION SAFETY CHECKS (avoid common bugs)
+Before writing any component code in a continuation, read the existing index.css and index.html first so you know what CSS classes, fonts, and variables are already defined. Then:
+1. IMPORTS: Every icon, component, or hook you use MUST be imported. If you use \`<Bell />\` from lucide-react, verify it's in the import statement. Read the top of the file before editing.
+2. CSS CLASSES: If you reference a class like \`.hero-gradient\` or \`.animate-fade-in\`, verify it exists in index.css FIRST. If not, add it before using it.
+3. CSS VARIABLES: If you use \`var(--color-primary)\`, verify the variable is defined in :root in index.css. Read index.css before creating components that reference variables.
+4. FONTS: If index.html has Google Fonts loaded, use those exact font names in CSS. Do not introduce new fonts without adding the <link> tag.
+5. DESIGN SCHEME: Read .pipilot/design.md if it exists — it has the project's font pairing, color palette, and CSS variables. Use those, do not invent new ones.`
+
 // Shared instructions injected into ALL system prompts (eliminates 3x duplication)
 const PIPILOT_COMMON_INSTRUCTIONS = `
 **CRITICAL: PiPilot DB, AUTH & STORAGE SETUP RESPONSIBILITY**
@@ -2213,20 +2224,10 @@ export async function POST(req: Request) {
         // ═══════════════════════════════════════════════════════════════
         console.log('[Chat-V2] 📦 Received compressed continuation request')
 
-        // Parse continuation metadata from header
-        const continuationMetaHeader = req.headers.get('x-continuation-meta')
-        let continuationMeta: any = {}
-        if (continuationMetaHeader) {
-          try {
-            continuationMeta = JSON.parse(decodeURIComponent(continuationMetaHeader))
-          } catch (e) {
-            console.warn('[Chat-V2] Failed to parse x-continuation-meta header:', e)
-          }
-        }
-
-        // Reconstruct continuationState with sessionStorage from compressed files
+        // Read continuation metadata from the compressed body (not headers — headers have size limits)
         const metadata = extractedMetadata as any
-        continuationState = continuationMeta.continuationState || {}
+        const continuationMeta = metadata.continuationState ? metadata : (metadata.continuationMeta || {})
+        continuationState = continuationMeta.continuationState || metadata.continuationState || {}
         continuationState.sessionStorage = {
           fileTree: clientFileTree,
           files: clientFiles.map((f: any) => ({
@@ -2244,7 +2245,7 @@ export async function POST(req: Request) {
         }
 
         // Set other fields from metadata
-        partialResponse = continuationMeta.partialResponse
+        partialResponse = continuationMeta.partialResponse || metadata.partialResponse
         projectId = metadata.project?.id
         project = metadata.project
         databaseId = metadata.databaseId
@@ -3170,7 +3171,8 @@ This is a continuation of an interrupted build session. The synthesized summary 
 
 ${synthesizedSummary}
 
-Read .pipilot/plan.md to see which steps are completed. Then continue building from the next pending step by calling tools continuously with zero text output between them. Call update_plan_progress after each step and update_project_context when all steps are done. Do not repeat completed work, do not narrate, and do not mention the continuation.`
+Read .pipilot/plan.md to see which steps are completed. Then continue building from the next pending step by calling tools continuously with zero text output between them. Call update_plan_progress after each step and update_project_context when all steps are done. Do not repeat completed work, do not narrate, and do not mention the continuation.
+${CONTINUATION_SAFETY_CHECKS}`
       } else {
         // ── FALLBACK PATH: raw context (when synthesis fails or no tool results) ──
         const truncatedContent = hasPartialContent
@@ -3190,7 +3192,8 @@ Read .pipilot/plan.md to see which steps are completed. Then continue building f
 This is a continuation of an interrupted build. ${previousToolResults.length} tool operations were completed in ${Math.round((continuationState.elapsedTimeMs || 0) / 1000)} seconds before interruption.
 ${hasModifiedFiles ? `\nFiles modified previously: ${modifiedFilesList.join(', ')}. Re-read these if you need to understand their current state before editing.\n` : ''}
 ${truncatedContent ? `Previous response (already shown to user): ${truncatedContent}\n` : ''}
-Read .pipilot/plan.md to see which steps are completed. Then continue building from the next pending step by calling tools continuously with zero text output between them. Call update_plan_progress after each step and update_project_context when all steps are done. Do not repeat completed work, do not narrate, and do not mention the continuation.`
+Read .pipilot/plan.md to see which steps are completed. Then continue building from the next pending step by calling tools continuously with zero text output between them. Call update_plan_progress after each step and update_project_context when all steps are done. Do not repeat completed work, do not narrate, and do not mention the continuation.
+${CONTINUATION_SAFETY_CHECKS}`
       }
     }
 
@@ -3239,7 +3242,8 @@ The user's connection was interrupted. Summary of what was already done:
 
 ${recoverySummary}
 
-Read .pipilot/plan.md to see which steps are completed. Continue building from the next pending step by calling tools continuously with zero text output between them. Do not repeat completed work, do not narrate, and do not mention the interruption.`
+Read .pipilot/plan.md to see which steps are completed. Continue building from the next pending step by calling tools continuously with zero text output between them. Do not repeat completed work, do not narrate, and do not mention the interruption.
+${CONTINUATION_SAFETY_CHECKS}`
       } else {
         // ── FALLBACK PATH ──
         const truncatedContent = hasPartialContent
@@ -3259,7 +3263,8 @@ Read .pipilot/plan.md to see which steps are completed. Continue building from t
 The user's connection was interrupted. ${(recoveryToolResults || []).length} tool operations were completed before interruption.
 ${hasModifiedFiles ? `Files modified: ${modifiedFilesList.join(', ')}. Re-read these if needed before editing.\n` : ''}
 ${truncatedContent ? `Previous response (already shown): ${truncatedContent}\n` : ''}
-Continue exactly where you left off — your output is appended. Call tools continuously with zero text between them. Do not repeat completed work, do not narrate, and do not mention the interruption.`
+Continue exactly where you left off — your output is appended. Call tools continuously with zero text between them. Do not repeat completed work, do not narrate, and do not mention the interruption.
+${CONTINUATION_SAFETY_CHECKS}`
       }
 
       console.log('[Chat-V2] 🔄 Recovery continuation mode - continuing from interrupted stream')

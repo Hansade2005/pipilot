@@ -2776,6 +2776,9 @@ export function ChatPanelV2({
 
         console.log(`[ChatPanelV2][Continuation] 📤 Sending compressed continuation (${(compressedData.byteLength / 1024).toFixed(1)}KB) with token:`, continuationState.continuationToken)
 
+        // Continuation metadata (continuationState + partialResponse) is already
+        // included in the compressed body via compressProjectFiles(). No need to
+        // duplicate it in a header — large headers cause nginx 494 errors.
         response = await fetch('/api/chat-v2', {
           method: 'POST',
           headers: {
@@ -2783,11 +2786,7 @@ export function ChatPanelV2({
             'x-model-id': selectedModel,
             'x-ai-mode': aiMode || '',
             'x-chat-mode': isAskMode ? 'ask' : 'agent',
-            'x-continuation': 'true',
-            'x-continuation-meta': encodeURIComponent(JSON.stringify({
-              continuationState: continuationMeta,
-              partialResponse: { content: accumulatedContent, reasoning: accumulatedReasoning }
-            }))
+            'x-continuation': 'true'
           },
           body: compressedData,
           signal: continuationController.signal
