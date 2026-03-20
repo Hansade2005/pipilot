@@ -59,7 +59,10 @@ Before writing any component code in a continuation, read the existing index.css
 2. CSS CLASSES: If you reference a class like \`.hero-gradient\` or \`.animate-fade-in\`, verify it exists in index.css FIRST. If not, add it before using it.
 3. CSS VARIABLES: If you use \`var(--color-primary)\`, verify the variable is defined in :root in index.css. Read index.css before creating components that reference variables.
 4. FONTS: If index.html has Google Fonts loaded, use those exact font names in CSS. Do not introduce new fonts without adding the <link> tag.
-5. DESIGN SCHEME: Read .pipilot/design.md if it exists — it has the project's font pairing, color palette, and CSS variables. Use those, do not invent new ones.`
+5. DESIGN SCHEME: Read .pipilot/design.md if it exists — it has the project's font pairing, color palette, and CSS variables. Use those, do not invent new ones.
+6. CONCISE CODE: Use .map() for repeated patterns. If a file exceeds ~400 lines, extract sections into separate component files (e.g. ChatMessage.tsx, ChatInput.tsx). This makes your edits faster — you only rewrite the small file you need to change.
+7. DEFAULT EXPORTS: All page components use \`export default function\`. Import with \`import PageName from './pages/PageName'\`.
+8. NO EMOJIS IN CODE: Use Lucide React icons, never emojis as UI elements.`
 
 // Shared instructions injected into ALL system prompts (eliminates 3x duplication)
 const PIPILOT_COMMON_INSTRUCTIONS = `
