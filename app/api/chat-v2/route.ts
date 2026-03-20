@@ -837,25 +837,50 @@ Unable to load project structure. Use list_files tool to explore the project.`
 const MAX_TOOL_RESULT_CHARS = 12000
 function capToolResult(result: any): any {
   if (!result || typeof result !== 'object') return result
-  // Cap the content field (read_file, grep_search, etc.)
+
+  // ── WRITE/EDIT OPERATIONS: strip content entirely ──
+  // The AI already knows what it wrote — echoing it back wastes tokens.
+  // Keep only the success message, path, and action.
+  if (result.action === 'created' || result.action === 'updated' || result.action === 'edited' || result.action === 'replaced') {
+    delete result.content
+    delete result.newContent
+    delete result.updatedContent
+    delete result.backupContent
+    // Also strip large diff/search fields from edit results
+    if (result.appliedEdits && Array.isArray(result.appliedEdits)) {
+      result.appliedEdits = result.appliedEdits.map((e: any) => typeof e === 'string' ? e.substring(0, 100) : e)
+    }
+    return result
+  }
+
+  // ── READ OPERATIONS: cap content field ──
   if (result.content && typeof result.content === 'string' && result.content.length > MAX_TOOL_RESULT_CHARS) {
     const originalLength = result.content.length
     result.content = result.content.substring(0, MAX_TOOL_RESULT_CHARS) + `\n\n... [TRUNCATED: ${originalLength} chars → ${MAX_TOOL_RESULT_CHARS} chars. Use startLine/endLine for specific sections.]`
     result.truncatedByContextCap = true
     result.originalLength = originalLength
   }
-  // Cap search results arrays
+
+  // ── SEARCH RESULTS: cap array length ──
   if (result.results && Array.isArray(result.results) && result.results.length > 15) {
     result.results = result.results.slice(0, 15)
     result.resultsTruncated = true
   }
-  // Cap the entire serialized result if it's still too large
+
+  // ── FINAL SAFETY NET: cap any remaining large string fields ──
+  for (const key of Object.keys(result)) {
+    if (typeof result[key] === 'string' && result[key].length > MAX_TOOL_RESULT_CHARS && key !== 'error') {
+      result[key] = result[key].substring(0, MAX_TOOL_RESULT_CHARS) + ` [TRUNCATED]`
+    }
+  }
+
+  // Strip non-essential bulky fields if total is still too large
   const serialized = JSON.stringify(result)
   if (serialized.length > MAX_TOOL_RESULT_CHARS * 1.5) {
-    // Strip non-essential fields to reduce size
     delete result.fileTree
     delete result.allPaths
     delete result.suggestions
+    delete result.backupContent
   }
   return result
 }
