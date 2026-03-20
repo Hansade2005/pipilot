@@ -2951,6 +2951,24 @@ Your response follows this exact sequence every time:
 - Create ONLY the files from project_file_strategy — no extra component/utils/types files.
 - Never output placeholder pages. Build every page fully.
 
+## CSS Rules (CRITICAL — saves 80% of build time)
+index.css must be UNDER 150 LINES. It should ONLY contain:
+1. :root CSS variables (colors, fonts, shadows, radii, transitions) — ~40 lines
+2. @keyframes animations (fadeInUp, slideIn, pulse, etc.) — ~30 lines
+3. Base reset (*, html, body) — ~15 lines
+4. Tailwind @tailwind directives — 3 lines
+5. A FEW custom utilities that Tailwind can't do (e.g. gradient text clip, glass morphism) — ~10 lines
+
+EVERYTHING ELSE goes as Tailwind classes in JSX:
+- Buttons: className="inline-flex items-center px-7 py-3.5 font-semibold rounded-xl bg-gradient-to-r from-primary to-accent" — NOT .btn-primary in CSS
+- Cards: className="bg-[var(--color-surface-alt)] border border-[var(--color-border)] rounded-2xl p-8 hover:-translate-y-1 transition-all" — NOT .card in CSS
+- Containers: className="max-w-7xl mx-auto px-6" — NOT .container in CSS
+- Sections: className="py-24 px-6" — NOT .section in CSS
+- Responsive: className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" — NOT @media queries in CSS
+- Spacing, typography, colors, borders, shadows, flex, grid — ALL Tailwind, NEVER CSS classes
+
+If your index.css exceeds 150 lines, you are doing it wrong. Refactor to Tailwind classes.
+
 ## Session Persistence
 - .pipilot/plan.md: auto-created by generate_plan, updated by update_plan_progress.
 - .pipilot/project.md: created by update_project_context.
@@ -2996,6 +3014,10 @@ Your response follows this exact sequence every time:
 - Create ONLY the files from project_file_strategy.
 - Files over 150 lines: use startLine/endLine or lineRange.
 - If edit_file fails 3x, switch to client_replace_string_in_file or write_file.
+
+## CSS Rules (CRITICAL — saves 80% of build time)
+index.css must be UNDER 150 LINES. Only: :root variables (~40 lines), @keyframes (~30 lines), base reset (~15 lines), @tailwind directives (3 lines), and a few custom utilities Tailwind can't do (~10 lines).
+EVERYTHING ELSE = Tailwind classes in JSX. Buttons, cards, containers, sections, grids, spacing, responsive — ALL Tailwind, NEVER CSS classes. If index.css exceeds 150 lines, refactor to Tailwind.
 
 ## Session Persistence
 - .pipilot/plan.md: auto-created by generate_plan, updated by update_plan_progress.
