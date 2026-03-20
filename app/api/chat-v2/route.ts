@@ -403,6 +403,7 @@ const TOOL_REGISTRY: ToolRegistryEntry[] = [
   // === Development & Deploy ===
   { name: 'check_dev_errors', description: 'Run dev server or build, check for runtime/build errors', category: 'dev', parameters: 'mode (dev|build), timeoutSeconds?' },
   { name: 'deploy_preview', description: 'Deploy project to live .pipilot.dev preview hosting', category: 'dev', parameters: 'deployMessage?' },
+  { name: 'publish_to_showcase', description: 'Publish deployed project to PiPilot Showcase gallery', category: 'dev', parameters: 'title, description, liveUrl, screenshotUrl, category?, techStack?' },
   { name: 'node_machine', description: 'Execute Node.js test scripts in sandbox with full project context', category: 'dev', parameters: 'command, timeoutSeconds?, envVars?' },
 
   // === Project Management ===
@@ -2942,9 +2943,11 @@ Your response follows this exact sequence every time:
 
 **Step 7 — Deploy** (MANDATORY for Vite/React and HTML, skip ONLY for Next.js/Expo): You MUST call check_dev_errors first, fix any errors, then call deploy_preview. Do NOT skip this step. Do NOT fabricate a preview URL — only include the URL returned by deploy_preview.
 
+**Step 7b — Showcase** (after deploy succeeds): Call browse_web to take a viewport screenshot of the deployed .pipilot.dev URL (NOT fullpage). Then call publish_to_showcase with the project title, description, liveUrl, screenshotUrl from browse_web, category, and techStack.
+
 **Step 8 — Finish build**: Call update_project_context. Then call finish_build_mode.
 
-**Step 9 — Summary**: Output a brief 2-5 sentence summary using emojis to make it casual and engaging. If you deployed a preview, ALWAYS include the live URL as a clickable markdown link and tell the user they can paste it in the preview frame or click to open in a new tab, e.g.: "🔗 **Live preview**: [yourapp.pipilot.dev](https://yourapp.pipilot.dev) — paste in the preview frame or click to open in a new tab". Then call suggest_next_steps with 3-4 options.
+**Step 9 — Summary**: Output a brief 2-5 sentence summary using emojis to make it casual and engaging. ALWAYS include the live URL as a clickable markdown link and tell the user they can paste it in the preview frame or click to open in a new tab, e.g.: "🔗 **Live preview**: [yourapp.pipilot.dev](https://yourapp.pipilot.dev) — paste in the preview frame or click to open in a new tab". Only include URLs returned by deploy_preview — NEVER fabricate URLs. Then call suggest_next_steps with 3-4 options.
 
 ## Rules
 - During build (Step 6), output ZERO text. Never re-read a file you just wrote. Never read the same file twice.
@@ -3005,9 +3008,11 @@ Your response follows this exact sequence every time:
 
 **Step 7 — Deploy** (MANDATORY for Vite/React and HTML, skip ONLY for Next.js/Expo): You MUST call check_dev_errors first, fix any errors, then call deploy_preview. Do NOT skip this step. Do NOT fabricate a preview URL — only include the URL returned by deploy_preview.
 
+**Step 7b — Showcase** (after deploy succeeds): Call browse_web to take a viewport screenshot of the deployed .pipilot.dev URL (NOT fullpage). Then call publish_to_showcase with the project title, description, liveUrl, screenshotUrl from browse_web, category, and techStack.
+
 **Step 8 — Finish build**: Call update_project_context. Then call finish_build_mode.
 
-**Step 9 — Summary**: Output a brief 2-5 sentence summary using emojis to make it casual and engaging. If you deployed a preview, ALWAYS include the live URL as a clickable markdown link and tell the user they can paste it in the preview frame or click to open in a new tab, e.g.: "🔗 **Live preview**: [yourapp.pipilot.dev](https://yourapp.pipilot.dev) — paste in the preview frame or click to open in a new tab". Then call suggest_next_steps with 3-4 options.
+**Step 9 — Summary**: Output a brief 2-5 sentence summary using emojis. ALWAYS include the live URL as a clickable markdown link, e.g.: "🔗 **Live preview**: [yourapp.pipilot.dev](https://yourapp.pipilot.dev) — paste in the preview frame or click to open in a new tab". Only include URLs returned by deploy_preview — NEVER fabricate. Then call suggest_next_steps with 3-4 options.
 
 ## Rules
 - During build (Step 6), output ZERO text. Never re-read a file you just wrote. Never read the same file twice.
@@ -5985,6 +5990,67 @@ ${CONTINUATION_SAFETY_CHECKS}`
               executionTimeMs: executionTime,
               timeWarning: timeStatus.warningMessage
             }
+          }
+        }
+      }),
+
+      // ── PROJECT SHOWCASE — Auto-publish after deploy ──
+      publish_to_showcase: tool({
+        description: 'Publish the deployed project to the PiPilot Showcase gallery. Call this AFTER deploy_preview succeeds AND after using browse_web to take a viewport screenshot of the live site. The showcase displays the project on the homepage and /showcase page for community browsing.',
+        inputSchema: z.object({
+          title: z.string().describe('Project name'),
+          description: z.string().describe('1-2 sentence description of what the project does'),
+          liveUrl: z.string().describe('The deployed .pipilot.dev URL returned by deploy_preview'),
+          screenshotUrl: z.string().describe('The screenshot URL returned by browse_web (Supabase storage URL)'),
+          category: z.string().optional().describe('Project category (e.g. "landing-page", "dashboard", "portfolio", "ecommerce", "saas", "blog")'),
+          techStack: z.array(z.string()).optional().describe('Technologies used (e.g. ["React", "Tailwind", "Framer Motion"])'),
+        }),
+        execute: async ({ title, description, liveUrl, screenshotUrl, category, techStack }) => {
+          try {
+            // Get authenticated user
+            const supabaseToken = req.headers.get('x-supabase-access-token') || ''
+            const { createClient: createServerClient } = await import('@/lib/supabase/server')
+            const supabase = await createServerClient()
+            const { data: { user } } = await supabase.auth.getUser()
+
+            if (!user) {
+              return { success: false, error: 'User not authenticated' }
+            }
+
+            // Upsert to showcase_projects table (main DB)
+            const { data, error } = await supabase
+              .from('showcase_projects')
+              .upsert({
+                user_id: user.id,
+                project_id: projectId,
+                title,
+                description,
+                category: category || 'general',
+                thumbnail_url: screenshotUrl,
+                live_url: liveUrl,
+                preview_url: liveUrl,
+                tech_stack: techStack || [],
+                status: 'published',
+                updated_at: new Date().toISOString()
+              }, { onConflict: 'project_id' })
+              .select('id')
+              .single()
+
+            if (error) {
+              console.error('[publish_to_showcase] Error:', error)
+              return { success: false, error: error.message }
+            }
+
+            console.log(`[publish_to_showcase] Published "${title}" to showcase (id: ${data?.id})`)
+            return {
+              success: true,
+              message: `Published "${title}" to the PiPilot Showcase!`,
+              showcaseId: data?.id,
+              showcaseUrl: `https://pipilot.dev/showcase`
+            }
+          } catch (err) {
+            console.error('[publish_to_showcase] Failed:', err)
+            return { success: false, error: String(err) }
           }
         }
       }),
