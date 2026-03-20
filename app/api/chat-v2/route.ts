@@ -2943,7 +2943,7 @@ Your response follows this exact sequence every time:
 
 **Step 7 — Deploy** (MANDATORY for Vite/React and HTML, skip ONLY for Next.js/Expo): You MUST call check_dev_errors first, fix any errors, then call deploy_preview. Do NOT skip this step. Do NOT fabricate a preview URL — only include the URL returned by deploy_preview.
 
-**Step 7b — Showcase** (after deploy succeeds): Call publish_to_showcase with action "check" first. If already published, skip to Step 8. If not published yet, call browse_web to take a viewport screenshot of the deployed .pipilot.dev URL (NOT fullpage), then call publish_to_showcase with action "publish" and the title, description, liveUrl, screenshotUrl, category, techStack.
+**Step 7b — Showcase** (after deploy succeeds): Call publish_to_showcase with action "check" first. If already published, skip to Step 8. If not published yet, call browse_web to take a VIEWPORT-ONLY screenshot (set fullPage to false, viewport 1280x720) of the deployed .pipilot.dev URL, then call publish_to_showcase with action "publish" and the title, description, liveUrl (MUST start with https://), screenshotUrl, category, techStack.
 
 **Step 8 — Finish build**: Call update_project_context. Then call finish_build_mode.
 
@@ -3027,7 +3027,7 @@ Your response follows this exact sequence every time:
 
 **Step 7 — Deploy** (MANDATORY for Vite/React and HTML, skip ONLY for Next.js/Expo): You MUST call check_dev_errors first, fix any errors, then call deploy_preview. Do NOT skip this step. Do NOT fabricate a preview URL — only include the URL returned by deploy_preview.
 
-**Step 7b — Showcase** (after deploy succeeds): Call publish_to_showcase with action "check" first. If already published, skip to Step 8. If not published yet, call browse_web to take a viewport screenshot of the deployed .pipilot.dev URL (NOT fullpage), then call publish_to_showcase with action "publish" and the title, description, liveUrl, screenshotUrl, category, techStack.
+**Step 7b — Showcase** (after deploy succeeds): Call publish_to_showcase with action "check" first. If already published, skip to Step 8. If not published yet, call browse_web to take a VIEWPORT-ONLY screenshot (set fullPage to false, viewport 1280x720) of the deployed .pipilot.dev URL, then call publish_to_showcase with action "publish" and the title, description, liveUrl (MUST start with https://), screenshotUrl, category, techStack.
 
 **Step 8 — Finish build**: Call update_project_context. Then call finish_build_mode.
 
@@ -6068,6 +6068,9 @@ ${CONTINUATION_SAFETY_CHECKS}`
               return { success: false, error: 'title, liveUrl, and screenshotUrl are required for publish' }
             }
 
+            // Normalize URL — ensure https:// prefix
+            const normalizedLiveUrl = liveUrl.startsWith('http') ? liveUrl : `https://${liveUrl}`
+
             const { data, error } = await supabase
               .from('showcase_projects')
               .upsert({
@@ -6077,8 +6080,8 @@ ${CONTINUATION_SAFETY_CHECKS}`
                 description: description || '',
                 category: category || 'general',
                 thumbnail_url: screenshotUrl,
-                live_url: liveUrl,
-                preview_url: liveUrl,
+                live_url: normalizedLiveUrl,
+                preview_url: normalizedLiveUrl,
                 tech_stack: techStack || [],
                 status: 'published',
                 updated_at: new Date().toISOString()

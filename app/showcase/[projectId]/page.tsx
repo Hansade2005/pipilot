@@ -129,6 +129,14 @@ export default function ShowcaseProjectPage() {
 
   if (!project) return null
 
+  // Normalize URL — ensure https:// prefix (prevents corrupted URLs like "pipilot.dev/showcase/xxx.pipilot.dev")
+  const normalizeUrl = (url: string) => {
+    if (!url) return ''
+    if (url.startsWith('http://') || url.startsWith('https://')) return url
+    return `https://${url}`
+  }
+  const liveUrl = normalizeUrl(project.live_url)
+
   const formattedDate = new Date(project.created_at).toLocaleDateString('en-US', {
     year: 'numeric', month: 'long', day: 'numeric'
   })
@@ -172,7 +180,7 @@ export default function ShowcaseProjectPage() {
           {/* Action buttons */}
           <div className="flex flex-wrap gap-3 mb-8">
             <a
-              href={project.live_url}
+              href={liveUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-medium rounded-lg transition-colors"
@@ -198,28 +206,25 @@ export default function ShowcaseProjectPage() {
             </button>
           </div>
 
-          {/* Screenshot / Preview */}
-          <div className="rounded-xl overflow-hidden border border-gray-800 mb-8">
-            {project.thumbnail_url ? (
+          {/* Screenshot (compact) */}
+          {project.thumbnail_url && (
+            <div className="rounded-xl overflow-hidden border border-gray-800 mb-8 max-w-2xl">
               <img
                 src={project.thumbnail_url}
                 alt={project.title}
-                className="w-full object-cover"
+                className="w-full h-auto object-cover rounded-xl"
+                style={{ maxHeight: '400px' }}
               />
-            ) : (
-              <div className="aspect-video bg-gradient-to-br from-orange-600/20 to-gray-900 flex items-center justify-center">
-                <span className="text-gray-500">No preview available</span>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Live iframe preview */}
-          {project.live_url && (
+          {/* Live iframe preview (large) */}
+          {liveUrl && (
             <div className="mb-8">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-lg font-semibold">Live Preview</h2>
                 <a
-                  href={project.live_url}
+                  href={liveUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 text-sm text-orange-400 hover:text-orange-300"
@@ -229,8 +234,8 @@ export default function ShowcaseProjectPage() {
               </div>
               <div className="rounded-xl overflow-hidden border border-gray-800 bg-white">
                 <iframe
-                  src={project.live_url}
-                  className="w-full h-[600px]"
+                  src={liveUrl}
+                  className="w-full h-[80vh] min-h-[700px]"
                   title={project.title}
                   sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
                 />
