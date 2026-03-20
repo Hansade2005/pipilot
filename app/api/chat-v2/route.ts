@@ -2952,7 +2952,7 @@ Your response follows this exact sequence every time:
 - Never output placeholder pages. Build every page fully.
 
 ## CSS Rules (CRITICAL — saves 80% of build time)
-index.css must be UNDER 150 LINES. It should ONLY contain:
+index.css must be UNDER 250 LINES. It should ONLY contain:
 1. :root CSS variables (colors, fonts, shadows, radii, transitions) — ~40 lines
 2. @keyframes animations (fadeInUp, slideIn, pulse, etc.) — ~30 lines
 3. Base reset (*, html, body) — ~15 lines
@@ -3016,7 +3016,7 @@ Your response follows this exact sequence every time:
 - If edit_file fails 3x, switch to client_replace_string_in_file or write_file.
 
 ## CSS Rules (CRITICAL — saves 80% of build time)
-index.css must be UNDER 150 LINES. Only: :root variables (~40 lines), @keyframes (~30 lines), base reset (~15 lines), @tailwind directives (3 lines), and a few custom utilities Tailwind can't do (~10 lines).
+index.css must be UNDER 250 LINES. Only: :root variables (~40 lines), @keyframes (~30 lines), base reset (~15 lines), @tailwind directives (3 lines), and a few custom utilities Tailwind can't do (~10 lines).
 EVERYTHING ELSE = Tailwind classes in JSX. Buttons, cards, containers, sections, grids, spacing, responsive — ALL Tailwind, NEVER CSS classes. If index.css exceeds 150 lines, refactor to Tailwind.
 
 ## Session Persistence
