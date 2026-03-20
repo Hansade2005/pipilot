@@ -510,6 +510,7 @@ function createModelInstance(modelId: string): any {
     case 'ollama/glm-4.7':
     case 'ollama/kimi-k2.5':
     case 'ollama/kimi-k2-thinking':
+    case 'ollama/minimax-m2.7':
     case 'ollama/minimax-m2.5':
     case 'ollama/minimax-m2.1':
     case 'ollama/kimi-k2:1t': {

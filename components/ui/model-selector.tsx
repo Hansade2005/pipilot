@@ -36,7 +36,7 @@ const shortNameMap = new Map<string, string>([
   ['ollama/glm-4.7', 'GLM 4.7'],
   ['ollama/kimi-k2.5', 'Kimi K2.5'],
   ['ollama/kimi-k2-thinking', 'Kimi K2'],
-  ['ollama/minimax-m2.5', 'Claude Opus 4.6'],
+  ['ollama/minimax-m2.7', 'Claude Opus 4.6'],
   ['ollama/minimax-m2.1', 'Claude Sonnet 4.6'],
   ['ollama/kimi-k2:1t', 'Kimi K2 1T'],
   // Kilo AI Gateway models
@@ -64,7 +64,7 @@ const descriptionMap = new Map<string, string>([
   ['ollama/glm-4.7', 'GLM 4.7 via Ollama Cloud'],
   ['ollama/kimi-k2.5', 'Kimi K2.5 - 262K context'],
   ['ollama/kimi-k2-thinking', 'Kimi K2 Thinking via Ollama'],
-  ['ollama/minimax-m2.5', 'Most capable model for ambitious work'],
+  ['ollama/minimax-m2.7', 'Most capable model for ambitious work'],
   ['ollama/minimax-m2.1', 'Best balance of speed and quality'],
   ['ollama/kimi-k2:1t', 'Kimi K2 1T params via Ollama'],
   // Kilo AI Gateway models
@@ -105,7 +105,7 @@ export function ModelSelector({
 
   const effectiveStatus = subscriptionStatus || (userPlan === 'free' ? 'active' : 'inactive')
   const isPremium = ['pro', 'creator', 'teams', 'collaborate', 'enterprise', 'scale'].includes(userPlan)
-  const defaultSelectedModel: string = 'ollama/minimax-m2.5'
+  const defaultSelectedModel: string = 'ollama/minimax-m2.7'
   const effectiveSelectedModel = selectedModel || defaultSelectedModel
 
   // Determine active BYOK providers
@@ -166,7 +166,7 @@ export function ModelSelector({
   if (userPlan === 'free') {
     allowedModels = [
       'xai/grok-code-fast-1', 'mistral/devstral-2', 'mistral/devstral-small-2',
-      'ollama/minimax-m2.5', 'ollama/minimax-m2.1',
+      'ollama/minimax-m2.7', 'ollama/minimax-m2.1',
       'ollama/devstral-2:123b', 'ollama/qwen3-coder:480b', 'ollama/qwen3-coder-next', 'ollama/qwen3.5:397b',
       'ollama/deepseek-v3.1:671b', 'ollama/deepseek-v3.2', 'ollama/glm-4.6', 'ollama/glm-4.7',
       'ollama/kimi-k2.5', 'ollama/kimi-k2-thinking', 'ollama/kimi-k2:1t',
@@ -178,7 +178,7 @@ export function ModelSelector({
       'auto', 'mistral/devstral-2', 'mistral/devstral-small-2', 'xai/grok-code-fast-1',
       'ollama/devstral-2:123b', 'ollama/qwen3-coder:480b', 'ollama/qwen3-coder-next', 'ollama/qwen3.5:397b',
       'ollama/deepseek-v3.1:671b', 'ollama/deepseek-v3.2', 'ollama/glm-4.6', 'ollama/glm-4.7',
-      'ollama/kimi-k2.5', 'ollama/kimi-k2-thinking', 'ollama/minimax-m2.5', 'ollama/minimax-m2.1',
+      'ollama/kimi-k2.5', 'ollama/kimi-k2-thinking', 'ollama/minimax-m2.7', 'ollama/minimax-m2.1',
       'ollama/kimi-k2:1t',
       'kilo/auto-free', 'kilo/minimax-m2.5-free', 'kilo/kimi-k2.5-free',
       'kilo/giga-potato', 'kilo/step-3.5-flash-free'
@@ -226,7 +226,7 @@ export function ModelSelector({
 
   // Ordered model list for the dropdown
   const modelOrder = [
-    'ollama/minimax-m2.5', 'ollama/minimax-m2.1',
+    'ollama/minimax-m2.7', 'ollama/minimax-m2.1',
     'mistral/devstral-2', 'mistral/devstral-small-2',
     'xai/grok-code-fast-1',
     'ollama/devstral-2:123b', 'ollama/qwen3-coder:480b', 'ollama/qwen3-coder-next', 'ollama/qwen3.5:397b',

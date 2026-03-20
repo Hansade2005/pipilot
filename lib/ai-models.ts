@@ -1,4 +1,4 @@
-export const DEFAULT_CHAT_MODEL: string = 'ollama/minimax-m2.5';
+export const DEFAULT_CHAT_MODEL: string = 'ollama/minimax-m2.7';
 
 export interface ChatModel {
   id: string;
@@ -161,7 +161,7 @@ export const chatModels: Array<ChatModel> = [
     provider: 'ollama',
   },
   {
-    id: 'ollama/minimax-m2.5',
+    id: 'ollama/minimax-m2.7',
     name: 'Claude Opus 4.6',
     description: 'Most capable model for ambitious, complex work',
     provider: 'ollama',

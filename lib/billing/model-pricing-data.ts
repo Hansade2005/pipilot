@@ -2445,13 +2445,30 @@ export const VERCEL_MODEL_PRICING: Record<string, ModelPricingEntry> = {
     throughputTps: 30,
   },
 
-  'ollama/minimax-m2.5': {
+  'ollama/minimax-m2.7': {
     name: 'Claude Opus 4.6',
     provider: 'ollama',
     contextWindow: 205_000,
     maxOutput: 131_000,
     inputPerToken: 0.00000045,     // $0.45/M
     outputPerToken: 0.0000018,     // $1.80/M
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: false,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 1.0,
+    throughputTps: 150,
+  },
+
+  'ollama/minimax-m2.5': {
+    name: 'MiniMax M2.5 (legacy)',
+    provider: 'ollama',
+    contextWindow: 205_000,
+    maxOutput: 131_000,
+    inputPerToken: 0.00000045,
+    outputPerToken: 0.0000018,
     cacheReadPerToken: 0,
     cacheWritePerToken: 0,
     webSearchPer1K: 0,
