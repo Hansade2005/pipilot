@@ -37,7 +37,10 @@ import {
   Key,
   MessageSquare,
   Play,
-  Rocket
+  Rocket,
+  Eye,
+  Heart,
+  ExternalLink
 } from "lucide-react"
 import Link from "next/link"
 import { ChatInput } from "@/components/chat-input"
@@ -58,6 +61,98 @@ import { TemplatesView } from "@/components/workspace/templates-view"
 import { ParticleBackground } from "@/components/particle-background"
 import { SpaceBackground } from "@/components/space-background"
 import { usePageTitle } from '@/hooks/use-page-title'
+
+function ShowcaseSection() {
+  const [projects, setProjects] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/showcase?sort=recent&limit=8')
+      .then(res => res.json())
+      .then(data => setProjects(data.projects || []))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (!loading && projects.length === 0) return null
+
+  return (
+    <section className="relative z-[5] py-20 bg-gray-950/50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between mb-10">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-100">
+              Built with <span className="text-orange-400">PiPilot</span>
+            </h2>
+            <p className="text-gray-400 mt-1">Real projects built by our community using AI</p>
+          </div>
+          <a
+            href="/showcase"
+            className="hidden sm:flex items-center gap-1.5 text-sm text-orange-400 hover:text-orange-300 transition-colors"
+          >
+            View all <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        </div>
+
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-xl bg-gray-900/60 border border-gray-800/50 overflow-hidden animate-pulse">
+                <div className="aspect-video bg-gray-800/50" />
+                <div className="p-3.5 space-y-2">
+                  <div className="h-3.5 bg-gray-800/50 rounded w-3/4" />
+                  <div className="h-3 bg-gray-800/50 rounded w-full" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {projects.slice(0, 8).map(project => (
+              <a
+                key={project.id}
+                href={project.live_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group rounded-xl bg-gray-900/60 border border-gray-800/50 overflow-hidden hover:border-orange-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/5"
+              >
+                <div className="aspect-video bg-gray-800/50 relative overflow-hidden">
+                  {project.thumbnail_url ? (
+                    <img
+                      src={project.thumbnail_url}
+                      alt={project.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-orange-600/20 to-gray-900 flex items-center justify-center">
+                      <span className="text-gray-600 text-xs">No preview</span>
+                    </div>
+                  )}
+                </div>
+                <div className="p-3.5">
+                  <h3 className="font-medium text-sm text-gray-200 truncate">{project.title}</h3>
+                  {project.description && (
+                    <p className="text-xs text-gray-500 mt-1 line-clamp-1">{project.description}</p>
+                  )}
+                  <div className="flex items-center gap-3 mt-2 text-[10px] text-gray-600">
+                    <span className="flex items-center gap-0.5"><Eye className="w-3 h-3" /> {project.views || 0}</span>
+                    <span className="flex items-center gap-0.5"><Heart className="w-3 h-3" /> {project.likes || 0}</span>
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
+
+        <div className="sm:hidden text-center mt-6">
+          <a href="/showcase" className="text-sm text-orange-400 hover:text-orange-300">
+            View all projects →
+          </a>
+        </div>
+      </div>
+    </section>
+  )
+}
 
 export default function LandingPage() {
   usePageTitle('Home')
@@ -646,6 +741,9 @@ export default function LandingPage() {
 
         </div>
       </section>
+
+      {/* Community Showcase Section */}
+      <ShowcaseSection />
 
       {/* Footer */}
       <Footer />
