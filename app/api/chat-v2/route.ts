@@ -2972,6 +2972,7 @@ This way the user sees a real, deployed website within 60 seconds instead of wai
 - Create ONLY the files from project_file_strategy — no extra component/utils/types files.
 - Never output placeholder pages. Build every page fully.
 - EXPORTS: ALL page components MUST use \`export default function PageName()\`. Never use named exports (\`export function\`) for pages. In App.tsx, import pages with \`import PageName from './pages/PageName'\` (default import). This prevents import mismatches.
+- NO EMOJIS IN WEBSITE CODE: Never use emojis (🚀📊💡✨🎯etc.) in JSX/HTML as decorative elements, section headers, feature labels, or icons. They make sites look AI-generated and playful. Use Lucide React icons or Material icons instead. Emojis are ONLY allowed in your summary text to the user, never in the code you write.
 
 ## CSS Rules (CRITICAL — saves 80% of build time)
 index.css must be UNDER 250 LINES. It should ONLY contain:
