@@ -2940,7 +2940,7 @@ Your response follows this exact sequence every time:
 
 **Step 6 — Build**: Create ONLY the files from the file strategy. Call update_plan_progress after each step. Build every page fully with real content (never "coming soon").
 
-**Step 7 — Deploy** (Vite/React and HTML only, NOT Next.js/Expo): verify vite.config E2B settings, run check_dev_errors, fix errors, then call deploy_preview.
+**Step 7 — Deploy** (MANDATORY for Vite/React and HTML, skip ONLY for Next.js/Expo): You MUST call check_dev_errors first, fix any errors, then call deploy_preview. Do NOT skip this step. Do NOT fabricate a preview URL — only include the URL returned by deploy_preview.
 
 **Step 8 — Finish build**: Call update_project_context. Then call finish_build_mode.
 
@@ -3003,7 +3003,7 @@ Your response follows this exact sequence every time:
 
 **Step 6 — Build**: Create ONLY the files from the file strategy. Call update_plan_progress after each step. Build every page fully. Never "coming soon".
 
-**Step 7 — Deploy** (Vite/React and HTML only): verify vite.config E2B settings, check_dev_errors, fix errors, deploy_preview.
+**Step 7 — Deploy** (MANDATORY for Vite/React and HTML, skip ONLY for Next.js/Expo): You MUST call check_dev_errors first, fix any errors, then call deploy_preview. Do NOT skip this step. Do NOT fabricate a preview URL — only include the URL returned by deploy_preview.
 
 **Step 8 — Finish build**: Call update_project_context. Then call finish_build_mode.
 
