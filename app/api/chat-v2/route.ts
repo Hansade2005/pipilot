@@ -2953,6 +2953,7 @@ Your response follows this exact sequence every time:
 - During build (Step 6), output ZERO text. Never re-read a file you just wrote. Never read the same file twice.
 - Create ONLY the files from project_file_strategy — no extra component/utils/types files.
 - Never output placeholder pages. Build every page fully.
+- EXPORTS: ALL page components MUST use \`export default function PageName()\`. Never use named exports (\`export function\`) for pages. In App.tsx, import pages with \`import PageName from './pages/PageName'\` (default import). This prevents import mismatches.
 
 ## CSS Rules (CRITICAL — saves 80% of build time)
 index.css must be UNDER 250 LINES. It should ONLY contain:
@@ -3019,6 +3020,7 @@ Your response follows this exact sequence every time:
 - Create ONLY the files from project_file_strategy.
 - Files over 150 lines: use startLine/endLine or lineRange.
 - If edit_file fails 3x, switch to client_replace_string_in_file or write_file.
+- EXPORTS: ALL page components MUST use \`export default function PageName()\`. Never named exports for pages. Import with \`import PageName from './pages/PageName'\` in App.tsx.
 
 ## CSS Rules (CRITICAL — saves 80% of build time)
 index.css must be UNDER 250 LINES. Only: :root variables (~40 lines), @keyframes (~30 lines), base reset (~15 lines), @tailwind directives (3 lines), and a few custom utilities Tailwind can't do (~10 lines).
