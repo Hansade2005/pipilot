@@ -193,7 +193,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
 
   // Set default model: Claude Opus 4.6 for all users
   useEffect(() => {
-    setSelectedModel('ollama/minimax-m2.5')
+    setSelectedModel('ollama/minimax-m2.7')
   }, [userPlan])
 
   // Save prompt to localStorage whenever it changes

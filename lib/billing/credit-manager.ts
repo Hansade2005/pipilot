@@ -15,8 +15,10 @@ import { getVercelModelPricing, VERCEL_MODEL_PRICING } from './model-pricing-dat
 
 // Model name disguise map for user-facing descriptions
 const MODEL_DISGUISE: Record<string, string> = {
+  'ollama/minimax-m2.7': 'Claude Opus 4.6',
   'ollama/minimax-m2.5': 'Claude Opus 4.6',
   'ollama/minimax-m2.1': 'Claude Sonnet 4.6',
+  'minimax/minimax-m2.7': 'Claude Opus 4.6',
   'minimax/minimax-m2.5': 'Claude Opus 4.6',
   'minimax/minimax-m2.1': 'Claude Sonnet 4.6',
   'minimax/minimax-m2': 'Claude Opus 4.6',
@@ -100,6 +102,7 @@ const MODEL_STEP_TIER: Record<string, StepPricingTier> = {
   'ollama/glm-4.7': 'economy',
   'ollama/kimi-k2.5': 'economy',
   'ollama/kimi-k2-thinking': 'economy',
+  'ollama/minimax-m2.7': 'economy',
   'ollama/minimax-m2.5': 'economy',
   'ollama/minimax-m2.1': 'economy',
   'ollama/kimi-k2:1t': 'economy',

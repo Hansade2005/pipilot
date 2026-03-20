@@ -1173,7 +1173,7 @@ interface ChatPanelV2Props {
 export function ChatPanelV2({
   project,
   isMobile = false,
-  selectedModel = 'ollama/minimax-m2.5',
+  selectedModel = 'ollama/minimax-m2.7',
   onModelChange,
   userPlan = 'free',
   subscriptionStatus,
