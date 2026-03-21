@@ -443,10 +443,13 @@ export default function PricingPage() {
             </div>
           )}
 
-          {/* E2B Sponsor */}
-          <div className="flex items-center justify-center mb-16">
+          {/* Sponsor Badges */}
+          <div className="flex items-center justify-center gap-4 mb-16">
             <a href="https://e2b.dev/startups" target="_blank" rel="noopener noreferrer" className="opacity-60 hover:opacity-100 transition-opacity">
               <img src="/e2b-badge.svg" alt="Sponsored by E2B for Startups" className="h-8 w-auto rounded" />
+            </a>
+            <a href="https://peerpush.net/p/pipilot" target="_blank" rel="noopener" className="opacity-60 hover:opacity-100 transition-opacity">
+              <img src="https://peerpush.net/p/pipilot/badge.png" alt="PiPilot badge" className="h-8 w-auto" style={{ width: '230px' }} />
             </a>
           </div>
 

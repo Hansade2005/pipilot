@@ -56,9 +56,12 @@ export default function AboutPage() {
               PiPilot is revolutionizing how developers and businesses create web applications
               through the power of artificial intelligence and cutting-edge technology.
             </p>
-            <div className="mt-6 flex items-center justify-center">
+            <div className="mt-6 flex items-center justify-center gap-4">
               <a href="https://e2b.dev/startups" target="_blank" rel="noopener noreferrer" className="opacity-80 hover:opacity-100 transition-opacity">
                 <img src="/e2b-badge.svg" alt="Sponsored by E2B for Startups" className="h-8 md:h-10 w-auto rounded" />
+              </a>
+              <a href="https://peerpush.net/p/pipilot" target="_blank" rel="noopener" className="opacity-80 hover:opacity-100 transition-opacity">
+                <img src="https://peerpush.net/p/pipilot/badge.png" alt="PiPilot badge" className="h-8 md:h-10 w-auto" style={{ width: '230px' }} />
               </a>
             </div>
           </div>
