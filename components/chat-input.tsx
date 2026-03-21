@@ -1659,7 +1659,13 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         {/* Help me plan */}
         <button
           type="button"
-          onClick={() => setShowLaunchWizard(true)}
+          onClick={() => {
+            if (!user) {
+              onAuthRequired()
+              return
+            }
+            setShowLaunchWizard(true)
+          }}
           disabled={isGenerating}
           className="flex items-center gap-1 px-2.5 py-1 sm:px-3 sm:py-1.5 bg-gradient-to-r from-orange-600/20 to-orange-500/10 hover:from-orange-600/30 hover:to-orange-500/20 border border-orange-500/40 hover:border-orange-400/60 rounded-full text-orange-300 hover:text-orange-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-[11px] sm:text-xs"
           title="Get help planning your app with a guided wizard"
