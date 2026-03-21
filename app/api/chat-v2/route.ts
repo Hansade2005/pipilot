@@ -5758,13 +5758,17 @@ ${CONTINUATION_SAFETY_CHECKS}`
             // Use project name as slug (sanitize it)
             const projectSlug = projectId.replace(/[^a-z0-9-]/gi, '-').toLowerCase().substring(0, 50)
 
-            // Make internal request to /api/preview
+            // Make internal request to /api/preview with 120s timeout
             const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+            const deployController = new AbortController()
+            const deployTimeout = setTimeout(() => deployController.abort(), 120000)
+
             const response = await fetch(`${baseUrl}/api/preview`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
               },
+              signal: deployController.signal,
               body: JSON.stringify({
                 projectId,
                 projectSlug,
@@ -5775,6 +5779,7 @@ ${CONTINUATION_SAFETY_CHECKS}`
                 isProduction: false,
               }),
             })
+            clearTimeout(deployTimeout)
 
             const executionTime = Date.now() - toolStartTime
             toolExecutionTimes['deploy_preview'] = (toolExecutionTimes['deploy_preview'] || 0) + executionTime
@@ -5795,8 +5800,12 @@ ${CONTINUATION_SAFETY_CHECKS}`
             const executionTime = Date.now() - toolStartTime
             toolExecutionTimes['deploy_preview'] = (toolExecutionTimes['deploy_preview'] || 0) + executionTime
             const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-            console.error('[deploy_preview] Error:', errorMessage)
-            return `Deploy failed. Run check_dev_errors({ mode: "build" }) to diagnose, fix any errors, then retry deploy_preview.`
+            const isTimeout = errorMessage.includes('abort') || errorMessage.includes('timeout') || errorMessage.includes('cancel')
+            console.error('[deploy_preview] Error:', errorMessage, isTimeout ? '(TIMEOUT)' : '')
+            if (isTimeout) {
+              return `Deploy timed out (took ${Math.round(executionTime / 1000)}s). The build may still be running. Call deploy_preview again — if the project was already built, it will be faster on retry.`
+            }
+            return `Deploy failed: ${errorMessage}. Run check_dev_errors({ mode: "build" }) to diagnose, fix any errors, then retry deploy_preview.`
           }
         }
       }),
