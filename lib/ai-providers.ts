@@ -120,8 +120,8 @@ function getOpenRouterProvider() {
 
 function getKiloGateway() {
   // Always create fresh to pick the next rotated key.
-  // Use OpenAI-compatible (not createOpenAI) because Kilo only accepts /chat/completions
-  return createOpenAICompatible({
+  // Using createOpenAI for parallel tool call support
+  return createOpenAI({
     name: 'kilo-gateway',
     baseURL: 'https://api.kilo.ai/api/gateway',
     apiKey: getNextKiloKey(),
@@ -130,7 +130,8 @@ function getKiloGateway() {
 
 function getOllamaCloudProvider() {
   // Fallback: env-based rotation (used when DB is unavailable)
-  return createOpenAICompatible({
+  // Using createOpenAI for parallel tool call support
+  return createOpenAI({
     name: 'ollama-cloud',
     baseURL: 'https://ollama.com/v1',
     apiKey: getNextOllamaKey(),
@@ -142,7 +143,7 @@ function getOllamaCloudProvider() {
  * respecting concurrency (1 req at a time), 5hr window limits, and weekly limits.
  * Call releaseOllamaKey() when the request completes.
  */
-async function getOllamaCloudProviderFromDB(): Promise<{ provider: ReturnType<typeof createOpenAICompatible>, keyId: number } | null> {
+async function getOllamaCloudProviderFromDB(): Promise<{ provider: ReturnType<typeof createOpenAI>, keyId: number } | null> {
   try {
     const { getServerSupabase } = await import('@/lib/supabase')
     const supabase = getServerSupabase()
@@ -217,7 +218,7 @@ async function getOllamaCloudProviderFromDB(): Promise<{ provider: ReturnType<ty
 
     console.log(`[OllamaDB] Acquired key #${key.id} (window: ${key.requests_in_window + 1}, week: ${key.requests_in_week + 1})`)
 
-    const provider = createOpenAICompatible({
+    const provider = createOpenAI({
       name: 'ollama-cloud',
       baseURL: 'https://ollama.com/v1',
       apiKey: key.api_key,

@@ -12192,12 +12192,17 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
     let originalError: Error | null = null
 
     try {
-      // Build provider options: Anthropic reasoning/context OR Qwen reasoning cap
+      // Build provider options: Anthropic reasoning/context OR Qwen reasoning cap OR parallel tool calls
+      const isOllamaOrKiloModel = modelId?.startsWith('ollama/') || modelId?.startsWith('kilo/')
+      const parallelToolCallsOptions = isOllamaOrKiloModel ? {
+        openai: { parallelToolCalls: true }
+      } : undefined
+
       const providerOptions = isAnthropicModel && anthropicProviderOptions
         ? anthropicProviderOptions
         : isQwenThinking && qwenThinkingProviderOptions
           ? qwenThinkingProviderOptions
-          : undefined
+          : parallelToolCallsOptions
 
       // ── PERFORMANCE: xAI prompt caching via x-grok-conv-id ──
       // Routes requests to the same server for 90%+ cache hit rates.
