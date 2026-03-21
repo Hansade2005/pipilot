@@ -374,8 +374,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       name: 'App.tsx',
       path: 'src/App.tsx',
       content: `import { Routes, Route } from 'react-router-dom'
-import { Home } from './pages/Home'
-import { NotFound } from './components/NotFound'
+import Home from './pages/Home'
+import NotFound from './components/NotFound'
 
 function App() {
   return (
@@ -1814,6 +1814,7 @@ export function LoadingOverlay() {
 export function NotFound() {
   const navigate = useNavigate()
 
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="text-center">
@@ -1862,7 +1863,9 @@ export function NotFound() {
       </div>
     </div>
   )
-}`,
+}
+
+export default NotFound`,
       fileType: 'tsx',
       type: 'tsx',
       size: 0,
@@ -1990,7 +1993,9 @@ export function Home() {
       </footer>
     </div>
   )
-}`,
+}
+
+export default Home`,
       fileType: 'tsx',
       type: 'tsx',
       size: 0,

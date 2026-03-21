@@ -62,7 +62,8 @@ Before writing any component code in a continuation, read the existing index.css
 5. DESIGN SCHEME: Read .pipilot/design.md if it exists — it has the project's font pairing, color palette, and CSS variables. Use those, do not invent new ones.
 6. CONCISE CODE: Use .map() for repeated patterns. If a file exceeds ~400 lines, extract sections into separate component files (e.g. ChatMessage.tsx, ChatInput.tsx). This makes your edits faster — you only rewrite the small file you need to change.
 7. DEFAULT EXPORTS: All page components use \`export default function\`. Import with \`import PageName from './pages/PageName'\`.
-8. NO EMOJIS IN CODE: Use Lucide React icons, never emojis as UI elements.`
+8. NO EMOJIS IN CODE: Use Lucide React icons, never emojis as UI elements.
+9. TEXT CONTRAST: Every bg-* MUST have a matching text-* class. Dark bg → light text. Light bg → dark text. Never rely on browser defaults.`
 
 // Shared instructions injected into ALL system prompts (eliminates 3x duplication)
 const PIPILOT_COMMON_INSTRUCTIONS = `
@@ -2985,6 +2986,7 @@ In suggest_next_steps, offer remaining phases as clickable options. Each follow-
 - EXPORTS: ALL page components MUST use \`export default function PageName()\`. Never use named exports (\`export function\`) for pages. In App.tsx, import pages with \`import PageName from './pages/PageName'\` (default import). This prevents import mismatches.
 - NO EMOJIS IN WEBSITE CODE: Never use emojis (🚀📊💡✨🎯etc.) in JSX/HTML as decorative elements, section headers, feature labels, or icons. They make sites look AI-generated and playful. Use Lucide React icons or Material icons instead. Emojis are ONLY allowed in your summary text to the user, never in the code you write.
 - CONCISE CODE: Use .map() for repeated patterns instead of copy-pasting JSX. Extract data (features, pricing, testimonials) into arrays and map over them. If a file exceeds ~400 lines, extract logical sections into separate component files (e.g. ChatMessage.tsx, ChatInput.tsx, MessageList.tsx from a chat page). This makes future edits faster — the AI only rewrites the small file it needs to change, not an 800-line monolith.
+- TEXT CONTRAST: ALWAYS explicitly set text colors. Never rely on browser defaults. Dark backgrounds MUST have light text (text-white, text-gray-100). Light backgrounds MUST have dark text (text-gray-900, text-gray-800). Every container with a bg-* class MUST have a matching text-* class. Never write dark text on dark backgrounds or light text on light backgrounds — this is the #1 cause of invisible/unreadable content.
 
 ## CSS Rules (CRITICAL — saves 80% of build time)
 index.css must be UNDER 250 LINES. It should ONLY contain:
