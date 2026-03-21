@@ -120,8 +120,7 @@ function getOpenRouterProvider() {
 
 function getKiloGateway() {
   // Always create fresh to pick the next rotated key.
-  // Using createOpenAI for parallel tool call support
-  return createOpenAI({
+  return createOpenAICompatible({
     name: 'kilo-gateway',
     baseURL: 'https://api.kilo.ai/api/gateway',
     apiKey: getNextKiloKey(),

@@ -12192,22 +12192,36 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
     let originalError: Error | null = null
 
     try {
-      // Build provider options: Anthropic reasoning/context OR Qwen reasoning cap OR parallel tool calls
-      const isOllamaOrKiloModel = modelId?.startsWith('ollama/') || modelId?.startsWith('kilo/')
-      const parallelToolCallsOptions = isOllamaOrKiloModel ? {
-        openai: { parallelToolCalls: true }
-      } : undefined
+      // Build provider options per model type
+      const isOllamaModel = modelId?.startsWith('ollama/')
+      const isGrokModel = modelId?.includes('grok') || modelId?.includes('xai/')
 
-      const providerOptions = isAnthropicModel && anthropicProviderOptions
-        ? anthropicProviderOptions
-        : isQwenThinking && qwenThinkingProviderOptions
-          ? qwenThinkingProviderOptions
-          : parallelToolCallsOptions
+      let providerOptions: any = undefined
+
+      if (isAnthropicModel && anthropicProviderOptions) {
+        providerOptions = anthropicProviderOptions
+      } else if (isQwenThinking && qwenThinkingProviderOptions) {
+        providerOptions = qwenThinkingProviderOptions
+      } else if (isGrokModel) {
+        // xAI Grok: parallel tool calls + Live Search (auto mode)
+        providerOptions = {
+          xai: {
+            parallel_function_calling: true,
+            searchParameters: {
+              mode: 'auto',
+              returnCitations: true,
+              maxSearchResults: 5,
+            },
+          }
+        }
+      } else if (isOllamaModel) {
+        // Ollama via createOpenAI: parallel tool calls
+        providerOptions = {
+          openai: { parallelToolCalls: true }
+        }
+      }
 
       // ── PERFORMANCE: xAI prompt caching via x-grok-conv-id ──
-      // Routes requests to the same server for 90%+ cache hit rates.
-      // Cached tokens: $0.02/1M vs $0.20/1M (10x cheaper) + faster TTFT.
-      const isGrokModel = modelId.includes('grok') || modelId.includes('xai/')
       const streamHeaders: Record<string, string> = {}
       if (isGrokModel) {
         streamHeaders['x-grok-conv-id'] = projectId
