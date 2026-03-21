@@ -2078,21 +2078,23 @@ export function ChatPanelV2({
         (tool: any) => ['edit_file', 'write_file', 'delete_file', 'client_replace_string_in_file'].includes(tool.toolName)
       )
 
-      // If AI called deploy_preview, it already deployed to .pipilot.dev hosting.
-      // Don't create a new E2B sandbox preview — just refresh the iframe to show the deployed site.
-      const hasDeployedPreview = accumulatedToolInvocations.some(
-        (tool: any) => tool.toolName === 'deploy_preview'
-      )
+      // Detect Vite project by checking if vite.config.ts exists in the project files
+      // Vite projects are always deployed to .pipilot.dev — never create E2B sandbox, just refresh
+      let isViteProject = false
+      try {
+        const files = await storageManager.getFiles(project.id)
+        isViteProject = files.some((f: any) => f.path === 'vite.config.ts' || f.path === 'vite.config.js' || f.path === '/vite.config.ts' || f.path === '/vite.config.js')
+      } catch {}
 
       if (typeof window !== 'undefined' && !isAskMode && hasFileModifications) {
-        console.log(`[ChatPanelV2] Dispatching auto-preview event (fileModifications: true, deployed: ${hasDeployedPreview})`)
+        console.log(`[ChatPanelV2] Dispatching auto-preview event (fileModifications: true, isVite: ${isViteProject})`)
         window.dispatchEvent(new CustomEvent('ai-stream-complete', {
           detail: {
             projectId: project.id,
             shouldSwitchToPreview: true,
-            // If AI deployed via deploy_preview (Vite/HTML), just refresh — don't create E2B sandbox
-            shouldCreatePreview: !hasDeployedPreview,
-            shouldRefreshPreview: hasDeployedPreview
+            // Vite/HTML projects deploy to .pipilot.dev — just refresh iframe, don't create E2B sandbox
+            shouldCreatePreview: !isViteProject,
+            shouldRefreshPreview: isViteProject
           }
         }))
       } else if (!isAskMode && !hasFileModifications) {
