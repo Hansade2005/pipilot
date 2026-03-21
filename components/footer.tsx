@@ -60,8 +60,8 @@ export function Footer() {
             <a href="https://e2b.dev/startups" target="_blank" rel="noopener noreferrer" className="shrink-0 mx-4 md:mx-6">
               <img src="/e2b-badge.svg" alt="Sponsored by E2B for Startups" className="h-10 md:h-12 w-auto rounded" />
             </a>
-            <a href="https://www.producthunt.com/products/pipilot?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-pipilot" target="_blank" rel="noopener noreferrer" className="shrink-0 mx-4 md:mx-6">
-              <img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1040549&theme=light&t=1763663329258" alt="PiPilot on Product Hunt" className="h-10 md:h-12 w-auto" />
+            <a href="https://peerpush.net/p/pipilot" target="_blank" rel="noopener" className="shrink-0 mx-4 md:mx-6">
+              <img src="https://peerpush.net/p/pipilot/badge.png" alt="PiPilot badge" className="h-10 md:h-12 w-auto" style={{ width: '230px' }} />
             </a>
             <a href="https://dang.ai/" target="_blank" className="shrink-0 mx-4 md:mx-6">
               <img src="https://cdn.prod.website-files.com/63d8afd87da01fb58ea3fbcb/6487e2868c6c8f93b4828827_dang-badge.png" alt="Dang.ai" className="h-10 md:h-12 w-auto rounded" />
@@ -73,8 +73,8 @@ export function Footer() {
             <a href="https://e2b.dev/startups" target="_blank" rel="noopener noreferrer" className="shrink-0 mx-4 md:mx-6">
               <img src="/e2b-badge.svg" alt="Sponsored by E2B for Startups" className="h-10 md:h-12 w-auto rounded" />
             </a>
-            <a href="https://www.producthunt.com/products/pipilot?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-pipilot" target="_blank" rel="noopener noreferrer" className="shrink-0 mx-4 md:mx-6">
-              <img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1040549&theme=light&t=1763663329258" alt="PiPilot on Product Hunt" className="h-10 md:h-12 w-auto" />
+            <a href="https://peerpush.net/p/pipilot" target="_blank" rel="noopener" className="shrink-0 mx-4 md:mx-6">
+              <img src="https://peerpush.net/p/pipilot/badge.png" alt="PiPilot badge" className="h-10 md:h-12 w-auto" style={{ width: '230px' }} />
             </a>
             <a href="https://dang.ai/" target="_blank" className="shrink-0 mx-4 md:mx-6">
               <img src="https://cdn.prod.website-files.com/63d8afd87da01fb58ea3fbcb/6487e2868c6c8f93b4828827_dang-badge.png" alt="Dang.ai" className="h-10 md:h-12 w-auto rounded" />

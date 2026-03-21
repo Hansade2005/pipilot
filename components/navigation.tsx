@@ -264,14 +264,14 @@ export function Navigation() {
                 </DropdownMenuContent>
               </DropdownMenu>
               
-              <Link href="/community" className="text-white hover:text-orange-400 transition-colors">
-                Community
+              <Link href="/showcase" className="text-white hover:text-orange-400 transition-colors">
+                Showcase
               </Link>
               <Link href="/enterprise" className="text-white hover:text-orange-400 transition-colors">
                 Business
               </Link>
               <Link href="/pricing" className="text-white hover:text-orange-400 transition-colors">
-                Plans
+                Pricing
               </Link>
               <Link href="/docs" className="text-white hover:text-orange-400 transition-colors">
                 Docs
