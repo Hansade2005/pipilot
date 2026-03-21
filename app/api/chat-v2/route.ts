@@ -12203,15 +12203,10 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
       } else if (isQwenThinking && qwenThinkingProviderOptions) {
         providerOptions = qwenThinkingProviderOptions
       } else if (isGrokModel) {
-        // xAI Grok: parallel tool calls + Live Search (auto mode)
+        // xAI Grok: parallel tool calls (Live Search deprecated — use browse_web tool instead)
         providerOptions = {
           xai: {
             parallel_function_calling: true,
-            searchParameters: {
-              mode: 'auto',
-              returnCitations: true,
-              maxSearchResults: 5,
-            },
           }
         }
       } else if (isOllamaModel) {
