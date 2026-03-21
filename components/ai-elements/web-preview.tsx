@@ -14,7 +14,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { ChevronDownIcon, Monitor, Smartphone, Tablet, RotateCcw, ExternalLink, Terminal, Globe, Sparkles, Trash2, Copy, Check } from "lucide-react";
+import { ChevronDownIcon, ChevronLeft, ChevronRight, Monitor, Smartphone, Tablet, RotateCcw, ExternalLink, Terminal, Globe, Sparkles, Trash2, Copy, Check } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import type { ComponentProps, ReactNode } from "react";
 import React, { createContext, useContext, useEffect, useState, forwardRef, useImperativeHandle, useRef, useMemo } from "react";
@@ -176,8 +176,12 @@ export const WebPreviewNavigationButton = ({
 export type WebPreviewUrlProps = ComponentProps<typeof Input> & {
   onRefresh?: () => void;
   onOpenExternal?: () => void;
+  onGoBack?: () => void;
+  onGoForward?: () => void;
   refreshDisabled?: boolean;
   externalDisabled?: boolean;
+  canGoBack?: boolean;
+  canGoForward?: boolean;
 };
 
 export const WebPreviewUrl = ({
@@ -186,8 +190,12 @@ export const WebPreviewUrl = ({
   onKeyDown,
   onRefresh,
   onOpenExternal,
+  onGoBack,
+  onGoForward,
   refreshDisabled = false,
   externalDisabled = false,
+  canGoBack = false,
+  canGoForward = false,
   ...props
 }: WebPreviewUrlProps) => {
   const { url, setUrl } = useWebPreview();
@@ -213,6 +221,30 @@ export const WebPreviewUrl = ({
 
   return (
     <div className="flex items-center h-8 flex-1 relative">
+      {onGoBack && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 w-6 p-0 mr-0.5 text-muted-foreground hover:text-orange-400 hover:bg-orange-500/10 disabled:opacity-30 disabled:cursor-not-allowed"
+          onClick={onGoBack}
+          disabled={!canGoBack}
+          title="Go back"
+        >
+          <ChevronLeft className="h-3.5 w-3.5" />
+        </Button>
+      )}
+      {onGoForward && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 w-6 p-0 mr-0.5 text-muted-foreground hover:text-orange-400 hover:bg-orange-500/10 disabled:opacity-30 disabled:cursor-not-allowed"
+          onClick={onGoForward}
+          disabled={!canGoForward}
+          title="Go forward"
+        >
+          <ChevronRight className="h-3.5 w-3.5" />
+        </Button>
+      )}
       {onRefresh && (
         <Button
           variant="ghost"

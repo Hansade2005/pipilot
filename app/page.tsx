@@ -117,11 +117,20 @@ function ShowcaseSection() {
                       src={project.thumbnail_url}
                       alt={project.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      onError={(e) => {
+                        const img = e.currentTarget
+                        if (!img.dataset.fallback) {
+                          img.dataset.fallback = "true"
+                          img.src = `https://api.a0.dev/assets/image?text=${encodeURIComponent(project.description || project.title)}&aspect=16:9&seed=${project.id.slice(0, 8)}`
+                        }
+                      }}
                     />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-orange-600/20 to-gray-900 flex items-center justify-center">
-                      <span className="text-gray-600 text-xs">No preview</span>
-                    </div>
+                    <img
+                      src={`https://api.a0.dev/assets/image?text=${encodeURIComponent(project.description || project.title)}&aspect=16:9&seed=${project.id.slice(0, 8)}`}
+                      alt={project.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
                   )}
                 </div>
                 <div className="p-3.5">

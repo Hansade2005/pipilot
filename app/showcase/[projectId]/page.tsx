@@ -207,16 +207,21 @@ export default function ShowcaseProjectPage() {
           </div>
 
           {/* Screenshot (compact) */}
-          {project.thumbnail_url && (
-            <div className="rounded-xl overflow-hidden border border-gray-800 mb-8 max-w-2xl">
-              <img
-                src={project.thumbnail_url}
-                alt={project.title}
-                className="w-full h-auto object-cover rounded-xl"
-                style={{ maxHeight: '400px' }}
-              />
-            </div>
-          )}
+          <div className="rounded-xl overflow-hidden border border-gray-800 mb-8 max-w-2xl">
+            <img
+              src={project.thumbnail_url || `https://api.a0.dev/assets/image?text=${encodeURIComponent(project.description || project.title)}&aspect=16:9&seed=${project.id.slice(0, 8)}`}
+              alt={project.title}
+              className="w-full h-auto object-cover rounded-xl"
+              style={{ maxHeight: '400px' }}
+              onError={(e) => {
+                const img = e.currentTarget
+                if (!img.dataset.fallback) {
+                  img.dataset.fallback = "true"
+                  img.src = `https://api.a0.dev/assets/image?text=${encodeURIComponent(project.description || project.title)}&aspect=16:9&seed=${project.id.slice(0, 8)}`
+                }
+              }}
+            />
+          </div>
 
           {/* Live iframe preview (large) */}
           {liveUrl && (

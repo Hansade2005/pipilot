@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Info, Eye, Sparkles, Edit3, Trash2, ShoppingCart, DollarSign, Star, MessageSquare, TrendingUp } from 'lucide-react'
-import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { storageManager } from '@/lib/storage-manager'
 import { useRouter } from 'next/navigation'
@@ -597,16 +596,24 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
 
                   <div className="relative aspect-video overflow-hidden bg-gradient-to-br from-orange-950/20 via-[#030305] to-gray-900/20">
                     {template.thumbnail_url ? (
-                      <Image
+                      <img
                         src={template.thumbnail_url}
                         alt={template.name}
-                        fill
-                        className="object-cover group-hover:scale-110 transition-transform duration-500"
+                        className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        onError={(e) => {
+                          const img = e.currentTarget
+                          if (!img.dataset.fallback) {
+                            img.dataset.fallback = "true"
+                            img.src = `https://api.a0.dev/assets/image?text=${encodeURIComponent(template.description || template.name)}&aspect=16:9&seed=${template.id.slice(0, 8)}`
+                          }
+                        }}
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-white/40 text-6xl">
-                        📄
-                      </div>
+                      <img
+                        src={`https://api.a0.dev/assets/image?text=${encodeURIComponent(template.description || template.name)}&aspect=16:9&seed=${template.id.slice(0, 8)}`}
+                        alt={template.name}
+                        className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      />
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
                     

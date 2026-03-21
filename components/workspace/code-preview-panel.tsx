@@ -896,6 +896,9 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
   const [isResizing, setIsResizing] = useState(false)
   const resizeRef = useRef<HTMLDivElement>(null)
   const [browserLogs, setBrowserLogs] = useState<string[]>([])
+  const [iframeNavHistory, setIframeNavHistory] = useState<string[]>([])
+  const [iframeNavIndex, setIframeNavIndex] = useState(-1)
+  const [currentIframeUrl, setCurrentIframeUrl] = useState<string>("")
   const [isExpoProject, setIsExpoProject] = useState(false)
   const [isViteProject, setIsViteProject] = useState(false)
   const [showSandpackPreview, setShowSandpackPreview] = useState(false)
@@ -1174,6 +1177,23 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
         return
       }
 
+      // Handle iframe navigation URL changes
+      if (event.data?.type === 'iframe-navigation' && event.data?.url) {
+        const navUrl = event.data.url
+        setCurrentIframeUrl(navUrl)
+        // Push to navigation history (trim forward history if we navigated back then go somewhere new)
+        setIframeNavIndex(prevIndex => {
+          setIframeNavHistory(prev => {
+            const newHistory = [...prev.slice(0, prevIndex + 1), navUrl]
+            return newHistory
+          })
+          return prevIndex + 1
+        })
+        // Update WebPreview context URL display
+        setCustomUrl(navUrl)
+        onUrlChange?.(navUrl)
+      }
+
       // Handle legacy console messages
       if (event.data?.type === 'console') {
         // Only add to browserLogs for the Browser tab (legacy format)
@@ -1301,6 +1321,46 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
                   }, '*');
                 });
 
+                // Track navigation changes and report URL to parent
+                var lastUrl = window.location.href;
+                window.parent.postMessage({
+                  type: 'iframe-navigation',
+                  url: lastUrl
+                }, '*');
+
+                var origPushState = history.pushState;
+                var origReplaceState = history.replaceState;
+                history.pushState = function() {
+                  origPushState.apply(this, arguments);
+                  var newUrl = window.location.href;
+                  if (newUrl !== lastUrl) {
+                    lastUrl = newUrl;
+                    window.parent.postMessage({ type: 'iframe-navigation', url: newUrl }, '*');
+                  }
+                };
+                history.replaceState = function() {
+                  origReplaceState.apply(this, arguments);
+                  var newUrl = window.location.href;
+                  if (newUrl !== lastUrl) {
+                    lastUrl = newUrl;
+                    window.parent.postMessage({ type: 'iframe-navigation', url: newUrl }, '*');
+                  }
+                };
+                window.addEventListener('popstate', function() {
+                  var newUrl = window.location.href;
+                  if (newUrl !== lastUrl) {
+                    lastUrl = newUrl;
+                    window.parent.postMessage({ type: 'iframe-navigation', url: newUrl }, '*');
+                  }
+                });
+                window.addEventListener('hashchange', function() {
+                  var newUrl = window.location.href;
+                  if (newUrl !== lastUrl) {
+                    lastUrl = newUrl;
+                    window.parent.postMessage({ type: 'iframe-navigation', url: newUrl }, '*');
+                  }
+                });
+
                 // Send initial message to confirm interceptor is loaded
                 window.parent.postMessage({
                   type: 'console',
@@ -1412,6 +1472,51 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
                   }, '*');
                 });
 
+                // Track navigation changes and report URL to parent
+                var lastUrl = window.location.href;
+                window.parent.postMessage({
+                  type: 'iframe-navigation',
+                  url: lastUrl
+                }, '*');
+
+                // Intercept pushState and replaceState
+                var origPushState = history.pushState;
+                var origReplaceState = history.replaceState;
+                history.pushState = function() {
+                  origPushState.apply(this, arguments);
+                  var newUrl = window.location.href;
+                  if (newUrl !== lastUrl) {
+                    lastUrl = newUrl;
+                    window.parent.postMessage({ type: 'iframe-navigation', url: newUrl }, '*');
+                  }
+                };
+                history.replaceState = function() {
+                  origReplaceState.apply(this, arguments);
+                  var newUrl = window.location.href;
+                  if (newUrl !== lastUrl) {
+                    lastUrl = newUrl;
+                    window.parent.postMessage({ type: 'iframe-navigation', url: newUrl }, '*');
+                  }
+                };
+
+                // Listen for popstate (back/forward within iframe)
+                window.addEventListener('popstate', function() {
+                  var newUrl = window.location.href;
+                  if (newUrl !== lastUrl) {
+                    lastUrl = newUrl;
+                    window.parent.postMessage({ type: 'iframe-navigation', url: newUrl }, '*');
+                  }
+                });
+
+                // Listen for hashchange
+                window.addEventListener('hashchange', function() {
+                  var newUrl = window.location.href;
+                  if (newUrl !== lastUrl) {
+                    lastUrl = newUrl;
+                    window.parent.postMessage({ type: 'iframe-navigation', url: newUrl }, '*');
+                  }
+                });
+
                 // Send initial message to confirm interceptor is loaded
                 window.parent.postMessage({
                   type: 'console',
@@ -1420,7 +1525,7 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
                 }, '*');
               })();
             `;
-            
+
             // Try multiple methods to inject the script
             try {
               // Method 1: Direct script injection
@@ -1434,14 +1539,14 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
               }
             } catch (scriptError) {
               console.warn('Script element injection failed, trying eval method:', scriptError)
-              
+
               // Method 2: Try eval (may be blocked by sandbox)
               try {
                 (iframe.contentWindow as any)?.eval(script)
                 console.log('Console interceptor injected via eval')
               } catch (evalError) {
                 console.warn('Eval injection failed, trying postMessage method:', evalError)
-                
+
                 // Method 3: PostMessage to iframe (requires iframe to listen)
                 iframe.contentWindow?.postMessage({
                   type: 'inject-console-interceptor',
@@ -1497,7 +1602,10 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
     setCurrentLog("Booting VM...")
     setRocketPhase('cruising') // Start with cruise rocket
     setConsoleOutput([]) // Clear previous console output
-    
+    setIframeNavHistory([]) // Reset navigation history
+    setIframeNavIndex(-1)
+    setCurrentIframeUrl("")
+
     // Dispatch preview starting event
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('preview-starting', { 
@@ -2998,7 +3106,7 @@ export default function TodoApp() {
           >
           <WebPreview
             className="h-full"
-            defaultUrl={syncedUrl || preview.url || ""}
+            defaultUrl={currentIframeUrl || syncedUrl || preview.url || ""}
             defaultDevice={previewViewMode === 'mobile' ? DEVICE_PRESETS.find(d => d.name === 'iPhone 12/13') || null : null}
             onUrlChange={(url) => {
               setCustomUrl(url)
@@ -3059,10 +3167,42 @@ export default function TodoApp() {
               )}
 
               <WebPreviewUrl
+                onGoBack={() => {
+                  if (iframeNavIndex > 0) {
+                    const newIndex = iframeNavIndex - 1
+                    const targetUrl = iframeNavHistory[newIndex]
+                    setIframeNavIndex(newIndex)
+                    setCurrentIframeUrl(targetUrl)
+                    setCustomUrl(targetUrl)
+                    onUrlChange?.(targetUrl)
+                    // Navigate the iframe
+                    const iframe = previewIframeRef.current
+                    if (iframe?.contentWindow) {
+                      try { iframe.contentWindow.history.back() } catch { /* cross-origin */ }
+                    }
+                  }
+                }}
+                onGoForward={() => {
+                  if (iframeNavIndex < iframeNavHistory.length - 1) {
+                    const newIndex = iframeNavIndex + 1
+                    const targetUrl = iframeNavHistory[newIndex]
+                    setIframeNavIndex(newIndex)
+                    setCurrentIframeUrl(targetUrl)
+                    setCustomUrl(targetUrl)
+                    onUrlChange?.(targetUrl)
+                    const iframe = previewIframeRef.current
+                    if (iframe?.contentWindow) {
+                      try { iframe.contentWindow.history.forward() } catch { /* cross-origin */ }
+                    }
+                  }
+                }}
+                canGoBack={iframeNavIndex > 0}
+                canGoForward={iframeNavIndex < iframeNavHistory.length - 1}
                 onRefresh={refreshPreview}
                 onOpenExternal={() => {
-                  if (preview.url) {
-                    window.open(preview.url, '_blank')
+                  const urlToOpen = currentIframeUrl || preview.url
+                  if (urlToOpen) {
+                    window.open(urlToOpen, '_blank')
                   }
                 }}
                 refreshDisabled={!preview.url}
@@ -3253,19 +3393,19 @@ export default function TodoApp() {
               terminalLogs={consoleOutput}
               browserLogs={browserLogs}
               onAskAiToFix={(errors) => {
-                // Dispatch custom event to fill chat input with error debugging request
                 const errorList = errors.map((err, i) => `${i + 1}. ${err}`).join('\n')
-                const prompt = `Debug and fix these browser console errors:\n\n${errorList}\n\nPlease analyze these errors and use your file edit tools to fix them.`
+                const routeInfo = currentIframeUrl ? `\n\nCurrent route where errors occurred: ${currentIframeUrl}` : ''
+                const prompt = `Debug and fix these browser console errors:\n\n${errorList}${routeInfo}\n\nPlease analyze these errors and use your file edit tools to fix them.`
                 window.dispatchEvent(new CustomEvent('ask-ai-to-fix', {
-                  detail: { prompt, errors }
+                  detail: { prompt, errors, currentRoute: currentIframeUrl || undefined }
                 }))
               }}
               onAskAiToFixTerminal={(errors) => {
-                // Dispatch custom event to fill chat input with terminal error debugging request
                 const errorList = errors.map((err, i) => `${i + 1}. ${err}`).join('\n')
-                const prompt = `Debug and fix these terminal errors:\n\n${errorList}\n\nPlease analyze these errors and use your file edit tools to fix them.`
+                const routeInfo = currentIframeUrl ? `\n\nCurrent route where errors occurred: ${currentIframeUrl}` : ''
+                const prompt = `Debug and fix these terminal errors:\n\n${errorList}${routeInfo}\n\nPlease analyze these errors and use your file edit tools to fix them.`
                 window.dispatchEvent(new CustomEvent('ask-ai-to-fix', {
-                  detail: { prompt, errors }
+                  detail: { prompt, errors, currentRoute: currentIframeUrl || undefined }
                 }))
               }}
               onClearBrowserLogs={() => {
