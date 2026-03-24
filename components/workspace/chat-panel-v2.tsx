@@ -4093,6 +4093,28 @@ export function ChatPanelV2({
         // Save the partial message to the database
         await saveMessageToIndexedDB(partialMessage)
 
+        // Dispatch preview event if file modifications were made before stop
+        const hasFileModifications = streamingToolCalls.some(
+          (tool: any) => ['edit_file', 'write_file', 'delete_file', 'client_replace_string_in_file'].includes(tool.toolName)
+        )
+        if (typeof window !== 'undefined' && hasFileModifications && project) {
+          try {
+            const { detectProjectTypeFromFiles } = await import('@/lib/utils')
+            const files = await storageManager.getFiles(project.id)
+            const projectType = detectProjectTypeFromFiles(files)
+            const isViteOrHtml = projectType === 'vite-react' || projectType === 'html'
+            const needsSandbox = projectType === 'nextjs' || projectType === 'expo'
+            window.dispatchEvent(new CustomEvent('ai-stream-complete', {
+              detail: {
+                projectId: project.id,
+                shouldSwitchToPreview: true,
+                shouldCreatePreview: needsSandbox,
+                shouldRefreshPreview: isViteOrHtml
+              }
+            }))
+          } catch {}
+        }
+
         // Clear streaming state
         setStreamingMessageId(null)
         setStreamingContent('')
@@ -6005,6 +6027,28 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
           }
           return msg
         }).filter(Boolean) as any)
+        // Dispatch preview event if file modifications were made before error
+        const errorToolCalls = streamingToolCalls.length > 0 ? streamingToolCalls : []
+        const hasFileModsBeforeError = errorToolCalls.some(
+          (tool: any) => ['edit_file', 'write_file', 'delete_file', 'client_replace_string_in_file'].includes(tool.toolName)
+        )
+        if (typeof window !== 'undefined' && hasFileModsBeforeError && project) {
+          try {
+            const { detectProjectTypeFromFiles } = await import('@/lib/utils')
+            const files = await storageManager.getFiles(project.id)
+            const projectType = detectProjectTypeFromFiles(files)
+            const isViteOrHtml = projectType === 'vite-react' || projectType === 'html'
+            const needsSandbox = projectType === 'nextjs' || projectType === 'expo'
+            window.dispatchEvent(new CustomEvent('ai-stream-complete', {
+              detail: {
+                projectId: project.id,
+                shouldSwitchToPreview: true,
+                shouldCreatePreview: needsSandbox,
+                shouldRefreshPreview: isViteOrHtml
+              }
+            }))
+          } catch {}
+        }
         // Clean up tool calls for failed message
         setActiveToolCalls(prev => {
           const newMap = new Map(prev)
