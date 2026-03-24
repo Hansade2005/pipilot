@@ -15,8 +15,8 @@ export function parseSearchReplaceBlock(blockText: string) {
   const REPLACE_END = ">>>>>>> REPLACE";
 
   const lines = blockText.split('\n');
-  let searchLines = [];
-  let replaceLines = [];
+  let searchLines: string[] = [];
+  let replaceLines: string[] = [];
   let mode = 'none'; // 'search' | 'replace'
 
   for (let i = 0; i < lines.length; i++) {
@@ -48,6 +48,59 @@ export function parseSearchReplaceBlock(blockText: string) {
     search: searchLines.join('\n'),
     replace: replaceLines.join('\n')
   };
+}
+
+/**
+ * Parse ALL search/replace blocks from a multi-block string.
+ * Handles cases where the model sends multiple blocks in one tool call.
+ */
+export function parseAllSearchReplaceBlocks(blockText: string): { search: string, replace: string }[] {
+  const SEARCH_START = "<<<<<<< SEARCH";
+  const DIVIDER = "=======";
+  const REPLACE_END = ">>>>>>> REPLACE";
+
+  const lines = blockText.split('\n');
+  const blocks: { search: string, replace: string }[] = [];
+  let searchLines: string[] = [];
+  let replaceLines: string[] = [];
+  let mode = 'none';
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (line.trim() === SEARCH_START) {
+      searchLines = [];
+      replaceLines = [];
+      mode = 'search';
+    } else if (line.trim() === DIVIDER && mode === 'search') {
+      mode = 'replace';
+    } else if (line.trim() === REPLACE_END && mode === 'replace') {
+      const hasContent = searchLines.some(l => l.trim() !== '') || replaceLines.some(l => l.trim() !== '');
+      if (hasContent) {
+        blocks.push({ search: searchLines.join('\n'), replace: replaceLines.join('\n') });
+      }
+      mode = 'none';
+    } else if (mode === 'search') {
+      searchLines.push(line);
+    } else if (mode === 'replace') {
+      replaceLines.push(line);
+    }
+  }
+
+  return blocks;
+}
+
+/**
+ * Strip any leftover search/replace markers from file content.
+ * Prevents markers from being written into files when edits fail or partially apply.
+ */
+export function stripSearchReplaceMarkers(content: string): string {
+  return content
+    .replace(/^<<<<<<< SEARCH\s*$/gm, '')
+    .replace(/^=======\s*$/gm, '')
+    .replace(/^>>>>>>> REPLACE\s*$/gm, '')
+    // Clean up any resulting double blank lines
+    .replace(/\n{3,}/g, '\n\n');
 }
 
 /**
@@ -289,10 +342,16 @@ export async function handleClientFileOperation(
         const originalLines = currentContent.split('\n');
         const originalLineCount = originalLines.length;
 
-        // Parse the search/replace block
-        const editBlock = parseSearchReplaceBlock(searchReplaceBlock);
+        // Parse ALL search/replace blocks (supports multiple blocks in one call)
+        const editBlocks = parseAllSearchReplaceBlocks(searchReplaceBlock);
 
-        if (!editBlock) {
+        if (editBlocks.length === 0) {
+          // Fallback to single block parser
+          const singleBlock = parseSearchReplaceBlock(searchReplaceBlock);
+          if (singleBlock) editBlocks.push(singleBlock);
+        }
+
+        if (editBlocks.length === 0) {
           addToolResult({
             tool: 'edit_file',
             toolCallId: toolCall.toolCallId,
@@ -302,104 +361,48 @@ export async function handleClientFileOperation(
           return;
         }
 
-        const { search, replace } = editBlock;
-
         // Create backup for potential rollback
         const backupContent = currentContent;
 
         let modifiedContent = currentContent;
-        const appliedEdits = [];
-        const failedEdits = [];
+        const appliedEdits: any[] = [];
+        const failedEdits: any[] = [];
         let replacementCount = 0;
 
         try {
-          if (useRegex) {
-            // Handle regex replacement
-            const regexFlags = replaceAll ? 'g' : '';
-            const regex = new RegExp(search, regexFlags);
+          // Apply each search/replace block sequentially
+          for (const { search, replace } of editBlocks) {
+            if (useRegex) {
+              const regexFlags = replaceAll ? 'g' : '';
+              const regex = new RegExp(search, regexFlags);
 
-            if (regex.test(currentContent)) {
-              modifiedContent = currentContent.replace(regex, replace);
-              replacementCount = replaceAll ? (currentContent.match(regex) || []).length : 1;
-
-              appliedEdits.push({
-                type: 'regex',
-                pattern: search,
-                replacement: replace,
-                flags: regexFlags,
-                occurrences: replacementCount,
-                status: 'applied'
-              });
-            } else {
-              failedEdits.push({
-                type: 'regex',
-                pattern: search,
-                replacement: replace,
-                status: 'failed',
-                reason: 'Regex pattern not found in file content'
-              });
-            }
-          } else {
-            // Handle string replacement
-            if (replaceAll) {
-              // Replace all occurrences
-              let occurrences = 0;
-              const allMatches = [];
-              let searchIndex = 0;
-
-              while ((searchIndex = modifiedContent.indexOf(search, searchIndex)) !== -1) {
-                allMatches.push(searchIndex);
-                searchIndex += search.length;
-                occurrences++;
-              }
-
-              if (occurrences > 0) {
-                modifiedContent = modifiedContent.replaceAll(search, replace);
-                replacementCount = occurrences;
-
-                appliedEdits.push({
-                  type: 'string',
-                  search: search,
-                  replacement: replace,
-                  occurrences: replacementCount,
-                  positions: allMatches,
-                  status: 'applied'
-                });
+              if (regex.test(modifiedContent)) {
+                const count = replaceAll ? (modifiedContent.match(regex) || []).length : 1;
+                modifiedContent = modifiedContent.replace(regex, replace);
+                replacementCount += count;
+                appliedEdits.push({ type: 'regex', occurrences: count, status: 'applied' });
               } else {
-                failedEdits.push({
-                  type: 'string',
-                  search: search,
-                  replacement: replace,
-                  status: 'failed',
-                  reason: 'Search text not found in file content'
-                });
+                failedEdits.push({ type: 'regex', status: 'failed', reason: 'Regex pattern not found' });
               }
             } else {
-              // Replace first occurrence only
               if (modifiedContent.includes(search)) {
-                const searchIndex = modifiedContent.indexOf(search);
-                modifiedContent = modifiedContent.replace(search, replace);
-                replacementCount = 1;
-
-                appliedEdits.push({
-                  type: 'string',
-                  search: search,
-                  replacement: replace,
-                  occurrences: 1,
-                  position: searchIndex,
-                  status: 'applied'
-                });
+                if (replaceAll) {
+                  const count = modifiedContent.split(search).length - 1;
+                  modifiedContent = modifiedContent.replaceAll(search, replace);
+                  replacementCount += count;
+                } else {
+                  modifiedContent = modifiedContent.replace(search, replace);
+                  replacementCount += 1;
+                }
+                appliedEdits.push({ type: 'string', occurrences: 1, status: 'applied' });
               } else {
-                failedEdits.push({
-                  type: 'string',
-                  search: search,
-                  replacement: replace,
-                  status: 'failed',
-                  reason: 'Search text not found in file content'
-                });
+                failedEdits.push({ type: 'string', status: 'failed', reason: 'Search text not found in file content' });
               }
             }
           }
+
+          // Safety: strip any leftover search/replace markers from the content
+          modifiedContent = stripSearchReplaceMarkers(modifiedContent);
 
           // Generate diff information
           const generateDiff = (oldContent: string, newContent: string) => {

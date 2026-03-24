@@ -1210,14 +1210,18 @@ const _constructToolResultInner = async (toolName: string, input: any, projectId
           }
         }
 
-        // Parse the search/replace block
-        const parsedBlock = parseSearchReplaceBlock(searchReplaceBlock)
-        if (!parsedBlock) {
+        // Parse ALL search/replace blocks (supports multiple blocks in one call)
+        const editBlocks = parseAllSearchReplaceBlocks(searchReplaceBlock)
+        if (editBlocks.length === 0) {
+          const singleBlock = parseSearchReplaceBlock(searchReplaceBlock)
+          if (singleBlock) editBlocks.push(singleBlock)
+        }
+
+        if (editBlocks.length === 0) {
           return {
             success: false,
             error: `Invalid search/replace block format`,
             filePath,
-            searchReplaceBlock,
             toolCallId
           }
         }
@@ -1234,109 +1238,45 @@ const _constructToolResultInner = async (toolName: string, input: any, projectId
         }
 
         const originalContent = file.content || ''
-        const originalLines = originalContent.split('\n')
-        const originalLineCount = originalLines.length
-        const { search, replace } = parsedBlock
-
-        // Create backup for potential rollback
-        const backupContent = originalContent
 
         let newContent = originalContent
-        const appliedEdits = []
-        const failedEdits = []
+        const appliedEdits: any[] = []
+        const failedEdits: any[] = []
         let replacementCount = 0
 
         try {
-          if (useRegex) {
-            // Handle regex replacement
-            const regexFlags = replaceAll ? 'g' : ''
-            const regex = new RegExp(search, regexFlags)
-
-            if (regex.test(originalContent)) {
-              newContent = originalContent.replace(regex, replace)
-              replacementCount = replaceAll ? (originalContent.match(regex) || []).length : 1
-
-              appliedEdits.push({
-                type: 'regex',
-                pattern: search,
-                replacement: replace,
-                flags: regexFlags,
-                occurrences: replacementCount,
-                status: 'applied'
-              })
-            } else {
-              failedEdits.push({
-                type: 'regex',
-                pattern: search,
-                replacement: replace,
-                status: 'failed',
-                reason: 'Regex pattern not found in file content'
-              })
-            }
-          } else {
-            // Handle string replacement
-            if (replaceAll) {
-              // Replace all occurrences
-              let occurrences = 0
-              const allMatches = []
-              let searchIndex = 0
-
-              while ((searchIndex = newContent.indexOf(search, searchIndex)) !== -1) {
-                allMatches.push(searchIndex)
-                searchIndex += search.length
-                occurrences++
-              }
-
-              if (occurrences > 0) {
-                newContent = newContent.replaceAll(search, replace)
-                replacementCount = occurrences
-
-                appliedEdits.push({
-                  type: 'string',
-                  search: search,
-                  replacement: replace,
-                  occurrences: replacementCount,
-                  positions: allMatches,
-                  status: 'applied'
-                })
+          // Apply each search/replace block sequentially
+          for (const { search, replace } of editBlocks) {
+            if (useRegex) {
+              const regexFlags = replaceAll ? 'g' : ''
+              const regex = new RegExp(search, regexFlags)
+              if (regex.test(newContent)) {
+                const count = replaceAll ? (newContent.match(regex) || []).length : 1
+                newContent = newContent.replace(regex, replace)
+                replacementCount += count
+                appliedEdits.push({ type: 'regex', occurrences: count, status: 'applied' })
               } else {
-                failedEdits.push({
-                  type: 'string',
-                  search: search,
-                  replacement: replace,
-                  status: 'failed',
-                  reason: 'Search text not found in file content'
-                })
+                failedEdits.push({ type: 'regex', status: 'failed', reason: 'Regex pattern not found' })
               }
             } else {
-              // Replace first occurrence only
               if (newContent.includes(search)) {
-                const searchIndex = newContent.indexOf(search)
-                newContent = newContent.replace(search, replace)
-                replacementCount = 1
-
-                appliedEdits.push({
-                  type: 'string',
-                  search: search,
-                  replacement: replace,
-                  occurrences: 1,
-                  position: searchIndex,
-                  status: 'applied'
-                })
+                if (replaceAll) {
+                  const count = newContent.split(search).length - 1
+                  newContent = newContent.replaceAll(search, replace)
+                  replacementCount += count
+                } else {
+                  newContent = newContent.replace(search, replace)
+                  replacementCount += 1
+                }
+                appliedEdits.push({ type: 'string', occurrences: 1, status: 'applied' })
               } else {
-                failedEdits.push({
-                  type: 'string',
-                  search: search,
-                  replacement: replace,
-                  status: 'failed',
-                  reason: 'Search text not found in file content'
-                })
+                failedEdits.push({ type: 'string', status: 'failed', reason: 'Search text not found in file content' })
               }
             }
           }
 
-          const newLines = newContent.split('\n')
-          const newLineCount = newLines.length
+          // Safety: strip any leftover search/replace markers
+          newContent = stripSearchReplaceMarkers(newContent)
 
           // Update the file in memory
           if (appliedEdits.length > 0) {
@@ -1536,8 +1476,8 @@ const _constructToolResultInner = async (toolName: string, input: any, projectId
             }
           }
 
-          const newLines = newContent.split('\n')
-          const newLineCount = newLines.length
+          // Safety: strip any leftover search/replace markers
+          newContent = stripSearchReplaceMarkers(newContent)
 
           // Update the file in memory
           if (appliedEdits.length > 0) {
@@ -1557,8 +1497,6 @@ const _constructToolResultInner = async (toolName: string, input: any, projectId
               success: false,
               error: `Failed to apply replacement: ${failedEdits[0]?.reason || 'Unknown error'}`,
               filePath,
-              appliedEdits,
-              failedEdits,
               toolCallId
             }
           }
@@ -2132,6 +2070,47 @@ function parseSearchReplaceBlock(blockText: string) {
     search: searchLines.join('\n'),
     replace: replaceLines.join('\n')
   };
+}
+
+function parseAllSearchReplaceBlocks(blockText: string): { search: string, replace: string }[] {
+  const SEARCH_START = "<<<<<<< SEARCH";
+  const DIVIDER = "=======";
+  const REPLACE_END = ">>>>>>> REPLACE";
+
+  const lines = blockText.split('\n');
+  const blocks: { search: string, replace: string }[] = [];
+  let searchLines: string[] = [];
+  let replaceLines: string[] = [];
+  let mode = 'none';
+
+  for (const line of lines) {
+    if (line.trim() === SEARCH_START) {
+      searchLines = [];
+      replaceLines = [];
+      mode = 'search';
+    } else if (line.trim() === DIVIDER && mode === 'search') {
+      mode = 'replace';
+    } else if (line.trim() === REPLACE_END && mode === 'replace') {
+      const hasContent = searchLines.some(l => l.trim() !== '') || replaceLines.some(l => l.trim() !== '');
+      if (hasContent) {
+        blocks.push({ search: searchLines.join('\n'), replace: replaceLines.join('\n') });
+      }
+      mode = 'none';
+    } else if (mode === 'search') {
+      searchLines.push(line);
+    } else if (mode === 'replace') {
+      replaceLines.push(line);
+    }
+  }
+  return blocks;
+}
+
+function stripSearchReplaceMarkers(content: string): string {
+  return content
+    .replace(/^<<<<<<< SEARCH\s*$/gm, '')
+    .replace(/^=======\s*$/gm, '')
+    .replace(/^>>>>>>> REPLACE\s*$/gm, '')
+    .replace(/\n{3,}/g, '\n\n');
 }
 
 export async function POST(req: Request) {
