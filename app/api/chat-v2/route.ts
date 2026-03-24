@@ -2172,9 +2172,12 @@ export async function POST(req: Request) {
       remaining,
       shouldContinue,
       isApproachingTimeout,
-      warningMessage: isApproachingTimeout
-        ? `⚠️ TIME WARNING: ${Math.round(remaining / 1000)} seconds remaining. Please provide final summary and avoid additional tool calls.`
-        : null
+      // Disabled: timeout warnings were bloating AI context with every tool result.
+      // The continuation system handles timeouts automatically now.
+      // warningMessage: isApproachingTimeout
+      //   ? `⚠️ TIME WARNING: ${Math.round(remaining / 1000)} seconds remaining. Please provide final summary and avoid additional tool calls.`
+      //   : null
+      warningMessage: ''
     };
   };
 
