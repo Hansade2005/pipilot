@@ -6893,12 +6893,6 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                       <Download className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
                     </Action>
                     <Action
-                      tooltip="Download as JSON"
-                      onClick={() => downloadMessageAsJSON(message)}
-                    >
-                      <FileJson className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
-                    </Action>
-                    <Action
                       tooltip="Delete message"
                       onClick={() => handleDeleteMessage(message.id)}
                     >
