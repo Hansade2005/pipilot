@@ -285,14 +285,7 @@ ${otherActions.length > 0 ? otherActions.map(a => `- ${a}`).join('\n') : '- None
 ${data.partialContent ? data.partialContent.slice(-1500) : '(no text content)'}
 `.trim()
 
-    const response = await fetch('https://api.a0.dev/ai/llm', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages: [
-          {
-            role: 'system',
-            content: `You are a session state synthesizer. Given raw data about an interrupted AI coding session (tool calls, files created/edited, plan progress), produce a CONCISE structured summary that another AI can use to continue the work seamlessly.
+    const synthesisSystemPrompt = `You are a session state synthesizer. Given raw data about an interrupted AI coding session (tool calls, files created/edited, plan progress), produce a CONCISE structured summary that another AI can use to continue the work seamlessly.
 
 Your output must be a structured summary with these EXACT sections:
 1. **What was built** — list files created/edited and their purpose (1 line each)
@@ -307,32 +300,58 @@ Rules:
 - Do NOT add opinions or suggestions
 - Do NOT repeat the full file contents
 - The goal is to give the continuation AI enough context to immediately start building without needing to re-read files`
-          },
-          {
-            role: 'user',
-            content: rawContext
-          }
-        ],
+
+    // Priority 1: Grok Code Fast 1 (fast, reliable)
+    try {
+      const { generateText } = await import('ai')
+      const grokResult = await generateText({
+        model: getFallbackModel(),
         temperature: 0.1,
-        max_tokens: 600
-      }),
-      signal: AbortSignal.timeout(8000) // 8s timeout — don't block continuation too long
-    })
+        maxTokens: 600,
+        system: synthesisSystemPrompt,
+        prompt: rawContext,
+        abortSignal: AbortSignal.timeout(10000),
+      })
 
-    if (!response.ok) {
-      console.warn(`[synthesizeContinuationContext] a0 API returned ${response.status}`)
-      return null
+      const summary = (grokResult.text || '').trim()
+      if (summary && summary.length > 50) {
+        console.log(`[synthesizeContinuationContext] ✅ Grok synthesized ${summary.length} char summary from ${data.toolResults.length} tool results`)
+        return summary
+      }
+      console.warn('[synthesizeContinuationContext] Grok summary too short, trying a0 fallback')
+    } catch (grokErr) {
+      console.warn('[synthesizeContinuationContext] Grok failed, trying a0 fallback:', grokErr)
     }
 
-    const result = await response.json()
-    const summary = (result.completion || result.message || '').trim()
+    // Priority 2: a0 LLM API (fallback)
+    try {
+      const response = await fetch('https://api.a0.dev/ai/llm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: synthesisSystemPrompt },
+            { role: 'user', content: rawContext }
+          ],
+          temperature: 0.1,
+          max_tokens: 600
+        }),
+        signal: AbortSignal.timeout(8000)
+      })
 
-    if (summary && summary.length > 50) {
-      console.log(`[synthesizeContinuationContext] ✅ Synthesized ${summary.length} char summary from ${data.toolResults.length} tool results`)
-      return summary
+      if (response.ok) {
+        const result = await response.json()
+        const summary = (result.completion || result.message || '').trim()
+        if (summary && summary.length > 50) {
+          console.log(`[synthesizeContinuationContext] ✅ a0 synthesized ${summary.length} char summary from ${data.toolResults.length} tool results`)
+          return summary
+        }
+      }
+      console.warn('[synthesizeContinuationContext] a0 fallback also failed or empty')
+    } catch (a0Err) {
+      console.warn('[synthesizeContinuationContext] a0 fallback failed:', a0Err)
     }
 
-    console.warn('[synthesizeContinuationContext] Summary too short or empty, falling back to raw context')
     return null
   } catch (error) {
     console.error('[synthesizeContinuationContext] Failed:', error)
