@@ -2139,7 +2139,7 @@ export async function POST(req: Request) {
   // Add overall request timeout to stay under Vercel's 300s limit
   const REQUEST_TIMEOUT_MS = 290000; // 290 seconds (5s buffer under 300s limit)
   const STREAM_CONTINUE_THRESHOLD_MS = 280000; // 280 seconds - trigger continuation with 10s buffer before 290s timeout
-  const WARNING_TIME_MS = 200000; // Warn at 200 seconds (100 seconds remaining)
+  const WARNING_TIME_MS = 275000; // 275 seconds — only block tools 5s before continuation kicks in at 280s
   const controller = new AbortController();
   const requestTimeoutId = setTimeout(() => {
     controller.abort();
