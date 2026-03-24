@@ -11320,7 +11320,55 @@ Use this exact file list when creating your generate_plan steps.`
 
             return { success: true, guide, strategy, projectType, framework }
           } catch (err) {
-            console.warn('[Chat-V2] 📁 File strategy LLM failed, using fallback:', err)
+            console.warn('[Chat-V2] 📁 File strategy a0 LLM failed, trying Grok Fast 1:', err)
+
+            // Fallback 1: Try Grok Code Fast 1 via xAI API
+            try {
+              const { generateText } = await import('ai')
+              const grokResult = await generateText({
+                model: getFallbackModel(),
+                temperature: 0.3,
+                maxTokens: 800,
+                system: `You are a senior architect. Given a project type and framework, return a minimal JSON file strategy. Return ONLY valid JSON with this structure: {"files":[{"path":"...","action":"create","purpose":"...","estimatedLines":100}],"totalFiles":N,"rationale":"...","inlineDecisions":["..."]}`,
+                prompt: `Project: "${projectType}", Framework: ${framework}, New: ${isNewProject !== false}, Pages: ${pages?.join(', ') || 'single page'}, Features: ${features?.join(', ') || 'standard'}, Existing files (${existingFilePaths.length}): ${existingFilePaths.slice(0, 30).join(', ') || '(empty)'}`,
+                abortSignal: AbortSignal.timeout(15000),
+              })
+
+              const grokText = grokResult.text || ''
+              const grokJsonMatch = grokText.match(/\{[\s\S]*\}/)
+              if (!grokJsonMatch) throw new Error('No JSON from Grok')
+              const strategy = JSON.parse(grokJsonMatch[0])
+
+              console.log(`[Chat-V2] 📁 File strategy (Grok fallback): ${strategy.totalFiles} files for ${projectType}`)
+
+              const newCount = strategy.newFiles || strategy.files?.filter((f: any) => f.action === 'create').length || strategy.totalFiles
+              const modCount = strategy.modifiedFiles || strategy.files?.filter((f: any) => f.action === 'modify').length || 0
+
+              const guide = `# File Strategy for "${projectType}" (${framework})
+
+## Files (${strategy.totalFiles} total — ${newCount} new, ${modCount} modified)
+${(strategy.files || []).map((f: any, i: number) => `${i + 1}. [${f.action || 'create'}] **${f.path}** — ${f.purpose} (~${f.estimatedLines} lines)`).join('\n')}
+
+## Why This Structure
+${strategy.rationale || 'Optimized for minimum file count and fast builds.'}
+
+## Inlined for Speed
+${(strategy.inlineDecisions || ['Header/footer inline in App', 'All CSS in one file']).map((d: string) => `- ${d}`).join('\n')}
+
+## Rules
+- Create/modify ONLY these files. No extra component, utils, or type files.
+- Each page file contains all its sections as inline components.
+- All CSS in the single stylesheet with CSS variables.
+- Header/footer inline in the layout/App file.
+
+Use this exact file list when creating your generate_plan steps.`
+
+              return { success: true, guide, strategy, projectType, framework, provider: 'grok-fallback' }
+            } catch (grokErr) {
+              console.warn('[Chat-V2] 📁 Grok fallback also failed, using static fallback:', grokErr)
+            }
+
+            // Fallback 2: Static file list (always works, no API needed)
             const fallbackFiles = framework === 'vite-react'
               ? ['package.json', 'vite.config.ts', 'index.html', 'src/index.css', 'src/main.tsx', 'src/App.tsx', 'src/pages/Home.tsx']
               : framework === 'nextjs'
