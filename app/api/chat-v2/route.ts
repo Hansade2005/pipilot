@@ -11965,6 +11965,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
     // For Qwen thinking models, wrap with extractReasoningMiddleware to parse <think> tags
     // and cap reasoning output to 800 tokens via maxTokens on the wrapped model
     const isQwenThinking = modelId === 'alibaba/qwen3-vl-thinking'
+    const isOllamaReasoningModel = modelId === 'ollama/kimi-k2-thinking' || modelId === 'ollama/minimax-m2.7' || modelId === 'ollama/minimax-m2.5' || modelId === 'ollama/minimax-m2.1'
     let baseModel: any
     let ollamaKeyId: number | null = null
     if (isByokMode && byokKeys) {
@@ -11994,6 +11995,14 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
       }
     }
     const model = isQwenThinking
+      ? wrapLanguageModel({
+          model: baseModel,
+          middleware: extractReasoningMiddleware({
+            tagName: 'think',
+            startWithReasoning: true,
+          }),
+        })
+      : isOllamaReasoningModel
       ? wrapLanguageModel({
           model: baseModel,
           middleware: extractReasoningMiddleware({
