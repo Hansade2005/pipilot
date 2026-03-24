@@ -1399,8 +1399,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
   return (
     <div className="h-screen flex bg-gray-950 relative">
-      {/* Desktop Layout */}
-      {!isMobile && (
+      {/* Desktop Layout - always mounted, hidden on mobile via CSS to preserve stream state */}
+      <div className={isMobile ? 'hidden' : 'contents'}>
         <>
           {/* Always use ModernSidebar for desktop */}
           <ModernSidebar
@@ -2382,11 +2382,10 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             )}
           </div>
         </>
-      )}
+      </div>
 
-      {/* Mobile Layout */}
-      {isMobile && (
-        <div className="h-full w-full flex flex-col">
+      {/* Mobile Layout - always mounted, hidden on desktop via CSS to preserve stream state */}
+      <div className={isMobile ? 'h-full w-full flex flex-col' : 'hidden'}>
           {/* Always use ModernSidebar for mobile */}
           <ModernSidebar
             user={user}
@@ -2669,7 +2668,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               )
             ) : (
               <Tabs value={mobileTab} onValueChange={(value) => setMobileTab(value as any)} className="h-full flex flex-col">
-                {/* Chat tab uses CSS visibility to keep the stream alive when switching tabs */}
+                {/* Chat tab - always mounted via CSS hidden to keep the stream alive */}
                 <div className={`flex-1 flex flex-col overflow-hidden ${mobileTab === "chat" ? "" : "hidden"}`}>
                   <div className="h-full overflow-hidden">
                     <ChatPanelV2
@@ -2879,7 +2878,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             </div>
           )}
         </div>
-      )}
+      </div>
 
       {/* Create Project Dialog - available for both desktop and mobile */}
       <Dialog open={isCreateDialogOpen} onOpenChange={handleModalClose}>
