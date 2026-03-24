@@ -235,8 +235,8 @@ export function detectProjectTypeFromFiles(files: any[]): string {
   if (hasIndexHtml && hasNoPackageJson) return 'html'
   if (hasIndexHtml && !hasViteConfig && paths.every(p => !p.includes('src/'))) return 'html'
 
-  // Expo with app.json but no expo dir
-  if (hasAppJson && pkgFile?.content) {
+  // Expo with app.json (check content for expo key)
+  if (hasAppJson) {
     try {
       const appJson = files.find((f: any) => (f.path || '').replace(/^\//, '') === 'app.json')
       if (appJson?.content) {
