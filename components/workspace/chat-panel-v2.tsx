@@ -3347,6 +3347,8 @@ export function ChatPanelV2({
       const detail = e.detail as { prompt: string; errors: string[] }
       if (detail.prompt) {
         setInput(detail.prompt)
+        // Switch to chat tab on mobile
+        window.dispatchEvent(new CustomEvent('switch-mobile-tab', { detail: { tab: 'chat' } }))
         // Focus the input after setting it
         setTimeout(() => {
           const textarea = document.querySelector('textarea[placeholder*="Message"]') as HTMLTextAreaElement

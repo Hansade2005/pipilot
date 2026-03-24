@@ -727,6 +727,15 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     window.addEventListener('ai-streaming-state', handleAiStreamingState as EventListener)
     window.addEventListener('openFileInEditor', handleOpenFileInEditor as EventListener)
 
+    // Listen for mobile tab switch requests (e.g., from "Ask AI to Fix" button)
+    const handleSwitchMobileTab = (e: CustomEvent) => {
+      const tab = e.detail?.tab
+      if (tab && isMobile) {
+        setMobileTab(tab)
+      }
+    }
+    window.addEventListener('switch-mobile-tab', handleSwitchMobileTab as EventListener)
+
     return () => {
       window.removeEventListener('preview-state-changed', handlePreviewStateChange as EventListener)
       window.removeEventListener('preview-url-changed', handlePreviewUrlChange as EventListener)
@@ -736,6 +745,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       window.removeEventListener('ai-stream-complete', handleAiStreamComplete as EventListener)
       window.removeEventListener('ai-streaming-state', handleAiStreamingState as EventListener)
       window.removeEventListener('openFileInEditor', handleOpenFileInEditor as EventListener)
+      window.removeEventListener('switch-mobile-tab', handleSwitchMobileTab as EventListener)
     }
   }, [selectedProject, isMobile, toast])
 
