@@ -3301,25 +3301,20 @@ ${synthesizedSummary}
 Read .pipilot/plan.md to see which steps are completed. Then continue building from the next pending step by calling tools continuously with zero text output between them. Call update_plan_progress after each step and update_project_context when all steps are done. Do not repeat completed work, do not narrate, and do not mention the continuation.
 ${CONTINUATION_SAFETY_CHECKS}`
       } else {
-        // ── FALLBACK PATH: raw context (when synthesis fails or no tool results) ──
-        const truncatedContent = hasPartialContent
-          ? (partialResponse.content.length > 2000
-              ? '...' + partialResponse.content.slice(-2000)
-              : partialResponse.content)
-          : ''
-        const truncatedReasoning = hasPartialReasoning
-          ? (partialResponse.reasoning.length > 1000
-              ? '...' + partialResponse.reasoning.slice(-1000)
-              : partialResponse.reasoning)
-          : ''
-
+        // ── FALLBACK PATH: compact instructions only (no raw content to avoid context bloat) ──
         systemPrompt += `
 
 ## STREAM CONTINUATION
-This is a continuation of an interrupted build. ${previousToolResults.length} tool operations were completed in ${Math.round((continuationState.elapsedTimeMs || 0) / 1000)} seconds before interruption.
-${hasModifiedFiles ? `\nFiles modified previously: ${modifiedFilesList.join(', ')}. Re-read these if you need to understand their current state before editing.\n` : ''}
-${truncatedContent ? `Previous response (already shown to user): ${truncatedContent}\n` : ''}
-Read .pipilot/plan.md to see which steps are completed. Then continue building from the next pending step by calling tools continuously with zero text output between them. Call update_plan_progress after each step and update_project_context when all steps are done. Do not repeat completed work, do not narrate, and do not mention the continuation.
+This is a continuation of an interrupted build session.
+${hasModifiedFiles ? `Files already modified: ${modifiedFilesList.join(', ')}.` : ''}
+
+**Your first action:** Read .pipilot/plan.md to see which steps are completed (marked with ✅).
+Then continue building from the next pending step by calling tools continuously with zero text output between them.
+- Do NOT re-read files you are about to overwrite with write_file
+- Do NOT repeat completed work
+- Call update_plan_progress after each step
+- Call update_project_context when all steps are done
+- Do not narrate or mention the continuation
 ${CONTINUATION_SAFETY_CHECKS}`
       }
     }
@@ -3372,25 +3367,20 @@ ${recoverySummary}
 Read .pipilot/plan.md to see which steps are completed. Continue building from the next pending step by calling tools continuously with zero text output between them. Do not repeat completed work, do not narrate, and do not mention the interruption.
 ${CONTINUATION_SAFETY_CHECKS}`
       } else {
-        // ── FALLBACK PATH ──
-        const truncatedContent = hasPartialContent
-          ? (partialResponse.content.length > 2000
-              ? '...' + partialResponse.content.slice(-2000)
-              : partialResponse.content)
-          : ''
-        const truncatedReasoning = hasPartialReasoning
-          ? (partialResponse.reasoning.length > 1000
-              ? '...' + partialResponse.reasoning.slice(-1000)
-              : partialResponse.reasoning)
-          : ''
-
+        // ── FALLBACK PATH: compact instructions only (no raw content to avoid context bloat) ──
         systemPrompt += `
 
 ## STREAM RECOVERY
-The user's connection was interrupted. ${(recoveryToolResults || []).length} tool operations were completed before interruption.
-${hasModifiedFiles ? `Files modified: ${modifiedFilesList.join(', ')}. Re-read these if needed before editing.\n` : ''}
-${truncatedContent ? `Previous response (already shown): ${truncatedContent}\n` : ''}
-Continue exactly where you left off — your output is appended. Call tools continuously with zero text between them. Do not repeat completed work, do not narrate, and do not mention the interruption.
+The user's connection was interrupted.
+${hasModifiedFiles ? `Files already modified: ${modifiedFilesList.join(', ')}.` : ''}
+
+**Your first action:** Read .pipilot/plan.md to see which steps are completed (marked with ✅).
+Then continue building from the next pending step by calling tools continuously with zero text output between them.
+- Do NOT re-read files you are about to overwrite with write_file
+- Do NOT repeat completed work
+- Call update_plan_progress after each step
+- Call update_project_context when all steps are done
+- Do not narrate or mention the interruption
 ${CONTINUATION_SAFETY_CHECKS}`
       }
 
