@@ -12198,9 +12198,10 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
         streamHeaders['x-grok-conv-id'] = projectId
       }
 
+      const isReasoningModel = isQwenThinking || isOllamaReasoningModel
       result = await streamText({
         model,
-        temperature: 0.7,
+        ...(isReasoningModel ? {} : { temperature: 0.7 }),
         maxRetries: 0, // No retries — manual fallback handles provider failures faster
         messages: messagesWithSystem,
         tools: toolsToUse,
