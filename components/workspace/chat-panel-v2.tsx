@@ -2078,23 +2078,28 @@ export function ChatPanelV2({
         (tool: any) => ['edit_file', 'write_file', 'delete_file', 'client_replace_string_in_file'].includes(tool.toolName)
       )
 
-      // Detect Vite project by checking if vite.config.ts exists in the project files
-      // Vite projects are always deployed to .pipilot.dev — never create E2B sandbox, just refresh
-      let isViteProject = false
+      // Use reliable file-based detection to determine project type
+      // Vite/HTML projects deploy to .pipilot.dev — just refresh, don't create E2B sandbox
+      // Next.js/Expo need E2B sandbox preview
+      let projectType = 'unknown'
       try {
+        const { detectProjectTypeFromFiles } = await import('@/lib/utils')
         const files = await storageManager.getFiles(project.id)
-        isViteProject = files.some((f: any) => f.path === 'vite.config.ts' || f.path === 'vite.config.js' || f.path === '/vite.config.ts' || f.path === '/vite.config.js')
+        projectType = detectProjectTypeFromFiles(files)
       } catch {}
+      const isViteOrHtml = projectType === 'vite-react' || projectType === 'html'
+      const needsSandbox = projectType === 'nextjs' || projectType === 'expo'
 
       if (typeof window !== 'undefined' && !isAskMode && hasFileModifications) {
-        console.log(`[ChatPanelV2] Dispatching auto-preview event (fileModifications: true, isVite: ${isViteProject})`)
+        console.log(`[ChatPanelV2] Dispatching auto-preview event (fileModifications: true, projectType: ${projectType}, isViteOrHtml: ${isViteOrHtml})`)
         window.dispatchEvent(new CustomEvent('ai-stream-complete', {
           detail: {
             projectId: project.id,
             shouldSwitchToPreview: true,
-            // Vite/HTML projects deploy to .pipilot.dev — just refresh iframe, don't create E2B sandbox
-            shouldCreatePreview: !isViteProject,
-            shouldRefreshPreview: isViteProject
+            // Vite/HTML → refresh iframe (deployed to .pipilot.dev)
+            // Next.js/Expo → create E2B sandbox preview
+            shouldCreatePreview: needsSandbox,
+            shouldRefreshPreview: isViteOrHtml
           }
         }))
       } else if (!isAskMode && !hasFileModifications) {

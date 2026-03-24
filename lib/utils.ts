@@ -190,7 +190,7 @@ export async function detectProjectTypeWithAI(files: any[]): Promise<string> {
  * Fast file-based project type detection. Checks file paths and package.json
  * dependencies to determine the project type without any external API calls.
  */
-function detectProjectTypeFromFiles(files: any[]): string {
+export function detectProjectTypeFromFiles(files: any[]): string {
   const paths = files.map((f: any) => (f.path || '').toLowerCase()).filter(Boolean)
   const pathSet = new Set(paths)
 
