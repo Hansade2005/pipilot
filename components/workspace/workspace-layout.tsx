@@ -2879,6 +2879,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           )}
         </div>
       </div>
+      </div>
 
       {/* Create Project Dialog - available for both desktop and mobile */}
       <Dialog open={isCreateDialogOpen} onOpenChange={handleModalClose}>
