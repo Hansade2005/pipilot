@@ -991,9 +991,8 @@ const _constructToolResultInner = async (toolName: string, input: any, projectId
           console.log(`[CONSTRUCT_TOOL_RESULT] write_file: Updated existing file ${path} (${content.length} chars)`)
           return {
             success: true,
-            message: `✅ File ${path} updated successfully.`,
+            message: `File ${path} updated (${content.length} chars).`,
             path,
-            content,
             action: 'updated',
             toolCallId
           }
@@ -1015,9 +1014,8 @@ const _constructToolResultInner = async (toolName: string, input: any, projectId
           console.log(`[CONSTRUCT_TOOL_RESULT] write_file: Created new file ${path} (${content.length} chars)`)
           return {
             success: true,
-            message: `✅ File ${path} created successfully.`,
+            message: `File ${path} created (${content.length} chars).`,
             path,
-            content,
             action: 'created',
             toolCallId
           }
@@ -1347,20 +1345,9 @@ const _constructToolResultInner = async (toolName: string, input: any, projectId
 
             return {
               success: true,
-              message: `✅ File ${filePath} modified successfully (${replacementCount} replacement${replacementCount !== 1 ? 's' : ''}).`,
+              message: `File ${filePath} modified (${replacementCount} replacement${replacementCount !== 1 ? 's' : ''}, ${newContent.length} chars).`,
               path: filePath,
-              originalContent,
-              newContent,
-              appliedEdits,
-              failedEdits,
-              stats: {
-                originalSize: originalContent.length,
-                newSize: newContent.length,
-                originalLines: originalLineCount,
-                newLines: newLineCount,
-                replacements: replacementCount
-              },
-              backupAvailable: true,
+              replacements: replacementCount,
               action: 'modified',
               toolCallId
             }
@@ -1559,20 +1546,9 @@ const _constructToolResultInner = async (toolName: string, input: any, projectId
 
             return {
               success: true,
-              message: `✅ File ${filePath} modified successfully (${replacementCount} replacement${replacementCount !== 1 ? 's' : ''}).`,
+              message: `File ${filePath} modified (${replacementCount} replacement${replacementCount !== 1 ? 's' : ''}, ${newContent.length} chars).`,
               path: filePath,
-              originalContent,
-              newContent,
-              appliedEdits,
-              failedEdits,
-              stats: {
-                originalSize: originalContent.length,
-                newSize: newContent.length,
-                originalLines: originalLineCount,
-                newLines: newLineCount,
-                replacements: replacementCount
-              },
-              backupAvailable: true,
+              replacements: replacementCount,
               action: 'modified',
               toolCallId
             }
