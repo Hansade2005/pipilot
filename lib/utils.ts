@@ -119,15 +119,21 @@ export function filterMediaFiles(files: any[]): any[] {
  * Returns: 'vite-react' | 'nextjs' | 'expo' | 'html'
  */
 export async function detectProjectTypeWithAI(files: any[]): Promise<string> {
+  // Phase 1: Fast file-based detection (instant, never fails)
+  const fileBasedResult = detectProjectTypeFromFiles(files)
+  if (fileBasedResult !== 'unknown') {
+    console.log(`[AI Detection] File-based detection: ${fileBasedResult}`)
+    return fileBasedResult
+  }
+
+  // Phase 2: Only call AI if file-based detection couldn't determine type
   try {
-    // Build a compact file tree (paths only, max 80 entries)
     const filePaths = files
       .map((f: any) => f.path)
       .filter(Boolean)
       .slice(0, 80)
       .join('\n')
 
-    // Extract package.json deps if available
     const pkgFile = files.find((f: any) => f.path === 'package.json')
     let depsInfo = ''
     if (pkgFile?.content) {
@@ -156,30 +162,94 @@ export async function detectProjectTypeWithAI(files: any[]): Promise<string> {
         temperature: 0.1,
         max_tokens: 10
       }),
-      signal: AbortSignal.timeout(5000) // 5s timeout — don't block preview
+      signal: AbortSignal.timeout(8000) // 8s timeout
     })
 
     const data = await response.json()
     const answer = (data.completion || '').trim().toLowerCase()
 
-    // Validate the response is one of the expected types
     const validTypes = ['vite-react', 'nextjs', 'expo', 'html']
     if (validTypes.includes(answer)) {
-      console.log(`[AI Detection] Detected project type: ${answer}`)
+      console.log(`[AI Detection] AI classified project type: ${answer}`)
       return answer
     }
 
-    // Partial match (e.g., "vite" → "vite-react")
     if (answer.includes('vite') || answer.includes('react')) return 'vite-react'
     if (answer.includes('next')) return 'nextjs'
     if (answer.includes('expo')) return 'expo'
 
-    console.warn(`[AI Detection] Unexpected response: "${answer}", defaulting to file-based detection`)
-    return 'unknown'
+    console.warn(`[AI Detection] Unexpected AI response: "${answer}", defaulting to vite-react`)
+    return 'vite-react'
   } catch (error) {
-    console.warn('[AI Detection] Failed, falling back to file-based detection:', error)
-    return 'unknown'
+    console.warn('[AI Detection] AI fallback failed, defaulting to vite-react:', error)
+    return 'vite-react'
   }
+}
+
+/**
+ * Fast file-based project type detection. Checks file paths and package.json
+ * dependencies to determine the project type without any external API calls.
+ */
+function detectProjectTypeFromFiles(files: any[]): string {
+  const paths = files.map((f: any) => (f.path || '').toLowerCase()).filter(Boolean)
+  const pathSet = new Set(paths)
+
+  // Check for Next.js markers
+  const hasNextConfig = paths.some(p => p.includes('next.config'))
+  const hasAppDir = paths.some(p => p.startsWith('app/') || p.startsWith('/app/'))
+  const hasPagesDir = paths.some(p => p.startsWith('pages/') || p.startsWith('/pages/'))
+  if (hasNextConfig || (hasAppDir && paths.some(p => p.includes('layout.tsx') || p.includes('layout.jsx') || p.includes('layout.js')))) {
+    return 'nextjs'
+  }
+
+  // Check for Expo markers
+  const hasAppJson = pathSet.has('app.json') || pathSet.has('/app.json')
+  const hasExpoDir = paths.some(p => p.includes('.expo/') || p.includes('expo-'))
+  if (hasExpoDir) return 'expo'
+
+  // Check package.json for framework deps
+  const pkgFile = files.find((f: any) => {
+    const p = (f.path || '').replace(/^\//, '')
+    return p === 'package.json'
+  })
+  if (pkgFile?.content) {
+    try {
+      const pkg = JSON.parse(pkgFile.content)
+      const allDeps = { ...pkg.dependencies, ...pkg.devDependencies }
+      const depNames = Object.keys(allDeps)
+
+      if (depNames.includes('next')) return 'nextjs'
+      if (depNames.includes('expo') || depNames.includes('expo-router') || depNames.includes('react-native')) return 'expo'
+      if (depNames.includes('vite') || depNames.includes('react') || depNames.includes('react-dom')) return 'vite-react'
+    } catch {}
+  }
+
+  // Check for Vite markers
+  const hasViteConfig = paths.some(p => p.includes('vite.config'))
+  const hasSrcMain = paths.some(p => p.includes('src/main.') || p.includes('src/index.'))
+  if (hasViteConfig) return 'vite-react'
+
+  // Check for HTML markers
+  const hasIndexHtml = pathSet.has('index.html') || pathSet.has('/index.html')
+  const hasNoPackageJson = !pkgFile
+  if (hasIndexHtml && hasNoPackageJson) return 'html'
+  if (hasIndexHtml && !hasViteConfig && paths.every(p => !p.includes('src/'))) return 'html'
+
+  // Expo with app.json but no expo dir
+  if (hasAppJson && pkgFile?.content) {
+    try {
+      const appJson = files.find((f: any) => (f.path || '').replace(/^\//, '') === 'app.json')
+      if (appJson?.content) {
+        const parsed = JSON.parse(appJson.content)
+        if (parsed.expo) return 'expo'
+      }
+    } catch {}
+  }
+
+  // Default: if we have React deps + index.html, it's vite-react
+  if (hasIndexHtml && hasSrcMain) return 'vite-react'
+
+  return 'unknown'
 }
 
 /**

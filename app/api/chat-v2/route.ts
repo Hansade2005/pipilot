@@ -11214,6 +11214,7 @@ Use https://api.a0.dev/assets/image?text={description}&aspect=16:9 for all image
             const response = await fetch('https://api.a0.dev/ai/llm', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
+              signal: AbortSignal.timeout(10000), // 10s timeout — fall back to local strategy if slow
               body: JSON.stringify({
                 messages: [
                   {
