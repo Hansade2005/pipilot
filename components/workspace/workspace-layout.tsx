@@ -2669,10 +2669,11 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               )
             ) : (
               <Tabs value={mobileTab} onValueChange={(value) => setMobileTab(value as any)} className="h-full flex flex-col">
-                <TabsContent value="chat" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
+                {/* Chat tab uses CSS visibility to keep the stream alive when switching tabs */}
+                <div className={`flex-1 flex flex-col overflow-hidden ${mobileTab === "chat" ? "" : "hidden"}`}>
                   <div className="h-full overflow-hidden">
                     <ChatPanelV2
-                      key={`chat-mobile-${selectedProject.id}-${chatSessionKey}`}
+                      key={`chat-${selectedProject.id}-${chatSessionKey}`}
                       project={selectedProject}
                       isMobile={true}
                       selectedModel={selectedModel}
@@ -2687,7 +2688,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       onClearTaggedComponent={() => setTaggedComponent(null)}
                     />
                   </div>
-                </TabsContent>
+                </div>
+                {/* Empty TabsContent to keep Tabs component happy */}
+                <TabsContent value="chat" className="flex-1 m-0 hidden" />
                 
                 <TabsContent value="files" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
                   <div className="h-full overflow-hidden">
