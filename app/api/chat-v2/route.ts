@@ -2603,26 +2603,27 @@ export async function POST(req: Request) {
       `[Chat-V2] ✅ Authenticated: User ${authContext.userId}, Plan: ${authContext.currentPlan}, Balance: ${authContext.creditsBalance} credits${isByokMode ? ' (BYOK - credits not consumed)' : ''}`
     )
 
-    // Check monthly request limit before processing (skip for BYOK users)
+    // Monthly request limit check — disabled for now, credit deduction still active
+    // TODO: Re-enable when request limits are finalized
     const supabaseForBilling = await createClient()
-    if (!isByokMode) {
-      const requestLimitCheck = await checkMonthlyRequestLimit(authContext.userId, supabaseForBilling)
-      if (!requestLimitCheck.allowed) {
-        console.warn(`[Chat-V2] ⚠️ Monthly request limit reached for user ${authContext.userId}: ${requestLimitCheck.requestsUsed}/${requestLimitCheck.requestsLimit}`)
-        return NextResponse.json(
-          {
-            error: {
-              message: requestLimitCheck.reason || 'Monthly request limit reached.',
-              code: 'REQUEST_LIMIT_REACHED',
-              type: 'credit_error',
-              requestsUsed: requestLimitCheck.requestsUsed,
-              requestsLimit: requestLimitCheck.requestsLimit
-            }
-          },
-          { status: 429 }
-        )
-      }
-    }
+    // if (!isByokMode) {
+    //   const requestLimitCheck = await checkMonthlyRequestLimit(authContext.userId, supabaseForBilling)
+    //   if (!requestLimitCheck.allowed) {
+    //     console.warn(`[Chat-V2] ⚠️ Monthly request limit reached for user ${authContext.userId}: ${requestLimitCheck.requestsUsed}/${requestLimitCheck.requestsLimit}`)
+    //     return NextResponse.json(
+    //       {
+    //         error: {
+    //           message: requestLimitCheck.reason || 'Monthly request limit reached.',
+    //           code: 'REQUEST_LIMIT_REACHED',
+    //           type: 'credit_error',
+    //           requestsUsed: requestLimitCheck.requestsUsed,
+    //           requestsLimit: requestLimitCheck.requestsLimit
+    //         }
+    //       },
+    //       { status: 429 }
+    //     )
+    //   }
+    // }
 
     // Check if user is trying to use a premium-only model on a free plan
     if (modelId && authContext.currentPlan === 'free') {
