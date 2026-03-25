@@ -2172,12 +2172,9 @@ export async function POST(req: Request) {
       remaining,
       shouldContinue,
       isApproachingTimeout,
-      // Disabled: timeout warnings were bloating AI context with every tool result.
-      // The continuation system handles timeouts automatically now.
-      // warningMessage: isApproachingTimeout
-      //   ? `⚠️ TIME WARNING: ${Math.round(remaining / 1000)} seconds remaining. Please provide final summary and avoid additional tool calls.`
-      //   : null
-      warningMessage: ''
+      warningMessage: isApproachingTimeout
+        ? `⚠️ TIMEOUT APPROACHING (${Math.round(remaining / 1000)}s left). You MUST immediately call write_file to save .pipilot/context.md with ALL research and context you've gathered so far (website analysis, design details, feature lists, page structures, color schemes, fonts, API findings, etc.). The continuation agent will read this file first to avoid re-doing your research. Then continue with your current task.`
+        : ''
     };
   };
 
@@ -3301,7 +3298,8 @@ This is a continuation of an interrupted build session. The synthesized summary 
 
 ${synthesizedSummary}
 
-Read .pipilot/plan.md to see which steps are completed. Then continue building from the next pending step by calling tools continuously with zero text output between them. Call update_plan_progress after each step and update_project_context when all steps are done. Do not repeat completed work, do not narrate, and do not mention the continuation.
+**First:** Read .pipilot/context.md (if it exists) for research context gathered before the interruption — website analysis, design details, feature lists, etc. This saves you from re-browsing or re-researching.
+**Then:** Read .pipilot/plan.md to see which steps are completed. Continue building from the next pending step by calling tools continuously with zero text output between them. Call update_plan_progress after each step and update_project_context when all steps are done. Do not repeat completed work, do not narrate, and do not mention the continuation.
 ${CONTINUATION_SAFETY_CHECKS}`
       } else {
         // ── FALLBACK PATH: compact instructions only (no raw content to avoid context bloat) ──
@@ -3311,7 +3309,7 @@ ${CONTINUATION_SAFETY_CHECKS}`
 This is a continuation of an interrupted build session.
 ${hasModifiedFiles ? `Files already modified: ${modifiedFilesList.join(', ')}.` : ''}
 
-**Your first action:** Read .pipilot/plan.md to see which steps are completed (marked with ✅).
+**Your first actions:** Read .pipilot/context.md (if it exists) for research context, then read .pipilot/plan.md to see which steps are completed (marked with ✅).
 Then continue building from the next pending step by calling tools continuously with zero text output between them.
 - Do NOT re-read files you are about to overwrite with write_file
 - Do NOT repeat completed work
@@ -3367,7 +3365,8 @@ The user's connection was interrupted. Summary of what was already done:
 
 ${recoverySummary}
 
-Read .pipilot/plan.md to see which steps are completed. Continue building from the next pending step by calling tools continuously with zero text output between them. Do not repeat completed work, do not narrate, and do not mention the interruption.
+**First:** Read .pipilot/context.md (if it exists) for research context gathered before the interruption.
+**Then:** Read .pipilot/plan.md to see which steps are completed. Continue building from the next pending step by calling tools continuously with zero text output between them. Do not repeat completed work, do not narrate, and do not mention the interruption.
 ${CONTINUATION_SAFETY_CHECKS}`
       } else {
         // ── FALLBACK PATH: compact instructions only (no raw content to avoid context bloat) ──
@@ -3377,7 +3376,7 @@ ${CONTINUATION_SAFETY_CHECKS}`
 The user's connection was interrupted.
 ${hasModifiedFiles ? `Files already modified: ${modifiedFilesList.join(', ')}.` : ''}
 
-**Your first action:** Read .pipilot/plan.md to see which steps are completed (marked with ✅).
+**Your first actions:** Read .pipilot/context.md (if it exists) for research context, then read .pipilot/plan.md to see which steps are completed (marked with ✅).
 Then continue building from the next pending step by calling tools continuously with zero text output between them.
 - Do NOT re-read files you are about to overwrite with write_file
 - Do NOT repeat completed work
