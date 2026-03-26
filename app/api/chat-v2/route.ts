@@ -3997,207 +3997,166 @@ ${CONTINUATION_SAFETY_CHECKS}`
 
             const results: any[] = []
 
+            // ── Tokenize query into individual keywords for multi-keyword search ──
+            const queryTokens = query.toLowerCase()
+              .split(/[\s,;|+]+/)
+              .map(t => t.trim())
+              .filter(t => t.length > 1)
+            const isMultiKeyword = queryTokens.length > 1
+
+            // ── Helper: calculate line number from char index ──
+            const getLineNumber = (content: string, charIndex: number, lines: string[]): number => {
+              let charCount = 0
+              for (let i = 0; i < lines.length; i++) {
+                charCount += lines[i].length + 1
+                if (charCount > charIndex) return i + 1
+              }
+              return lines.length
+            }
+
+            // ── Helper: extract context lines around a line number ──
+            const getContext = (lines: string[], lineNum: number, radius: number = 2): string => {
+              const start = Math.max(1, lineNum - radius)
+              const end = Math.min(lines.length, lineNum + radius)
+              return lines.slice(start - 1, end)
+                .map((line: string, idx: number) => `${String(start + idx).padStart(4, ' ')}: ${line}`)
+                .join('\n')
+            }
+
             // Search through each file
             for (const file of filesToSearch) {
               if (!file.content || file.isDirectory) continue
 
               const content = file.content
               const lines = content.split('\n')
-              const lowerQuery = query.toLowerCase()
+              const lowerContent = content.toLowerCase()
 
-              // Enhanced semantic code analysis with framework-specific patterns
-              const searchPatterns = [
-                // React/TypeScript specific patterns
-                {
-                  type: 'react_component',
-                  regex: /^\s*(export\s+)?(const|function)\s+(\w+)\s*[=:]\s*(React\.)?(memo\()?(\([^)]*\)\s*=>|function)/gm,
-                  description: 'React component definition'
-                },
-                {
-                  type: 'typescript_interface',
-                  regex: /^\s*(export\s+)?interface\s+(\w+)/gm,
-                  description: 'TypeScript interface definition'
-                },
-                {
-                  type: 'typescript_type',
-                  regex: /^\s*(export\s+)?type\s+(\w+)\s*=/gm,
-                  description: 'TypeScript type definition'
-                },
-                {
-                  type: 'api_route',
-                  regex: /^\s*export\s+(async\s+)?function\s+(GET|POST|PUT|DELETE|PATCH)/gm,
-                  description: 'Next.js API route handler'
-                },
-                {
-                  type: 'database_query',
-                  regex: /\b(SELECT|INSERT|UPDATE|DELETE)\b.*\bFROM\b|\bCREATE\s+TABLE\b|\bALTER\s+TABLE\b/gi,
-                  description: 'Database query or schema definition'
-                },
-                {
-                  type: 'async_function',
-                  regex: /^\s*(export\s+)?async\s+(function|const)\s+(\w+)/gm,
-                  description: 'Async function definition'
-                },
-                {
-                  type: 'hook_definition',
-                  regex: /^\s*(export\s+)?function\s+use\w+/gm,
-                  description: 'React hook definition'
-                },
-                {
-                  type: 'error_handling',
-                  regex: /\btry\s*\{|\bcatch\s*\(|\bthrow\s+new\b|\bError\s*\(/gi,
-                  description: 'Error handling code'
-                },
-                {
-                  type: 'validation_schema',
-                  regex: /\b(z\.)?(object|array|string|number|boolean)\(\)|\.refine\(|schema\.parse\b/gi,
-                  description: 'Zod validation schema'
-                },
-                {
-                  type: 'test_case',
-                  regex: /^\s*(it|test|describe)\s*\(/gm,
-                  description: 'Test case definition'
-                },
-                {
-                  type: 'configuration',
-                  regex: /\b(process\.env|NEXT_PUBLIC_|REACT_APP_)\b|\bconfig\b.*=|\bsettings\b.*=/gi,
-                  description: 'Configuration or environment variables'
-                },
-                {
-                  type: 'styling',
-                  regex: /\bclassName\s*=|\bstyle\s*=|\btailwind\b|\bcss\b|\bsass\b/gi,
-                  description: 'Styling and CSS classes'
-                },
-                // Generic patterns for broader coverage
-                {
-                  type: 'function',
-                  regex: /^\s*(export\s+)?(function|const|let|var)\s+(\w+)\s*[=({]/gm,
-                  description: 'Function or method definition'
-                },
-                {
-                  type: 'class',
-                  regex: /^\s*(export\s+)?(class|interface|type)\s+(\w+)/gm,
-                  description: 'Class, interface, or type definition'
-                },
-                {
-                  type: 'import',
-                  regex: /^\s*import\s+.*from\s+['"`].*['"`]/gm,
-                  description: 'Import statement'
-                },
-                {
-                  type: 'export',
-                  regex: /^\s*export\s+/gm,
-                  description: 'Export statement'
-                },
-                // Semantic text search with context awareness
-                {
-                  type: 'semantic_match',
-                  regex: new RegExp(`\\b${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi'),
-                  description: 'Semantic code match'
-                }
+              // ══════════════════════════════════════════════════════════════
+              // PHASE 1: Structural AST-like analysis (components, functions,
+              // sections, JSX elements, hooks, types, routes, state)
+              // ══════════════════════════════════════════════════════════════
+              const structuralPatterns = [
+                { type: 'react_component', regex: /^\s*(export\s+)?(const|function)\s+(\w+)\s*[=:]\s*(React\.)?(memo\()?(\([^)]*\)\s*=>|function)/gm, score: 10 },
+                { type: 'typescript_interface', regex: /^\s*(export\s+)?interface\s+(\w+)/gm, score: 8 },
+                { type: 'typescript_type', regex: /^\s*(export\s+)?type\s+(\w+)\s*=/gm, score: 8 },
+                { type: 'api_route', regex: /^\s*export\s+(async\s+)?function\s+(GET|POST|PUT|DELETE|PATCH)/gm, score: 10 },
+                { type: 'async_function', regex: /^\s*(export\s+)?async\s+(function|const)\s+(\w+)/gm, score: 7 },
+                { type: 'hook_definition', regex: /^\s*(export\s+)?function\s+use\w+/gm, score: 8 },
+                { type: 'hook_usage', regex: /\b(useState|useEffect|useRef|useMemo|useCallback|useContext|useReducer|useRouter|useSearchParams|useParams)\s*[<(]/gm, score: 6 },
+                { type: 'function', regex: /^\s*(export\s+)?(function|const|let|var)\s+(\w+)\s*[=({]/gm, score: 5 },
+                { type: 'class', regex: /^\s*(export\s+)?(class|interface|type)\s+(\w+)/gm, score: 5 },
+                { type: 'jsx_section', regex: /\{\/\*\s*(.+?)\s*\*\/\}/gm, score: 7 },  // {/* Section Comment */}
+                { type: 'jsx_section_html', regex: /<!--\s*(.+?)\s*-->/gm, score: 7 },    // <!-- Section Comment -->
+                { type: 'jsx_id', regex: /\bid=["']([^"']+)["']/gm, score: 6 },           // id="hero"
+                { type: 'jsx_classname_section', regex: /className=["'][^"']*\b(hero|header|footer|nav|sidebar|main|section|banner|cta|pricing|features|testimonials|about|contact|faq|gallery|portfolio|team|blog|services)\b[^"']*["']/gim, score: 6 },
+                { type: 'database_query', regex: /\b(SELECT|INSERT|UPDATE|DELETE)\b.*\bFROM\b|\bCREATE\s+TABLE\b/gi, score: 7 },
+                { type: 'validation_schema', regex: /\b(z\.)?(object|array|string|number|boolean)\(\)|\.refine\(|schema\.parse\b/gi, score: 6 },
+                { type: 'error_handling', regex: /\btry\s*\{|\bcatch\s*\(|\bthrow\s+new\b/gi, score: 5 },
+                { type: 'test_case', regex: /^\s*(it|test|describe)\s*\(/gm, score: 6 },
+                { type: 'configuration', regex: /\b(process\.env|NEXT_PUBLIC_|REACT_APP_)\b/gi, score: 5 },
+                { type: 'import', regex: /^\s*import\s+.*from\s+['"`].*['"`]/gm, score: 3 },
+                { type: 'export', regex: /^\s*export\s+(default\s+)?/gm, score: 3 },
               ]
 
-              // Search for each pattern
-              for (const pattern of searchPatterns) {
+              for (const pattern of structuralPatterns) {
                 let match
-                while ((match = pattern.regex.exec(content)) !== null && results.length < maxResults) {
-                  // Calculate line number (1-indexed)
-                  const matchIndex = match.index
-                  let lineNumber = 1
-                  let charCount = 0
+                pattern.regex.lastIndex = 0
+                while ((match = pattern.regex.exec(content)) !== null && results.length < maxResults * 2) {
+                  const lineNumber = getLineNumber(content, match.index, lines)
+                  const matchText = match[0].trim()
+                  const matchLower = matchText.toLowerCase()
 
-                  for (let i = 0; i < lines.length; i++) {
-                    charCount += lines[i].length + 1 // +1 for newline
-                    if (charCount > matchIndex) {
-                      lineNumber = i + 1
-                      break
+                  // ── Relevance scoring: boost for keyword matches ──
+                  let relevanceScore = pattern.score
+
+                  if (isMultiKeyword) {
+                    // Multi-keyword: score by how many query tokens match
+                    let keywordHits = 0
+                    for (const token of queryTokens) {
+                      // Check match text, surrounding lines, component name
+                      const surroundStart = Math.max(0, lineNumber - 5)
+                      const surroundEnd = Math.min(lines.length, lineNumber + 15)
+                      const surroundingText = lines.slice(surroundStart, surroundEnd).join('\n').toLowerCase()
+
+                      if (matchLower.includes(token) || surroundingText.includes(token)) {
+                        keywordHits++
+                        relevanceScore += 5
+                      }
+                    }
+                    // Only include if at least one keyword matches
+                    if (keywordHits === 0) continue
+                    // Bonus for matching multiple keywords
+                    if (keywordHits >= 2) relevanceScore += keywordHits * 3
+                    if (keywordHits === queryTokens.length) relevanceScore += 15 // all keywords matched
+                  } else {
+                    // Single keyword: boost for direct match
+                    const singleToken = queryTokens[0] || query.toLowerCase()
+                    if (matchLower.includes(singleToken)) {
+                      relevanceScore += 8
+                    } else {
+                      // Check surrounding context for the keyword
+                      const surroundStart = Math.max(0, lineNumber - 3)
+                      const surroundEnd = Math.min(lines.length, lineNumber + 10)
+                      const surroundingText = lines.slice(surroundStart, surroundEnd).join('\n').toLowerCase()
+                      if (!surroundingText.includes(singleToken)) continue
+                      relevanceScore += 3
                     }
                   }
 
-                  // Calculate relevance score based on pattern type and context
-                  let relevanceScore = 1
-                  switch (pattern.type) {
-                    case 'react_component':
-                    case 'api_route':
-                    case 'async_function':
-                      relevanceScore = 10
-                      break
-                    case 'typescript_interface':
-                    case 'typescript_type':
-                    case 'hook_definition':
-                      relevanceScore = 8
-                      break
-                    case 'database_query':
-                    case 'validation_schema':
-                    case 'error_handling':
-                      relevanceScore = 7
-                      break
-                    case 'test_case':
-                    case 'configuration':
-                      relevanceScore = 6
-                      break
-                    case 'function':
-                    case 'class':
-                      relevanceScore = 5
-                      break
-                    case 'styling':
-                    case 'import':
-                    case 'export':
-                      relevanceScore = 3
-                      break
-                    default:
-                      relevanceScore = 2
-                  }
-
-                  // Boost score for exact matches and word boundaries
-                  if (match[0].toLowerCase() === query.toLowerCase()) {
-                    relevanceScore += 5
-                  }
-                  if (new RegExp(`\\b${query}\\b`, 'i').test(match[0])) {
-                    relevanceScore += 3
-                  }
-
-                  // Extract context around the match
-                  const startLine = Math.max(1, lineNumber - 2)
-                  const endLine = Math.min(lines.length, lineNumber + 2)
-                  const contextLines = lines.slice(startLine - 1, endLine)
-                  const contextWithNumbers = contextLines.map((line: string, idx: number) =>
-                    `${String(startLine + idx).padStart(4, ' ')}: ${line}`
-                  ).join('\n')
-
-                  // Highlight the match in context
-                  const highlightedContext = contextWithNumbers.replace(
-                    new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
-                    '**$&**'
-                  )
-
-                  // Check for dependencies if requested
                   let dependencies: string[] = []
                   if (includeDependencies && pattern.type === 'import') {
                     const importMatch = match[0].match(/from\s+['"`]([^'"`]+)['"`]/)
-                    if (importMatch) {
-                      dependencies.push(importMatch[1])
-                    }
+                    if (importMatch) dependencies.push(importMatch[1])
                   }
 
                   results.push({
                     file: file.path,
                     type: pattern.type,
-                    description: pattern.description,
+                    description: matchText.substring(0, 120),
                     lineNumber,
-                    match: match[0].trim(),
-                    context: highlightedContext,
-                    fullMatch: match[0],
+                    match: matchText.substring(0, 200),
+                    context: getContext(lines, lineNumber, 3),
+                    fullMatch: matchText,
                     relevanceScore,
                     dependencies: dependencies.length > 0 ? dependencies : undefined
                   })
 
-                  // Prevent infinite loops for global regex
                   if (!pattern.regex.global) break
                 }
               }
 
-              if (results.length >= maxResults) break
+              // ══════════════════════════════════════════════════════════════
+              // PHASE 2: Per-keyword direct text search (catches things
+              // structural patterns miss: variable names, string literals,
+              // JSX text content, CSS classes, comments)
+              // ══════════════════════════════════════════════════════════════
+              for (const token of queryTokens) {
+                const escapedToken = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                const tokenRegex = new RegExp(`\\b${escapedToken}\\b`, 'gi')
+                let match
+                let tokenHits = 0
+                while ((match = tokenRegex.exec(content)) !== null && tokenHits < 5 && results.length < maxResults * 2) {
+                  const lineNumber = getLineNumber(content, match.index, lines)
+                  const line = lines[lineNumber - 1] || ''
+
+                  // Skip if we already have a structural result at this line
+                  if (results.some(r => r.file === file.path && Math.abs(r.lineNumber - lineNumber) <= 1)) continue
+
+                  results.push({
+                    file: file.path,
+                    type: 'keyword_match',
+                    description: `Keyword "${token}" found`,
+                    lineNumber,
+                    match: line.trim().substring(0, 200),
+                    context: getContext(lines, lineNumber, 2),
+                    fullMatch: match[0],
+                    relevanceScore: 4
+                  })
+                  tokenHits++
+                }
+              }
+
+              if (results.length >= maxResults * 2) break
             }
 
             // Sort results by relevance score and deduplicate
