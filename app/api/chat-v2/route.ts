@@ -4025,6 +4025,74 @@ ${CONTINUATION_SAFETY_CHECKS}`
             }
             const isMultiKeyword = queryTokens.length > 1
 
+            // ══════════════════════════════════════════════════════════════
+            // PHASE 0: TypeScript AST Analysis (real parser, not regex)
+            // Uses the TypeScript Compiler API for accurate structural analysis
+            // ══════════════════════════════════════════════════════════════
+            let astResults: any[] = []
+            let astSummaries: any[] = []
+            try {
+              const { analyzeProjectAST } = await import('@/lib/ast-analyzer')
+              const astFiles = filesToSearch
+                .filter((f: any) => !f.isDirectory && f.content && /\.(tsx?|jsx?|mjs)$/.test(f.path))
+                .map((f: any) => ({ path: f.path, content: f.content }))
+
+              if (astFiles.length > 0) {
+                const { analyses, matchedNodes } = analyzeProjectAST(astFiles, queryTokens, maxResults)
+                astSummaries = analyses.map(a => ({
+                  file: a.file,
+                  lines: a.totalLines,
+                  parseTimeMs: a.parseTimeMs,
+                  ...a.summary
+                }))
+
+                // Convert AST nodes to result format
+                for (const node of matchedNodes) {
+                  const file = filesToSearch.find((f: any) => f.path === node.file)
+                  const lines = file?.content?.split('\n') || []
+                  const startLine = Math.max(1, node.line - 2)
+                  const endLine = Math.min(lines.length, (node.endLine || node.line) + 2)
+                  const context = lines.slice(startLine - 1, Math.min(endLine, startLine + 6))
+                    .map((line: string, idx: number) => `${String(startLine + idx).padStart(4, ' ')}: ${line}`)
+                    .join('\n')
+
+                  // Build rich description
+                  let desc = `${node.type}: ${node.name}`
+                  if (node.exportKind) desc += ` (${node.exportKind} export)`
+                  if (node.hooks?.length) desc += ` | hooks: ${node.hooks.join(', ')}`
+                  if (node.stateVariables?.length) desc += ` | state: ${node.stateVariables.join(', ')}`
+                  if (node.jsxElements?.length) desc += ` | renders: ${node.jsxElements.slice(0, 8).join(', ')}`
+                  if (node.props?.length) desc += ` | props: ${node.props.slice(0, 8).join(', ')}`
+                  if (node.params?.length) desc += ` | params: ${node.params.join(', ')}`
+
+                  astResults.push({
+                    file: node.file,
+                    type: 'ast_' + node.type,
+                    description: desc,
+                    lineNumber: node.line,
+                    endLine: node.endLine,
+                    match: `${node.type} ${node.name} (lines ${node.line}-${node.endLine})`,
+                    context,
+                    fullMatch: node.name,
+                    relevanceScore: node.relevanceScore + 15, // AST results ranked higher than regex
+                    astNode: {
+                      type: node.type,
+                      name: node.name,
+                      exportKind: node.exportKind,
+                      hooks: node.hooks,
+                      jsxElements: node.jsxElements,
+                      stateVariables: node.stateVariables,
+                      props: node.props,
+                      description: node.description,
+                    }
+                  })
+                }
+                console.log(`[semantic_code_navigator] AST parsed ${astFiles.length} files (${analyses.reduce((s, a) => s + a.totalLines, 0)} lines) in ${analyses.reduce((s, a) => s + a.parseTimeMs, 0)}ms, found ${matchedNodes.length} matching nodes`)
+              }
+            } catch (astError) {
+              console.warn('[semantic_code_navigator] AST analysis failed, falling back to regex:', astError)
+            }
+
             // ── Helper: calculate line number from char index ──
             const getLineNumber = (content: string, charIndex: number, lines: string[]): number => {
               let charCount = 0
@@ -4180,13 +4248,16 @@ ${CONTINUATION_SAFETY_CHECKS}`
               if (results.length >= maxResults * 2) break
             }
 
-            // Sort results by relevance score and deduplicate
-            const uniqueResults = results
+            // Merge AST results (Phase 0) with regex results (Phase 1+2)
+            // AST results have higher base scores so they rank first
+            const allResults = [...astResults, ...results]
+
+            // Sort by relevance and deduplicate (same file + same line = duplicate)
+            const uniqueResults = allResults
               .sort((a, b) => b.relevanceScore - a.relevanceScore)
               .filter((result, index, arr) =>
                 index === 0 || !(arr[index - 1].file === result.file &&
-                  arr[index - 1].lineNumber === result.lineNumber &&
-                  arr[index - 1].match === result.match)
+                  Math.abs(arr[index - 1].lineNumber - result.lineNumber) <= 1)
               )
               .slice(0, maxResults)
 
@@ -4378,10 +4449,11 @@ ${CONTINUATION_SAFETY_CHECKS}`
 
             return {
               success: true,
-              message: `Found ${uniqueResults.length} code sections matching "${query}" (sorted by relevance)`,
+              message: `Found ${uniqueResults.length} code sections matching "${query}" (${astResults.length} from AST, ${uniqueResults.length - astResults.length} from regex, sorted by relevance)`,
               query,
               results: uniqueResults,
               totalResults: uniqueResults.length,
+              astAnalysis: astSummaries.length > 0 ? { filesParsed: astSummaries.length, totalLines: astSummaries.reduce((s: number, a: any) => s + a.lines, 0), totalParseTimeMs: astSummaries.reduce((s: number, a: any) => s + a.parseTimeMs, 0), perFile: astSummaries } : undefined,
               dependencyAnalysis,
               crossReferences: crossReferences.length > 0 ? crossReferences : undefined,
               groupedResults,
