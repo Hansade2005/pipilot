@@ -1162,36 +1162,32 @@ const _constructToolResultInner = async (toolName: string, input: any, projectId
         }
 
         console.log(`[CONSTRUCT_TOOL_RESULT] read_file: Successfully read ${path} (${content.length} chars${wasTruncated ? ' - TRUNCATED' : ''}, lines ${actualStartLine || 1}-${actualEndLine || 'end'})`)
-        let response: any = {
-          success: true,
-          message: `✅ File ${path} read successfully${wasTruncated ? ` (content truncated to ${MAX_CONTENT_SIZE} characters)` : ''}.`,
-          path,
-          content,
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          action: 'read',
-          toolCallId
-        }
 
-        // Add truncation warning
-        if (wasTruncated) {
-          response.truncated = true
-          response.maxContentSize = MAX_CONTENT_SIZE
-          response.fullSize = fullContent.length
-        }
-
-        // Add line number information if requested
+        // If line numbers requested, embed them directly in content (no duplicate field)
         if (includeLineNumbers) {
-          const lines = content.split('\n')
-          const lineCount = lines.length
-          const linesWithNumbers = lines.map((line: string, index: number) => {
+          const contentLines = content.split('\n')
+          content = contentLines.map((line: string, index: number) => {
             const lineNumber = actualStartLine ? actualStartLine + index : index + 1
             return `${String(lineNumber).padStart(4, ' ')}: ${line}`
           }).join('\n')
+        }
 
-          response.lineCount = lineCount
-          response.contentWithLineNumbers = linesWithNumbers
+        const totalLines = fullContent.split('\n').length
+        let response: any = {
+          success: true,
+          path,
+          content,
+          lines: totalLines,
+          toolCallId
+        }
+
+        if (wasTruncated) {
+          response.truncated = true
+          response.fullSize = fullContent.length
+        }
+
+        if (actualStartLine) {
+          response.range = `${actualStartLine}-${actualEndLine || totalLines}`
           response.lines = lines // Array of individual lines for programmatic access
         }
 
