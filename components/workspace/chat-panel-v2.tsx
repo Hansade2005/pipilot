@@ -2872,6 +2872,14 @@ export function ChatPanelV2({
         reasoningPosition: number
       }> = []
 
+      // Clear activeToolCalls for this message to prevent duplicate pills
+      // (original stream's pills are already saved in the message metadata)
+      setActiveToolCalls(prev => {
+        const newMap = new Map(prev)
+        newMap.delete(originalAssistantMessageId)
+        return newMap
+      })
+
       console.log('[ChatPanelV2][Continuation] 📥 Processing continuation stream')
 
       while (true) {

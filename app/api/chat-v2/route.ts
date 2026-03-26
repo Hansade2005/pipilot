@@ -12429,12 +12429,27 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
       // Capture current session storage state
       const currentSessionData = sessionProjectStorage.get(projectId);
 
+      // Strip file content from tool-call args to prevent payload bloat
+      // The synthesizer only needs tool names and file paths, not full file content
+      const compactToolResults = toolResults.map((tr: any) => {
+        if (tr.type === 'tool-call' && tr.args) {
+          const { content, searchReplaceBlock, oldString, newString, ...safeArgs } = tr.args
+          return { ...tr, args: safeArgs }
+        }
+        if (tr.type === 'tool-result' && tr.result) {
+          // Strip content from results too
+          const { content, newContent, originalContent, ...safeResult } = (typeof tr.result === 'object' ? tr.result : {})
+          return { ...tr, result: { ...safeResult, success: tr.result?.success } }
+        }
+        return tr
+      })
+
       return {
         continuationToken: crypto.randomUUID(),
         timestamp: new Date().toISOString(),
         elapsedTimeMs: timeStatus.elapsed,
         messages: currentMessages,
-        toolResults,
+        toolResults: compactToolResults,
         sessionData: {
           projectId,
           modelId,
