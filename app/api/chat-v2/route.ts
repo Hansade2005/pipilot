@@ -222,6 +222,7 @@ interface ContinuationData {
   partialReasoning: string
   elapsedTimeMs: number
   modifiedFiles: string[]
+  userPrompt?: string  // The original user message that started the session
 }
 
 async function synthesizeContinuationContext(data: ContinuationData): Promise<string | null> {
@@ -284,7 +285,10 @@ async function synthesizeContinuationContext(data: ContinuationData): Promise<st
     const lastThinking = data.partialReasoning ? data.partialReasoning.trim() : ''
 
     // Build the conversation flow (compact, readable)
-    const rawContext = `## Agent Conversation Flow (${Math.round(data.elapsedTimeMs / 1000)}s elapsed)
+    const rawContext = `## User's Original Request
+"${data.userPrompt ? data.userPrompt.slice(0, 500) : '(not available)'}"
+
+## Agent Conversation Flow (${Math.round(data.elapsedTimeMs / 1000)}s elapsed)
 
 ${flowLines.join('\n')}
 ${data.modifiedFiles.length > 0 ? `\nFiles modified: ${data.modifiedFiles.join(', ')}` : ''}
@@ -3274,6 +3278,12 @@ ${customPersona.trim()}`
       const hasPartialContent = partialResponse?.content && partialResponse.content.trim().length > 0
       const hasPartialReasoning = partialResponse?.reasoning && partialResponse.reasoning.trim().length > 0
 
+      // Extract the user's original prompt from messages for synthesizer context
+      const userPrompt = processedMessages
+        .filter((m: any) => m.role === 'user')
+        .map((m: any) => typeof m.content === 'string' ? m.content : '')
+        .find((c: string) => c.length > 5) || ''
+
       let synthesizedSummary: string | null = null
       if (previousToolResults.length > 0) {
         try {
@@ -3282,7 +3292,8 @@ ${customPersona.trim()}`
             partialContent: hasPartialContent ? partialResponse.content : '',
             partialReasoning: hasPartialReasoning ? partialResponse.reasoning : '',
             elapsedTimeMs: continuationState.elapsedTimeMs || 0,
-            modifiedFiles: modifiedFilesList
+            modifiedFiles: modifiedFilesList,
+            userPrompt
           })
           if (synthesizedSummary) {
             console.log(`[Chat-V2] ✅ Using synthesized continuation context (${synthesizedSummary.length} chars)`)
@@ -3349,7 +3360,8 @@ ${CONTINUATION_SAFETY_CHECKS}`
             partialContent: hasPartialContent ? partialResponse.content : '',
             partialReasoning: hasPartialReasoning ? partialResponse.reasoning : '',
             elapsedTimeMs: 0,
-            modifiedFiles: modifiedFilesList
+            modifiedFiles: modifiedFilesList,
+            userPrompt
           })
           if (recoverySummary) {
             console.log(`[Chat-V2] ✅ Using synthesized recovery context (${recoverySummary.length} chars)`)
