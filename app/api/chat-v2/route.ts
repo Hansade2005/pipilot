@@ -4703,6 +4703,24 @@ ${CONTINUATION_SAFETY_CHECKS}`
               { type: 'test_case', regex: /^\s*(it|test|describe)\s*\(/gm, score: 6, description: 'Test case' },
             ] : []
 
+            // ── Tokenize query for multi-keyword search (same stopwords as semantic navigator) ──
+            const grepStopwords = new Set([
+              'a', 'an', 'the', 'this', 'that', 'these', 'those', 'is', 'are', 'was', 'were',
+              'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
+              'could', 'should', 'may', 'might', 'shall', 'can', 'need', 'must', 'of', 'to',
+              'in', 'for', 'on', 'with', 'at', 'by', 'from', 'as', 'into', 'about', 'between',
+              'through', 'during', 'before', 'after', 'up', 'down', 'out', 'off', 'over', 'under',
+              'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'each',
+              'every', 'both', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'not',
+              'only', 'so', 'than', 'too', 'very', 'just', 'but', 'and', 'or', 'if', 'while',
+              'it', 'its', 'my', 'me', 'we', 'our', 'you', 'your', 'he', 'she', 'they', 'them',
+              'what', 'which', 'who', 'whose',
+              'find', 'show', 'list', 'get', 'search', 'look', 'check', 'analyze', 'analyse',
+              'display', 'give', 'tell', 'describe', 'explain', 'locate', 'identify',
+            ])
+            const grepTokens = query.toLowerCase().split(/[\s,;|+]+/).map(t => t.trim()).filter(t => t.length > 1 && !grepStopwords.has(t))
+            const isNaturalLanguageQuery = !isRegexp && grepTokens.length >= 2 && query.includes(' ')
+
             // 🎯 Prepare Primary Search Strategy
             let primarySearchRegex: RegExp
             try {
@@ -4713,11 +4731,12 @@ ${CONTINUATION_SAFETY_CHECKS}`
                 const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
                 primarySearchRegex = new RegExp(escapedQuery, caseSensitive ? 'gm' : 'gim')
                 searchStrategies.push('literal')
-              } else if (searchMode === 'semantic') {
-                // For semantic, we'll use smart patterns only
-                const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-                primarySearchRegex = new RegExp(escapedQuery, 'gim') // Always case-insensitive for semantic
-                searchStrategies.push('semantic-patterns')
+              } else if (searchMode === 'semantic' || isNaturalLanguageQuery) {
+                // For semantic or natural language queries, search for each keyword with OR
+                const keywordsToSearch = grepTokens.length > 0 ? grepTokens : [query]
+                const escapedTokens = keywordsToSearch.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+                primarySearchRegex = new RegExp(`\\b(${escapedTokens.join('|')})\\b`, 'gim')
+                searchStrategies.push('multi-keyword')
               } else {
                 // Hybrid mode: literal + smart patterns
                 const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
