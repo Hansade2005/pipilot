@@ -3997,11 +3997,32 @@ ${CONTINUATION_SAFETY_CHECKS}`
 
             const results: any[] = []
 
-            // ── Tokenize query into individual keywords for multi-keyword search ──
+            // ── Tokenize query into meaningful keywords (filter stopwords) ──
+            const stopwords = new Set([
+              'a', 'an', 'the', 'this', 'that', 'these', 'those', 'is', 'are', 'was', 'were',
+              'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
+              'could', 'should', 'may', 'might', 'shall', 'can', 'need', 'must', 'of', 'to',
+              'in', 'for', 'on', 'with', 'at', 'by', 'from', 'as', 'into', 'about', 'between',
+              'through', 'during', 'before', 'after', 'above', 'below', 'up', 'down', 'out',
+              'off', 'over', 'under', 'again', 'further', 'then', 'once', 'here', 'there',
+              'when', 'where', 'why', 'how', 'all', 'each', 'every', 'both', 'few', 'more',
+              'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same',
+              'so', 'than', 'too', 'very', 'just', 'because', 'but', 'and', 'or', 'if',
+              'while', 'it', 'its', 'my', 'me', 'we', 'our', 'you', 'your', 'he', 'she',
+              'they', 'them', 'what', 'which', 'who', 'whom', 'whose',
+              // Common query verbs that aren't code keywords
+              'find', 'show', 'list', 'get', 'search', 'look', 'check', 'analyze', 'analyse',
+              'display', 'give', 'tell', 'describe', 'explain', 'locate', 'identify',
+            ])
             const queryTokens = query.toLowerCase()
               .split(/[\s,;|+]+/)
               .map(t => t.trim())
-              .filter(t => t.length > 1)
+              .filter(t => t.length > 1 && !stopwords.has(t))
+            // If all tokens were stopwords, fall back to using original tokens > 3 chars
+            if (queryTokens.length === 0) {
+              const fallbackTokens = query.toLowerCase().split(/[\s,;|+]+/).map(t => t.trim()).filter(t => t.length > 3)
+              queryTokens.push(...fallbackTokens)
+            }
             const isMultiKeyword = queryTokens.length > 1
 
             // ── Helper: calculate line number from char index ──
