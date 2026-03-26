@@ -226,80 +226,86 @@ interface ContinuationData {
 
 async function synthesizeContinuationContext(data: ContinuationData): Promise<string | null> {
   try {
-    // Build a structured representation of what was done
-    const toolSummaryLines: string[] = []
-    const filesWritten: string[] = []
-    const filesRead: string[] = []
-    const filesEdited: string[] = []
-    const planUpdates: string[] = []
-    const otherActions: string[] = []
+    // ── Build a conversation flow timeline (like how a human would describe what happened) ──
+    const flowLines: string[] = []
+    let lastAIText = ''
 
     for (const tr of data.toolResults) {
-      // Skip tool-result entries — they're redundant with tool-call entries
-      // and don't have args (file paths). Only process tool-call entries.
-      if (tr.type === 'tool-result') continue
-
       const name = tr.toolName || tr.name || 'unknown'
       const args = tr.args || tr.input || {}
+      const result = tr.result || {}
 
-      if (name === 'write_file') {
-        filesWritten.push(args.path || 'unknown')
-      } else if (name === 'read_file') {
-        filesRead.push(args.path || 'unknown')
+      if (tr.type === 'tool-result') continue // Skip results, only process calls
+
+      // Format each tool call as a simple action line
+      if (name === 'read_file') {
+        flowLines.push(`→ Read ${args.path || 'file'}`)
+      } else if (name === 'write_file') {
+        flowLines.push(`→ Write ${args.path || 'file'}`)
       } else if (name === 'edit_file' || name === 'client_replace_string_in_file') {
-        filesEdited.push(args.filePath || args.path || 'unknown')
-      } else if (name === 'update_plan_progress') {
-        planUpdates.push(`Step ${args.stepNumber}${args.notes ? ': ' + args.notes : ''}`)
+        flowLines.push(`→ Edit ${args.filePath || args.path || 'file'}`)
+      } else if (name === 'delete_file') {
+        flowLines.push(`→ Delete ${args.path || 'file'}`)
+      } else if (name === 'list_files') {
+        flowLines.push(`→ List files`)
       } else if (name === 'generate_plan') {
-        const planTitle = args.title || 'Untitled'
-        const stepCount = Array.isArray(args.steps) ? args.steps.length : '?'
-        otherActions.push(`Generated plan: "${planTitle}" (${stepCount} steps)`)
+        flowLines.push(`→ Generated plan: "${args.title || 'Untitled'}" (${Array.isArray(args.steps) ? args.steps.length : '?'} steps)`)
+      } else if (name === 'update_plan_progress') {
+        flowLines.push(`→ Completed plan step ${args.stepNumber || '?'}${args.notes ? ': ' + args.notes : ''}`)
+      } else if (name === 'start_build_mode') {
+        flowLines.push(`→ Entered build mode`)
+      } else if (name === 'finish_build_mode') {
+        flowLines.push(`→ Finished build mode`)
+      } else if (name === 'check_dev_errors') {
+        flowLines.push(`→ Check dev errors (${args.mode || 'build'})`)
+      } else if (name === 'deploy_preview') {
+        flowLines.push(`→ Deploy preview`)
+      } else if (name === 'frontend_design_guide') {
+        flowLines.push(`→ Design guide (${args.action || 'read'})`)
+      } else if (name === 'project_file_strategy') {
+        flowLines.push(`→ File strategy for ${args.projectType || 'project'} (${args.framework || 'unknown'})`)
+      } else if (name === 'browse_web') {
+        flowLines.push(`→ Browse web: ${args.url || 'URL'}`)
+      } else if (name === 'web_search') {
+        flowLines.push(`→ Web search: "${args.query || ''}"`)
+      } else if (name === 'grep_search' || name === 'semantic_code_navigator') {
+        flowLines.push(`→ Search: "${args.query || ''}"`)
+      } else if (name === 'update_project_context') {
+        flowLines.push(`→ Updated project context`)
+      } else if (name === 'publish_to_showcase') {
+        flowLines.push(`→ Publish to showcase (${args.action || 'check'})`)
       } else if (name !== 'suggest_next_steps' && name !== 'discover_tools') {
-        otherActions.push(`${name}(${JSON.stringify(args).slice(0, 80)})`)
+        flowLines.push(`→ ${name}`)
       }
     }
 
-    // Build the synthesis prompt
-    const rawContext = `
-## Session State to Synthesize
+    // Add what the AI was saying/thinking when it got cut off
+    const lastContent = data.partialContent ? data.partialContent.trim() : ''
+    const lastThinking = data.partialReasoning ? data.partialReasoning.trim() : ''
 
-### Time elapsed: ${Math.round(data.elapsedTimeMs / 1000)} seconds
-### Total tool operations: ${data.toolResults.length}
+    // Build the conversation flow (compact, readable)
+    const rawContext = `## Agent Conversation Flow (${Math.round(data.elapsedTimeMs / 1000)}s elapsed)
 
-### Files CREATED (write_file):
-${filesWritten.length > 0 ? filesWritten.map(f => `- ${f}`).join('\n') : '- None'}
+${flowLines.join('\n')}
+${data.modifiedFiles.length > 0 ? `\nFiles modified: ${data.modifiedFiles.join(', ')}` : ''}
+${lastContent ? `\nAgent's last message before cutoff:\n"${lastContent.slice(-800)}"` : ''}
+${lastThinking ? `\nAgent was thinking:\n"${lastThinking.slice(-400)}"` : ''}
+[CUTOFF HERE - agent was interrupted]`.trim()
 
-### Files EDITED (edit_file / client_replace_string_in_file):
-${filesEdited.length > 0 ? filesEdited.map(f => `- ${f}`).join('\n') : '- None'}
+    const synthesisSystemPrompt = `You are a session state synthesizer. You receive a conversation flow showing what an AI coding agent did before it was interrupted. Produce a CONCISE handoff summary so the next agent can continue immediately.
 
-### Files READ for context:
-${filesRead.length > 0 ? filesRead.map(f => `- ${f}`).join('\n') : '- None'}
-
-### Plan progress updates:
-${planUpdates.length > 0 ? planUpdates.map(p => `- Completed: ${p}`).join('\n') : '- None'}
-
-### Other actions:
-${otherActions.length > 0 ? otherActions.map(a => `- ${a}`).join('\n') : '- None'}
-
-### Last partial response content (what AI was saying when interrupted):
-${data.partialContent ? data.partialContent.slice(-1500) : '(no text content)'}
-`.trim()
-
-    const synthesisSystemPrompt = `You are a session state synthesizer. Given raw data about an interrupted AI coding session (tool calls, files created/edited, plan progress), produce a CONCISE structured summary that another AI can use to continue the work seamlessly.
-
-Your output must be a structured summary with these EXACT sections:
-1. **What was built** — list files created/edited and their purpose (1 line each)
-2. **Plan status** — which steps are done, which is next
-3. **Current state** — what the AI was doing when interrupted
-4. **What to do next** — the specific next action to take (e.g. "Create src/pages/Calendar.tsx")
+Your output must have these EXACT sections:
+1. **What was done** — files created/edited with purpose (1 line each, use exact paths)
+2. **Where it stopped** — what the agent was doing at cutoff and its last message
+3. **What to do next** — the specific next action (e.g. "Create src/pages/Settings.tsx with user profile form")
+4. **Plan status** — which plan steps are done (if plan exists)
 
 Rules:
-- Be CONCISE — max 400 words total
-- Focus on ACTIONABLE state, not history
-- List file paths exactly as given
-- Do NOT add opinions or suggestions
-- Do NOT repeat the full file contents
-- The goal is to give the continuation AI enough context to immediately start building without needing to re-read files`
+- Max 300 words
+- Focus on what the NEXT agent needs to know to continue immediately
+- Use exact file paths from the flow
+- Do NOT re-explain what the project is — the next agent already has the system prompt
+- Do NOT suggest re-reading files unless the agent was mid-edit when cut off`
 
     // Priority 1: Grok Code Fast 1 (fast, reliable)
     try {
@@ -1172,12 +1178,12 @@ const _constructToolResultInner = async (toolName: string, input: any, projectId
           }).join('\n')
         }
 
-        const totalLines = fullContent.split('\n').length
+        const fileLineCount = fullContent.split('\n').length
         let response: any = {
           success: true,
           path,
           content,
-          lines: totalLines,
+          lines: fileLineCount,
           toolCallId
         }
 
