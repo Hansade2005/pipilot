@@ -3395,7 +3395,7 @@ export default function TodoApp() {
               onAskAiToFix={(errors) => {
                 const errorList = errors.map((err, i) => `${i + 1}. ${err}`).join('\n')
                 const routeInfo = currentIframeUrl ? `\n\nCurrent route where errors occurred: ${currentIframeUrl}` : ''
-                const prompt = `Debug and fix these browser console errors:\n\n${errorList}${routeInfo}\n\nPlease analyze these errors and use your file edit tools to fix them.`
+                const prompt = `Fix these browser console errors:\n\n${errorList}${routeInfo}\n\nIMPORTANT: Read the file ONCE, identify ALL issues, fix them ALL in one edit, then check_dev_errors once. Do NOT read the same file multiple times or fix errors one at a time.`
                 window.dispatchEvent(new CustomEvent('ask-ai-to-fix', {
                   detail: { prompt, errors, currentRoute: currentIframeUrl || undefined }
                 }))
@@ -3403,7 +3403,7 @@ export default function TodoApp() {
               onAskAiToFixTerminal={(errors) => {
                 const errorList = errors.map((err, i) => `${i + 1}. ${err}`).join('\n')
                 const routeInfo = currentIframeUrl ? `\n\nCurrent route where errors occurred: ${currentIframeUrl}` : ''
-                const prompt = `Debug and fix these terminal errors:\n\n${errorList}${routeInfo}\n\nPlease analyze these errors and use your file edit tools to fix them.`
+                const prompt = `Fix these terminal/build errors:\n\n${errorList}${routeInfo}\n\nIMPORTANT: Read the erroring file ONCE, identify ALL similar issues throughout the file, fix them ALL in one write_file call, then check_dev_errors once. Do NOT fix one error at a time — find the pattern and fix all occurrences at once.`
                 window.dispatchEvent(new CustomEvent('ask-ai-to-fix', {
                   detail: { prompt, errors, currentRoute: currentIframeUrl || undefined }
                 }))
