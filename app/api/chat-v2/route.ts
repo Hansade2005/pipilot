@@ -4937,62 +4937,12 @@ ${CONTINUATION_SAFETY_CHECKS}`
               console.log(`[grep_search] 📊 Sorted by file path and line number`)
             }
 
-            // 📈 Calculate statistics
-            const fileMatches = new Map<string, number>()
-            const matchTypeStats = new Map<string, number>()
-
-            uniqueResults.forEach(result => {
-              fileMatches.set(result.file, (fileMatches.get(result.file) || 0) + 1)
-              if (result.matchType) {
-                matchTypeStats.set(result.matchType, (matchTypeStats.get(result.matchType) || 0) + 1)
-              }
-            })
-
-            const topFiles = Array.from(fileMatches.entries())
-              .sort((a, b) => b[1] - a[1])
-              .slice(0, 5)
-              .map(([file, count]) => ({ file, matches: count }))
-
             return {
               success: true,
-              message: totalMatches > 0
-                ? `🎯 Found ${totalMatches} matches (${uniqueResults.length} unique) for "${query}" using [${searchStrategies.join(', ')}] strategies`
-                : `🔍 No matches found for "${query}" in ${filesSearchedCount} files. Try broader search terms or check spelling.`,
               query,
-              searchMode,
-              strategies: searchStrategies,
               results: uniqueResults,
               totalMatches,
-              uniqueMatches: uniqueResults.length,
               filesSearched: filesSearchedCount,
-              topFiles,
-              matchTypeBreakdown: Array.from(matchTypeStats.entries()).map(([type, count]) => ({ type, count })),
-              diagnostics: {
-                filesSource,
-                totalSessionFiles: sessionFiles.size,
-                filesWithContent: filesToSearch.length,
-                filesActuallySearched: filesSearchedCount,
-                primaryRegexPattern: primarySearchRegex.source,
-                primaryRegexFlags: primarySearchRegex.flags,
-                smartPatternsEnabled: enableSmartPatterns && smartPatterns.length > 0,
-                smartPatternsCount: smartPatterns.length,
-                autoDetectedRegex,
-                sortedByRelevance: sortByRelevance,
-                contextLinesUsed: actualContextLines,
-                searchStrategies,
-                includePattern: includePattern || 'none',
-                excludePattern: excludePattern || 'none'
-              },
-              settings: {
-                maxResults,
-                caseSensitive,
-                isRegexp,
-                searchMode,
-                enableSmartPatterns,
-                sortByRelevance,
-                includeContext,
-                contextLines: actualContextLines
-              },
               toolCallId
             }
 
