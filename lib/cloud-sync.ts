@@ -8,13 +8,49 @@ const supabase = createClient()
 // Maximum number of projects to sync to cloud backup
 export const MAX_BACKUP_PROJECTS = 4
 
+// Supabase Storage max object size (50MB default, but we use a safe limit)
+const MAX_BACKUP_SIZE_BYTES = 45 * 1024 * 1024 // 45MB safe limit
+
+// Track excluded projects to show user notifications
+let lastExcludedProjects: string[] = []
+export function getLastExcludedProjects(): string[] { return lastExcludedProjects }
+
 /**
- * Select the N most recently active workspaces and filter all related data
- * (files, chatSessions, messages, deployments, envVars) to only include
- * data belonging to those workspaces.
+ * Estimate the serialized size of a workspace's data (files, messages, sessions).
+ */
+function estimateWorkspaceSize(workspaceId: string, data: any): number {
+  let size = 0
+  const files: any[] = Array.isArray(data.files) ? data.files : []
+  for (const f of files) {
+    if (f.workspaceId === workspaceId) {
+      size += (f.content?.length || 0) + (f.path?.length || 0) + 100 // overhead
+    }
+  }
+  const sessions: any[] = Array.isArray(data.chatSessions) ? data.chatSessions : []
+  const sessionIds = new Set(sessions.filter((s: any) => s.workspaceId === workspaceId).map((s: any) => s.id))
+  const messages: any[] = Array.isArray(data.messages) ? data.messages : []
+  for (const m of messages) {
+    if (sessionIds.has(m.chatSessionId)) {
+      size += (typeof m.content === 'string' ? m.content.length : JSON.stringify(m.content || '').length) + 200
+    }
+  }
+  const checkpoints: any[] = Array.isArray(data.checkpoints) ? data.checkpoints : []
+  for (const cp of checkpoints) {
+    if (cp.workspaceId === workspaceId) {
+      size += JSON.stringify(cp).length
+    }
+  }
+  return size
+}
+
+/**
+ * Select the N most recently active workspaces, then progressively exclude
+ * the largest ones until the total backup size fits under the storage limit.
+ * Returns the filtered data and a list of excluded project names.
  */
 function filterDataToTopProjects(data: any, maxProjects: number = MAX_BACKUP_PROJECTS): any {
   const workspaces: any[] = Array.isArray(data.workspaces) ? data.workspaces : []
+  lastExcludedProjects = []
 
   // Sort by lastActivity descending, pick top N
   const sortedWorkspaces = [...workspaces].sort((a, b) => {
@@ -22,8 +58,41 @@ function filterDataToTopProjects(data: any, maxProjects: number = MAX_BACKUP_PRO
     const dateB = new Date(b.lastActivity || b.updatedAt || b.createdAt || 0).getTime()
     return dateB - dateA
   })
-  const topWorkspaces = sortedWorkspaces.slice(0, maxProjects)
+  let topWorkspaces = sortedWorkspaces.slice(0, maxProjects)
+
+  // Estimate size of each workspace and progressively exclude largest if over limit
+  let workspaceSizes = topWorkspaces.map(w => ({
+    workspace: w,
+    size: estimateWorkspaceSize(w.id, data)
+  }))
+
+  let totalSize = workspaceSizes.reduce((sum, ws) => sum + ws.size, 0)
+  const baseOverhead = 50000 // ~50KB for metadata, BYOK, MCP configs
+
+  while (totalSize + baseOverhead > MAX_BACKUP_SIZE_BYTES && workspaceSizes.length > 1) {
+    // Find the largest workspace
+    workspaceSizes.sort((a, b) => b.size - a.size)
+    const largest = workspaceSizes[0]
+    const sizeMB = (largest.size / (1024 * 1024)).toFixed(1)
+    console.warn(`[CloudSync] Excluding "${largest.workspace.name}" (${sizeMB}MB) from backup — exceeds size limit`)
+    lastExcludedProjects.push(largest.workspace.name)
+    workspaceSizes = workspaceSizes.slice(1)
+    totalSize = workspaceSizes.reduce((sum, ws) => sum + ws.size, 0)
+  }
+
+  // If even the last remaining workspace is too large, still include it but warn
+  if (workspaceSizes.length === 1 && totalSize + baseOverhead > MAX_BACKUP_SIZE_BYTES) {
+    const ws = workspaceSizes[0]
+    const sizeMB = (ws.size / (1024 * 1024)).toFixed(1)
+    console.warn(`[CloudSync] Warning: "${ws.workspace.name}" (${sizeMB}MB) may exceed upload limit`)
+  }
+
+  topWorkspaces = workspaceSizes.map(ws => ws.workspace)
   const topWorkspaceIds = new Set(topWorkspaces.map(w => w.id))
+
+  if (lastExcludedProjects.length > 0) {
+    console.log(`[CloudSync] Backup includes ${topWorkspaces.length} projects, excluded ${lastExcludedProjects.length}: ${lastExcludedProjects.join(', ')}`)
+  }
 
   // Also collect chatSession IDs that belong to these workspaces
   const allChatSessions: any[] = Array.isArray(data.chatSessions) ? data.chatSessions : []
@@ -100,8 +169,18 @@ export async function uploadBackupToCloud(userId: string): Promise<boolean> {
       }
     }
 
-    // Filter to only the top N most recently active projects
+    // Filter to only the top N most recently active projects (with size limits)
     const data = filterDataToTopProjects(fullData, MAX_BACKUP_PROJECTS)
+
+    // Notify user if any projects were excluded due to size
+    if (lastExcludedProjects.length > 0 && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('backup-projects-excluded', {
+        detail: {
+          excluded: lastExcludedProjects,
+          message: `${lastExcludedProjects.length} project${lastExcludedProjects.length > 1 ? 's' : ''} excluded from backup (too large): ${lastExcludedProjects.join(', ')}. Consider using GitHub sync for large projects.`
+        }
+      }))
+    }
 
     // Include BYOK config in backup if user opted in
     const byokConfig = getByokConfig()

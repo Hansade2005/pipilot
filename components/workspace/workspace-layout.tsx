@@ -736,6 +736,19 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     }
     window.addEventListener('switch-mobile-tab', handleSwitchMobileTab as EventListener)
 
+    // Listen for backup size exclusion notifications
+    const handleBackupExcluded = (e: CustomEvent) => {
+      const { excluded, message } = e.detail || {}
+      if (excluded?.length > 0) {
+        toast({
+          title: `${excluded.length} project${excluded.length > 1 ? 's' : ''} excluded from backup`,
+          description: message || 'Some projects are too large for cloud backup. Use GitHub sync instead.',
+          duration: 8000
+        })
+      }
+    }
+    window.addEventListener('backup-projects-excluded', handleBackupExcluded as EventListener)
+
     return () => {
       window.removeEventListener('preview-state-changed', handlePreviewStateChange as EventListener)
       window.removeEventListener('preview-url-changed', handlePreviewUrlChange as EventListener)
@@ -746,6 +759,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       window.removeEventListener('ai-streaming-state', handleAiStreamingState as EventListener)
       window.removeEventListener('openFileInEditor', handleOpenFileInEditor as EventListener)
       window.removeEventListener('switch-mobile-tab', handleSwitchMobileTab as EventListener)
+      window.removeEventListener('backup-projects-excluded', handleBackupExcluded as EventListener)
     }
   }, [selectedProject, isMobile, toast])
 
