@@ -67,27 +67,27 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
     }
   }
 
-  const handleGitHubAuth = async () => {
-      const handleGoogleAuth = async () => {
-        const supabase = createClient()
-        setIsLoading(true)
-        setError(null)
+  const handleGoogleAuth = async () => {
+    const supabase = createClient()
+    setIsLoading(true)
+    setError(null)
 
-        try {
-          const { error } = await supabase.auth.signInWithOAuth({
-            provider: 'google',
-            options: {
-              scopes: 'openid email profile',
-              redirectTo: `${window.location.origin}/api/auth/callback?next=/workspace`,
-            },
-          })
-          if (error) throw error
-          // Google OAuth will redirect, so we don't need to handle success here
-        } catch (error: unknown) {
-          setError(error instanceof Error ? error.message : "An error occurred")
-          setIsLoading(false)
-        }
-      }
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          scopes: 'openid email profile',
+          redirectTo: `${window.location.origin}/api/auth/callback?next=/workspace`,
+        },
+      })
+      if (error) throw error
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "An error occurred")
+      setIsLoading(false)
+    }
+  }
+
+  const handleGitHubAuth = async () => {
     const supabase = createClient()
     setIsLoading(true)
     setError(null)
