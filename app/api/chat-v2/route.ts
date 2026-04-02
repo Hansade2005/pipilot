@@ -2138,6 +2138,297 @@ function stripSearchReplaceMarkers(content: string): string {
     .replace(/\n{3,}/g, '\n\n');
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// EXPERIMENTAL: Direct LLM stream with client-driven tool loop
+// Bypasses AI SDK streamText entirely. Uses raw fetch to OpenAI-compatible
+// API, manages SSE parsing, separates server vs client tools.
+// Activated by x-direct-stream: true header.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Server-side tools that execute on the server (need in-memory files or external APIs)
+const DIRECT_STREAM_SERVER_TOOLS = new Set([
+  'generate_plan', 'update_plan_progress', 'update_project_context',
+  'suggest_next_steps', 'start_build_mode', 'finish_build_mode',
+  'frontend_design_guide', 'project_file_strategy',
+  'check_dev_errors', 'deploy_preview', 'browse_web', 'web_search',
+  'grep_search', 'semantic_code_navigator', 'list_files',
+  'discover_tools', 'publish_to_showcase', 'node_machine',
+])
+
+// Client-side tools — streamed to client for IndexedDB execution
+const DIRECT_STREAM_CLIENT_TOOLS = new Set([
+  'write_file', 'edit_file', 'client_replace_string_in_file',
+  'delete_file', 'delete_folder', 'read_file',
+])
+
+function sseChunk(data: any): string {
+  return `data: ${JSON.stringify(data)}\n\n`
+}
+
+async function handleDirectStream(
+  req: Request,
+  messages: any[],
+  systemPrompt: string,
+  modelId: string,
+  tools: any[],
+  projectId: string,
+  maxSteps: number,
+): Promise<Response> {
+  const encoder = new TextEncoder()
+
+  // Resolve LLM API endpoint and key based on model
+  // Primary: Kilo Gateway (same endpoint as reference project)
+  // Fallback: Direct provider APIs
+  let apiUrl: string
+  let apiKey: string
+  let apiModel: string
+
+  const kiloKey = process.env.KILO_API_KEY?.split(',')[0] || ''
+
+  if (kiloKey) {
+    // Use Kilo Gateway (OpenAI-compatible, routes to best model)
+    apiUrl = 'https://api.kilo.ai/api/gateway/chat/completions'
+    apiKey = kiloKey
+    apiModel = modelId?.startsWith('ollama/') ? modelId.replace('ollama/', '')
+      : modelId?.startsWith('xai/') ? modelId.replace('xai/', '')
+      : modelId || 'kilo-auto/free'
+  } else if (modelId?.startsWith('ollama/')) {
+    apiUrl = 'https://ollama.com/v1/chat/completions'
+    apiKey = process.env.OLLAMA_API_KEYS?.split(',')[0] || ''
+    apiModel = modelId.replace('ollama/', '')
+  } else if (modelId?.includes('grok') || modelId?.startsWith('xai/')) {
+    apiUrl = 'https://api.x.ai/v1/chat/completions'
+    apiKey = process.env.XAI_API_KEY || ''
+    apiModel = modelId.replace('xai/', '')
+  } else {
+    apiUrl = 'https://ollama.com/v1/chat/completions'
+    apiKey = process.env.OLLAMA_API_KEYS?.split(',')[0] || ''
+    apiModel = modelId?.replace('ollama/', '') || 'minimax-m2.7'
+  }
+
+  // Convert tools to OpenAI function calling format
+  const openaiTools = tools.map((t: any) => ({
+    type: 'function',
+    function: {
+      name: t.name || Object.keys(t)[0],
+      description: t.description || '',
+      parameters: t.inputSchema || t.parameters || { type: 'object', properties: {} },
+    }
+  })).filter((t: any) => t.function.name)
+
+  // Build OpenAI-format messages
+  const openaiMessages: any[] = [
+    { role: 'system', content: systemPrompt },
+    ...messages.map((m: any) => {
+      if (m.role === 'tool') return m // Already OpenAI format from tool result loop
+      if (typeof m.content === 'string') return { role: m.role, content: m.content }
+      // Handle array content (tool calls)
+      if (Array.isArray(m.content)) {
+        const toolCalls = m.content.filter((p: any) => p.type === 'tool-call')
+        if (toolCalls.length > 0) {
+          return {
+            role: 'assistant',
+            content: null,
+            tool_calls: toolCalls.map((tc: any) => ({
+              id: tc.toolCallId,
+              type: 'function',
+              function: { name: tc.toolName, arguments: JSON.stringify(tc.input || tc.args || {}) }
+            }))
+          }
+        }
+      }
+      return { role: m.role, content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) }
+    })
+  ]
+
+  return new Response(
+    new ReadableStream({
+      async start(controller) {
+        try {
+          for (let step = 0; step < maxSteps; step++) {
+            console.log(`[DirectStream] Step ${step + 1}/${maxSteps}`)
+
+            const fetchRes = await fetch(apiUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+              },
+              body: JSON.stringify({
+                model: apiModel,
+                messages: openaiMessages,
+                max_tokens: 16384,
+                temperature: 0.7,
+                stream: true,
+                tools: openaiTools.length > 0 ? openaiTools : undefined,
+                tool_choice: 'auto',
+              }),
+            })
+
+            if (!fetchRes.ok) {
+              const errText = await fetchRes.text().catch(() => 'Unknown error')
+              console.error(`[DirectStream] API error ${fetchRes.status}: ${errText.slice(0, 500)}`)
+              controller.enqueue(encoder.encode(JSON.stringify({ type: 'text-delta', text: `\n\nError: API returned ${fetchRes.status}` }) + '\n'))
+              break
+            }
+
+            // Read SSE stream, collect text + tool_calls
+            const reader = fetchRes.body!.getReader()
+            const decoder = new TextDecoder()
+            let collected = ''
+            const streamToolCalls: any[] = []
+            let finishReason: string | null = null
+            let sseBuffer = ''
+
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
+
+              sseBuffer += decoder.decode(value, { stream: true })
+              const lines = sseBuffer.split('\n')
+              sseBuffer = lines.pop() || ''
+
+              for (const line of lines) {
+                if (!line.startsWith('data: ') || line === 'data: [DONE]') continue
+                try {
+                  const chunk = JSON.parse(line.slice(6))
+                  const delta = chunk.choices?.[0]?.delta
+                  const reason = chunk.choices?.[0]?.finish_reason
+
+                  if (reason) finishReason = reason
+
+                  // Text content → stream to client
+                  if (delta?.content) {
+                    collected += delta.content
+                    controller.enqueue(encoder.encode(JSON.stringify({ type: 'text-delta', text: delta.content }) + '\n'))
+                  }
+
+                  // Reasoning → stream to client
+                  if (delta?.reasoning_content || delta?.reasoning) {
+                    const reasoning = delta.reasoning_content || delta.reasoning
+                    controller.enqueue(encoder.encode(JSON.stringify({ type: 'reasoning-delta', text: reasoning }) + '\n'))
+                  }
+
+                  // Tool call deltas → collect
+                  if (delta?.tool_calls) {
+                    for (const tc of delta.tool_calls) {
+                      const idx = tc.index ?? 0
+                      if (!streamToolCalls[idx]) {
+                        streamToolCalls[idx] = {
+                          id: tc.id || '',
+                          type: 'function',
+                          function: { name: tc.function?.name || '', arguments: '' },
+                        }
+                      }
+                      if (tc.id) streamToolCalls[idx].id = tc.id
+                      if (tc.function?.name) streamToolCalls[idx].function.name = tc.function.name
+                      if (tc.function?.arguments) streamToolCalls[idx].function.arguments += tc.function.arguments
+                    }
+                  }
+                } catch {
+                  // Skip malformed SSE chunks
+                }
+              }
+            }
+
+            const parsedToolCalls = streamToolCalls.filter(Boolean)
+
+            if (finishReason === 'tool_calls' && parsedToolCalls.length > 0) {
+              // Separate server vs client tools
+              const serverCalls = parsedToolCalls.filter((tc: any) => DIRECT_STREAM_SERVER_TOOLS.has(tc.function.name))
+              const clientCalls = parsedToolCalls.filter((tc: any) => !DIRECT_STREAM_SERVER_TOOLS.has(tc.function.name))
+
+              console.log(`[DirectStream] Tool calls: server=[${serverCalls.map((t: any) => t.function.name)}], client=[${clientCalls.map((t: any) => t.function.name)}]`)
+
+              // Add assistant message to conversation
+              openaiMessages.push({
+                role: 'assistant',
+                content: collected || null,
+                tool_calls: parsedToolCalls,
+              })
+
+              // Execute server-side tools
+              for (const tc of serverCalls) {
+                const toolArgs = JSON.parse(tc.function.arguments || '{}')
+                // Emit tool-call event to client for pill display
+                controller.enqueue(encoder.encode(JSON.stringify({
+                  type: 'tool-call',
+                  toolCallId: tc.id,
+                  toolName: tc.function.name,
+                  input: toolArgs,
+                }) + '\n'))
+
+                try {
+                  const result = await constructToolResult(tc.function.name, toolArgs, projectId, tc.id)
+                  openaiMessages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) })
+                  // Emit tool-result event
+                  controller.enqueue(encoder.encode(JSON.stringify({
+                    type: 'tool-result',
+                    toolCallId: tc.id,
+                    toolName: tc.function.name,
+                    result,
+                  }) + '\n'))
+                } catch (toolErr) {
+                  const errMsg = toolErr instanceof Error ? toolErr.message : 'Tool execution failed'
+                  openaiMessages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify({ error: errMsg }) })
+                }
+              }
+
+              // If there are client tools, stream them and pause for client execution
+              if (clientCalls.length > 0) {
+                // Stream each client tool call to the client
+                for (const tc of clientCalls) {
+                  controller.enqueue(encoder.encode(JSON.stringify({
+                    type: 'tool-call',
+                    toolCallId: tc.id,
+                    toolName: tc.function.name,
+                    input: JSON.parse(tc.function.arguments || '{}'),
+                  }) + '\n'))
+                }
+
+                // Emit client_tool_calls_pending — client executes and sends results back
+                controller.enqueue(encoder.encode(JSON.stringify({
+                  type: 'client_tool_calls_pending',
+                  toolCalls: clientCalls.map((tc: any) => ({
+                    toolCallId: tc.id,
+                    toolName: tc.function.name,
+                    input: JSON.parse(tc.function.arguments || '{}'),
+                  })),
+                  stepCount: step + 1,
+                  openaiMessages, // Pass conversation state so client can resume
+                }) + '\n'))
+
+                break // End stream — client will execute and send new request
+              }
+
+              // Only server tools — continue loop
+              continue
+            }
+
+            // Normal stop — done
+            controller.enqueue(encoder.encode(JSON.stringify({ type: 'finish', reason: finishReason || 'stop' }) + '\n'))
+            break
+          }
+        } catch (error) {
+          console.error('[DirectStream] Error:', error)
+          controller.enqueue(encoder.encode(JSON.stringify({ type: 'error', message: error instanceof Error ? error.message : 'Unknown error' }) + '\n'))
+        } finally {
+          controller.close()
+        }
+      }
+    }),
+    {
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Transfer-Encoding': 'chunked',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
+      }
+    }
+  )
+}
+
 export async function POST(req: Request) {
   let requestId = crypto.randomUUID()
   let startTime = Date.now()
