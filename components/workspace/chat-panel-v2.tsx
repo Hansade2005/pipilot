@@ -4387,7 +4387,7 @@ index.css: UNDER 250 lines. Only :root variables, @keyframes, base reset, @tailw
                 accumulatedReasoning += parsed.text
                 scheduleFlush()
               } else if (parsed.type === 'tool-call') {
-                // Show pill
+                // Show pill immediately (even without text)
                 const toolEntry = {
                   toolName: parsed.toolName,
                   toolCallId: parsed.toolCallId,
@@ -4397,6 +4397,7 @@ index.css: UNDER 250 lines. Only :root variables, @keyframes, base reset, @tailw
                 }
                 localToolCalls.push(toolEntry)
                 setStreamingToolCalls([...localToolCalls])
+                scheduleFlush() // Flush so pills render even without text
                 setActiveToolCalls(prev => {
                   const newMap = new Map(prev)
                   const calls = newMap.get(assistantMessageId) || []
@@ -4420,6 +4421,7 @@ index.css: UNDER 250 lines. Only :root variables, @keyframes, base reset, @tailw
                     newMap.set(assistantMessageId, calls)
                     return newMap
                   })
+                  scheduleFlush() // Update UI with completed pill status
                 }
               } else if (parsed.type === 'client_tool_calls_pending') {
                 // Client tools need execution
