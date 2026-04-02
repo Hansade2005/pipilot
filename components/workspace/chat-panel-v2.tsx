@@ -4274,13 +4274,27 @@ index.css: UNDER 250 lines. Only :root variables, @keyframes, base reset, @tailw
       { role: 'user', content: userMessage },
     ]
 
-    // Tool definitions in OpenAI format (same as reference project)
-    const FILE_TOOLS = [
+    // Tool definitions in OpenAI format
+    // Client tools: executed on IndexedDB by the client
+    // Server tools: executed by our server via constructToolResult
+    const ALL_TOOLS = [
+      // ── Client-side file tools ──
       { type: 'function', function: { name: 'write_file', description: 'Create or update a file in the project.', parameters: { type: 'object', properties: { path: { type: 'string', description: 'File path (e.g. src/pages/Home.tsx)' }, content: { type: 'string', description: 'Complete file content' } }, required: ['path', 'content'] } } },
-      { type: 'function', function: { name: 'edit_file', description: 'Edit a file using search/replace blocks.', parameters: { type: 'object', properties: { filePath: { type: 'string' }, searchReplaceBlock: { type: 'string', description: '<<<<<<< SEARCH\\n[old]\\n=======\\n[new]\\n>>>>>>> REPLACE' } }, required: ['filePath', 'searchReplaceBlock'] } } },
-      { type: 'function', function: { name: 'read_file', description: 'Read file contents (max 150 lines per read).', parameters: { type: 'object', properties: { path: { type: 'string' }, startLine: { type: 'number' }, endLine: { type: 'number' } }, required: ['path'] } } },
+      { type: 'function', function: { name: 'edit_file', description: 'Edit a file using search/replace blocks. If fails 3x, use write_file instead.', parameters: { type: 'object', properties: { filePath: { type: 'string' }, searchReplaceBlock: { type: 'string', description: '<<<<<<< SEARCH\\n[old]\\n=======\\n[new]\\n>>>>>>> REPLACE' } }, required: ['filePath', 'searchReplaceBlock'] } } },
+      { type: 'function', function: { name: 'read_file', description: 'Read file contents (max 150 lines per read). Use startLine/endLine for large files.', parameters: { type: 'object', properties: { path: { type: 'string' }, startLine: { type: 'number' }, endLine: { type: 'number' } }, required: ['path'] } } },
       { type: 'function', function: { name: 'delete_file', description: 'Delete a file.', parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] } } },
-      { type: 'function', function: { name: 'list_files', description: 'List files and directories.', parameters: { type: 'object', properties: { path: { type: 'string' } } } } },
+      // ── Server-side tools (executed by PiPilot server) ──
+      { type: 'function', function: { name: 'list_files', description: 'List all files and directories in the project.', parameters: { type: 'object', properties: { path: { type: 'string', description: 'Optional directory path' } } } } },
+      { type: 'function', function: { name: 'grep_search', description: 'Search file contents for text or regex patterns.', parameters: { type: 'object', properties: { query: { type: 'string', description: 'Search query' }, includePattern: { type: 'string', description: 'Glob pattern (e.g. **/*.tsx)' } }, required: ['query'] } } },
+      { type: 'function', function: { name: 'semantic_code_navigator', description: 'Advanced semantic code search with TypeScript AST analysis. Find components, functions, hooks, types.', parameters: { type: 'object', properties: { query: { type: 'string', description: 'Natural language query (e.g. "hero features pricing sections")' }, filePath: { type: 'string' }, analysisDepth: { type: 'string', enum: ['basic', 'detailed', 'comprehensive'] } }, required: ['query'] } } },
+      { type: 'function', function: { name: 'check_dev_errors', description: 'Run build check to find errors. Use mode "build" for production build check.', parameters: { type: 'object', properties: { mode: { type: 'string', enum: ['dev', 'build'], description: 'Check mode' } }, required: ['mode'] } } },
+      { type: 'function', function: { name: 'deploy_preview', description: 'Deploy project to a live .pipilot.dev URL. Only call after check_dev_errors passes.', parameters: { type: 'object', properties: { framework: { type: 'string', description: 'Project framework (vite-react, nextjs, html)' } } } } },
+      { type: 'function', function: { name: 'generate_plan', description: 'Generate a build plan. Call before building.', parameters: { type: 'object', properties: { title: { type: 'string' }, description: { type: 'string' }, steps: { type: 'array', items: { type: 'string' } }, techStack: { type: 'array', items: { type: 'string' } }, estimatedFiles: { type: 'number' } }, required: ['title', 'description', 'steps'] } } },
+      { type: 'function', function: { name: 'update_plan_progress', description: 'Mark a plan step as completed.', parameters: { type: 'object', properties: { stepNumber: { type: 'number' }, notes: { type: 'string' } }, required: ['stepNumber'] } } },
+      { type: 'function', function: { name: 'update_project_context', description: 'Save project context to .pipilot/project.md.', parameters: { type: 'object', properties: { projectName: { type: 'string' }, summary: { type: 'string' }, features: { type: 'array', items: { type: 'string' } }, techStack: { type: 'array', items: { type: 'string' } } }, required: ['projectName'] } } },
+      { type: 'function', function: { name: 'suggest_next_steps', description: 'Suggest 3-4 next steps for the user. Call as the LAST action.', parameters: { type: 'object', properties: { suggestions: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, description: { type: 'string' } } } } }, required: ['suggestions'] } } },
+      { type: 'function', function: { name: 'frontend_design_guide', description: 'Read or generate the design system. Call with action "read" first, then "generate" if empty.', parameters: { type: 'object', properties: { action: { type: 'string', enum: ['read', 'generate'] }, projectType: { type: 'string' }, userMessage: { type: 'string' } }, required: ['action'] } } },
+      { type: 'function', function: { name: 'project_file_strategy', description: 'Get optimal minimal file structure for the project.', parameters: { type: 'object', properties: { projectType: { type: 'string' }, framework: { type: 'string', enum: ['vite-react', 'nextjs', 'expo', 'html'] }, pages: { type: 'array', items: { type: 'string' } }, features: { type: 'array', items: { type: 'string' } } }, required: ['projectType', 'framework'] } } },
     ]
 
     const directController = new AbortController()
@@ -4330,7 +4344,7 @@ index.css: UNDER 250 lines. Only :root variables, @keyframes, base reset, @tailw
             project,
             projectId: project.id,
             files: projectFiles,
-            tools: FILE_TOOLS,
+            tools: ALL_TOOLS,
             maxSteps: 100,
           }),
           signal: directController.signal,
