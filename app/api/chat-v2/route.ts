@@ -2181,15 +2181,21 @@ async function handleDirectStream(
   // Same endpoint the reference PiPilot IDE project uses.
   const apiUrl = 'https://the3rdacademy.com/api/chat/completions'
 
-  // Convert tools to OpenAI function calling format
-  const openaiTools = tools.map((t: any) => ({
-    type: 'function',
-    function: {
-      name: t.name || Object.keys(t)[0],
-      description: t.description || '',
-      parameters: t.inputSchema || t.parameters || { type: 'object', properties: {} },
+  // Pass tools through — they should already be in OpenAI format from the client
+  // { type: "function", function: { name, description, parameters } }
+  const openaiTools = tools.filter((t: any) => t?.function?.name || t?.name).map((t: any) => {
+    // Already in OpenAI format
+    if (t.type === 'function' && t.function?.name) return t
+    // AI SDK format — convert
+    return {
+      type: 'function',
+      function: {
+        name: t.name,
+        description: t.description || '',
+        parameters: t.inputSchema || t.parameters || { type: 'object', properties: {} },
+      }
     }
-  })).filter((t: any) => t.function.name)
+  })
 
   // Build OpenAI-format messages
   const openaiMessages: any[] = [
