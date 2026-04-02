@@ -1099,6 +1099,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                   const params = new URLSearchParams(searchParams.toString())
                   params.set('projectId', newProject.id)
                   params.set('newProject', newProject.id) // ✅ CRITICAL: This prevents auto-restore from running
+                  params.set('directStream', 'true')
                   router.push(`/workspace?${params.toString()}`)
                   
                   console.log('✅ WorkspaceLayout: Navigating to NEW project with newProject flag:', newProject.id)
@@ -1209,6 +1210,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     const params = new URLSearchParams(searchParams.toString())
                     params.set('projectId', newProject.id)
                     params.set('newProject', newProject.id) // ✅ CRITICAL: This prevents auto-restore from running
+                  params.set('directStream', 'true')
                     router.push(`/workspace?${params.toString()}`)
                     
                     console.log('✅ WorkspaceLayout: Navigating to NEW project with newProject flag:', newProject.id)
@@ -1907,6 +1909,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                           const params = new URLSearchParams(searchParams.toString())
                           params.set('projectId', newProject.id)
                           params.set('newProject', newProject.id) // ✅ CRITICAL: This prevents auto-restore from running
+                  params.set('directStream', 'true')
                           router.push(`/workspace?${params.toString()}`)
                           
                           console.log('✅ WorkspaceLayout: Navigating to NEW project with newProject flag:', newProject.id)

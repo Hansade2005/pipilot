@@ -1492,6 +1492,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     const params = new URLSearchParams(searchParams.toString())
                     params.set('projectId', newProject.id)
                     params.set('newProject', newProject.id) // ✅ CRITICAL: This prevents auto-restore from running
+                          params.set('directStream', 'true')
                     router.push(`/workspace?${params.toString()}`)
                     
                                         
@@ -2200,6 +2201,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       const params = new URLSearchParams(searchParams.toString())
                       params.set('projectId', newProject.id)
                       params.set('newProject', newProject.id)
+                      params.set('directStream', 'true')
                       router.push(`/workspace?${params.toString()}`)
                       
                       // Prevent auto-restore for newly created project
@@ -2467,6 +2469,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                           const params = new URLSearchParams(searchParams.toString())
                           params.set('projectId', newProject.id)
                           params.set('newProject', newProject.id) // ✅ CRITICAL: This prevents auto-restore from running
+                          params.set('directStream', 'true')
                           router.push(`/workspace?${params.toString()}`)
                           
                                                     
@@ -2667,6 +2670,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       const params = new URLSearchParams(searchParams.toString())
                       params.set('projectId', newProject.id)
                       params.set('newProject', newProject.id)
+                      params.set('directStream', 'true')
                       router.push(`/workspace?${params.toString()}`)
                       // Prevent auto-restore for newly created project
                       setJustCreatedProject(true)
