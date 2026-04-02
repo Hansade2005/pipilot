@@ -857,7 +857,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
         // Update URL to ADD projectId alongside newProject (KEEP BOTH for protection)
         // DO NOT delete newProject parameter - it's needed to prevent auto-restore contamination!
-        if (searchParams.get('newProject') && !searchParams.get('projectId')) {
+        if (searchParams.get('newProject')) {
           const params = new URLSearchParams(searchParams.toString())
           // ✅ CRITICAL FIX: Keep newProject parameter AND add projectId
           // This ensures auto-restore is skipped during the initial load period
