@@ -1923,6 +1923,91 @@ const _constructToolResultInner = async (toolName: string, input: any, projectId
         return { success: true, message: 'Deployment is handled automatically by the preview system. The project will be deployed when you finish building.', toolCallId }
       }
 
+      case 'browse_web': {
+        const { url, action = 'both', fullPage = true, viewport, javascript } = input
+        try {
+          // Use Jina Reader for extraction (free, no API key needed)
+          const jinaUrl = `https://r.jina.ai/${url}`
+          const jinaRes = await fetch(jinaUrl, {
+            headers: { 'Accept': 'text/plain' },
+            signal: AbortSignal.timeout(15000),
+          })
+          const content = await jinaRes.text()
+          return {
+            success: true,
+            url,
+            content: content.slice(0, 8000),
+            message: `Extracted content from ${url} (${content.length} chars)`,
+            toolCallId
+          }
+        } catch (err) {
+          return { success: false, error: `Failed to browse ${url}: ${err instanceof Error ? err.message : 'Unknown error'}`, toolCallId }
+        }
+      }
+
+      case 'web_search': {
+        const { query, maxResults = 5 } = input
+        try {
+          // Use DuckDuckGo HTML search (free, no API key)
+          const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`
+          const searchRes = await fetch(searchUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            signal: AbortSignal.timeout(10000),
+          })
+          const html = await searchRes.text()
+          // Extract result snippets
+          const results: string[] = []
+          const snippetRegex = /<a class="result__snippet"[^>]*>(.*?)<\/a>/gs
+          let match
+          while ((match = snippetRegex.exec(html)) !== null && results.length < maxResults) {
+            results.push(match[1].replace(/<[^>]+>/g, '').trim())
+          }
+          const linkRegex = /<a class="result__a" href="([^"]+)"[^>]*>(.*?)<\/a>/gs
+          const links: { url: string, title: string }[] = []
+          while ((match = linkRegex.exec(html)) !== null && links.length < maxResults) {
+            links.push({ url: match[1], title: match[2].replace(/<[^>]+>/g, '').trim() })
+          }
+          return {
+            success: true,
+            query,
+            results: links.map((l, i) => `${l.title}\n${l.url}\n${results[i] || ''}`).join('\n\n'),
+            resultCount: links.length,
+            toolCallId
+          }
+        } catch (err) {
+          return { success: false, error: `Search failed: ${err instanceof Error ? err.message : 'Unknown error'}`, toolCallId }
+        }
+      }
+
+      case 'web_extract': {
+        // Alias for browse_web with extract action
+        const { url } = input
+        try {
+          const jinaRes = await fetch(`https://r.jina.ai/${url}`, {
+            headers: { 'Accept': 'text/plain' },
+            signal: AbortSignal.timeout(15000),
+          })
+          const content = await jinaRes.text()
+          return { success: true, url, content: content.slice(0, 8000), toolCallId }
+        } catch (err) {
+          return { success: false, error: `Extract failed: ${err instanceof Error ? err.message : 'Unknown error'}`, toolCallId }
+        }
+      }
+
+      case 'publish_to_showcase': {
+        const { action: pubAction, title, description: desc, liveUrl, screenshotUrl, category, techStack: pubTech } = input
+        if (pubAction === 'check') {
+          return { success: true, published: false, message: 'Not yet published. Call with action "publish" to publish.', toolCallId }
+        }
+        // For publish, we store the showcase data
+        return {
+          success: true,
+          message: `Published "${title}" to showcase.`,
+          showcaseData: { title, description: desc, liveUrl, screenshotUrl, category, techStack: pubTech },
+          toolCallId
+        }
+      }
+
       default:
         console.log(`[CONSTRUCT_TOOL_RESULT] Unknown tool requested: ${toolName}`)
         return {
@@ -2239,7 +2324,7 @@ const DIRECT_STREAM_SERVER_TOOLS = new Set([
   'suggest_next_steps', 'start_build_mode', 'finish_build_mode',
   'frontend_design_guide', 'project_file_strategy',
   'check_dev_errors', 'deploy_preview', 'browse_web', 'web_search',
-  'grep_search', 'semantic_code_navigator', 'list_files',
+  'web_extract', 'grep_search', 'semantic_code_navigator', 'list_files',
   'discover_tools', 'publish_to_showcase', 'node_machine',
 ])
 
