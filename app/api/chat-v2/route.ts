@@ -1835,6 +1835,94 @@ const _constructToolResultInner = async (toolName: string, input: any, projectId
         }
       }
 
+      // ── Tools for direct stream mode (lightweight implementations) ──
+
+      case 'generate_plan': {
+        const { title, description, steps, techStack, estimatedFiles } = input
+        const planContent = `# ${title || 'Build Plan'}\n\n${description || ''}\n\n## Steps\n${(steps || []).map((s: string, i: number) => `${i + 1}. [ ] ${s}`).join('\n')}\n\n## Tech Stack\n${(techStack || []).map((t: string) => `- ${t}`).join('\n')}\n\nEstimated files: ${estimatedFiles || '?'}`
+        // Write to .pipilot/plan.md
+        const planResult = await _constructToolResultInner('write_file', { path: '.pipilot/plan.md', content: planContent }, projectId, toolCallId)
+        return { success: true, message: `Plan "${title}" created with ${(steps || []).length} steps.`, planContent, toolCallId }
+      }
+
+      case 'update_plan_progress': {
+        const { stepNumber, notes } = input
+        // Read current plan, mark step as done
+        const planFile = resolveFile('.pipilot/plan.md')
+        if (planFile?.content) {
+          const updated = planFile.content.replace(
+            new RegExp(`${stepNumber}\\. \\[ \\]`),
+            `${stepNumber}. [x]`
+          )
+          planFile.content = updated
+          return { success: true, message: `Step ${stepNumber} marked complete.${notes ? ' ' + notes : ''}`, toolCallId }
+        }
+        return { success: true, message: `Step ${stepNumber} noted.`, toolCallId }
+      }
+
+      case 'suggest_next_steps': {
+        return { success: true, message: 'Next steps suggested.', suggestions: input.suggestions || [], toolCallId }
+      }
+
+      case 'update_project_context': {
+        const { projectName, summary, features, techStack } = input
+        const contextContent = `# ${projectName || 'Project'}\n\n## Summary\n${summary || ''}\n\n## Features\n${(features || []).map((f: string) => `- ${f}`).join('\n')}\n\n## Tech Stack\n${(techStack || []).map((t: string) => `- ${t}`).join('\n')}`
+        await _constructToolResultInner('write_file', { path: '.pipilot/project.md', content: contextContent }, projectId, toolCallId)
+        return { success: true, message: `Project context saved for "${projectName}".`, toolCallId }
+      }
+
+      case 'frontend_design_guide': {
+        const { action, projectType, userMessage } = input
+        if (action === 'read') {
+          const designFile = resolveFile('.pipilot/design.md')
+          if (designFile?.content) {
+            return { success: true, content: designFile.content, toolCallId }
+          }
+          return { success: true, content: '', message: 'No design guide found. Call with action "generate" to create one.', toolCallId }
+        }
+        // Generate a basic design guide
+        const designContent = `# Design Guide\n\nProject: ${projectType || 'web app'}\nUser request: ${userMessage || ''}\n\n## Colors\nPrimary: #2563eb\nAccent: #f59e0b\nSurface: #ffffff\nText: #0f172a\n\n## Typography\nDisplay: Sora\nBody: Nunito Sans\n\n## Style\nModern, clean, professional`
+        await _constructToolResultInner('write_file', { path: '.pipilot/design.md', content: designContent }, projectId, toolCallId)
+        return { success: true, guide: designContent, toolCallId }
+      }
+
+      case 'project_file_strategy': {
+        const { projectType, framework, pages, features } = input
+        const files = framework === 'vite-react'
+          ? ['package.json', 'vite.config.ts', 'index.html', 'src/index.css', 'src/main.tsx', 'src/App.tsx', ...(pages || []).map((p: string) => `src/pages/${p}.tsx`)]
+          : framework === 'nextjs'
+          ? ['package.json', 'app/layout.tsx', 'app/page.tsx', 'app/globals.css', ...(pages || []).map((p: string) => `app/${p.toLowerCase()}/page.tsx`)]
+          : ['index.html', 'styles.css', 'script.js']
+        return { success: true, guide: `Create these files: ${files.join(', ')}`, strategy: { files: files.map(f => ({ path: f, purpose: 'core file' })), totalFiles: files.length }, toolCallId }
+      }
+
+      case 'check_dev_errors': {
+        // Lightweight: scan files for obvious syntax issues
+        const allFiles = Array.from(sessionFiles.entries())
+        const errors: string[] = []
+        for (const [path, file] of allFiles) {
+          if (!file.content || file.isDirectory) continue
+          if (path.endsWith('.tsx') || path.endsWith('.ts') || path.endsWith('.jsx') || path.endsWith('.js')) {
+            // Check for obvious issues
+            const content = file.content
+            if ((content.match(/\{/g) || []).length !== (content.match(/\}/g) || []).length) {
+              errors.push(`${path}: Mismatched braces`)
+            }
+            if (content.includes('<<<<<<< SEARCH') || content.includes('>>>>>>> REPLACE')) {
+              errors.push(`${path}: Contains search/replace markers`)
+            }
+          }
+        }
+        if (errors.length > 0) {
+          return { success: false, errors, errorCount: errors.length, message: `Found ${errors.length} potential issues`, toolCallId }
+        }
+        return { success: true, message: 'No obvious errors found. Files look clean.', errorCount: 0, toolCallId }
+      }
+
+      case 'deploy_preview': {
+        return { success: true, message: 'Deployment is handled automatically by the preview system. The project will be deployed when you finish building.', toolCallId }
+      }
+
       default:
         console.log(`[CONSTRUCT_TOOL_RESULT] Unknown tool requested: ${toolName}`)
         return {
