@@ -4185,34 +4185,80 @@ export function ChatPanelV2({
     } as any])
     setStreamingMessageId(assistantMessageId)
 
-    // Build OpenAI-format messages from conversation history
-    const apiMessages: any[] = messages
-      .filter((m: any) => m.role === 'user' || m.role === 'assistant')
-      .slice(-20)
-      .map((m: any) => ({
-        role: m.role,
-        content: typeof m.content === 'string' ? m.content : '',
-        ...(m.tool_calls ? { tool_calls: m.tool_calls } : {}),
-      }))
-
-    // Add the new user message
-    apiMessages.push({ role: 'user', content: userMessage })
-
-    // Get project files for context
+    // Get project files and build workspace context (like reference project)
     let projectFiles: any[] = []
+    let fileTreeStr = ''
+    let projectType = 'HTML + CSS + JavaScript'
     try {
-      const files = await storageManager.getFiles(project.id)
+      const { storageManager: sm } = await import('@/lib/storage-manager')
+      await sm.init()
+      const files = await sm.getFiles(project.id)
       projectFiles = files.map((f: any) => ({ path: f.path, content: f.content }))
+
+      // Build file tree string with line counts
+      fileTreeStr = files
+        .filter((f: any) => f.path && !f.isDirectory)
+        .map((f: any) => `${f.path} (${(f.content || '').split('\n').length} lines)`)
+        .join('\n')
+
+      // Detect project type
+      const paths = files.map((f: any) => (f.path || '').toLowerCase())
+      if (paths.some(p => p.includes('vite.config'))) projectType = 'Vite + React + TypeScript'
+      else if (paths.some(p => p.includes('next.config'))) projectType = 'Next.js'
+      else if (paths.some(p => p.includes('app.json'))) projectType = 'Expo'
     } catch {}
 
-    // Build system prompt (simplified version)
-    const systemPrompt = `You are PiPilot, an expert AI coding assistant. You have access to file tools to create, edit, and manage project files. Build complete, production-ready code.`
+    // Build system prompt with project context (following reference pattern)
+    const projectContext = fileTreeStr ? `
+## CURRENT PROJECT
 
-    // Tool definitions in OpenAI format
+**Stack:** ${projectType}
+**Project ID:** ${project.id}
+
+**File tree:**
+\`\`\`
+${fileTreeStr}
+\`\`\`
+
+IMPORTANT: This is a ${projectType} project. Create files in the proper directory structure (src/pages/, src/components/ for Vite+React). Do NOT create standalone HTML files.
+` : ''
+
+    const systemPrompt = `You are PiPilot, an expert full-stack AI coding assistant with direct file system access. Build complete, production-ready applications.
+${projectContext}
+## TOOLS
+- write_file: Create or overwrite a file (path + content)
+- edit_file: Edit via search/replace blocks (filePath + searchReplaceBlock)
+- read_file: Read file contents (path, optional startLine/endLine)
+- delete_file: Delete a file (path)
+- list_files: List directory contents (optional path)
+
+## RULES
+- Use TypeScript (.tsx) for React components
+- Use Tailwind CSS for styling
+- All pages must be fully responsive
+- Use real sample data, not lorem ipsum
+- After building, summarize what was created`
+
+    // Build OpenAI-format messages from conversation history
+    // System prompt sent separately — server prepends it
+    const apiMessages: any[] = [
+      ...messages
+        .filter((m: any) => m.role === 'user' || m.role === 'assistant')
+        .slice(-20)
+        .map((m: any) => {
+          if (m.role === 'assistant' && m.tool_calls) {
+            return { role: 'assistant', content: m.content || null, tool_calls: m.tool_calls }
+          }
+          return { role: m.role, content: typeof m.content === 'string' ? m.content : '' }
+        }),
+      { role: 'user', content: userMessage },
+    ]
+
+    // Tool definitions in OpenAI format (same as reference project)
     const FILE_TOOLS = [
-      { type: 'function', function: { name: 'write_file', description: 'Create or update a file.', parameters: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' } }, required: ['path', 'content'] } } },
-      { type: 'function', function: { name: 'edit_file', description: 'Edit a file via search/replace.', parameters: { type: 'object', properties: { filePath: { type: 'string' }, searchReplaceBlock: { type: 'string' } }, required: ['filePath', 'searchReplaceBlock'] } } },
-      { type: 'function', function: { name: 'read_file', description: 'Read file contents.', parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] } } },
+      { type: 'function', function: { name: 'write_file', description: 'Create or update a file in the project.', parameters: { type: 'object', properties: { path: { type: 'string', description: 'File path (e.g. src/pages/Home.tsx)' }, content: { type: 'string', description: 'Complete file content' } }, required: ['path', 'content'] } } },
+      { type: 'function', function: { name: 'edit_file', description: 'Edit a file using search/replace blocks.', parameters: { type: 'object', properties: { filePath: { type: 'string' }, searchReplaceBlock: { type: 'string', description: '<<<<<<< SEARCH\\n[old]\\n=======\\n[new]\\n>>>>>>> REPLACE' } }, required: ['filePath', 'searchReplaceBlock'] } } },
+      { type: 'function', function: { name: 'read_file', description: 'Read file contents (max 150 lines per read).', parameters: { type: 'object', properties: { path: { type: 'string' }, startLine: { type: 'number' }, endLine: { type: 'number' } }, required: ['path'] } } },
       { type: 'function', function: { name: 'delete_file', description: 'Delete a file.', parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] } } },
       { type: 'function', function: { name: 'list_files', description: 'List files and directories.', parameters: { type: 'object', properties: { path: { type: 'string' } } } } },
     ]
@@ -5426,11 +5472,14 @@ export function ChatPanelV2({
 
     // ── EXPERIMENTAL: Direct stream mode (bypasses AI SDK) ──
     // Activated by URL param ?directStream=true
-    const useDirectStream = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('directStream') === 'true'
-    if (useDirectStream) {
-      console.log('[ChatPanelV2] Using experimental direct stream mode')
-      await sendMessageDirect(input.trim())
-      return
+    try {
+      if (typeof window !== 'undefined' && window.location.search.includes('directStream=true')) {
+        console.log('[ChatPanelV2] Using experimental direct stream mode')
+        sendMessageDirect(input.trim())
+        return
+      }
+    } catch (e) {
+      console.warn('[ChatPanelV2] Direct stream check failed, using regular path:', e)
     }
 
     // Build enhanced message content with attachments
