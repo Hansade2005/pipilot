@@ -4153,6 +4153,307 @@ export function ChatPanelV2({
     }
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // EXPERIMENTAL: Direct stream with client-driven tool loop
+  // Bypasses AI SDK entirely. Uses raw fetch → SSE parsing → client tool
+  // execution → send results back → loop until stop.
+  // Activated when useDirectStream is true (URL param ?directStream=true)
+  // ═══════════════════════════════════════════════════════════════════════════
+  const sendMessageDirect = async (userMessage: string) => {
+    if (!project || !userMessage.trim()) return
+
+    const assistantMessageId = `direct-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+
+    // Add user message to UI
+    const userMsg = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: userMessage,
+      createdAt: new Date().toISOString(),
+    }
+    setMessages(prev => [...prev, userMsg as any])
+    setInput('')
+    setIsLoading(true)
+
+    // Add assistant placeholder
+    setMessages(prev => [...prev, {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      createdAt: new Date().toISOString(),
+      metadata: { startTime: Date.now() }
+    } as any])
+    setStreamingMessageId(assistantMessageId)
+
+    // Build OpenAI-format messages from conversation history
+    const apiMessages: any[] = messages
+      .filter((m: any) => m.role === 'user' || m.role === 'assistant')
+      .slice(-20)
+      .map((m: any) => ({
+        role: m.role,
+        content: typeof m.content === 'string' ? m.content : '',
+        ...(m.tool_calls ? { tool_calls: m.tool_calls } : {}),
+      }))
+
+    // Add the new user message
+    apiMessages.push({ role: 'user', content: userMessage })
+
+    // Get project files for context
+    let projectFiles: any[] = []
+    try {
+      const files = await storageManager.getFiles(project.id)
+      projectFiles = files.map((f: any) => ({ path: f.path, content: f.content }))
+    } catch {}
+
+    // Build system prompt (simplified version)
+    const systemPrompt = `You are PiPilot, an expert AI coding assistant. You have access to file tools to create, edit, and manage project files. Build complete, production-ready code.`
+
+    // Tool definitions in OpenAI format
+    const FILE_TOOLS = [
+      { type: 'function', function: { name: 'write_file', description: 'Create or update a file.', parameters: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' } }, required: ['path', 'content'] } } },
+      { type: 'function', function: { name: 'edit_file', description: 'Edit a file via search/replace.', parameters: { type: 'object', properties: { filePath: { type: 'string' }, searchReplaceBlock: { type: 'string' } }, required: ['filePath', 'searchReplaceBlock'] } } },
+      { type: 'function', function: { name: 'read_file', description: 'Read file contents.', parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] } } },
+      { type: 'function', function: { name: 'delete_file', description: 'Delete a file.', parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] } } },
+      { type: 'function', function: { name: 'list_files', description: 'List files and directories.', parameters: { type: 'object', properties: { path: { type: 'string' } } } } },
+    ]
+
+    const directController = new AbortController()
+    setAbortController(directController)
+
+    let accumulatedContent = ''
+    let accumulatedReasoning = ''
+    const localToolCalls: any[] = []
+
+    // RAF-batched UI update (same pattern as main stream)
+    let flushScheduled = false
+    const scheduleFlush = () => {
+      if (flushScheduled) return
+      flushScheduled = true
+      requestAnimationFrame(() => {
+        flushScheduled = false
+        setStreamingContent(accumulatedContent)
+        setStreamingReasoning(accumulatedReasoning)
+        setMessages(prev => prev.map(msg =>
+          msg.id === assistantMessageId
+            ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
+            : msg
+        ))
+      })
+    }
+
+    try {
+      // ── The client-driven tool loop ──
+      let loopCount = 0
+      const maxLoops = 50
+
+      while (loopCount < maxLoops) {
+        loopCount++
+        console.log(`[DirectStream] Loop ${loopCount}/${maxLoops}`)
+
+        const response = await fetch('/api/chat-v2', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-direct-stream': 'true',
+            'x-model-id': selectedModel || '',
+          },
+          body: JSON.stringify({
+            messages: apiMessages,
+            systemPrompt,
+            modelId: selectedModel,
+            project,
+            projectId: project.id,
+            files: projectFiles,
+            tools: FILE_TOOLS,
+            maxSteps: 100,
+          }),
+          signal: directController.signal,
+        })
+
+        if (!response.ok) {
+          const errText = await response.text().catch(() => 'Unknown error')
+          console.error(`[DirectStream] API error ${response.status}: ${errText.slice(0, 500)}`)
+          accumulatedContent += `\n\nError: ${response.status}`
+          scheduleFlush()
+          break
+        }
+
+        // Consume the newline-delimited JSON stream
+        const reader = response.body?.getReader()
+        if (!reader) break
+
+        const decoder = new TextDecoder()
+        let lineBuffer = ''
+        const pendingClientToolCalls: any[] = []
+        let gotClientToolsPending = false
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          lineBuffer += decoder.decode(value, { stream: true })
+          const lines = lineBuffer.split('\n')
+          lineBuffer = lines.pop() || ''
+
+          for (const line of lines) {
+            if (!line.trim()) continue
+            try {
+              const parsed = JSON.parse(line)
+
+              if (parsed.type === 'text-delta' && parsed.text) {
+                accumulatedContent += parsed.text
+                scheduleFlush()
+              } else if (parsed.type === 'reasoning-delta' && parsed.text) {
+                accumulatedReasoning += parsed.text
+                scheduleFlush()
+              } else if (parsed.type === 'tool-call') {
+                // Show pill
+                const toolEntry = {
+                  toolName: parsed.toolName,
+                  toolCallId: parsed.toolCallId,
+                  input: parsed.input,
+                  status: 'executing' as const,
+                  textPosition: accumulatedContent.length,
+                }
+                localToolCalls.push(toolEntry)
+                setStreamingToolCalls([...localToolCalls])
+                setActiveToolCalls(prev => {
+                  const newMap = new Map(prev)
+                  const calls = newMap.get(assistantMessageId) || []
+                  calls.push(toolEntry)
+                  newMap.set(assistantMessageId, calls)
+                  return newMap
+                })
+              } else if (parsed.type === 'tool-result') {
+                // Server-side tool completed
+                const lt = localToolCalls.find(t => t.toolCallId === parsed.toolCallId)
+                if (lt) {
+                  lt.status = parsed.result?.error ? 'failed' : 'completed'
+                  setStreamingToolCalls([...localToolCalls])
+                  setActiveToolCalls(prev => {
+                    const newMap = new Map(prev)
+                    const calls = (newMap.get(assistantMessageId) || []).map((c: any) =>
+                      c.toolCallId === parsed.toolCallId
+                        ? { ...c, status: lt.status }
+                        : c
+                    )
+                    newMap.set(assistantMessageId, calls)
+                    return newMap
+                  })
+                }
+              } else if (parsed.type === 'client_tool_calls_pending') {
+                // Client tools need execution
+                pendingClientToolCalls.push(...(parsed.toolCalls || []))
+                gotClientToolsPending = true
+              } else if (parsed.type === 'finish') {
+                // Done
+              }
+            } catch {
+              // Skip unparseable lines
+            }
+          }
+        }
+
+        // If no client tool calls pending, we're done
+        if (!gotClientToolsPending || pendingClientToolCalls.length === 0) {
+          console.log('[DirectStream] No more tool calls — done')
+          break
+        }
+
+        // ── Execute client tools on IndexedDB ──
+        console.log(`[DirectStream] Executing ${pendingClientToolCalls.length} client tools`)
+
+        // Add assistant message with tool_calls to apiMessages
+        apiMessages.push({
+          role: 'assistant',
+          content: accumulatedContent || null,
+          tool_calls: pendingClientToolCalls.map((tc: any) => ({
+            id: tc.toolCallId,
+            type: 'function',
+            function: { name: tc.toolName, arguments: JSON.stringify(tc.input || {}) },
+          })),
+        })
+
+        for (const tc of pendingClientToolCalls) {
+          let toolResult: string
+          try {
+            const { handleClientFileOperation } = await import('@/lib/client-file-tools')
+            toolResult = await new Promise<string>((resolve) => {
+              handleClientFileOperation(
+                { toolName: tc.toolName, toolCallId: tc.toolCallId, args: tc.input, dynamic: false },
+                project.id,
+                (result: any) => {
+                  resolve(result.output?.message || result.errorText || JSON.stringify(result.output || { success: true }))
+                }
+              ).catch((err: any) => resolve(`Error: ${err.message}`))
+            })
+
+            // Update pill to completed
+            const lt = localToolCalls.find(t => t.toolCallId === tc.toolCallId)
+            if (lt) lt.status = 'completed'
+          } catch (err) {
+            toolResult = `Error: ${err instanceof Error ? err.message : 'Tool failed'}`
+            const lt = localToolCalls.find(t => t.toolCallId === tc.toolCallId)
+            if (lt) lt.status = 'failed'
+          }
+
+          setStreamingToolCalls([...localToolCalls])
+
+          // Add tool result to apiMessages (OpenAI format)
+          apiMessages.push({
+            role: 'tool',
+            tool_call_id: tc.toolCallId,
+            content: toolResult,
+          })
+        }
+
+        // Clear pending and loop back — send new request with tool results
+        console.log(`[DirectStream] Tool results sent, looping back for step ${loopCount + 1}`)
+      }
+
+      // ── Stream complete — save message ──
+      setMessages(prev => prev.map(msg =>
+        msg.id === assistantMessageId
+          ? { ...msg, content: accumulatedContent, streaming: false }
+          : msg
+      ))
+
+      if (accumulatedContent.trim() || localToolCalls.length > 0) {
+        const toolInvocations = localToolCalls.map(t => ({
+          toolName: t.toolName,
+          toolCallId: t.toolCallId,
+          args: t.input,
+          state: t.status === 'completed' ? 'result' : 'call',
+          result: t.status === 'completed' ? { success: true } : undefined,
+          textPosition: t.textPosition,
+        }))
+        await saveAssistantMessageAfterStreaming(
+          assistantMessageId,
+          accumulatedContent,
+          accumulatedReasoning,
+          toolInvocations
+        )
+      }
+
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        console.error('[DirectStream] Error:', error)
+        setMessages(prev => prev.map(msg =>
+          msg.id === assistantMessageId
+            ? { ...msg, content: accumulatedContent + '\n\n*Stream interrupted.*', streaming: false }
+            : msg
+        ))
+      }
+    } finally {
+      setIsLoading(false)
+      setStreamingMessageId(null)
+      setStreamingContent('')
+      setStreamingReasoning('')
+      setStreamingToolCalls([])
+      setAbortController(null)
+    }
+  }
+
   // Handle recovering an interrupted stream - automatically continues from where it stopped
   const handleRecoverStream = async (streamToRecover?: InterruptedStream) => {
     const stream = streamToRecover || interruptedStream
@@ -5120,6 +5421,15 @@ export function ChatPanelV2({
     // Check credit balance before sending message
     if (!loadingCredits && creditBalance !== null && creditBalance <= 0) {
       setShowCreditExhaustionModal(true)
+      return
+    }
+
+    // ── EXPERIMENTAL: Direct stream mode (bypasses AI SDK) ──
+    // Activated by URL param ?directStream=true
+    const useDirectStream = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('directStream') === 'true'
+    if (useDirectStream) {
+      console.log('[ChatPanelV2] Using experimental direct stream mode')
+      await sendMessageDirect(input.trim())
       return
     }
 
