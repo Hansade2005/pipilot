@@ -4249,6 +4249,32 @@ Pick colors matching the industry (navy+gold=finance, sage+cream=wellness, coral
 ## CSS Rules
 index.css: UNDER 250 lines. Only :root variables, @keyframes, base reset, @tailwind directives. EVERYTHING ELSE = Tailwind classes in JSX.
 
+## MANDATORY BUILD WORKFLOW
+Follow this exact sequence for EVERY build request:
+1. Call frontend_design_guide with action "read". If empty, call again with action "generate", projectType and userMessage.
+2. Call project_file_strategy with projectType, framework, pages, features to get the minimal file plan.
+3. Call generate_plan with title, description (include colors, fonts, file list), steps, techStack.
+4. Build all files using write_file. Call update_plan_progress after each step.
+5. After ALL files are built: call check_dev_errors with mode "build" to verify.
+6. Fix any errors, then call deploy_preview to deploy to a live .pipilot.dev URL.
+7. Call update_project_context with project summary.
+8. Call suggest_next_steps with 3-4 follow-up options as your LAST action.
+
+## ALL TOOLS ARE AVAILABLE — USE THEM
+You have these tools and MUST use them. Do NOT say "tool not available":
+- **write_file / edit_file / read_file / delete_file** — file operations
+- **list_files** — list project structure
+- **grep_search** — search file contents
+- **semantic_code_navigator** — AST-based code analysis
+- **check_dev_errors** — run build check (mode: "build"). ALWAYS call before deploy.
+- **deploy_preview** — deploy to live .pipilot.dev URL. ALWAYS call after build check passes.
+- **generate_plan** — create build plan
+- **update_plan_progress** — mark steps complete
+- **update_project_context** — save project metadata
+- **suggest_next_steps** — suggest follow-ups (LAST action)
+- **frontend_design_guide** — read/generate design system
+- **project_file_strategy** — get optimal file structure
+
 ## RULES
 - Use TypeScript (.tsx) for React components with export default function
 - Use Tailwind CSS for all styling (no custom CSS classes)
@@ -4257,7 +4283,7 @@ index.css: UNDER 250 lines. Only :root variables, @keyframes, base reset, @tailw
 - NO emojis in code — use Lucide React icons instead
 - Dark text on light backgrounds, light text on dark backgrounds (ALWAYS)
 - Images: use https://api.a0.dev/assets/image?text={description}&aspect=16:9&seed={number}
-- After building ALL files, provide a brief summary of what was created`
+- After building ALL files, provide a brief summary with the live URL`
 
     // Build OpenAI-format messages from conversation history
     // System prompt sent separately — server prepends it
