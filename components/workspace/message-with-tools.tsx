@@ -482,7 +482,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
   const hasInlineReasoningBlocks = reasoningBlocks.length > 0
 
   const hasReasoning = reasoningContent.trim().length > 0
-  const hasResponse = responseContent.trim().length > 0 || textStreamToolCalls.length > 0
+  const hasResponse = responseContent.trim().length > 0
 
   // Get saved duration from metadata (for past messages)
   const savedDuration = message.metadata?.durationSeconds
@@ -861,7 +861,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
             </ChainOfThought>
           )}
 
-          {hasResponse && (
+          {(hasResponse || textStreamToolCalls.length > 0) && (
             <div className={textWrapperClasses}>
               {textStreamToolCalls.length > 0 ? (
                 <InterleavedContent
