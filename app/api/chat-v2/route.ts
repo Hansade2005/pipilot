@@ -2176,35 +2176,10 @@ async function handleDirectStream(
 ): Promise<Response> {
   const encoder = new TextEncoder()
 
-  // Resolve LLM API endpoint and key based on model
-  // Primary: Kilo Gateway (same endpoint as reference project)
-  // Fallback: Direct provider APIs
-  let apiUrl: string
-  let apiKey: string
-  let apiModel: string
-
-  const kiloKey = process.env.KILO_API_KEY?.split(',')[0] || ''
-
-  if (kiloKey) {
-    // Use Kilo Gateway (OpenAI-compatible, routes to best model)
-    apiUrl = 'https://api.kilo.ai/api/gateway/chat/completions'
-    apiKey = kiloKey
-    apiModel = modelId?.startsWith('ollama/') ? modelId.replace('ollama/', '')
-      : modelId?.startsWith('xai/') ? modelId.replace('xai/', '')
-      : modelId || 'kilo-auto/free'
-  } else if (modelId?.startsWith('ollama/')) {
-    apiUrl = 'https://ollama.com/v1/chat/completions'
-    apiKey = process.env.OLLAMA_API_KEYS?.split(',')[0] || ''
-    apiModel = modelId.replace('ollama/', '')
-  } else if (modelId?.includes('grok') || modelId?.startsWith('xai/')) {
-    apiUrl = 'https://api.x.ai/v1/chat/completions'
-    apiKey = process.env.XAI_API_KEY || ''
-    apiModel = modelId.replace('xai/', '')
-  } else {
-    apiUrl = 'https://ollama.com/v1/chat/completions'
-    apiKey = process.env.OLLAMA_API_KEYS?.split(',')[0] || ''
-    apiModel = modelId?.replace('ollama/', '') || 'minimax-m2.7'
-  }
+  // Use the3rdacademy.com completion proxy — handles all API keys and
+  // model routing internally via Kilo Gateway. No API keys needed on our end.
+  // Same endpoint the reference PiPilot IDE project uses.
+  const apiUrl = 'https://the3rdacademy.com/api/chat/completions'
 
   // Convert tools to OpenAI function calling format
   const openaiTools = tools.map((t: any) => ({
@@ -2250,16 +2225,14 @@ async function handleDirectStream(
 
             const fetchRes = await fetch(apiUrl, {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-              },
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                model: apiModel,
                 messages: openaiMessages,
+                stream: true,
                 max_tokens: 16384,
                 temperature: 0.7,
-                stream: true,
+                direct_kilo: true,
+                max_steps: maxSteps,
                 tools: openaiTools.length > 0 ? openaiTools : undefined,
                 tool_choice: 'auto',
               }),
