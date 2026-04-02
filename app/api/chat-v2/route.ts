@@ -2286,16 +2286,20 @@ async function handleDirectStream(
 
                   if (reason) finishReason = reason
 
+                  // Reasoning → stream to client (multiple provider formats)
+                  // Format 1: delta.reasoning_content (DeepSeek, OpenAI o1/o3)
+                  // Format 2: delta.reasoning (some providers)
+                  // Format 3: delta.thinking (Anthropic-style)
+                  if (delta?.reasoning_content || delta?.reasoning || delta?.thinking) {
+                    const reasoning = delta.reasoning_content || delta.reasoning || delta.thinking
+                    controller.enqueue(encoder.encode(JSON.stringify({ type: 'reasoning-delta', text: reasoning }) + '\n'))
+                  }
+
                   // Text content → stream to client
+                  // Also detect <think> tags in content (Qwen, some Kilo models)
                   if (delta?.content) {
                     collected += delta.content
                     controller.enqueue(encoder.encode(JSON.stringify({ type: 'text-delta', text: delta.content }) + '\n'))
-                  }
-
-                  // Reasoning → stream to client
-                  if (delta?.reasoning_content || delta?.reasoning) {
-                    const reasoning = delta.reasoning_content || delta.reasoning
-                    controller.enqueue(encoder.encode(JSON.stringify({ type: 'reasoning-delta', text: reasoning }) + '\n'))
                   }
 
                   // Tool call deltas → collect
