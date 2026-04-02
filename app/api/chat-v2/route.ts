@@ -2403,6 +2403,49 @@ async function handleDirectStream(
 }
 
 export async function POST(req: Request) {
+  // ── EXPERIMENTAL: Direct stream mode (bypasses AI SDK entirely) ──
+  // Activated by x-direct-stream: true header
+  if (req.headers.get('x-direct-stream') === 'true') {
+    try {
+      const body = await req.json()
+      const messages = body.messages || []
+      const systemPrompt = body.systemPrompt || ''
+      const modelId = body.modelId || req.headers.get('x-model-id') || ''
+      const projectId = body.project?.id || body.projectId || ''
+      const maxSteps = body.maxSteps || 100
+
+      // Build tools array from body or use empty
+      const tools = body.tools || []
+
+      console.log(`[DirectStream] Request: ${messages.length} messages, model=${modelId}, project=${projectId}`)
+
+      // Initialize session storage if projectId and files provided
+      if (projectId && body.files?.length > 0) {
+        const sessionData = sessionProjectStorage.get(projectId) || { fileTree: [], files: new Map() }
+        for (const f of body.files) {
+          if (f.path && f.content !== undefined) {
+            sessionData.files.set(f.path, {
+              workspaceId: projectId,
+              name: f.path.split('/').pop() || f.path,
+              path: f.path,
+              content: f.content,
+              fileType: f.path.split('.').pop() || 'text',
+              type: f.path.split('.').pop() || 'text',
+              size: (f.content || '').length,
+              isDirectory: false,
+            })
+          }
+        }
+        sessionProjectStorage.set(projectId, sessionData)
+      }
+
+      return await handleDirectStream(req, messages, systemPrompt, modelId, tools, projectId, maxSteps)
+    } catch (error) {
+      console.error('[DirectStream] Error:', error)
+      return new Response(JSON.stringify({ error: 'Direct stream failed' }), { status: 500 })
+    }
+  }
+
   let requestId = crypto.randomUUID()
   let startTime = Date.now()
 
