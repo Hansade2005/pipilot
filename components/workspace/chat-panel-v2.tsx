@@ -4423,6 +4423,7 @@ You have these tools and MUST use them. Do NOT say "tool not available":
                   input: parsed.input,
                   status: 'executing' as const,
                   textPosition: accumulatedContent.length,
+                  reasoningPosition: accumulatedReasoning.length,
                 }
                 localToolCalls.push(toolEntry)
                 setStreamingToolCalls([...localToolCalls])

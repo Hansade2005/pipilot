@@ -692,9 +692,13 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
     if (tc.status === 'failed') return false
     const textPos = tc.textPosition ?? 0
     const reasoningPos = tc.reasoningPosition ?? 0
+    // Has a text position — belongs in text stream
     if (textPos > 0) return true
-    // Only include pos-0 tools if there's no reasoning (they're pre-output tools, not reasoning tools)
-    if (textPos === 0 && reasoningPos === 0 && !hasReasoning) return true
+    // Position 0 with no reasoning position — pre-output tool, show in text stream
+    if (textPos === 0 && reasoningPos === 0) return true
+    // Position 0 but has reasoning position — it's a reasoning-phase tool
+    // Still show in text stream if there's no reasoning section (e.g. direct stream mode)
+    if (textPos === 0 && reasoningPos > 0 && !hasReasoning) return true
     return false
   }) || []
 
