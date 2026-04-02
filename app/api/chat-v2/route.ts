@@ -2197,13 +2197,22 @@ async function handleDirectStream(
     }
   })
 
-  // Build OpenAI-format messages
+  // Build OpenAI-format messages — pass through tool messages and preserve tool_calls
   const openaiMessages: any[] = [
     { role: 'system', content: systemPrompt },
     ...messages.map((m: any) => {
-      if (m.role === 'tool') return m // Already OpenAI format from tool result loop
+      // Tool result messages — pass through as-is
+      if (m.role === 'tool') return m
+
+      // Assistant messages with tool_calls — preserve them
+      if (m.role === 'assistant' && m.tool_calls) {
+        return { role: 'assistant', content: m.content || null, tool_calls: m.tool_calls }
+      }
+
+      // Regular string messages
       if (typeof m.content === 'string') return { role: m.role, content: m.content }
-      // Handle array content (tool calls)
+
+      // AI SDK array content (tool calls in parts format)
       if (Array.isArray(m.content)) {
         const toolCalls = m.content.filter((p: any) => p.type === 'tool-call')
         if (toolCalls.length > 0) {
@@ -2218,6 +2227,7 @@ async function handleDirectStream(
           }
         }
       }
+
       return { role: m.role, content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) }
     })
   ]
