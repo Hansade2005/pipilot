@@ -4290,7 +4290,7 @@ ${projectContext}
     try {
       // ── The client-driven tool loop ──
       let loopCount = 0
-      const maxLoops = 50
+      const maxLoops = 100
 
       while (loopCount < maxLoops) {
         loopCount++
