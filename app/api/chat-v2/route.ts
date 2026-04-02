@@ -3931,13 +3931,13 @@ ${CONTINUATION_SAFETY_CHECKS}`
 
       // SERVER-SIDE TOOL: Read operations need server-side execution to return fresh data
       read_file: tool({
-        description: '🚨 CRITICAL: NEVER read files >150 lines without line ranges! 🚨 Read the contents of a file using MANDATORY line-range parameters for files over 150 lines. Files ≤150 lines can be read fully. For large files: use semantic_code_navigator to understand structure, or grep_search for patterns. VIOLATION BREAKS SYSTEM - always specify ranges for large files!',
+        description: 'Read file contents. Files over 150 lines MUST use startLine + endLine parameters. Max 150 lines per read.',
         inputSchema: z.object({
           path: z.string().describe('File path to read'),
-          includeLineNumbers: z.boolean().optional().describe('Whether to include line numbers in the response (default: false)'),
-          startLine: z.number().optional().describe('REQUIRED for files >150 lines: Starting line number (1-indexed) to read from'),
-          endLine: z.number().optional().describe('REQUIRED for files >150 lines: Ending line number (1-indexed) to read to. Maximum 150 lines per read'),
-          lineRange: z.string().optional().describe('Line range in format "start-end" (e.g., "654-661"). REQUIRED for files >150 lines. Max 150 lines')
+          startLine: z.number().optional().describe('Starting line number (1-indexed). REQUIRED for files >150 lines.'),
+          endLine: z.number().optional().describe('Ending line number (1-indexed). REQUIRED for files >150 lines. Max 150 lines from startLine.'),
+          lineRange: z.string().optional().describe('Alternative: line range as "start-end" string (e.g. "1-150")'),
+          includeLineNumbers: z.boolean().optional().describe('Include line numbers in output (default: false)'),
         }),
         execute: async ({ path, includeLineNumbers, startLine, endLine, lineRange }, { toolCallId }) => {
           // Use the powerful constructor to get actual results from in-memory store
