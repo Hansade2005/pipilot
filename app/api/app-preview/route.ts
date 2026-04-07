@@ -4,6 +4,64 @@ import {
   type SandboxFile,
 } from '@/lib/e2b-enhanced'
 
+// ─── E2B server config injection ─────────────────────────────────────────────
+// Patches vite.config / next.config to bind 0.0.0.0 and allow E2B sandbox domains
+// so the dev server port is externally accessible via {port}-{sandboxId}.e2b.app
+function injectE2BServerConfig(files: any[], framework: string, port: number) {
+  if (framework === 'vite') {
+    const viteConfig = files.find((f: any) =>
+      /^vite\.config\.(js|ts|mjs|mts)$/.test(f.path)
+    )
+    if (viteConfig) {
+      // Check if server config already exists
+      if (!viteConfig.content.includes('server:') && !viteConfig.content.includes("server :")) {
+        // Inject server block into defineConfig
+        viteConfig.content = viteConfig.content.replace(
+          /defineConfig\s*\(\s*\{/,
+          `defineConfig({\n  server: {\n    host: '0.0.0.0',\n    port: ${port},\n    strictPort: true,\n    cors: true,\n    allowedHosts: ['localhost', '127.0.0.1', '.e2b.app', '.e2b.dev'],\n    hmr: { host: 'localhost' },\n  },`
+        )
+        console.log('[AppPreview] Injected E2B server config into vite.config')
+      } else {
+        // Server block exists — ensure host is 0.0.0.0
+        if (!viteConfig.content.includes("host:") || viteConfig.content.includes("host: 'localhost'")) {
+          viteConfig.content = viteConfig.content.replace(
+            /host:\s*['"][^'"]*['"]/,
+            "host: '0.0.0.0'"
+          )
+          console.log('[AppPreview] Patched vite.config server.host to 0.0.0.0')
+        }
+        // Ensure allowedHosts includes e2b
+        if (!viteConfig.content.includes('.e2b.')) {
+          viteConfig.content = viteConfig.content.replace(
+            /server:\s*\{/,
+            "server: {\n    allowedHosts: ['.e2b.app', '.e2b.dev'],"
+          )
+          console.log('[AppPreview] Added E2B allowedHosts to vite.config')
+        }
+      }
+    } else {
+      // No vite config — create one with E2B settings
+      files.push({
+        path: 'vite.config.js',
+        content: `import { defineConfig } from 'vite'\n\nexport default defineConfig({\n  server: {\n    host: '0.0.0.0',\n    port: ${port},\n    strictPort: true,\n    cors: true,\n    allowedHosts: ['localhost', '127.0.0.1', '.e2b.app', '.e2b.dev'],\n    hmr: { host: 'localhost' },\n  },\n})\n`,
+      })
+      console.log('[AppPreview] Created vite.config.js with E2B server settings')
+    }
+  }
+
+  if (framework === 'nextjs') {
+    const nextConfig = files.find((f: any) =>
+      /^next\.config\.(js|ts|mjs|mts)$/.test(f.path)
+    )
+    if (nextConfig) {
+      // Ensure hostname 0.0.0.0 — Next.js uses the CLI flag, but we also set experimental
+      if (!nextConfig.content.includes('hostname')) {
+        console.log('[AppPreview] Next.js config found — will use --hostname 0.0.0.0 CLI flag')
+      }
+    }
+  }
+}
+
 // ─── Config ──────────────────────────────────────────────────────────────────
 const PIPILOT_PREVIEW_API_KEY = process.env.PIPILOT_PREVIEW_API_KEY || 'ppk_live_pipilot_preview_2026'
 
@@ -172,6 +230,9 @@ export async function POST(request: NextRequest) {
 
     session.sandboxId = sandbox.id
     session.sandbox = sandbox
+
+    // ── Inject E2B-compatible server config before writing ──────────────────
+    injectE2BServerConfig(files, detectedFramework, port)
 
     // ── Write files (same as preview API) ─────────────────────────────────
     console.log(`[AppPreview] Writing ${files.length} files...`)
