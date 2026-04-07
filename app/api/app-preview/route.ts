@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Sandbox } from 'e2b'
+import {
+  createEnhancedSandbox,
+  type SandboxFile,
+} from '@/lib/e2b-enhanced'
 
 // ─── Config ──────────────────────────────────────────────────────────────────
-// Default API key for PiPilot IDE and public integrations.
-// Requests must include this key in the Authorization header.
 const PIPILOT_PREVIEW_API_KEY = process.env.PIPILOT_PREVIEW_API_KEY || 'ppk_live_pipilot_preview_2026'
 
 const CORS_HEADERS: Record<string, string> = {
@@ -106,14 +107,16 @@ export async function POST(request: NextRequest) {
           if (allDeps['next']) detectedFramework = 'nextjs'
           else if (allDeps['expo']) detectedFramework = 'expo'
           else if (allDeps['vite']) detectedFramework = 'vite'
-          else detectedFramework = 'vite' // Default to Vite
+          else detectedFramework = 'vite'
         } catch { detectedFramework = 'vite' }
       } else {
         detectedFramework = 'vite'
       }
     }
 
-    const port = requestedPort || (detectedFramework === 'nextjs' ? 3000 : detectedFramework === 'expo' ? 8081 : 5173)
+    const isExpoProject = detectedFramework === 'expo'
+    const port = requestedPort || (detectedFramework === 'nextjs' ? 3000 : isExpoProject ? 8081 : 5173)
+    const workingDir = isExpoProject ? '/home/user' : '/project'
     const sessionId = existingSessionId || `preview-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
     // ── Reuse existing sandbox if sessionId provided ──────────────────────
@@ -122,13 +125,12 @@ export async function POST(request: NextRequest) {
       existing.lastActivity = new Date()
 
       try {
-        // Write updated files to existing sandbox
         const sandbox = existing.sandbox
-        for (const file of files) {
-          const dir = file.path.includes('/') ? file.path.substring(0, file.path.lastIndexOf('/')) : null
-          if (dir) await sandbox.commands.run(`mkdir -p /project/${dir}`, { timeoutMs: 5000 })
-          await sandbox.files.write(`/project/${file.path}`, file.content)
-        }
+        const sandboxFiles: SandboxFile[] = files.map((f: any) => ({
+          path: `${workingDir}/${f.path}`,
+          content: f.content || '',
+        }))
+        await sandbox.writeFiles(sandboxFiles)
 
         existing.status = 'running'
         return json({
@@ -158,44 +160,95 @@ export async function POST(request: NextRequest) {
     }
     sessions.set(sessionId, session)
 
-    const sandbox = await Sandbox.create({
-      timeoutMs: 600000, // 10 min sandbox lifetime
-      envs: { NODE_ENV: 'development' },
+    const template = isExpoProject ? 'pipilot-expo' : 'pipilot-expo'
+    const sandbox = await createEnhancedSandbox({
+      template,
+      timeoutMs: 600000,
+      env: { NODE_ENV: 'development' },
     })
 
-    session.sandboxId = sandbox.sandboxId
+    session.sandboxId = sandbox.id
     session.sandbox = sandbox
 
-    // ── Write files ───────────────────────────────────────────────────────
-    await sandbox.commands.run('mkdir -p /project', { timeoutMs: 5000 })
+    // ── Write files (same as preview API) ─────────────────────────────────
+    console.log(`[AppPreview] Writing ${files.length} files...`)
+    const sandboxFiles: SandboxFile[] = files.map((f: any) => ({
+      path: `${workingDir}/${f.path}`,
+      content: f.content || '',
+    }))
 
-    for (const file of files) {
-      const dir = file.path.includes('/') ? file.path.substring(0, file.path.lastIndexOf('/')) : null
-      if (dir) await sandbox.commands.run(`mkdir -p /project/${dir}`, { timeoutMs: 5000 })
-      await sandbox.files.write(`/project/${file.path}`, file.content)
+    const fileResult = await sandbox.writeFiles(sandboxFiles)
+    if (!fileResult.success) {
+      const failedFiles = fileResult.results.filter(r => !r.success).map(r => `${r.path}: ${r.error}`)
+      session.status = 'error'
+      session.error = `Failed to write files: ${failedFiles.join(', ')}`
+      console.error('[AppPreview] File write errors:', failedFiles)
+      return json({ sessionId, status: 'error', error: session.error, framework: detectedFramework }, 500)
     }
+    console.log(`[AppPreview] Files written: ${fileResult.successCount}/${fileResult.totalFiles}`)
 
-    // ── Install dependencies ──────────────────────────────────────────────
+    // ── Install dependencies (same as preview API) ────────────────────────
     session.status = 'installing'
 
     const hasPackageJson = files.some((f: any) => f.path === 'package.json')
     if (hasPackageJson) {
-      const install = installCommand || 'npm install --legacy-peer-deps'
-      console.log(`[AppPreview] Installing deps: ${install}`)
-      const installResult = await sandbox.commands.run(`cd /project && ${install}`, { timeoutMs: 180000 })
-      if (installResult.exitCode !== 0) {
-        session.status = 'error'
-        session.error = `Dependency install failed: ${installResult.stderr?.slice(0, 500)}`
-        return json({
-          sessionId,
-          status: 'error',
-          error: session.error,
-          framework: detectedFramework,
-        }, 500)
+      // Detect package manager
+      const hasPnpmLock = files.some((f: any) => f.path === 'pnpm-lock.yaml')
+      const hasYarnLock = files.some((f: any) => f.path === 'yarn.lock')
+      const packageManager = installCommand
+        ? undefined // user provided full command, skip auto-detection
+        : isExpoProject ? 'yarn' : (hasPnpmLock ? 'pnpm' : hasYarnLock ? 'yarn' : 'pnpm')
+
+      if (installCommand) {
+        // User provided a custom install command — run it directly
+        console.log(`[AppPreview] Installing deps (custom): ${installCommand}`)
+        try {
+          const installResult = await sandbox.executeCommand(installCommand, {
+            workingDirectory: workingDir,
+            timeoutMs: 0,
+            onStdout: (data) => console.log(`[AppPreview Install] ${data.trim()}`),
+            onStderr: (data) => {
+              const msg = data.trim()
+              if (msg.includes('ERR!') || msg.includes('ENOENT') || msg.includes('failed')) {
+                console.error(`[AppPreview Install Error] ${msg}`)
+              }
+            },
+          })
+          if (installResult.exitCode !== 0) {
+            session.status = 'error'
+            session.error = `Dependency install failed: ${installResult.stderr?.slice(0, 500)}`
+            return json({ sessionId, status: 'error', error: session.error, framework: detectedFramework }, 500)
+          }
+        } catch (err: any) {
+          session.status = 'error'
+          session.error = `Dependency install failed: ${err.message?.slice(0, 500)}`
+          return json({ sessionId, status: 'error', error: session.error, framework: detectedFramework }, 500)
+        }
+      } else {
+        // Use robust install with automatic retry strategies (same as preview API)
+        console.log(`[AppPreview] Installing deps with ${packageManager}...`)
+        const installResult = await sandbox.installDependenciesRobust(workingDir, {
+          timeoutMs: 0,
+          packageManager,
+          onStdout: (data) => console.log(`[AppPreview Install] ${data.trim()}`),
+          onStderr: (data) => {
+            const msg = data.trim()
+            if (msg.includes('ERR!') || msg.includes('ENOENT') || msg.includes('failed')) {
+              console.error(`[AppPreview Install Error] ${msg}`)
+            }
+          },
+        })
+
+        if (installResult.exitCode !== 0) {
+          session.status = 'error'
+          session.error = `Dependency install failed: ${installResult.stderr?.slice(0, 500)}`
+          return json({ sessionId, status: 'error', error: session.error, framework: detectedFramework }, 500)
+        }
       }
+      console.log('[AppPreview] Dependencies installed successfully')
     }
 
-    // ── Start dev server ──────────────────────────────────────────────────
+    // ── Start dev server (same as preview API) ────────────────────────────
     session.status = 'building'
 
     let dev = devCommand
@@ -207,42 +260,53 @@ export async function POST(request: NextRequest) {
 
     console.log(`[AppPreview] Starting dev server: ${dev}`)
 
-    // Start dev server in background
-    sandbox.commands.run(`cd /project && ${dev}`, { timeoutMs: 600000 }).catch(() => {})
+    try {
+      const serverResult = await sandbox.startDevServer({
+        command: dev,
+        workingDirectory: workingDir,
+        port,
+        timeoutMs: 60000,
+        onStdout: (data) => console.log(`[AppPreview Dev] ${data.trim()}`),
+        onStderr: (data) => console.error(`[AppPreview Dev Error] ${data.trim()}`),
+      })
 
-    // Wait for the port to be ready
-    const startTime = Date.now()
-    let previewUrl: string | null = null
-    while (Date.now() - startTime < 60000) { // 60 second timeout
-      await new Promise(r => setTimeout(r, 2000))
+      session.previewUrl = serverResult.url
+      session.status = 'running'
+      session.lastActivity = new Date()
+
+      console.log(`[AppPreview] Preview ready: ${serverResult.url}`)
+
+      return json({
+        sessionId,
+        sandboxId: sandbox.id,
+        previewUrl: serverResult.url,
+        port,
+        status: 'running',
+        framework: detectedFramework,
+      })
+    } catch (serverErr: any) {
+      // Server didn't become ready in time — still return a URL, it may come up shortly
+      console.warn(`[AppPreview] Dev server start warning: ${serverErr.message}`)
+      let previewUrl: string | null = null
       try {
-        const check = await sandbox.commands.run(`curl -s -o /dev/null -w "%{http_code}" http://localhost:${port}`, { timeoutMs: 5000 })
-        if (check.stdout?.trim() === '200' || check.exitCode === 0) {
-          previewUrl = `https://${sandbox.getHost(port)}`
-          break
-        }
+        const info = await sandbox.getInfo()
+        previewUrl = info?.url || null
       } catch {}
+
+      session.previewUrl = previewUrl
+      session.status = 'running'
+      session.lastActivity = new Date()
+
+      return json({
+        sessionId,
+        sandboxId: sandbox.id,
+        previewUrl,
+        port,
+        status: 'running',
+        framework: detectedFramework,
+        warning: 'Dev server may still be starting up',
+      })
     }
-
-    if (!previewUrl) {
-      // Try to get the URL anyway (some dev servers need more time)
-      previewUrl = `https://${sandbox.getHost(port)}`
-    }
-
-    session.previewUrl = previewUrl
-    session.status = 'running'
-    session.lastActivity = new Date()
-
-    console.log(`[AppPreview] Preview ready: ${previewUrl}`)
-
-    return json({
-      sessionId,
-      sandboxId: sandbox.sandboxId,
-      previewUrl,
-      port,
-      status: 'running',
-      framework: detectedFramework,
-    })
   } catch (error: any) {
     console.error('[AppPreview] Error:', error)
     return json({ error: error.message || 'Failed to create preview' }, 500)
@@ -258,7 +322,6 @@ export async function GET(request: NextRequest) {
   const sessionId = request.nextUrl.searchParams.get('sessionId')
 
   if (!sessionId) {
-    // List all active sessions
     const activeSessions = Array.from(sessions.entries()).map(([id, s]) => ({
       sessionId: id,
       previewUrl: s.previewUrl,
