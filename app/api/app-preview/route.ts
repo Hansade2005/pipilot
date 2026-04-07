@@ -45,12 +45,11 @@ interface PreviewSession {
 
 const sessions = new Map<string, PreviewSession>()
 
-// Cleanup sessions older than 30 minutes
 function cleanupSessions() {
   const cutoff = Date.now() - 30 * 60 * 1000
   for (const [id, session] of sessions) {
     if (session.lastActivity.getTime() < cutoff) {
-      try { session.sandbox?.kill?.() } catch {}
+      try { session.sandbox?.terminate?.() } catch {}
       sessions.delete(id)
     }
   }
@@ -59,12 +58,12 @@ function cleanupSessions() {
 // ─── POST /api/app-preview — Create a new preview session ────────────────────
 //
 // Body: {
-//   files: [{ path: string, content: string }],     // Project files
+//   files: [{ path: string, content: string }],
 //   framework?: 'vite' | 'nextjs' | 'expo' | 'auto',
-//   installCommand?: string,                          // e.g. "pnpm install"
-//   devCommand?: string,                              // e.g. "pnpm dev"
-//   port?: number,                                    // Default: 5173 (Vite) or 3000
-//   sessionId?: string,                               // Reuse existing session
+//   installCommand?: string,
+//   devCommand?: string,
+//   port?: number,
+//   sessionId?: string,
 // }
 //
 // Returns: { sessionId, previewUrl, port, status, framework }
@@ -115,9 +114,15 @@ export async function POST(request: NextRequest) {
     }
 
     const isExpoProject = detectedFramework === 'expo'
-    const port = requestedPort || (detectedFramework === 'nextjs' ? 3000 : isExpoProject ? 8081 : 5173)
+    const defaultPort = detectedFramework === 'nextjs' ? 3000 : isExpoProject ? 8081 : 5173
+    const port = requestedPort || defaultPort
     const workingDir = isExpoProject ? '/home/user' : '/project'
     const sessionId = existingSessionId || `preview-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
+    // ── Detect package manager ────────────────────────────────────────────
+    const hasPnpmLock = files.some((f: any) => f.path === 'pnpm-lock.yaml')
+    const hasYarnLock = files.some((f: any) => f.path === 'yarn.lock')
+    const packageManager = isExpoProject ? 'yarn' : (hasPnpmLock ? 'pnpm' : hasYarnLock ? 'yarn' : 'pnpm')
 
     // ── Reuse existing sandbox if sessionId provided ──────────────────────
     if (existingSessionId && sessions.has(existingSessionId)) {
@@ -141,8 +146,7 @@ export async function POST(request: NextRequest) {
           framework: existing.framework,
           reused: true,
         })
-      } catch (err) {
-        // Sandbox expired, create new
+      } catch {
         sessions.delete(existingSessionId)
       }
     }
@@ -160,9 +164,8 @@ export async function POST(request: NextRequest) {
     }
     sessions.set(sessionId, session)
 
-    const template = isExpoProject ? 'pipilot-expo' : 'pipilot-expo'
     const sandbox = await createEnhancedSandbox({
-      template,
+      template: 'pipilot-expo',
       timeoutMs: 600000,
       env: { NODE_ENV: 'development' },
     })
@@ -182,7 +185,6 @@ export async function POST(request: NextRequest) {
       const failedFiles = fileResult.results.filter(r => !r.success).map(r => `${r.path}: ${r.error}`)
       session.status = 'error'
       session.error = `Failed to write files: ${failedFiles.join(', ')}`
-      console.error('[AppPreview] File write errors:', failedFiles)
       return json({ sessionId, status: 'error', error: session.error, framework: detectedFramework }, 500)
     }
     console.log(`[AppPreview] Files written: ${fileResult.successCount}/${fileResult.totalFiles}`)
@@ -192,15 +194,7 @@ export async function POST(request: NextRequest) {
 
     const hasPackageJson = files.some((f: any) => f.path === 'package.json')
     if (hasPackageJson) {
-      // Detect package manager
-      const hasPnpmLock = files.some((f: any) => f.path === 'pnpm-lock.yaml')
-      const hasYarnLock = files.some((f: any) => f.path === 'yarn.lock')
-      const packageManager = installCommand
-        ? undefined // user provided full command, skip auto-detection
-        : isExpoProject ? 'yarn' : (hasPnpmLock ? 'pnpm' : hasYarnLock ? 'yarn' : 'pnpm')
-
       if (installCommand) {
-        // User provided a custom install command — run it directly
         console.log(`[AppPreview] Installing deps (custom): ${installCommand}`)
         try {
           const installResult = await sandbox.executeCommand(installCommand, {
@@ -225,8 +219,7 @@ export async function POST(request: NextRequest) {
           return json({ sessionId, status: 'error', error: session.error, framework: detectedFramework }, 500)
         }
       } else {
-        // Use robust install with automatic retry strategies (same as preview API)
-        console.log(`[AppPreview] Installing deps with ${packageManager}...`)
+        console.log(`[AppPreview] Installing deps with ${packageManager} (robust)...`)
         const installResult = await sandbox.installDependenciesRobust(workingDir, {
           timeoutMs: 0,
           packageManager,
@@ -238,7 +231,6 @@ export async function POST(request: NextRequest) {
             }
           },
         })
-
         if (installResult.exitCode !== 0) {
           session.status = 'error'
           session.error = `Dependency install failed: ${installResult.stderr?.slice(0, 500)}`
@@ -248,63 +240,128 @@ export async function POST(request: NextRequest) {
       console.log('[AppPreview] Dependencies installed successfully')
     }
 
-    // ── Start dev server (same as preview API) ────────────────────────────
+    // ── Start dev server ──────────────────────────────────────────────────
     session.status = 'building'
 
+    // Build the dev command — always bind to 0.0.0.0 so E2B can expose the port
     let dev = devCommand
     if (!dev) {
-      if (detectedFramework === 'nextjs') dev = 'npx next dev -p 3000'
-      else if (detectedFramework === 'expo') dev = 'npx expo start --web --port 8081'
-      else dev = 'npx vite --host 0.0.0.0 --port 5173'
+      if (detectedFramework === 'nextjs') {
+        dev = `${packageManager} run dev`
+      } else if (detectedFramework === 'expo') {
+        dev = 'npx expo start --web'
+      } else {
+        // Vite: must use --host 0.0.0.0 so the port is accessible outside the sandbox
+        dev = `${packageManager} run dev -- --host 0.0.0.0 --port ${port}`
+      }
+    }
+
+    // If user provided a custom devCommand, ensure it binds to 0.0.0.0 for Vite
+    if (dev && detectedFramework === 'vite' && !dev.includes('--host')) {
+      dev = `${dev} --host 0.0.0.0`
     }
 
     console.log(`[AppPreview] Starting dev server: ${dev}`)
 
     try {
-      const serverResult = await sandbox.startDevServer({
+      const devServer = await sandbox.startDevServer({
         command: dev,
         workingDirectory: workingDir,
         port,
-        timeoutMs: 60000,
+        timeoutMs: 120000, // 2 min timeout for server readiness
+        envVars: {
+          PORT: port.toString(),
+          HOST: '0.0.0.0',
+          ...(isExpoProject ? { EXPO_NO_TELEMETRY: '1', EXPO_NO_REDIRECT: '1' } : {}),
+        },
         onStdout: (data) => console.log(`[AppPreview Dev] ${data.trim()}`),
         onStderr: (data) => console.error(`[AppPreview Dev Error] ${data.trim()}`),
       })
 
-      session.previewUrl = serverResult.url
+      session.previewUrl = devServer.url
       session.status = 'running'
       session.lastActivity = new Date()
 
-      console.log(`[AppPreview] Preview ready: ${serverResult.url}`)
+      console.log(`[AppPreview] Preview ready: ${devServer.url}`)
 
       return json({
         sessionId,
         sandboxId: sandbox.id,
-        previewUrl: serverResult.url,
+        previewUrl: devServer.url,
         port,
         status: 'running',
         framework: detectedFramework,
       })
     } catch (serverErr: any) {
-      // Server didn't become ready in time — still return a URL, it may come up shortly
-      console.warn(`[AppPreview] Dev server start warning: ${serverErr.message}`)
+      // Server readiness check timed out — try to find which port IS running
+      console.warn(`[AppPreview] Dev server readiness timed out: ${serverErr.message}`)
+      console.log(`[AppPreview] Scanning for any running port...`)
+
+      let foundPort: number | null = null
       let previewUrl: string | null = null
+
+      try {
+        // Scan common dev server ports to find which one is actually running
+        const portsToScan = [port, 3000, 3001, 5173, 5174, 4173, 8080, 8081, 8000]
+        const scanResult = await sandbox.executeCommand(
+          `netstat -tln 2>/dev/null | grep -oP ':\\K[0-9]+(?=\\s)' | sort -un || ss -tln 2>/dev/null | grep -oP ':\\K[0-9]+(?=\\s)' | sort -un || echo "NO_PORTS"`,
+          { timeoutMs: 5000 }
+        )
+
+        if (scanResult.stdout && !scanResult.stdout.includes('NO_PORTS')) {
+          const listeningPorts = scanResult.stdout.trim().split('\n').map(p => parseInt(p.trim())).filter(p => !isNaN(p))
+          console.log(`[AppPreview] Listening ports found: ${listeningPorts.join(', ')}`)
+
+          // Prefer the requested port, then common dev ports
+          for (const candidate of portsToScan) {
+            if (listeningPorts.includes(candidate)) {
+              foundPort = candidate
+              break
+            }
+          }
+
+          // If none of the common ports match, use the first non-system port
+          if (!foundPort) {
+            foundPort = listeningPorts.find(p => p > 1024) || null
+          }
+        }
+      } catch {
+        console.warn('[AppPreview] Port scan failed')
+      }
+
+      // Build the URL from whatever port we found (or the original requested port)
+      const effectivePort = foundPort || port
       try {
         const info = await sandbox.getInfo()
-        previewUrl = info?.url || null
+        if (info?.url) {
+          // Replace port in URL if needed
+          previewUrl = info.url.replace(/:\d+/, `:${effectivePort}`)
+        }
       } catch {}
 
+      // Fallback: construct URL manually using E2B convention
+      if (!previewUrl) {
+        previewUrl = `https://${effectivePort}-${sandbox.id}.e2b.dev`
+      }
+
       session.previewUrl = previewUrl
+      session.port = effectivePort
       session.status = 'running'
       session.lastActivity = new Date()
+
+      console.log(`[AppPreview] Returning URL with ${foundPort ? 'detected' : 'requested'} port ${effectivePort}: ${previewUrl}`)
 
       return json({
         sessionId,
         sandboxId: sandbox.id,
         previewUrl,
-        port,
+        port: effectivePort,
         status: 'running',
         framework: detectedFramework,
-        warning: 'Dev server may still be starting up',
+        portDetected: !!foundPort,
+        warning: foundPort
+          ? `Dev server detected on port ${foundPort} (requested ${port})`
+          : 'Dev server may still be starting up',
       })
     }
   } catch (error: any) {
@@ -338,6 +395,28 @@ export async function GET(request: NextRequest) {
     return json({ error: 'Session not found' }, 404)
   }
 
+  // If session is running, check for port changes (server may have started on a different port)
+  if (session.status === 'running' && session.sandbox) {
+    try {
+      const scanResult = await session.sandbox.executeCommand(
+        `netstat -tln 2>/dev/null | grep -oP ':\\K[0-9]+(?=\\s)' | sort -un || ss -tln 2>/dev/null | grep -oP ':\\K[0-9]+(?=\\s)' | sort -un || echo ""`,
+        { timeoutMs: 3000 }
+      )
+      if (scanResult.stdout?.trim()) {
+        const listeningPorts = scanResult.stdout.trim().split('\n').map((p: string) => parseInt(p.trim())).filter((p: number) => !isNaN(p) && p > 1024)
+        if (listeningPorts.length > 0) {
+          const commonPorts = [session.port, 3000, 5173, 8080, 8081]
+          const bestPort = commonPorts.find(p => p && listeningPorts.includes(p)) || listeningPorts[0]
+          if (bestPort && bestPort !== session.port) {
+            session.port = bestPort
+            session.previewUrl = `https://${bestPort}-${session.sandboxId}.e2b.dev`
+            console.log(`[AppPreview] Updated session port to ${bestPort}`)
+          }
+        }
+      }
+    } catch {}
+  }
+
   session.lastActivity = new Date()
   return json({
     sessionId,
@@ -368,7 +447,7 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
-    await session.sandbox?.kill?.()
+    await session.sandbox?.terminate?.()
   } catch {}
   sessions.delete(sessionId)
 
