@@ -247,18 +247,19 @@ export async function POST(request: NextRequest) {
     let dev = devCommand
     if (!dev) {
       if (detectedFramework === 'nextjs') {
-        dev = `${packageManager} run dev`
+        dev = `npx next dev --hostname 0.0.0.0 -p ${port}`
       } else if (detectedFramework === 'expo') {
         dev = 'npx expo start --web'
       } else {
-        // Vite: must use --host 0.0.0.0 so the port is accessible outside the sandbox
-        dev = `${packageManager} run dev -- --host 0.0.0.0 --port ${port}`
+        // Vite: run directly via npx, bind 0.0.0.0 so E2B exposes the port
+        dev = `npx vite --host 0.0.0.0 --port ${port}`
       }
     }
 
-    // If user provided a custom devCommand, ensure it binds to 0.0.0.0 for Vite
-    if (dev && detectedFramework === 'vite' && !dev.includes('--host')) {
-      dev = `${dev} --host 0.0.0.0`
+    // If user provided a custom devCommand, ensure it binds to 0.0.0.0
+    if (dev && !dev.includes('--host') && !dev.includes('--hostname')) {
+      if (detectedFramework === 'vite') dev = `${dev} --host 0.0.0.0`
+      else if (detectedFramework === 'nextjs') dev = `${dev} --hostname 0.0.0.0`
     }
 
     console.log(`[AppPreview] Starting dev server: ${dev}`)
