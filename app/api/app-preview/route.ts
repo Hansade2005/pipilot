@@ -167,12 +167,21 @@ export async function POST(request: NextRequest) {
     session.sandbox = sandbox
 
     // ── Write files ───────────────────────────────────────────────────────
-    await sandbox.commands.run('mkdir -p /project', { timeoutMs: 5000 })
+    try {
+      await sandbox.commands.run('mkdir -p /project', { timeoutMs: 5000 })
+    } catch {}
 
     for (const file of files) {
-      const dir = file.path.includes('/') ? file.path.substring(0, file.path.lastIndexOf('/')) : null
-      if (dir) await sandbox.commands.run(`mkdir -p /project/${dir}`, { timeoutMs: 5000 })
-      await sandbox.files.write(`/project/${file.path}`, file.content)
+      try {
+        const dir = file.path.includes('/') ? file.path.substring(0, file.path.lastIndexOf('/')) : null
+        if (dir) await sandbox.commands.run(`mkdir -p /project/${dir}`, { timeoutMs: 5000 })
+        await sandbox.files.write(`/project/${file.path}`, file.content)
+      } catch (writeErr: any) {
+        console.error(`[AppPreview] Failed to write ${file.path}:`, writeErr.message)
+        session.status = 'error'
+        session.error = `Failed to write file ${file.path}: ${writeErr.message}`
+        return json({ sessionId, status: 'error', error: session.error, framework: detectedFramework }, 500)
+      }
     }
 
     // ── Install dependencies ──────────────────────────────────────────────
@@ -182,10 +191,22 @@ export async function POST(request: NextRequest) {
     if (hasPackageJson) {
       const install = installCommand || 'npm install --legacy-peer-deps'
       console.log(`[AppPreview] Installing deps: ${install}`)
-      const installResult = await sandbox.commands.run(`cd /project && ${install}`, { timeoutMs: 180000 })
-      if (installResult.exitCode !== 0) {
+      try {
+        const installResult = await sandbox.commands.run(`cd /project && ${install}`, { timeoutMs: 180000 })
+        if (installResult.exitCode !== 0) {
+          session.status = 'error'
+          session.error = `Dependency install failed: ${installResult.stderr?.slice(0, 500)}`
+          return json({
+            sessionId,
+            status: 'error',
+            error: session.error,
+            framework: detectedFramework,
+          }, 500)
+        }
+      } catch (installErr: any) {
         session.status = 'error'
-        session.error = `Dependency install failed: ${installResult.stderr?.slice(0, 500)}`
+        session.error = `Dependency install failed: ${installErr.message?.slice(0, 500)}`
+        console.error('[AppPreview] Install error:', installErr.message)
         return json({
           sessionId,
           status: 'error',
@@ -207,7 +228,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`[AppPreview] Starting dev server: ${dev}`)
 
-    // Start dev server in background
+    // Start dev server in background (ignore exit errors — it runs until sandbox dies)
     sandbox.commands.run(`cd /project && ${dev}`, { timeoutMs: 600000 }).catch(() => {})
 
     // Wait for the port to be ready
@@ -216,12 +237,18 @@ export async function POST(request: NextRequest) {
     while (Date.now() - startTime < 60000) { // 60 second timeout
       await new Promise(r => setTimeout(r, 2000))
       try {
-        const check = await sandbox.commands.run(`curl -s -o /dev/null -w "%{http_code}" http://localhost:${port}`, { timeoutMs: 5000 })
-        if (check.stdout?.trim() === '200' || check.exitCode === 0) {
+        // Use shell exit code check instead of relying on CommandExitError
+        const check = await sandbox.commands.run(
+          `curl -sf -o /dev/null http://localhost:${port} && echo OK || echo WAIT`,
+          { timeoutMs: 5000 }
+        )
+        if (check.stdout?.trim() === 'OK') {
           previewUrl = `https://${sandbox.getHost(port)}`
           break
         }
-      } catch {}
+      } catch {
+        // Sandbox may not have curl yet or command threw — just keep retrying
+      }
     }
 
     if (!previewUrl) {
