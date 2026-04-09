@@ -8,9 +8,10 @@ import {
 // Patches vite.config / next.config to bind 0.0.0.0 and allow E2B sandbox domains
 // so the dev server port is externally accessible via {port}-{sandboxId}.e2b.app
 function injectE2BServerConfig(files: any[], framework: string, port: number) {
+  const fname = (p: string) => p.split('/').pop() || p
   if (framework === 'vite') {
     const viteConfig = files.find((f: any) =>
-      /^vite\.config\.(js|ts|mjs|mts)$/.test(f.path)
+      /^vite\.config\.(js|ts|mjs|mts)$/.test(fname(f.path))
     )
     if (viteConfig) {
       // Check if server config already exists
@@ -51,7 +52,7 @@ function injectE2BServerConfig(files: any[], framework: string, port: number) {
 
   if (framework === 'nextjs') {
     const nextConfig = files.find((f: any) =>
-      /^next\.config\.(js|ts|mjs|mts)$/.test(f.path)
+      /^next\.config\.(js|ts|mjs|mts)$/.test(fname(f.path))
     )
     if (nextConfig) {
       // Ensure hostname 0.0.0.0 — Next.js uses the CLI flag, but we also set experimental
@@ -153,22 +154,27 @@ export async function POST(request: NextRequest) {
       return json({ error: 'files array is required (each item: { path, content })' }, 400)
     }
 
+    // Helper: extract filename from paths that may include directories (e.g. "src/next.config.js" → "next.config.js")
+    const basename = (p: string) => p.split('/').pop() || p
+
     // ── Detect framework ──────────────────────────────────────────────────
     let detectedFramework = framework
     if (framework === 'auto') {
       // Check config files first (most reliable detection)
-      const hasNextConfig = files.some((f: any) =>
-        f.path === 'next.config.js' || f.path === 'next.config.mjs' || f.path === 'next.config.ts'
-      )
-      const hasViteConfig = files.some((f: any) =>
-        f.path === 'vite.config.js' || f.path === 'vite.config.ts' || f.path === 'vite.config.mjs'
-      )
-      const hasExpoConfig = files.some((f: any) =>
-        f.path === 'app.json' || f.path === 'app.config.js'
-      )
+      const hasNextConfig = files.some((f: any) => {
+        const base = basename(f.path)
+        return base === 'next.config.js' || base === 'next.config.mjs' || base === 'next.config.ts'
+      })
+      const hasViteConfig = files.some((f: any) => {
+        const base = basename(f.path)
+        return base === 'vite.config.js' || base === 'vite.config.ts' || base === 'vite.config.mjs'
+      })
+      const hasExpoConfig = files.some((f: any) => {
+        const base = basename(f.path)
+        return base === 'app.json' || base === 'app.config.js'
+      })
 
-      // Fallback to package.json dependency detection (combined with config files)
-      const packageJson = files.find((f: any) => f.path === 'package.json')
+      const packageJson = files.find((f: any) => basename(f.path) === 'package.json')
       if (hasNextConfig) {
         detectedFramework = 'nextjs'
       } else if (packageJson) {
@@ -194,8 +200,8 @@ export async function POST(request: NextRequest) {
     const sessionId = existingSessionId || `preview-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
     // ── Detect package manager ────────────────────────────────────────────
-    const hasPnpmLock = files.some((f: any) => f.path === 'pnpm-lock.yaml')
-    const hasYarnLock = files.some((f: any) => f.path === 'yarn.lock')
+    const hasPnpmLock = files.some((f: any) => basename(f.path) === 'pnpm-lock.yaml')
+    const hasYarnLock = files.some((f: any) => basename(f.path) === 'yarn.lock')
     const packageManager = isExpoProject ? 'yarn' : (hasPnpmLock ? 'pnpm' : hasYarnLock ? 'yarn' : 'pnpm')
 
     // ── Reuse existing sandbox if sessionId provided ──────────────────────
@@ -269,7 +275,7 @@ export async function POST(request: NextRequest) {
     // ── Install dependencies (same as preview API) ────────────────────────
     session.status = 'installing'
 
-    const hasPackageJson = files.some((f: any) => f.path === 'package.json')
+    const hasPackageJson = files.some((f: any) => basename(f.path) === 'package.json')
     if (hasPackageJson) {
       if (installCommand) {
         console.log(`[AppPreview] Installing deps (custom): ${installCommand}`)
