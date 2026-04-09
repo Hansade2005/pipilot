@@ -4,6 +4,65 @@ import {
   type SandboxFile,
 } from '@/lib/e2b-enhanced'
 
+// ─── E2B server config injection ─────────────────────────────────────────────
+// Patches vite.config / next.config to bind 0.0.0.0 and allow E2B sandbox domains
+// so the dev server port is externally accessible via {port}-{sandboxId}.e2b.app
+function injectE2BServerConfig(files: any[], framework: string, port: number) {
+  const fname = (p: string) => p.split('/').pop() || p
+  if (framework === 'vite') {
+    const viteConfig = files.find((f: any) =>
+      /^vite\.config\.(js|ts|mjs|mts)$/.test(fname(f.path))
+    )
+    if (viteConfig) {
+      // Check if server config already exists
+      if (!viteConfig.content.includes('server:') && !viteConfig.content.includes("server :")) {
+        // Inject server block into defineConfig
+        viteConfig.content = viteConfig.content.replace(
+          /defineConfig\s*\(\s*\{/,
+          `defineConfig({\n  server: {\n    host: '0.0.0.0',\n    port: ${port},\n    strictPort: true,\n    cors: true,\n    allowedHosts: ['localhost', '127.0.0.1', '.e2b.app', '.e2b.dev'],\n    hmr: { host: 'localhost' },\n  },`
+        )
+        console.log('[AppPreview] Injected E2B server config into vite.config')
+      } else {
+        // Server block exists — ensure host is 0.0.0.0
+        if (!viteConfig.content.includes("host:") || viteConfig.content.includes("host: 'localhost'")) {
+          viteConfig.content = viteConfig.content.replace(
+            /host:\s*['"][^'"]*['"]/,
+            "host: '0.0.0.0'"
+          )
+          console.log('[AppPreview] Patched vite.config server.host to 0.0.0.0')
+        }
+        // Ensure allowedHosts includes e2b
+        if (!viteConfig.content.includes('.e2b.')) {
+          viteConfig.content = viteConfig.content.replace(
+            /server:\s*\{/,
+            "server: {\n    allowedHosts: ['.e2b.app', '.e2b.dev'],"
+          )
+          console.log('[AppPreview] Added E2B allowedHosts to vite.config')
+        }
+      }
+    } else {
+      // No vite config — create one with E2B settings
+      files.push({
+        path: 'vite.config.js',
+        content: `import { defineConfig } from 'vite'\n\nexport default defineConfig({\n  server: {\n    host: '0.0.0.0',\n    port: ${port},\n    strictPort: true,\n    cors: true,\n    allowedHosts: ['localhost', '127.0.0.1', '.e2b.app', '.e2b.dev'],\n    hmr: { host: 'localhost' },\n  },\n})\n`,
+      })
+      console.log('[AppPreview] Created vite.config.js with E2B server settings')
+    }
+  }
+
+  if (framework === 'nextjs') {
+    const nextConfig = files.find((f: any) =>
+      /^next\.config\.(js|ts|mjs|mts)$/.test(fname(f.path))
+    )
+    if (nextConfig) {
+      // Ensure hostname 0.0.0.0 — Next.js uses the CLI flag, but we also set experimental
+      if (!nextConfig.content.includes('hostname')) {
+        console.log('[AppPreview] Next.js config found — will use --hostname 0.0.0.0 CLI flag')
+      }
+    }
+  }
+}
+
 // ─── Config ──────────────────────────────────────────────────────────────────
 const PIPILOT_PREVIEW_API_KEY = process.env.PIPILOT_PREVIEW_API_KEY || 'ppk_live_pipilot_preview_2026'
 
@@ -95,22 +154,43 @@ export async function POST(request: NextRequest) {
       return json({ error: 'files array is required (each item: { path, content })' }, 400)
     }
 
+    // Helper: extract filename from paths that may include directories (e.g. "src/next.config.js" → "next.config.js")
+    const basename = (p: string) => p.split('/').pop() || p
+
     // ── Detect framework ──────────────────────────────────────────────────
     let detectedFramework = framework
     if (framework === 'auto') {
-      const packageJson = files.find((f: any) => f.path === 'package.json')
-      if (packageJson) {
+      // Check config files first (most reliable detection)
+      const hasNextConfig = files.some((f: any) => {
+        const base = basename(f.path)
+        return base === 'next.config.js' || base === 'next.config.mjs' || base === 'next.config.ts'
+      })
+      const hasViteConfig = files.some((f: any) => {
+        const base = basename(f.path)
+        return base === 'vite.config.js' || base === 'vite.config.ts' || base === 'vite.config.mjs'
+      })
+      const hasExpoConfig = files.some((f: any) => {
+        const base = basename(f.path)
+        return base === 'app.json' || base === 'app.config.js'
+      })
+
+      const packageJson = files.find((f: any) => basename(f.path) === 'package.json')
+      if (hasNextConfig) {
+        detectedFramework = 'nextjs'
+      } else if (packageJson) {
         try {
           const pkg = JSON.parse(packageJson.content)
           const allDeps = { ...pkg.dependencies, ...pkg.devDependencies }
           if (allDeps['next']) detectedFramework = 'nextjs'
-          else if (allDeps['expo']) detectedFramework = 'expo'
-          else if (allDeps['vite']) detectedFramework = 'vite'
+          else if (allDeps['expo'] || (hasExpoConfig && allDeps['expo'])) detectedFramework = 'expo'
+          else if (allDeps['vite'] || hasViteConfig) detectedFramework = 'vite'
           else detectedFramework = 'vite'
-        } catch { detectedFramework = 'vite' }
+        } catch { detectedFramework = hasViteConfig ? 'vite' : 'vite' }
       } else {
-        detectedFramework = 'vite'
+        detectedFramework = hasViteConfig ? 'vite' : 'vite'
       }
+
+      console.log(`[AppPreview] Framework detection: detected=${detectedFramework}, hasNextConfig=${hasNextConfig}, hasViteConfig=${hasViteConfig}, hasExpoConfig=${hasExpoConfig}`)
     }
 
     const isExpoProject = detectedFramework === 'expo'
@@ -120,8 +200,8 @@ export async function POST(request: NextRequest) {
     const sessionId = existingSessionId || `preview-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
     // ── Detect package manager ────────────────────────────────────────────
-    const hasPnpmLock = files.some((f: any) => f.path === 'pnpm-lock.yaml')
-    const hasYarnLock = files.some((f: any) => f.path === 'yarn.lock')
+    const hasPnpmLock = files.some((f: any) => basename(f.path) === 'pnpm-lock.yaml')
+    const hasYarnLock = files.some((f: any) => basename(f.path) === 'yarn.lock')
     const packageManager = isExpoProject ? 'yarn' : (hasPnpmLock ? 'pnpm' : hasYarnLock ? 'yarn' : 'pnpm')
 
     // ── Reuse existing sandbox if sessionId provided ──────────────────────
@@ -173,6 +253,9 @@ export async function POST(request: NextRequest) {
     session.sandboxId = sandbox.id
     session.sandbox = sandbox
 
+    // ── Inject E2B-compatible server config before writing ──────────────────
+    injectE2BServerConfig(files, detectedFramework, port)
+
     // ── Write files (same as preview API) ─────────────────────────────────
     console.log(`[AppPreview] Writing ${files.length} files...`)
     const sandboxFiles: SandboxFile[] = files.map((f: any) => ({
@@ -192,7 +275,7 @@ export async function POST(request: NextRequest) {
     // ── Install dependencies (same as preview API) ────────────────────────
     session.status = 'installing'
 
-    const hasPackageJson = files.some((f: any) => f.path === 'package.json')
+    const hasPackageJson = files.some((f: any) => basename(f.path) === 'package.json')
     if (hasPackageJson) {
       if (installCommand) {
         console.log(`[AppPreview] Installing deps (custom): ${installCommand}`)
