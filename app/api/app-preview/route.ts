@@ -156,19 +156,35 @@ export async function POST(request: NextRequest) {
     // ── Detect framework ──────────────────────────────────────────────────
     let detectedFramework = framework
     if (framework === 'auto') {
+      // Check config files first (most reliable detection)
+      const hasNextConfig = files.some((f: any) =>
+        f.path === 'next.config.js' || f.path === 'next.config.mjs' || f.path === 'next.config.ts'
+      )
+      const hasViteConfig = files.some((f: any) =>
+        f.path === 'vite.config.js' || f.path === 'vite.config.ts' || f.path === 'vite.config.mjs'
+      )
+      const hasExpoConfig = files.some((f: any) =>
+        f.path === 'app.json' || f.path === 'app.config.js'
+      )
+
+      // Fallback to package.json dependency detection (combined with config files)
       const packageJson = files.find((f: any) => f.path === 'package.json')
-      if (packageJson) {
+      if (hasNextConfig) {
+        detectedFramework = 'nextjs'
+      } else if (packageJson) {
         try {
           const pkg = JSON.parse(packageJson.content)
           const allDeps = { ...pkg.dependencies, ...pkg.devDependencies }
           if (allDeps['next']) detectedFramework = 'nextjs'
-          else if (allDeps['expo']) detectedFramework = 'expo'
-          else if (allDeps['vite']) detectedFramework = 'vite'
+          else if (allDeps['expo'] || (hasExpoConfig && allDeps['expo'])) detectedFramework = 'expo'
+          else if (allDeps['vite'] || hasViteConfig) detectedFramework = 'vite'
           else detectedFramework = 'vite'
-        } catch { detectedFramework = 'vite' }
+        } catch { detectedFramework = hasViteConfig ? 'vite' : 'vite' }
       } else {
-        detectedFramework = 'vite'
+        detectedFramework = hasViteConfig ? 'vite' : 'vite'
       }
+
+      console.log(`[AppPreview] Framework detection: detected=${detectedFramework}, hasNextConfig=${hasNextConfig}, hasViteConfig=${hasViteConfig}, hasExpoConfig=${hasExpoConfig}`)
     }
 
     const isExpoProject = detectedFramework === 'expo'
