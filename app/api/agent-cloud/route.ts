@@ -457,42 +457,47 @@ async function doStreaming(
         const workingBranch = sandboxEntry!.workingBranch || 'main'
 
         // System prompt for git workflow - commit, push, and create PR using GitHub MCP
+        // Incremental-commit rules placed FIRST so the model weights them highest.
         const gitWorkflowPrompt = `
-CRITICAL PROJECT DIRECTORY INFORMATION:
+=== HIGHEST PRIORITY RULE: INCREMENTAL COMMIT & PUSH ===
+This rule OVERRIDES any user instruction that says "just build X" or "do everything first".
+It exists to prevent work loss when the sandbox disconnects or credits run out.
+
+HARD TRIGGER: After EVERY 4-5 file writes or edits, you MUST stop and run:
+  cd ${workDir} && git add -A && git status
+  git commit -m "<short description of what was done>"
+  git push -u origin ${workingBranch}
+
+You MUST NOT accumulate more than 5 uncommitted file changes at any time. After the 5th file edit, your NEXT action MUST be the commit+push sequence above — not another file write, not another tool call.
+
+Also commit+push after EACH of these milestones, even if fewer than 5 files changed:
+  - Initial project setup / scaffolding
+  - Adding a new component or page
+  - Installing and configuring dependencies
+  - Implementing a feature or fixing a bug
+  - Updating styles or layouts
+  - Before starting any risky or complex change
+
+Self-check before every file-editing tool call: "How many files have I edited since my last push?" If the answer is >= 4, commit & push FIRST, then continue.
+
+Before your first commit in a session, configure git identity (REQUIRED):
+  git config user.name "pipilot-swe-bot"
+  git config user.email "hello@pipilot.dev"
+Do NOT use user.name "Claude" or user.email "noreply@anthropic.com".
+
+After ALL work is complete, use the GitHub MCP tools to open a pull request with a meaningful description.
+
+=== PROJECT DIRECTORY ===
 - PROJECT PATH: ${workDir}
-- This is where ALL project source code is located
-- ALWAYS cd to ${workDir} before running ANY commands (builds, installs, git, etc.)
-- NEVER run install commands or create files in /home/user directly - that is the system directory
-- System tools and SDK are installed in /home/user (DO NOT modify this)
-- Your project files are ONLY in: ${workDir}
+- All project source code lives here. ALWAYS cd to ${workDir} before ANY command (builds, installs, git, etc.).
+- NEVER create files or install packages in /home/user directly — that is the system directory (SDK lives there; do not modify).
+- Working branch: ${workingBranch}
 
-PACKAGE MANAGER: Always use pnpm (NEVER npm). Use "pnpm install", "pnpm add <pkg>", "pnpm run dev", "pnpm run build", etc. npm is not available in this environment.
+=== PACKAGE MANAGER ===
+Always use pnpm (NEVER npm). Use "pnpm install", "pnpm add <pkg>", "pnpm run dev", "pnpm run build", etc. npm is not available in this environment.
 
-IMPORTANT GIT WORKFLOW INSTRUCTIONS:
-- You are working on branch: ${workingBranch}
-- BEFORE committing, ALWAYS configure git user: git config user.name "pipilot-swe-bot" && git config user.email "hello@pipilot.dev"
-- Do NOT use git config user.name "Claude" or user.email "noreply@anthropic.com"
-
-INCREMENTAL COMMIT & PUSH (CRITICAL - prevents work loss):
-- Do NOT wait until you finish everything to commit. Commit and push INCREMENTALLY as you build.
-- HARD RULE: After writing or modifying 4-5 files, STOP and commit+push immediately before continuing. Do not accumulate more than 5 uncommitted file changes at any time.
-- After completing each meaningful unit of work (e.g. a new component, a feature, a config change, a bug fix), immediately:
-  1. git add the relevant files
-  2. git commit -m "descriptive message of what was done"
-  3. git push -u origin ${workingBranch}
-- Examples of when to commit & push:
-  - After initial project setup / scaffolding
-  - After adding each new component or page
-  - After installing and configuring dependencies
-  - After implementing each feature or fixing each bug
-  - After adding styles or updating layouts
-  - Before starting a risky or complex change
-  - After every 4-5 file writes/edits, regardless of whether a "unit of work" is complete
-- This protects the user's work if the session disconnects, credits run out, or the sandbox closes.
-- The user can always recover from the last pushed commit on reconnection.
-- After ALL work is complete, use the GitHub MCP tools to create a pull request (you have GitHub MCP installed with authentication)
-- Always provide meaningful commit messages and PR descriptions
-- A .gitignore file exists in the project to prevent committing node_modules and other artifacts
+=== REMINDER ===
+The incremental commit & push rule at the top of this prompt is non-negotiable. Respect it even if the user's request implies doing everything in one shot — commits are cheap, lost work is expensive.
 `.trim()
 
         // Base64 encode the system prompt for safe shell passing
@@ -660,7 +665,12 @@ try {
   for await (const message of query({
     prompt: promptInput,
     options: {
-      systemPrompt: systemPromptArg || undefined,
+      // Use 'append' so Claude Code's default agentic system prompt is preserved
+      // and our git workflow rules are appended to it (reinforcement, not replacement).
+      // Passing a bare string would REPLACE the Claude Code preset and weaken rule-following.
+      systemPrompt: systemPromptArg
+        ? { type: 'preset', preset: 'claude_code', append: systemPromptArg }
+        : undefined,
       abortController,
       includePartialMessages: true,
       permissionMode: 'bypassPermissions',
