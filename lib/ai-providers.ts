@@ -299,6 +299,85 @@ export function getNextBonsaiKey(): string {
   return key;
 }
 
+// ─── AI Gateway Configuration (Agent Cloud) ──────────────────────────────────
+// Primary: Praxis API (configured via ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN)
+// Fallback: Bonsai AI Gateway (go.trybons.ai) via BONSAI_API_KEY
+// Claude Agent SDK reads ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN to route requests.
+
+export interface AIGatewayConfig {
+  provider: 'praxis' | 'bonsai'
+  baseUrl: string
+  authToken: string
+  models: {
+    sonnet: string
+    opus: string
+    haiku: string
+    flash?: string
+  }
+}
+
+const BONSAI_BASE_URL = 'https://go.trybons.ai'
+
+/**
+ * Primary gateway: Praxis API.
+ * Returns null if ANTHROPIC_BASE_URL / ANTHROPIC_AUTH_TOKEN are not configured
+ * or if ANTHROPIC_BASE_URL points to Bonsai (meaning Bonsai is the configured primary).
+ */
+export function getPrimaryGatewayConfig(): AIGatewayConfig | null {
+  const baseUrl = (process.env.ANTHROPIC_BASE_URL || '').trim()
+  const token = (process.env.ANTHROPIC_AUTH_TOKEN || '').trim()
+  if (!baseUrl || !token) return null
+  // If ANTHROPIC_BASE_URL is Bonsai, primary = Bonsai (skip Praxis path)
+  if (baseUrl.includes('go.trybons.ai')) return null
+
+  const sonnet = (process.env.ANTHROPIC_DEFAULT_SONNET_MODEL || '').trim() || 'claude-sonnet-4-6'
+  const opus = (process.env.ANTHROPIC_DEFAULT_OPUS_MODEL || '').trim() || sonnet
+  const haiku = (process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL || '').trim() || sonnet
+
+  return {
+    provider: 'praxis',
+    baseUrl,
+    authToken: token,
+    models: { sonnet, opus, haiku, flash: sonnet },
+  }
+}
+
+/**
+ * Bonsai fallback gateway.
+ * Returns null if BONSAI_API_KEY is not configured.
+ */
+export function getBonsaiGatewayConfig(): AIGatewayConfig | null {
+  const key = getNextBonsaiKey()
+  if (!key) return null
+  return {
+    provider: 'bonsai',
+    baseUrl: BONSAI_BASE_URL,
+    authToken: key,
+    models: {
+      sonnet: 'anthropic/claude-sonnet-4.5',
+      opus: 'anthropic/claude-opus-4',
+      haiku: 'openai/gpt-5.1-codex',
+      flash: 'z-ai/glm-4.6',
+    },
+  }
+}
+
+/**
+ * Resolve the active AI gateway configuration for agent-cloud requests.
+ * Tries Praxis first (if configured), falls back to Bonsai.
+ * Throws if neither is configured.
+ */
+export function getAIGatewayConfig(): AIGatewayConfig {
+  const primary = getPrimaryGatewayConfig()
+  if (primary) return primary
+  const bonsai = getBonsaiGatewayConfig()
+  if (bonsai) return bonsai
+  throw new Error(
+    'No AI gateway configured: set ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN (Praxis) ' +
+    'or BONSAI_API_KEY (Bonsai fallback).'
+  )
+}
+
 /**
  * Get the next Kilo API key using round-robin rotation.
  * Supports comma-separated keys in KILO_API_KEY env var.

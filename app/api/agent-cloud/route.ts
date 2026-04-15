@@ -2,7 +2,11 @@
  * Agent Cloud API
  *
  * API endpoint for running Claude Code in E2B sandboxes.
- * Configured with Bonsai AI Gateway (go.trybons.ai) for AI routing.
+ * Routes AI requests through Praxis API (primary) with Bonsai gateway fallback.
+ *
+ * Gateway resolution:
+ *   1. Praxis (ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN env vars)
+ *   2. Bonsai (BONSAI_API_KEY env var) — automatic fallback
  *
  * Features:
  * - Sandbox reuse with Sandbox.connect() for persistent sessions
@@ -24,30 +28,50 @@
  * - action: 'status' - Get sandbox status
  * - action: 'list' - List all sandboxes for user
  *
- * Environment Variables Required:
- * - BONSAI_API_KEY: Your Bonsai API key (go.trybons.ai)
- * - E2B_API_KEY: Your E2B API key (for sandbox creation)
+ * Environment Variables:
+ * - ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN: Praxis API (primary)
+ * - ANTHROPIC_DEFAULT_SONNET_MODEL / OPUS_MODEL / HAIKU_MODEL: Model overrides for Praxis
+ * - BONSAI_API_KEY: Bonsai gateway key(s) — used as fallback
+ * - E2B_API_KEY: E2B sandbox creation key
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { Sandbox } from 'e2b'
 import { createClient } from '@/lib/supabase/server'
-import { getNextBonsaiKey } from '@/lib/ai-providers'
+import {
+  getAIGatewayConfig,
+  getBonsaiGatewayConfig,
+  type AIGatewayConfig,
+} from '@/lib/ai-providers'
 // getDeploymentTokens uses browser client - query user_settings directly with server client instead
 
-// Bonsai AI Gateway configuration (testing Bonsai as general API proxy)
-// Bonsai exposes an Anthropic-compatible API at https://go.trybons.ai
-// Claude Code reads ANTHROPIC_BASE_URL to know where to send requests
-const AI_GATEWAY_BASE_URL = 'https://go.trybons.ai'
+// Model tier slugs exposed to the client. The active gateway decides the actual
+// upstream model IDs (see AIGatewayConfig.models) — Praxis maps all tiers to
+// claude-sonnet-4-6 by default; Bonsai uses provider/model format.
+type ModelTier = 'sonnet' | 'opus' | 'haiku' | 'flash'
 
-// Available models through Bonsai AI Gateway
-// These model IDs are what Bonsai expects (provider/model format)
-const AVAILABLE_MODELS = {
-  sonnet: 'anthropic/claude-sonnet-4.5',   // Default - fast code generation
-  opus: 'anthropic/claude-opus-4',         // High quality
-  haiku: 'openai/gpt-5.1-codex',          // OpenAI Codex via Bonsai
-  flash: 'z-ai/glm-4.6',                  // Fast inference via Bonsai
-} as const
+/**
+ * Resolve the model ID for a given tier using the currently active gateway.
+ * Falls back to Bonsai's model slugs when Praxis is not configured.
+ */
+function resolveModelId(tier: ModelTier | undefined): string {
+  const cfg = getAIGatewayConfig()
+  return cfg.models[tier || 'sonnet'] || cfg.models.sonnet
+}
+
+/**
+ * Return a model map shaped like the legacy AVAILABLE_MODELS constant —
+ * used wherever we need the upstream model IDs for sonnet/opus/haiku slots.
+ */
+function getModelMap(): Record<ModelTier, string> {
+  const cfg = getAIGatewayConfig()
+  return {
+    sonnet: cfg.models.sonnet,
+    opus: cfg.models.opus,
+    haiku: cfg.models.haiku,
+    flash: cfg.models.flash || cfg.models.sonnet,
+  }
+}
 
 // Strip Bonsai routing metadata from model responses.
 // Bonsai injects lines like: "@bonsai: routing to driven-jay (stealth, free premium model)..."
@@ -328,9 +352,16 @@ async function doStreaming(
     )
   }
 
-  // Get Bonsai API key (round-robin rotation for load distribution)
-  // Not required if sandbox is running in BYOK mode (key checked later)
-  const aiGatewayKey = getNextBonsaiKey()
+  // Resolve the active AI gateway (Praxis primary, Bonsai fallback).
+  // Not required if sandbox is running in BYOK mode (key checked later).
+  // If resolution fails (neither gateway configured), BYOK check may still succeed.
+  let activeGateway: AIGatewayConfig | null = null
+  try {
+    activeGateway = getAIGatewayConfig()
+  } catch {
+    activeGateway = null
+  }
+  const bonsaiFallback = getBonsaiGatewayConfig()
 
   // Find sandbox entry by sandboxId
   let sandboxEntry: (typeof activeSandboxes extends Map<string, infer V> ? V : never) | undefined = undefined
@@ -732,55 +763,76 @@ try {
           }
         }, 15000) // Send heartbeat every 15 seconds
 
-        try {
-          // Build env vars for the streaming command (respects sandbox-level BYOK config)
-          const streamEnvs: Record<string, string> = {
-            // Selected model goes into sonnet slot (Claude Code's default tier)
-            ANTHROPIC_DEFAULT_SONNET_MODEL: AVAILABLE_MODELS[(sandboxEntry!.model as keyof typeof AVAILABLE_MODELS) || 'sonnet'] || AVAILABLE_MODELS.sonnet,
-            ANTHROPIC_DEFAULT_OPUS_MODEL: AVAILABLE_MODELS.opus,
-            ANTHROPIC_DEFAULT_HAIKU_MODEL: AVAILABLE_MODELS.haiku,
-            // Playwright browser path (0 = use node_modules local install)
+        // Build env vars for a given gateway (used by both primary run and fallback retry)
+        const buildStreamEnvs = (gw: AIGatewayConfig): Record<string, string> => {
+          const tier = (sandboxEntry!.model as ModelTier) || 'sonnet'
+          return {
+            ANTHROPIC_BASE_URL: gw.baseUrl,
+            ANTHROPIC_AUTH_TOKEN: gw.authToken,
+            ANTHROPIC_API_KEY: '', // Must be empty for gateway routing
+            ANTHROPIC_DEFAULT_SONNET_MODEL: gw.models[tier] || gw.models.sonnet,
+            ANTHROPIC_DEFAULT_OPUS_MODEL: gw.models.opus,
+            ANTHROPIC_DEFAULT_HAIKU_MODEL: gw.models.haiku,
             PLAYWRIGHT_BROWSERS_PATH: '0',
-            // MCP gateway - Tavily HTTP MCP for web search
             ...(sandboxEntry!.mcpGatewayUrl ? { MCP_GATEWAY_URL: sandboxEntry!.mcpGatewayUrl } : {}),
           }
+        }
 
+        // Initial env vars: resolve active gateway (Praxis primary, Bonsai fallback).
+        // If sandbox has BYOK mode (ANTHROPIC_API_KEY set at sandbox creation), use that instead.
+        let streamEnvs: Record<string, string>
+        let usedGateway: 'byok' | 'praxis' | 'bonsai' = 'praxis'
+
+        try {
           // Check if sandbox was created with BYOK keys (stored in sandbox env)
-          // We check the sandbox envs that were set during creation
-          // If ANTHROPIC_API_KEY is set (non-empty), it's BYOK mode
-          try {
-            const checkResult = await sandbox.commands.run('echo "$ANTHROPIC_API_KEY"', { timeoutMs: 3000 })
-            const existingKey = checkResult.stdout?.trim()
-            if (existingKey) {
-              // BYOK mode: sandbox already has user's key
-              streamEnvs.ANTHROPIC_API_KEY = existingKey
-              // Check for custom base URL
-              const baseResult = await sandbox.commands.run('echo "$ANTHROPIC_BASE_URL"', { timeoutMs: 3000 })
-              const existingBase = baseResult.stdout?.trim()
-              if (existingBase) {
-                streamEnvs.ANTHROPIC_BASE_URL = existingBase
-              }
-            } else {
-              // Platform mode: use Bonsai gateway
-              streamEnvs.ANTHROPIC_BASE_URL = AI_GATEWAY_BASE_URL
-              streamEnvs.ANTHROPIC_AUTH_TOKEN = aiGatewayKey
-              streamEnvs.ANTHROPIC_API_KEY = '' // Must be empty
+          const checkResult = await sandbox.commands.run('echo "$ANTHROPIC_API_KEY"', { timeoutMs: 3000 })
+          const existingKey = checkResult.stdout?.trim()
+          if (existingKey) {
+            // BYOK mode: sandbox already has user's key
+            usedGateway = 'byok'
+            streamEnvs = {
+              ANTHROPIC_API_KEY: existingKey,
+              ANTHROPIC_DEFAULT_SONNET_MODEL: getModelMap()[(sandboxEntry!.model as ModelTier) || 'sonnet'] || getModelMap().sonnet,
+              ANTHROPIC_DEFAULT_OPUS_MODEL: getModelMap().opus,
+              ANTHROPIC_DEFAULT_HAIKU_MODEL: getModelMap().haiku,
+              PLAYWRIGHT_BROWSERS_PATH: '0',
+              ...(sandboxEntry!.mcpGatewayUrl ? { MCP_GATEWAY_URL: sandboxEntry!.mcpGatewayUrl } : {}),
             }
-          } catch {
-            // Fallback: use Bonsai gateway
-            streamEnvs.ANTHROPIC_BASE_URL = AI_GATEWAY_BASE_URL
-            streamEnvs.ANTHROPIC_AUTH_TOKEN = aiGatewayKey
-            streamEnvs.ANTHROPIC_API_KEY = ''
+            const baseResult = await sandbox.commands.run('echo "$ANTHROPIC_BASE_URL"', { timeoutMs: 3000 })
+            const existingBase = baseResult.stdout?.trim()
+            if (existingBase) streamEnvs.ANTHROPIC_BASE_URL = existingBase
+          } else if (activeGateway) {
+            // Platform mode: use primary gateway (Praxis if configured, else Bonsai)
+            usedGateway = activeGateway.provider
+            streamEnvs = buildStreamEnvs(activeGateway)
+          } else if (bonsaiFallback) {
+            usedGateway = 'bonsai'
+            streamEnvs = buildStreamEnvs(bonsaiFallback)
+          } else {
+            throw new Error('No AI gateway configured (Praxis or Bonsai)')
           }
+        } catch (envErr) {
+          // If BYOK check failed, fall back to configured gateway
+          if (activeGateway) {
+            usedGateway = activeGateway.provider
+            streamEnvs = buildStreamEnvs(activeGateway)
+          } else if (bonsaiFallback) {
+            usedGateway = 'bonsai'
+            streamEnvs = buildStreamEnvs(bonsaiFallback)
+          } else {
+            throw envErr
+          }
+        }
 
-          const result = await sandbox.commands.run(command, {
-            cwd: SYSTEM_DIR, // Run from system dir where SDK is installed
-            timeoutMs: 0, // No timeout
-            envs: streamEnvs,
-            onStdout: (data) => {
+        console.log(`[Agent Cloud] Using gateway: ${usedGateway} (base: ${streamEnvs.ANTHROPIC_BASE_URL || 'default'})`)
+
+        try {
+
+          // Shared streaming callbacks (onStdout/onStderr used for both primary + fallback runs)
+          const onStdoutStream = (data: string) => {
               if (isClosed) return
               fullOutput += data
-              
+
               // Log raw data for debugging
               console.log(`[Agent Cloud] 📤 Raw stdout chunk (${data.length} bytes):`, data.substring(0, 200))
 
@@ -794,7 +846,7 @@ try {
 
                 try {
                   const message = JSON.parse(line)
-                  
+
                   // Log message types (skip noisy ones)
                   if (!['user', 'system'].includes(message.type)) {
                     console.log(`[Agent Cloud] 📨 Parsed message type: ${message.type}`)
@@ -859,12 +911,52 @@ try {
                   }
                 }
               }
-            },
-            onStderr: (data) => {
-              if (isClosed) return
-              send({ type: 'stderr', data, timestamp: Date.now() })
             }
-          })
+
+          let stderrBuffer = ''
+          const onStderrStream = (data: string) => {
+            if (isClosed) return
+            stderrBuffer += data
+            send({ type: 'stderr', data, timestamp: Date.now() })
+          }
+
+          const runStreamingCommand = (envs: Record<string, string>) =>
+            sandbox.commands.run(command, {
+              cwd: SYSTEM_DIR,
+              timeoutMs: 0,
+              envs,
+              onStdout: onStdoutStream,
+              onStderr: onStderrStream,
+            })
+
+          let result = await runStreamingCommand(streamEnvs)
+
+          // Runtime fallback: if Praxis failed with an API/gateway error, retry with Bonsai once.
+          const looksLikeGatewayError = (output: string) =>
+            /401|403|429|5\d\d|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|getaddrinfo|AuthenticationError|RateLimitError|gateway|upstream|unauthorized/i.test(output)
+
+          if (
+            result.exitCode !== 0 &&
+            usedGateway === 'praxis' &&
+            bonsaiFallback &&
+            looksLikeGatewayError(fullOutput + '\n' + stderrBuffer)
+          ) {
+            console.warn('[Agent Cloud] Praxis gateway call failed — retrying with Bonsai fallback')
+            send({ type: 'log', message: 'Primary gateway failed, retrying with Bonsai fallback...' })
+
+            // Reset stream state for the retry
+            fullOutput = ''
+            textContent = ''
+            jsonBuffer = ''
+            stderrBuffer = ''
+            sdkStarted = false
+
+            const fallbackEnvs = buildStreamEnvs(bonsaiFallback)
+            usedGateway = 'bonsai'
+            console.log(`[Agent Cloud] Retry gateway: bonsai (base: ${fallbackEnvs.ANTHROPIC_BASE_URL})`)
+
+            result = await runStreamingCommand(fallbackEnvs)
+          }
 
           // Clear heartbeat
           clearInterval(heartbeatInterval)
@@ -1011,11 +1103,18 @@ async function handleCreate(
 
   const userId = user.id
 
-  // Get Bonsai API key (round-robin rotation for load distribution)
-  const aiGatewayKey = getNextBonsaiKey()
-  if (!aiGatewayKey) {
+  // Resolve active AI gateway (Praxis primary, Bonsai fallback)
+  let platformGateway: AIGatewayConfig | null = null
+  try {
+    platformGateway = getAIGatewayConfig()
+  } catch {
+    platformGateway = null
+  }
+  if (!platformGateway && !(config?.byokKeys?.some(k => k.enabled && k.apiKey))) {
     return NextResponse.json(
-      { error: 'BONSAI_API_KEY not configured. Add it to your environment variables.' },
+      {
+        error: 'No AI gateway configured. Set ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN (Praxis) or BONSAI_API_KEY (Bonsai fallback).',
+      },
       { status: 500 }
     )
   }
@@ -1044,8 +1143,9 @@ async function handleCreate(
       return NextResponse.json({
         success: true,
         sandboxId: existingEntry.sandboxId,
-        model: AVAILABLE_MODELS[existingEntry.model as keyof typeof AVAILABLE_MODELS || 'sonnet'],
-        gateway: AI_GATEWAY_BASE_URL,
+        model: resolveModelId(existingEntry.model as ModelTier),
+        gateway: platformGateway?.baseUrl || 'unknown',
+        gatewayProvider: platformGateway?.provider || 'unknown',
         repoCloned: existingEntry.repo?.cloned || false,
         projectDir: existingEntry.workDir || SYSTEM_DIR,
         reconnected: true,
@@ -1135,8 +1235,9 @@ async function handleCreate(
         return NextResponse.json({
           success: true,
           sandboxId: existingSandbox.sandboxId,
-          model: AVAILABLE_MODELS[config?.model || 'sonnet'],
-          gateway: AI_GATEWAY_BASE_URL,
+          model: resolveModelId((config?.model || 'sonnet') as ModelTier),
+          gateway: platformGateway?.baseUrl || 'unknown',
+          gatewayProvider: platformGateway?.provider || 'unknown',
           repoCloned: true,
           projectDir: reconnectedWorkDir,
           reconnected: true,
@@ -1191,13 +1292,18 @@ async function handleCreate(
     console.log(`[Agent Cloud] BYOK mode active - providers: ${byokKeys.map(k => k.providerId).join(', ')}`)
   }
 
-  // Configure environment variables for Claude Code
-  // The user's selected model becomes the sonnet tier (Claude Code's default)
-  const selectedModelId = AVAILABLE_MODELS[(config?.model || 'sonnet') as keyof typeof AVAILABLE_MODELS] || AVAILABLE_MODELS.sonnet
+  // Configure environment variables for Claude Code.
+  // Platform gateway: Praxis (primary) or Bonsai (fallback) — resolved earlier.
+  // BYOK overrides the platform gateway with the user's own key.
+  const gatewayModels = platformGateway
+    ? platformGateway.models
+    : { sonnet: 'claude-sonnet-4-6', opus: 'claude-sonnet-4-6', haiku: 'claude-sonnet-4-6' }
+  const tier = (config?.model || 'sonnet') as ModelTier
+  const selectedModelId = gatewayModels[tier] || gatewayModels.sonnet
 
-  // Determine API configuration: BYOK key or Bonsai gateway
-  let apiBaseUrl = AI_GATEWAY_BASE_URL
-  let apiAuthToken = aiGatewayKey
+  // Determine API configuration: BYOK key or platform gateway
+  let apiBaseUrl = platformGateway?.baseUrl || ''
+  let apiAuthToken = platformGateway?.authToken || ''
   let apiKey = ''
 
   if (byokAnthropicKey) {
@@ -1207,10 +1313,10 @@ async function handleCreate(
     apiKey = byokAnthropicKey.apiKey
     console.log(`[Agent Cloud] BYOK: Using user's Anthropic API key`)
   } else if (byokBonsaiKey) {
-    // Bonsai gateway with user's own key (same URL, their key)
-    apiBaseUrl = AI_GATEWAY_BASE_URL  // Same Bonsai gateway URL
-    apiAuthToken = byokBonsaiKey.apiKey // User's Bonsai key as auth token
-    apiKey = '' // Not needed - Bonsai uses auth token
+    // Bonsai gateway with user's own key
+    apiBaseUrl = 'https://go.trybons.ai'
+    apiAuthToken = byokBonsaiKey.apiKey
+    apiKey = ''
     console.log(`[Agent Cloud] BYOK: Using user's Bonsai API key`)
   } else if (byokOpenrouterKey) {
     // OpenRouter as Anthropic-compatible proxy
@@ -1221,15 +1327,15 @@ async function handleCreate(
   }
 
   const envs: Record<string, string> = {
-    // AI Gateway configuration (Bonsai or BYOK direct)
+    // AI Gateway configuration (Praxis/Bonsai platform or BYOK direct)
     ...(apiBaseUrl ? { ANTHROPIC_BASE_URL: apiBaseUrl } : {}),
     ...(apiAuthToken ? { ANTHROPIC_AUTH_TOKEN: apiAuthToken } : {}),
-    ANTHROPIC_API_KEY: apiKey, // Empty for Bonsai, set for BYOK
+    ANTHROPIC_API_KEY: apiKey, // Empty for gateway routing, set for BYOK direct
 
     // Model overrides - selected model goes into sonnet slot (default tier)
     ANTHROPIC_DEFAULT_SONNET_MODEL: selectedModelId,
-    ANTHROPIC_DEFAULT_OPUS_MODEL: AVAILABLE_MODELS.opus,
-    ANTHROPIC_DEFAULT_HAIKU_MODEL: AVAILABLE_MODELS.haiku,
+    ANTHROPIC_DEFAULT_OPUS_MODEL: gatewayModels.opus,
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: gatewayModels.haiku,
 
     // Playwright configuration
     PLAYWRIGHT_BROWSERS_PATH: '0',
@@ -1299,8 +1405,8 @@ async function handleCreate(
   const selectedModel = config?.model || 'sonnet'
 
   console.log(`[Agent Cloud] Creating new sandbox with template: ${template}`)
-  console.log(`[Agent Cloud] Using Bonsai AI Gateway: ${AI_GATEWAY_BASE_URL}`)
-  console.log(`[Agent Cloud] Default model: ${AVAILABLE_MODELS[selectedModel]}`)
+  console.log(`[Agent Cloud] AI gateway: ${platformGateway?.provider || 'byok'} (${platformGateway?.baseUrl || 'direct'})`)
+  console.log(`[Agent Cloud] Default model: ${selectedModelId}`)
 
   // Create sandbox (MCP is configured directly in Claude Agent SDK script)
   const sandbox = await Sandbox.create(template, {
@@ -1605,8 +1711,9 @@ async function handleCreate(
   return NextResponse.json({
     success: true,
     sandboxId,
-    model: AVAILABLE_MODELS[selectedModel],
-    gateway: isByokMode ? 'byok' : AI_GATEWAY_BASE_URL,
+    model: selectedModelId,
+    gateway: isByokMode ? 'byok' : (platformGateway?.baseUrl || 'unknown'),
+    gatewayProvider: isByokMode ? 'byok' : (platformGateway?.provider || 'unknown'),
     repoCloned,
     isNewProject: !!config?.newProject,
     newProjectName: config?.newProject?.name,
@@ -2219,11 +2326,13 @@ async function handleStartStreamServer(request: NextRequest, sandboxId: string) 
     )
   }
 
-  // Get Bonsai API key (round-robin rotation for load distribution)
-  const aiGatewayKey = getNextBonsaiKey()
-  if (!aiGatewayKey) {
+  // Resolve active AI gateway (Praxis primary, Bonsai fallback)
+  let streamGateway: AIGatewayConfig
+  try {
+    streamGateway = getAIGatewayConfig()
+  } catch (err: any) {
     return NextResponse.json(
-      { error: 'BONSAI_API_KEY not configured' },
+      { error: err?.message || 'No AI gateway configured' },
       { status: 500 }
     )
   }
@@ -2543,13 +2652,13 @@ app.listen(PORT, '0.0.0.0', () => {
       cwd: SYSTEM_DIR,
       timeoutMs: 10000,
       envs: {
-        ANTHROPIC_BASE_URL: AI_GATEWAY_BASE_URL,
-        ANTHROPIC_AUTH_TOKEN: aiGatewayKey,
+        ANTHROPIC_BASE_URL: streamGateway.baseUrl,
+        ANTHROPIC_AUTH_TOKEN: streamGateway.authToken,
         ANTHROPIC_API_KEY: '',
         // Selected model goes into sonnet slot (Claude Code's default tier)
-        ANTHROPIC_DEFAULT_SONNET_MODEL: AVAILABLE_MODELS[(sandboxEntry.model as keyof typeof AVAILABLE_MODELS) || 'sonnet'] || AVAILABLE_MODELS.sonnet,
-        ANTHROPIC_DEFAULT_OPUS_MODEL: AVAILABLE_MODELS.opus,
-        ANTHROPIC_DEFAULT_HAIKU_MODEL: AVAILABLE_MODELS.haiku,
+        ANTHROPIC_DEFAULT_SONNET_MODEL: streamGateway.models[(sandboxEntry.model as ModelTier) || 'sonnet'] || streamGateway.models.sonnet,
+        ANTHROPIC_DEFAULT_OPUS_MODEL: streamGateway.models.opus,
+        ANTHROPIC_DEFAULT_HAIKU_MODEL: streamGateway.models.haiku,
         PLAYWRIGHT_BROWSERS_PATH: '0',
         ...(sandboxEntry.mcpGatewayUrl ? { MCP_GATEWAY_URL: sandboxEntry.mcpGatewayUrl } : {}),
       }
