@@ -55,10 +55,9 @@ const webScraperKeyManager = new KeyRotationManager([
   'h1ahqt8unmoruj1ugndr6gd4bacveb3ssok0l89hq6oeip17topu48'
 ]);
 
-const webSearchKeyManager = new KeyRotationManager([
-  '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',
-  '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'
-]);
+const webSearchKeyManager = new KeyRotationManager(
+  (process.env.TAVILY_API_KEYS || '').split(',').filter(Boolean)
+);
 
 /**
  * Clean and format scraped content

@@ -1466,7 +1466,7 @@ async function handleCreate(
 
   // MCP is configured directly in the Claude Agent SDK script via mcpServers option
   // Using Tavily HTTP MCP for web search, Playwright MCP for browser automation
-  const mcpGatewayUrl = 'https://mcp.tavily.com/mcp/?tavilyApiKey=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'
+  const mcpGatewayUrl = `https://mcp.tavily.com/mcp/?tavilyApiKey=${process.env.TAVILY_API_KEY || ''}`
   console.log(`[Agent Cloud] MCP gateway configured: Tavily, Playwright, GitHub, Context7, Sequential Thinking`)
 
   // Track the working branch created for this session

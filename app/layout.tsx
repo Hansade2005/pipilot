@@ -105,7 +105,7 @@ export default function RootLayout({
               window.OneSignalDeferred = window.OneSignalDeferred || [];
               OneSignalDeferred.push(async function(OneSignal) {
                 await OneSignal.init({
-                  appId: "${process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID || '074baec0-7042-4faf-a337-674711dd90ad'}",
+                  appId: "${process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID || ''}",
                 });
               });
             `,

@@ -1,22 +1,31 @@
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { generateText, tool } from 'ai'
 import { z } from 'zod'
+import { createClient } from '@/lib/supabase/server'
 
 // Create the AI client
 const createAIClient = () => {
   return createOpenAICompatible({
     name: 'codestral',
     baseURL: 'https://codestral.mistral.ai/v1',
-    apiKey: process.env.MISTRAL_API_KEY || 'DXfXAjwNIZcAv1ESKtoDwWZZF98lJxho',
+    apiKey: process.env.MISTRAL_API_KEY || '',
   })
 }
 
 export async function POST(req: Request) {
   try {
+    // Require authentication — debug endpoints must not be publicly accessible
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
     const body = await req.json()
     const { testMessage = "use tools to list files" } = body
-    
-    console.log('[DEBUG-TOOLS] Testing with message:', testMessage)
     
     const codestral = createAIClient()
     
