@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
+import { createClient } from "@/lib/supabase/client"
 
 export type OutageKind = 'quota' | 'storage' | 'auth' | 'database' | 'network' | 'unknown'
 export type ServiceStatus = 'healthy' | 'down'
@@ -53,10 +54,14 @@ export function ServiceStatusProvider({ children }: { children: React.ReactNode 
 
   const recheck = useCallback(async () => {
     try {
-      const res = await fetch('/api/health', { cache: 'no-store' })
-      if (res.ok) { setHealthy(); return }
-      const body = await res.json().catch(() => ({}))
-      setDown({ http: body.http ?? res.status, message: body.message, kind: body.kind })
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('system_settings')
+        .select('id', { head: true, count: 'exact' })
+        .limit(1)
+      if (!error) { setHealthy(); return }
+      const code = (error as { code?: string; status?: number }).status
+      setDown({ http: code, message: error.message })
     } catch (e) {
       setDown({ message: e instanceof Error ? e.message : 'Network error', kind: 'network' })
     }
