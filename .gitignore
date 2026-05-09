@@ -63,3 +63,6 @@ e2e/
 
 # Claude local rules (contains credentials, never commit)
 .claude/rules/local-*.md
+
+# Supabase CLI scratch dir
+supabase/.temp/

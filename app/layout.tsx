@@ -7,6 +7,8 @@ import 'react-toastify/dist/ReactToastify.css'
 import { ThemeProvider } from "@/components/theme-provider"
 import { ServiceWorkerProvider } from "@/components/service-worker-provider"
 import { OneSignalProvider } from "@/components/onesignal-provider"
+import { ServiceStatusProvider } from "@/components/service-status-provider"
+import { ServiceOutageScreen } from "@/components/service-outage-screen"
 
 // const poppins = Poppins({
 //   subsets: ['latin'],
@@ -194,20 +196,23 @@ export default function RootLayout({
           enableSystem={false}
           disableTransitionOnChange
         >
-          {children}
-          <Toaster />
-          <ToastContainer
-            position="top-right"
-            autoClose={5000}
-            hideProgressBar={false}
-            newestOnTop={false}
-            closeOnClick
-            rtl={false}
-            pauseOnFocusLoss
-            draggable
-            pauseOnHover
-            theme="dark"
-          />
+          <ServiceStatusProvider>
+            {children}
+            <ServiceOutageScreen />
+            <Toaster />
+            <ToastContainer
+              position="top-right"
+              autoClose={5000}
+              hideProgressBar={false}
+              newestOnTop={false}
+              closeOnClick
+              rtl={false}
+              pauseOnFocusLoss
+              draggable
+              pauseOnHover
+              theme="dark"
+            />
+          </ServiceStatusProvider>
         </ThemeProvider>
       </body>
     </html>
