@@ -223,39 +223,19 @@ export async function uploadBackupToCloud(userId: string): Promise<boolean> {
       }
     }
 
-    // Create backup filename with timestamp
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-    const backupFilename = `backup-${userId}-${timestamp}.json`
-
-    // CLEANUP: Delete old backup file before uploading new one
-    const { data: existingBackup } = await supabase
-      .from('user_backups')
-      .select('storage_url')
-      .eq('user_id', userId)
-      .single()
-
-    if (existingBackup?.storage_url) {
-      try {
-        // Extract filename from storage URL
-        const oldFileName = existingBackup.storage_url.split('/').pop()
-        if (oldFileName && oldFileName.startsWith('backup-')) {
-          await supabase.storage.from('backups').remove([oldFileName])
-        }
-      } catch (cleanupError) {
-        // Continue with upload even if cleanup fails
-      }
-    }
+    // Fixed path per user — overwrites previous backup, no storage bloat
+    const backupPath = `${userId}/latest.backup.json`
 
     // Convert data to JSON blob
     const jsonString = JSON.stringify(data, null, 2)
     const blob = new Blob([jsonString], { type: 'application/json' })
 
-    // Upload to Supabase Storage
+    // Upload to Supabase Storage (upsert overwrites the single file)
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('backups')
-      .upload(backupFilename, blob, {
+      .upload(backupPath, blob, {
         contentType: 'application/json',
-        upsert: false
+        upsert: true
       })
 
     if (uploadError) {
@@ -265,7 +245,7 @@ export async function uploadBackupToCloud(userId: string): Promise<boolean> {
     // Get the public URL for the uploaded file
     const { data: urlData } = supabase.storage
       .from('backups')
-      .getPublicUrl(backupFilename)
+      .getPublicUrl(backupPath)
 
     if (!urlData?.publicUrl) {
       throw new Error('Failed to get public URL for uploaded backup')
@@ -388,25 +368,21 @@ export async function restoreBackupFromCloud(userId: string): Promise<boolean> {
 
     let backupData: any = null
 
-    // Handle new storage-based backups
+    // Handle storage-based backups
     if (data.storage_url) {
       try {
-        // Extract filename from storage URL
-        const filename = data.storage_url.split('/').pop()
-        if (!filename) {
-          throw new Error('Invalid storage URL: could not extract filename')
-        }
+        // Use fixed path per user
+        const backupPath = `${userId}/latest.backup.json`
 
-        // Use Supabase storage client to download (works regardless of bucket privacy)
         const { data: fileData, error: dlError } = await supabase.storage
           .from('backups')
-          .download(filename)
+          .download(backupPath)
 
         if (dlError || !fileData) {
           // Fallback: try a signed URL
           const { data: signedData, error: signError } = await supabase.storage
             .from('backups')
-            .createSignedUrl(filename, 60)
+            .createSignedUrl(backupPath, 60)
 
           if (signError || !signedData?.signedUrl) {
             throw new Error(`Failed to download backup: ${dlError?.message || signError?.message || 'unknown error'}`)
