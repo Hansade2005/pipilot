@@ -2292,6 +2292,74 @@ export const VERCEL_MODEL_PRICING: Record<string, ModelPricingEntry> = {
     throughputTps: 60,
   },
 
+  'ollama/qwen3-coder:480b': {
+    name: 'Qwen3 Coder 480B',
+    provider: 'ollama',
+    contextWindow: 128_000,
+    maxOutput: 32_000,
+    inputPerToken: 0.00000030,     // $0.30/M (estimated)
+    outputPerToken: 0.0000012,     // $1.20/M (estimated)
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: false,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 1.8,
+    throughputTps: 50,
+  },
+
+  'ollama/qwen3-coder-next': {
+    name: 'Qwen3 Coder Next',
+    provider: 'ollama',
+    contextWindow: 128_000,
+    maxOutput: 32_000,
+    inputPerToken: 0.00000025,     // $0.25/M (estimated)
+    outputPerToken: 0.0000010,     // $1.00/M (estimated)
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: false,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 1.2,
+    throughputTps: 65,
+  },
+
+  'ollama/qwen3.5:397b': {
+    name: 'Qwen3.5 397B',
+    provider: 'ollama',
+    contextWindow: 128_000,
+    maxOutput: 32_000,
+    inputPerToken: 0.00000028,     // $0.28/M (estimated)
+    outputPerToken: 0.0000011,     // $1.10/M (estimated)
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: false,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 1.5,
+    throughputTps: 55,
+  },
+
+  'ollama/deepseek-v3.1:671b': {
+    name: 'DeepSeek V3.1 671B',
+    provider: 'ollama',
+    contextWindow: 128_000,
+    maxOutput: 32_000,
+    inputPerToken: 0.00000027,     // $0.27/M (estimated)
+    outputPerToken: 0.0000011,     // $1.10/M (estimated)
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: false,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 1.5,
+    throughputTps: 55,
+  },
+
   'ollama/deepseek-v3.2': {
     name: 'DeepSeek V3.2',
     provider: 'ollama',
@@ -2377,13 +2445,30 @@ export const VERCEL_MODEL_PRICING: Record<string, ModelPricingEntry> = {
     throughputTps: 30,
   },
 
-  'ollama/minimax-m2.5': {
+  'ollama/minimax-m2.7': {
     name: 'Claude Opus 4.6',
     provider: 'ollama',
     contextWindow: 205_000,
     maxOutput: 131_000,
     inputPerToken: 0.00000045,     // $0.45/M
     outputPerToken: 0.0000018,     // $1.80/M
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: false,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 1.0,
+    throughputTps: 150,
+  },
+
+  'ollama/minimax-m2.5': {
+    name: 'MiniMax M2.5 (legacy)',
+    provider: 'ollama',
+    contextWindow: 205_000,
+    maxOutput: 131_000,
+    inputPerToken: 0.00000045,
+    outputPerToken: 0.0000018,
     cacheReadPerToken: 0,
     cacheWritePerToken: 0,
     webSearchPer1K: 0,

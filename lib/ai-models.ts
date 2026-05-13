@@ -1,4 +1,4 @@
-export const DEFAULT_CHAT_MODEL: string = 'ollama/minimax-m2.5';
+export const DEFAULT_CHAT_MODEL: string = 'ollama/minimax-m2.7';
 
 export interface ChatModel {
   id: string;
@@ -106,6 +106,30 @@ export const chatModels: Array<ChatModel> = [
     provider: 'ollama',
   },
   {
+    id: 'ollama/qwen3-coder:480b',
+    name: 'Qwen3 Coder 480B',
+    description: 'Qwen3 Coder 480B - Purpose-built for coding via Ollama Cloud',
+    provider: 'ollama',
+  },
+  {
+    id: 'ollama/qwen3-coder-next',
+    name: 'Qwen3 Coder Next',
+    description: 'Qwen3 Coder Next - Next-gen coding model via Ollama Cloud',
+    provider: 'ollama',
+  },
+  {
+    id: 'ollama/qwen3.5:397b',
+    name: 'Qwen3.5 397B',
+    description: 'Qwen3.5 397B - Latest flagship with excellent reasoning via Ollama Cloud',
+    provider: 'ollama',
+  },
+  {
+    id: 'ollama/deepseek-v3.1:671b',
+    name: 'DeepSeek V3.1 671B',
+    description: 'DeepSeek V3.1 671B - Proven for code, full model via Ollama Cloud',
+    provider: 'ollama',
+  },
+  {
     id: 'ollama/deepseek-v3.2',
     name: 'DeepSeek V3.2',
     description: 'DeepSeek V3.2 via Ollama Cloud',
@@ -137,7 +161,7 @@ export const chatModels: Array<ChatModel> = [
     provider: 'ollama',
   },
   {
-    id: 'ollama/minimax-m2.5',
+    id: 'ollama/minimax-m2.7',
     name: 'Claude Opus 4.6',
     description: 'Most capable model for ambitious, complex work',
     provider: 'ollama',

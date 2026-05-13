@@ -37,7 +37,7 @@ import {
   Key,
   MessageSquare,
   Play,
-  Rocket
+  Rocket,
 } from "lucide-react"
 import Link from "next/link"
 import { ChatInput } from "@/components/chat-input"
@@ -59,6 +59,105 @@ import { ParticleBackground } from "@/components/particle-background"
 import { SpaceBackground } from "@/components/space-background"
 import { usePageTitle } from '@/hooks/use-page-title'
 
+function ShowcaseSection() {
+  const [projects, setProjects] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/showcase?sort=recent&limit=8')
+      .then(res => res.json())
+      .then(data => setProjects(data.projects || []))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (!loading && projects.length === 0) return null
+
+  return (
+    <section className="relative z-[5] py-20 bg-gray-950/50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between mb-10">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-100">
+              Built with <span className="text-orange-400">PiPilot</span>
+            </h2>
+            <p className="text-gray-400 mt-1">Real projects built by our community using AI</p>
+          </div>
+          <a
+            href="/showcase"
+            className="hidden sm:flex items-center gap-1.5 text-sm text-orange-400 hover:text-orange-300 transition-colors"
+          >
+            View all <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        </div>
+
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-xl bg-gray-900/60 border border-gray-800/50 overflow-hidden animate-pulse">
+                <div className="aspect-video bg-gray-800/50" />
+                <div className="p-3.5 space-y-2">
+                  <div className="h-3.5 bg-gray-800/50 rounded w-3/4" />
+                  <div className="h-3 bg-gray-800/50 rounded w-full" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {projects.slice(0, 8).map(project => (
+              <a
+                key={project.id}
+                href={`/showcase/${project.id}`}
+                className="group rounded-xl bg-gray-900/60 border border-gray-800/50 overflow-hidden hover:border-orange-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/5"
+              >
+                <div className="aspect-video bg-gray-800/50 relative overflow-hidden">
+                  {project.thumbnail_url ? (
+                    <img
+                      src={project.thumbnail_url}
+                      alt={project.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      onError={(e) => {
+                        const img = e.currentTarget
+                        if (!img.dataset.fallback) {
+                          img.dataset.fallback = "true"
+                          img.src = `https://api.a0.dev/assets/image?text=${encodeURIComponent(project.description || project.title)}&aspect=16:9&seed=${project.id.slice(0, 8)}`
+                        }
+                      }}
+                    />
+                  ) : (
+                    <img
+                      src={`https://api.a0.dev/assets/image?text=${encodeURIComponent(project.description || project.title)}&aspect=16:9&seed=${project.id.slice(0, 8)}`}
+                      alt={project.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  )}
+                </div>
+                <div className="p-3.5">
+                  <h3 className="font-medium text-sm text-gray-200 truncate">{project.title}</h3>
+                  {project.description && (
+                    <p className="text-xs text-gray-500 mt-1 line-clamp-1">{project.description}</p>
+                  )}
+                  <div className="flex items-center gap-3 mt-2 text-[10px] text-gray-600">
+                    <span className="flex items-center gap-0.5"><Eye className="w-3 h-3" /> {project.views || 0}</span>
+                    <span className="flex items-center gap-0.5"><Heart className="w-3 h-3" /> {project.likes || 0}</span>
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
+
+        <div className="sm:hidden text-center mt-6">
+          <a href="/showcase" className="text-sm text-orange-400 hover:text-orange-300">
+            View all projects →
+          </a>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export default function LandingPage() {
   usePageTitle('Home')
   const router = useRouter()
@@ -76,6 +175,7 @@ export default function LandingPage() {
   const templatesPerPage = 8
 
   const badgeItems = [
+    { icon: <Rocket className="w-4 h-4 text-orange-400" />, text: "NEW: Search API - AI search for your apps!", link: "/api" },
     { icon: <Gamepad2 className="w-4 h-4 text-emerald-400" />, text: "PiPilot Game Kit Now Available! 🎮" },
     { icon: <Wand2 className="w-4 h-4 text-orange-400" />, text: "Visual Editor Now Live! 🎨" },
     { icon: <Database className="w-4 h-4 text-orange-400" />, text: "Introducing PiPilot DB 🎉" },
@@ -486,33 +586,27 @@ export default function LandingPage() {
         <div className="text-center mb-16">
            {/* Dynamic Badge */}
         <div className="mb-6 animate-fade-in">
-          {currentBadgeIndex === 1 ? (
-            <Link href="/features/visual-editor">
-              <Badge className="bg-transparent backdrop-blur-[32px] text-white border border-white/20 px-6 py-3 text-sm font-semibold rounded-full shadow-lg relative overflow-hidden hover:bg-white/10 transition-all duration-300 cursor-pointer">
+          {(() => {
+            const currentBadge = badgeItems[currentBadgeIndex]
+            const badgeLink = currentBadgeIndex === 1 ? "/features/visual-editor" : (currentBadge as any).link
+            const badgeContent = (
+              <Badge className={`bg-transparent backdrop-blur-[32px] text-white border px-6 py-3 text-sm font-semibold rounded-full shadow-lg relative overflow-hidden transition-all duration-300 ${
+                badgeLink ? 'hover:bg-white/10 cursor-pointer border-orange-500/40 hover:border-orange-400/60' : 'border-white/20 hover:bg-white/10'
+              } ${currentBadgeIndex === 0 ? 'border-orange-500/50 shadow-orange-500/10' : ''}`}>
                 <div className="flex items-center gap-2">
-                  {badgeItems[currentBadgeIndex].icon}
+                  {currentBadge.icon}
                   <span
                     className="inline-block transition-opacity duration-500 ease-in-out opacity-100"
                     key={currentBadgeIndex}
                   >
-                    {badgeItems[currentBadgeIndex].text}
+                    {currentBadge.text}
                   </span>
+                  {badgeLink && <ChevronRight className="w-3.5 h-3.5 text-orange-400" />}
                 </div>
               </Badge>
-            </Link>
-          ) : (
-            <Badge className="bg-transparent backdrop-blur-[32px] text-white border border-white/20 px-6 py-3 text-sm font-semibold rounded-full shadow-lg relative overflow-hidden hover:bg-white/10 transition-all duration-300">
-              <div className="flex items-center gap-2">
-                {badgeItems[currentBadgeIndex].icon}
-                <span
-                  className="inline-block transition-opacity duration-500 ease-in-out opacity-100"
-                  key={currentBadgeIndex}
-                >
-                  {badgeItems[currentBadgeIndex].text}
-                </span>
-              </div>
-            </Badge>
-          )}
+            )
+            return badgeLink ? <Link href={badgeLink}>{badgeContent}</Link> : badgeContent
+          })()}
         </div>
           <h1 className="mb-2 flex items-center justify-center gap-1 text-xl font-medium leading-none text-white sm:text-2xl md:mb-2.5 md:gap-0 md:text-5xl">
             <span className="pt-0.5 tracking-tight md:pt-0">Build something</span>
@@ -533,12 +627,29 @@ export default function LandingPage() {
           <ChatInput onAuthRequired={handleAuthRequired} />
         </div>
 
-        {/* E2B Sponsor Badge */}
-        <div className="mt-8 flex items-center justify-center">
+        {/* Sponsor Badges */}
+        <div className="mt-8 flex items-center justify-center gap-4">
           <a href="https://e2b.dev/startups" target="_blank" rel="noopener noreferrer" className="opacity-80 hover:opacity-100 transition-opacity">
             <img src="/e2b-badge.svg" alt="Sponsored by E2B for Startups" className="h-8 md:h-10 w-auto rounded" />
           </a>
+          <a href="https://peerpush.net/p/pipilot" target="_blank" rel="noopener" className="opacity-80 hover:opacity-100 transition-opacity">
+            <img src="https://peerpush.net/p/pipilot/badge.png" alt="PiPilot badge" className="h-8 md:h-10 w-auto" style={{ width: '230px' }} />
+          </a>
         </div>
+
+        {/* Search API Promo */}
+        <Link href="/api" className="mt-8 group">
+          <div className="flex items-center gap-3 px-5 py-3 rounded-2xl border border-orange-500/20 bg-orange-500/5 backdrop-blur-sm hover:border-orange-500/40 hover:bg-orange-500/10 transition-all duration-300">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center flex-shrink-0">
+              <Rocket className="w-4 h-4 text-white" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-white">Search API</p>
+              <p className="text-xs text-gray-400">Add AI-powered search to your apps. Free 10k requests/mo</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-orange-400 group-hover:translate-x-0.5 transition-transform" />
+          </div>
+        </Link>
       </main>
 
       {/* Projects Section - Right after hero so users can quickly access their work */}
@@ -637,6 +748,9 @@ export default function LandingPage() {
 
         </div>
       </section>
+
+      {/* Community Showcase Section */}
+      <ShowcaseSection />
 
       {/* Footer */}
       <Footer />

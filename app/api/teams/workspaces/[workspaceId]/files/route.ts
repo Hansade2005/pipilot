@@ -5,8 +5,9 @@ import { createClient } from '@/lib/supabase/server'
 // List all files in team workspace
 export async function GET(
   request: NextRequest,
-  { params }: { params: { workspaceId: string } }
+  { params }: { params: Promise<{ workspaceId: string }> }
 ) {
+  const { workspaceId } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -19,7 +20,7 @@ export async function GET(
     const { data: workspace, error } = await supabase
       .from('team_workspaces')
       .select('*, organization_id')
-      .eq('id', params.workspaceId)
+      .eq('id', workspaceId)
       .single()
 
     if (error || !workspace) {
@@ -56,8 +57,9 @@ export async function GET(
 // Create new file in team workspace
 export async function POST(
   request: NextRequest,
-  { params }: { params: { workspaceId: string } }
+  { params }: { params: Promise<{ workspaceId: string }> }
 ) {
+  const { workspaceId } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -72,7 +74,7 @@ export async function POST(
     const { data: workspace, error: fetchError } = await supabase
       .from('team_workspaces')
       .select('files, organization_id')
-      .eq('id', params.workspaceId)
+      .eq('id', workspaceId)
       .single()
 
     if (fetchError || !workspace) {
@@ -102,7 +104,7 @@ export async function POST(
       type: fileData.fileType || 'text',
       size: fileData.size || 0,
       isDirectory: fileData.isDirectory || false,
-      workspaceId: params.workspaceId,
+      workspaceId: workspaceId,
       lastEditedBy: user.id,
       lastEditedAt: new Date().toISOString(),
       createdAt: new Date().toISOString(),
@@ -120,7 +122,7 @@ export async function POST(
         last_edited_by: user.id,
         last_edited_at: new Date().toISOString()
       })
-      .eq('id', params.workspaceId)
+      .eq('id', workspaceId)
 
     if (updateError) {
       console.error('Error updating workspace:', updateError)
@@ -130,7 +132,7 @@ export async function POST(
     // Log activity
     await supabase.from('team_activity').insert({
       organization_id: workspace.organization_id,
-      workspace_id: params.workspaceId,
+      workspace_id: workspaceId,
       action: 'file_created',
       actor_id: user.id,
       metadata: {

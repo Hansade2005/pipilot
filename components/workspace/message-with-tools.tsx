@@ -145,6 +145,7 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
   input?: any,
   status?: 'executing' | 'completed' | 'failed'
 }) => {
+  // Icon for the tool type
   const getToolIcon = (tool: string) => {
     switch (tool) {
       case 'write_file': return <FileText className="w-3.5 h-3.5" />
@@ -155,21 +156,21 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
       case 'delete_file':
       case 'delete_folder': return <X className="w-3.5 h-3.5" />
       case 'remove_package': return <PackageMinus className="w-3.5 h-3.5" />
-      case 'create_database': return <Database className="w-3.5 h-3.5" />
-      case 'create_table':
+      case 'pipilotdb_create_database': return <Database className="w-3.5 h-3.5" />
+      case 'pipilotdb_create_table':
       case 'supabase_create_table':
-      case 'list_tables':
+      case 'pipilotdb_list_tables':
       case 'supabase_list_tables_rls': return <Table className="w-3.5 h-3.5" />
-      case 'query_database':
+      case 'pipilotdb_query_database':
       case 'supabase_execute_sql': return <Code className="w-3.5 h-3.5" />
-      case 'manipulate_table_data':
+      case 'pipilotdb_manipulate_table_data':
       case 'supabase_insert_data':
       case 'supabase_delete_data':
-      case 'read_table':
+      case 'pipilotdb_read_table':
       case 'supabase_read_table':
-      case 'delete_table':
+      case 'pipilotdb_delete_table':
       case 'supabase_drop_table': return <Database className="w-3.5 h-3.5" />
-      case 'manage_api_keys':
+      case 'pipilotdb_manage_api_keys':
       case 'supabase_fetch_api_keys': return <Key className="w-3.5 h-3.5" />
       case 'grep_search':
       case 'semantic_code_navigator': return <Search className="w-3.5 h-3.5" />
@@ -177,65 +178,169 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
       case 'web_extract': return <Globe className="w-3.5 h-3.5" />
       case 'browse_web': return <Monitor className="w-3.5 h-3.5" />
       case 'check_dev_errors': return <Settings className="w-3.5 h-3.5" />
+      case 'deploy_preview': return <Globe className="w-3.5 h-3.5" />
       case 'generate_report': return <BarChart3 className="w-3.5 h-3.5" />
+      case 'generate_image': return <FileImage className="w-3.5 h-3.5" />
+      case 'generate_plan': return <FileText className="w-3.5 h-3.5" />
+      case 'update_plan_progress': return <CheckCircle2 className="w-3.5 h-3.5" />
+      case 'update_project_context': return <FileCode className="w-3.5 h-3.5" />
+      case 'suggest_next_steps': return <Zap className="w-3.5 h-3.5" />
+      case 'node_machine': return <Settings className="w-3.5 h-3.5" />
+      case 'discover_tools': return <Search className="w-3.5 h-3.5" />
       default: return <Zap className="w-3.5 h-3.5" />
     }
   }
 
-  const getToolLabel = (tool: string, args?: any) => {
+  // Short action verb
+  const getActionVerb = (tool: string) => {
     switch (tool) {
-      case 'write_file': return `Creating ${args?.path ? args.path.split('/').pop() : 'file'}`
-      case 'edit_file': return `Editing ${args?.filePath ? args.filePath.split('/').pop() : 'file'}`
-      case 'client_replace_string_in_file': return `Replacing in ${args?.filePath ? args.filePath.split('/').pop() : 'file'}`
-      case 'delete_file': return `Deleting ${args?.path ? args.path.split('/').pop() : 'file'}`
-      case 'delete_folder': return `Deleting folder ${args?.path ? args.path.split('/').pop() : 'folder'}`
-      case 'read_file': return `Reading ${args?.path ? args.path.split('/').pop() : 'file'}`
-      case 'list_files': return 'Listing files'
-      case 'remove_package': return `Removing ${args?.packageName || 'package'}`
-      case 'create_database': return `Creating database "${args?.name || 'main'}"`
-      case 'create_table': return `Creating table "${args?.tableName || 'table'}"`
-      case 'supabase_create_table': return `Creating Supabase table "${args?.tableName || 'table'}"`
-      case 'query_database': return `Querying database`
-      case 'supabase_execute_sql': return `Executing SQL on Supabase`
-      case 'grep_search': return `Grep for "${args?.query || 'pattern'}"`
-      case 'semantic_code_navigator': return `Search codebase for "${args?.query || 'query'}"`
-      case 'web_search': return `Searching: ${args?.query || 'query'}`
-      case 'web_extract': return 'Extracting web content'
-      case 'browse_web': return 'Using the Browser'
-      case 'update_plan_progress': return 'Updating plan progress'
-      case 'update_project_context': return 'Documenting project'
-      case 'check_dev_errors': return 'Checking for errors'
-      case 'generate_report': return 'Generating report'
-      default: return tool
+      case 'write_file': return 'Write'
+      case 'edit_file':
+      case 'client_replace_string_in_file': return 'Edit'
+      case 'read_file': return 'Read'
+      case 'list_files': return 'List'
+      case 'delete_file':
+      case 'delete_folder': return 'Delete'
+      case 'remove_package': return 'Remove'
+      case 'grep_search': return 'Search'
+      case 'semantic_code_navigator': return 'Analyze'
+      case 'web_search': return 'Search'
+      case 'web_extract': return 'Extract'
+      case 'browse_web': return 'Browse'
+      case 'check_dev_errors': return 'Check'
+      case 'deploy_preview': return 'Deploy'
+      case 'generate_image': return 'Generate'
+      case 'generate_report': return 'Report'
+      case 'generate_plan': return 'Generate Plan'
+      case 'update_plan_progress': return 'Update Plan'
+      case 'update_project_context': return 'Update Context'
+      case 'suggest_next_steps': return 'Next Steps'
+      case 'node_machine': return 'Execute'
+      case 'pipilotdb_create_database': return 'Create DB'
+      case 'pipilotdb_create_table':
+      case 'supabase_create_table': return 'Create Table'
+      case 'pipilotdb_query_database':
+      case 'supabase_execute_sql': return 'Query'
+      case 'pipilotdb_list_tables':
+      case 'supabase_list_tables_rls': return 'List Tables'
+      case 'pipilotdb_read_table':
+      case 'supabase_read_table': return 'Read Table'
+      case 'pipilotdb_delete_table':
+      case 'supabase_drop_table': return 'Drop Table'
+      case 'pipilotdb_manipulate_table_data':
+      case 'supabase_insert_data': return 'Insert'
+      case 'supabase_delete_data': return 'Delete'
+      case 'pipilotdb_manage_api_keys':
+      case 'supabase_fetch_api_keys': return 'API Keys'
+      case 'create_snapshot': return 'Snapshot'
+      case 'code_quality_analysis':
+      case 'code_review': return 'Review'
+      case 'auto_documentation': return 'Document'
+      case 'discover_tools': return 'Discover'
+      default: return tool.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'executing': return 'bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400'
-      case 'completed': return 'bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400'
-      case 'failed': return 'bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400'
-      default: return 'bg-muted/10 border-border text-muted-foreground'
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'executing': return <Loader2 className="w-3.5 h-3.5 animate-spin" />
-      case 'completed': return <CheckCircle2 className="w-3.5 h-3.5" />
-      case 'failed': return <XCircle className="w-3.5 h-3.5" />
+  // Context badge text (filename, query, etc.)
+  const getContextBadge = (tool: string, args?: any): string | null => {
+    if (!args) return null
+    switch (tool) {
+      case 'write_file':
+      case 'delete_file':
+      case 'read_file': return args.path?.split('/').pop() || null
+      case 'edit_file':
+      case 'client_replace_string_in_file': return args.filePath?.split('/').pop() || null
+      case 'delete_folder': return args.path?.split('/').pop() || null
+      case 'list_files': return args.path || null
+      case 'remove_package': return args.packageName || args.name || null
+      case 'grep_search':
+      case 'semantic_code_navigator': return args.query ? `"${args.query}"` : null
+      case 'web_search': return args.query ? `"${args.query}"` : null
+      case 'web_extract': return args.url ? new URL(args.url).hostname : null
+      case 'browse_web': return args.url ? new URL(args.url).hostname : null
+      case 'deploy_preview': return args.deployMessage || null
+      case 'pipilotdb_create_database': return args.name || null
+      case 'pipilotdb_create_table':
+      case 'supabase_create_table': return args.tableName || null
+      case 'node_machine': return args.command?.split(' ')[0] || null
+      case 'generate_plan': return '.pipilot/plan.md'
+      case 'update_plan_progress': return args.stepNumber ? `Step ${args.stepNumber}` : '.pipilot/plan.md'
+      case 'update_project_context': return '.pipilot/project.md'
+      case 'suggest_next_steps': return args.suggestions?.length ? `${args.suggestions.length} suggestions` : null
+      case 'discover_tools': return args.query ? `"${args.query}"` : args.category || null
       default: return null
     }
   }
 
+  const contextBadge = getContextBadge(toolName, input)
+
+  // Determine if this pill should deep-link to a file in the editor
+  const getFilePath = (tool: string, args?: any): string | null => {
+    let p: string | null = null
+    if (!args) {
+      // For plan/context tools, we know the path even without args
+      if (tool === 'generate_plan' || tool === 'update_plan_progress') return '.pipilot/plan.md'
+      if (tool === 'update_project_context') return '.pipilot/project.md'
+      return null
+    }
+    switch (tool) {
+      case 'write_file':
+      case 'delete_file':
+      case 'read_file': p = args.path || null; break
+      case 'edit_file':
+      case 'client_replace_string_in_file': p = args.filePath || null; break
+      case 'generate_plan':
+      case 'update_plan_progress': return '.pipilot/plan.md'
+      case 'update_project_context': return '.pipilot/project.md'
+      default: return null
+    }
+    // Normalize: strip leading / so path matches storage keys
+    if (p && p.startsWith('/')) p = p.slice(1)
+    return p
+  }
+
+  const linkedFilePath = getFilePath(toolName, input)
+
+  const handleFileClick = () => {
+    if (!linkedFilePath) return
+    const normalizedPath = linkedFilePath.startsWith('/') ? linkedFilePath.slice(1) : linkedFilePath
+    window.dispatchEvent(new CustomEvent('openFileInEditor', {
+      detail: { filePath: normalizedPath }
+    }))
+    window.dispatchEvent(new CustomEvent('focusFileInExplorer', {
+      detail: { path: normalizedPath }
+    }))
+  }
+
   return (
-    <div className={cn(
-      "inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border",
-      getStatusColor(status)
-    )}>
-      {getToolIcon(toolName)}
-      <span className="max-w-[200px] truncate">{getToolLabel(toolName, input)}</span>
-      {getStatusIcon(status)}
+    <div className="flex items-center gap-2 py-1.5">
+      <span className="text-gray-500 flex-shrink-0">
+        {getToolIcon(toolName)}
+      </span>
+      <span className="text-[13px] text-gray-300 font-medium">
+        {getActionVerb(toolName)}
+      </span>
+      {contextBadge && (
+        linkedFilePath ? (
+          <button
+            onClick={handleFileClick}
+            className="text-[13px] bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-orange-400 px-2 py-0.5 rounded font-mono transition-colors cursor-pointer"
+            title={`Open ${linkedFilePath}`}
+          >
+            {contextBadge}
+          </button>
+        ) : (
+          <span className="text-[13px] bg-gray-800 text-gray-300 px-2 py-0.5 rounded font-mono">
+            {contextBadge}
+          </span>
+        )
+      )}
+      {status === 'executing' && (
+        <Loader2 className="w-3 h-3 text-gray-500 animate-spin flex-shrink-0" />
+      )}
+      {status === 'failed' && (
+        <XCircle className="w-3 h-3 text-red-400 flex-shrink-0" />
+      )}
     </div>
   )
 }
@@ -260,45 +365,78 @@ const InterleavedContent = ({
     return positionKey === 'reasoningPosition' ? tc.reasoningPosition : tc.textPosition
   }
 
-  // Filter out failed tool calls (consistent with ToolPanel activity display) and require positions
-  const toolsWithPositions = toolCalls.filter(tc => tc.status !== 'failed' && typeof getPosition(tc) === 'number')
+  // Filter out failed tool calls, require valid positions, and deduplicate by toolCallId
+  const seen = new Set<string>()
+  const toolsWithPositions = toolCalls.filter(tc => {
+    if (tc.status === 'failed') return false
+    if (typeof getPosition(tc) !== 'number') return false
+    if (seen.has(tc.toolCallId)) return false
+    seen.add(tc.toolCallId)
+    return true
+  })
 
   if (toolsWithPositions.length === 0) {
     return <>{children(content)}</>
   }
 
-  // Sort tool calls by position
-  const sortedTools = [...toolsWithPositions].sort((a, b) => (getPosition(a) || 0) - (getPosition(b) || 0))
+  const contentLen = content.length
+
+  // Clamp positions to valid range and sort
+  const sortedTools = [...toolsWithPositions]
+    .map(tc => ({ ...tc, _pos: Math.min(Math.max(getPosition(tc) || 0, 0), contentLen) }))
+    .sort((a, b) => a._pos - b._pos)
 
   // Build segments: text chunks interleaved with tool pills
+  // Snap to nearest FORWARD paragraph break (newline) within 30 chars — never snap backward
+  // This ensures pills appear AFTER the text that was written before the tool ran
   const segments: Array<{ type: 'text' | 'tool', content?: string, tool?: InlineToolCall }> = []
   let lastPosition = 0
 
   for (const tool of sortedTools) {
-    const position = getPosition(tool) || 0
+    let position = tool._pos
 
-    // Add text segment before this tool (if any)
-    if (position > lastPosition) {
-      const textSegment = content.slice(lastPosition, position)
-      if (textSegment) {
-        segments.push({ type: 'text', content: textSegment })
+    // Only snap forward to the next newline within 30 chars (not backward)
+    if (position > lastPosition && position < contentLen) {
+      const forwardSearch = content.slice(position, Math.min(contentLen, position + 30))
+      const nextNewline = forwardSearch.indexOf('\n')
+      if (nextNewline !== -1) {
+        // Snap to right after the newline
+        position = position + nextNewline + 1
+      } else {
+        // No newline nearby — try to snap to end of current sentence (. ! ?)
+        const sentenceEnd = forwardSearch.search(/[.!?]\s/)
+        if (sentenceEnd !== -1) {
+          position = position + sentenceEnd + 1
+        }
+        // Otherwise keep the raw position — don't shift it arbitrarily
       }
     }
 
-    // Add the tool pill
+    // Ensure we don't go backward past the last position
+    position = Math.max(lastPosition, Math.min(position, contentLen))
+
+    // Add text segment before this tool
+    if (position > lastPosition) {
+      segments.push({ type: 'text', content: content.slice(lastPosition, position) })
+    }
+
+    // Group consecutive tools at the same position into a single batch
     segments.push({ type: 'tool', tool })
     lastPosition = position
   }
 
   // Add remaining text after the last tool
-  if (lastPosition < content.length) {
+  if (lastPosition < contentLen) {
     segments.push({ type: 'text', content: content.slice(lastPosition) })
   }
 
   return (
-    <div className="interleaved-content space-y-2">
+    <div className="interleaved-content space-y-1">
       {segments.map((segment, index) => {
         if (segment.type === 'text' && segment.content) {
+          // Skip segments that are only whitespace but preserve them if they're just newlines
+          // between meaningful content — avoids collapsing spacing
+          if (!segment.content.trim()) return null
           return (
             <div key={`text-${index}`}>
               {children(segment.content)}
@@ -307,7 +445,7 @@ const InterleavedContent = ({
         }
         if (segment.type === 'tool' && segment.tool) {
           return (
-            <div key={`tool-${segment.tool.toolCallId}`} className="my-2">
+            <div key={`tool-${segment.tool.toolCallId}`} className="my-1">
               <InlineToolPill
                 toolName={segment.tool.toolName}
                 input={segment.tool.input}
@@ -320,7 +458,7 @@ const InterleavedContent = ({
       })}
       {/* Show streaming indicator after last tool if streaming and last tool is executing */}
       {isStreaming && sortedTools.length > 0 && sortedTools[sortedTools.length - 1].status === 'executing' && (
-        <div className="flex items-center gap-2 text-muted-foreground text-sm mt-2">
+        <div className="flex items-center gap-2 text-muted-foreground text-sm mt-1">
           <Loader2 className="w-3 h-3 animate-spin" />
           <span>Executing...</span>
         </div>
@@ -546,11 +684,22 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
   )
 
   // Filter text-stream tool calls (used by both old and new rendering)
+  // A tool belongs to the text stream if:
+  //   1. It has a textPosition > 0 (was recorded during text output), OR
+  //   2. Both positions are 0 AND there is no reasoning content (tool fired before any output)
+  // Tools with textPosition === 0 but reasoningPosition > 0 belong to reasoning only
   const textStreamToolCalls = inlineToolCalls?.filter(tc => {
     if (tc.status === 'failed') return false
     const textPos = tc.textPosition ?? 0
     const reasoningPos = tc.reasoningPosition ?? 0
-    return textPos > 0 || (textPos === 0 && reasoningPos === 0)
+    // Has a text position — belongs in text stream
+    if (textPos > 0) return true
+    // Position 0 with no reasoning position — pre-output tool, show in text stream
+    if (textPos === 0 && reasoningPos === 0) return true
+    // Position 0 but has reasoning position — it's a reasoning-phase tool
+    // Still show in text stream if there's no reasoning section (e.g. direct stream mode)
+    if (textPos === 0 && reasoningPos > 0 && !hasReasoning) return true
+    return false
   }) || []
 
   return (
@@ -691,18 +840,24 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
                     status={isStreaming && !hasResponse ? "active" : "complete"}
                   >
                     <div className={reasoningWrapperClasses}>
-                      {inlineToolCalls && inlineToolCalls.length > 0 ? (
-                        <InterleavedContent
-                          content={reasoningContent}
-                          toolCalls={inlineToolCalls}
-                          isStreaming={isStreaming}
-                          positionKey="reasoningPosition"
-                        >
-                          {(text) => <Response className={reasoningResponseClasses}>{text}</Response>}
-                        </InterleavedContent>
-                      ) : (
-                        <Response className={reasoningResponseClasses}>{reasoningContent}</Response>
-                      )}
+                      {(() => {
+                        // Only include tools that actually have a reasoning position > 0
+                        const reasoningToolCalls = inlineToolCalls?.filter(tc =>
+                          tc.status !== 'failed' && (tc.reasoningPosition ?? 0) > 0
+                        ) || []
+                        return reasoningToolCalls.length > 0 ? (
+                          <InterleavedContent
+                            content={reasoningContent}
+                            toolCalls={reasoningToolCalls}
+                            isStreaming={isStreaming}
+                            positionKey="reasoningPosition"
+                          >
+                            {(text) => <Response className={reasoningResponseClasses}>{text}</Response>}
+                          </InterleavedContent>
+                        ) : (
+                          <Response className={reasoningResponseClasses}>{reasoningContent}</Response>
+                        )
+                      })()}
                     </div>
                   </ChainOfThoughtStep>
                 )}
@@ -710,7 +865,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
             </ChainOfThought>
           )}
 
-          {hasResponse && (
+          {(hasResponse || textStreamToolCalls.length > 0) && (
             <div className={textWrapperClasses}>
               {textStreamToolCalls.length > 0 ? (
                 <InterleavedContent

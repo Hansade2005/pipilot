@@ -89,8 +89,8 @@ export function ConvertToTeamDialog({
       }
 
       const orgs = (data || [])
-        .filter(item => item.organizations)
-        .map(item => item.organizations as Organization)
+        .filter((item: any) => item.organizations)
+        .map((item: any) => item.organizations as unknown as Organization)
 
       setOrganizations(orgs)
     } catch (error) {
@@ -258,15 +258,15 @@ export function ConvertToTeamDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] bg-gray-900 border-gray-800 text-white">
         {step === "select" && (
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-blue-500" />
-                Convert to Team Workspace
+                <Users className="h-5 w-5 text-orange-400" />
+                <span className="text-gray-100">Convert to Team Workspace</span>
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-gray-400">
                 Make "{workspaceName}" a collaborative team workspace. All files will be synced to Supabase for real-time collaboration.
               </DialogDescription>
             </DialogHeader>
@@ -274,16 +274,16 @@ export function ConvertToTeamDialog({
             <div className="space-y-4 py-4">
               {organizations.length > 0 && (
                 <div className="space-y-2">
-                  <Label>Select Organization</Label>
+                  <Label className="text-gray-300">Select Organization</Label>
                   <Select value={selectedOrgId} onValueChange={setSelectedOrgId}>
-                    <SelectTrigger>
+                    <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
                       <SelectValue placeholder="Choose an organization..." />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-gray-800 border-gray-700">
                       {organizations.map((org) => (
-                        <SelectItem key={org.id} value={org.id}>
+                        <SelectItem key={org.id} value={org.id} className="text-gray-200">
                           <div className="flex items-center gap-2">
-                            <Users className="h-4 w-4" />
+                            <Users className="h-4 w-4 text-orange-400" />
                             {org.name}
                           </div>
                         </SelectItem>
@@ -298,7 +298,7 @@ export function ConvertToTeamDialog({
                   <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">
+                  <span className="bg-gray-900 px-2 text-gray-500">
                     Or
                   </span>
                 </div>
@@ -306,19 +306,19 @@ export function ConvertToTeamDialog({
 
               <Button
                 variant="outline"
-                className="w-full"
+                className="w-full border-gray-700 text-gray-300 hover:bg-gray-800"
                 onClick={() => setStep("create")}
               >
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="h-4 w-4 mr-2 text-orange-400" />
                 Create New Organization
               </Button>
 
-              <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-4 space-y-2">
+              <div className="rounded-lg bg-orange-500/10 border border-orange-500/20 p-4 space-y-2">
                 <div className="flex items-start gap-2">
-                  <Sparkles className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                  <Sparkles className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
                   <div className="text-sm">
-                    <p className="font-medium text-blue-900 dark:text-blue-100">Team Features:</p>
-                    <ul className="text-blue-700 dark:text-blue-300 text-xs space-y-1 mt-1 ml-4 list-disc">
+                    <p className="font-medium text-orange-300">Team Features:</p>
+                    <ul className="text-orange-300 text-xs space-y-1 mt-1 ml-4 list-disc">
                       <li>Real-time collaboration</li>
                       <li>Team member access</li>
                       <li>Activity tracking</li>
@@ -330,10 +330,10 @@ export function ConvertToTeamDialog({
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
+              <Button variant="outline" className="border-gray-700 text-gray-300 hover:bg-gray-800" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleConvert} disabled={!selectedOrgId || loading}>
+              <Button className="bg-orange-600 hover:bg-orange-500 text-white" onClick={handleConvert} disabled={!selectedOrgId || loading}>
                 {loading ? "Converting..." : "Convert to Team"}
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
@@ -345,20 +345,21 @@ export function ConvertToTeamDialog({
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Plus className="h-5 w-5" />
-                Create Organization
+                <Plus className="h-5 w-5 text-orange-400" />
+                <span className="text-gray-100">Create Organization</span>
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-gray-400">
                 Create a new organization to manage your team workspaces.
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="org-name">Organization Name</Label>
+                <Label htmlFor="org-name" className="text-gray-300">Organization Name</Label>
                 <Input
                   id="org-name"
                   placeholder="e.g., Acme Inc"
+                  className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500"
                   value={newOrgName}
                   onChange={(e) => setNewOrgName(e.target.value)}
                 />
@@ -366,10 +367,10 @@ export function ConvertToTeamDialog({
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setStep("select")}>
+              <Button variant="outline" className="border-gray-700 text-gray-300 hover:bg-gray-800" onClick={() => setStep("select")}>
                 Back
               </Button>
-              <Button onClick={handleCreateNewOrg} disabled={!newOrgName.trim() || loading}>
+              <Button className="bg-orange-600 hover:bg-orange-500 text-white" onClick={handleCreateNewOrg} disabled={!newOrgName.trim() || loading}>
                 {loading ? "Creating..." : "Create & Convert"}
               </Button>
             </DialogFooter>
@@ -378,9 +379,9 @@ export function ConvertToTeamDialog({
 
         {step === "converting" && (
           <div className="py-8 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-            <h3 className="text-lg font-semibold mb-2">Converting to Team Workspace</h3>
-            <p className="text-sm text-muted-foreground">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+            <h3 className="text-lg font-semibold mb-2 text-gray-100">Converting to Team Workspace</h3>
+            <p className="text-sm text-gray-400">
               Copying files and setting up collaboration...
             </p>
           </div>
@@ -388,11 +389,11 @@ export function ConvertToTeamDialog({
 
         {step === "success" && (
           <div className="py-8 text-center">
-            <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center mx-auto mb-4">
+            <div className="h-12 w-12 rounded-full bg-green-500/15 flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="h-6 w-6 text-green-500" />
             </div>
-            <h3 className="text-lg font-semibold mb-2">Conversion Complete!</h3>
-            <p className="text-sm text-muted-foreground">
+            <h3 className="text-lg font-semibold mb-2 text-gray-100">Conversion Complete!</h3>
+            <p className="text-sm text-gray-400">
               Your workspace is now ready for team collaboration.
             </p>
           </div>

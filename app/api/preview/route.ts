@@ -6,7 +6,7 @@ import {
   SandboxErrorType,
   type SandboxFile 
 } from '@/lib/e2b-enhanced'
-import { filterUnwantedFiles } from '@/lib/utils'
+import { filterUnwantedFiles, detectProjectTypeWithAI } from '@/lib/utils'
 import JSZip from 'jszip'
 import lz4 from 'lz4js'
 import { createClient as createExternalClient } from '@supabase/supabase-js'
@@ -892,6 +892,7 @@ async function handleStreamingPreview(req: Request) {
     let authUsername: string | undefined
     let isProduction = false
     let customDomainId: string | undefined
+    let projectType: string | undefined // Explicit project type flag from caller
 
     if (contentType.includes('application/octet-stream')) {
       // Handle compressed data (LZ4 + Zip)
@@ -901,22 +902,24 @@ async function handleStreamingPreview(req: Request) {
       projectId = extractedData.projectId
       projectSlug = extractedData.projectSlug
       files = extractedData.files
-      // Extract auth info from metadata if available
+      // Extract auth info and projectType from metadata if available
       authUserId = extractedData.metadata?.authUserId
       authUsername = extractedData.metadata?.authUsername
       isProduction = extractedData.metadata?.isProduction || false
       customDomainId = extractedData.metadata?.customDomainId
+      projectType = extractedData.metadata?.projectType
     } else {
-      // Handle JSON format (backward compatibility)
+      // Handle JSON format
       console.log('[Preview] 📄 Received JSON data')
-      const { 
-        projectId: jsonProjectId, 
-        projectSlug: jsonProjectSlug, 
+      const {
+        projectId: jsonProjectId,
+        projectSlug: jsonProjectSlug,
         files: jsonFiles,
         authUserId: parsedAuthUserId,
         authUsername: parsedAuthUsername,
         isProduction: jsonIsProduction,
-        customDomainId: jsonCustomDomainId
+        customDomainId: jsonCustomDomainId,
+        projectType: jsonProjectType
       } = await req.json()
       projectId = jsonProjectId
       projectSlug = jsonProjectSlug || projectId // fallback to projectId
@@ -925,6 +928,11 @@ async function handleStreamingPreview(req: Request) {
       authUsername = parsedAuthUsername
       isProduction = jsonIsProduction || false
       customDomainId = jsonCustomDomainId
+      projectType = jsonProjectType
+    }
+
+    if (projectType) {
+      console.log(`[Preview] Caller provided projectType: ${projectType}`)
     }
 
     if (!projectId || !files?.length) {
@@ -1007,7 +1015,11 @@ async function handleStreamingPreview(req: Request) {
           )
           const hasExpoConfig = files.some((f: any) => f.path === 'app.json' || f.path === 'app.config.js')
           const hasExpoDepInPkg = packageJson && packageJson.dependencies && packageJson.dependencies['expo']
-          const hasViteDepInPkg = packageJson && packageJson.dependencies && (packageJson.dependencies['vite'] || packageJson.dependencies['react'])
+          const hasViteDepInPkg = packageJson && (
+            packageJson.dependencies?.['vite'] || packageJson.dependencies?.['react'] ||
+            packageJson.devDependencies?.['vite'] || packageJson.devDependencies?.['@vitejs/plugin-react'] ||
+            packageJson.devDependencies?.['@vitejs/plugin-react-swc']
+          )
           const hasNuxtConfig = files.some((f: any) =>
             f.path === 'nuxt.config.js' || f.path === 'nuxt.config.ts'
           )
@@ -1026,15 +1038,24 @@ async function handleStreamingPreview(req: Request) {
           })
           const isClassicHtmlTemplate = hasRootScriptJs && hasRootStylesCss
 
-          // HTML/static project = ANY of:
-          // 1. Has index.html with no framework configs/deps
-          // 2. No package.json at all (nothing to install/build)
-          // 3. Classic HTML template pattern (script.js + styles.css in root)
-          const isHtmlProject = (hasIndexHtml && !hasAnyFrameworkConfig && !hasAnyFrameworkDeps) ||
-            !packageJson ||
-            isClassicHtmlTemplate
+          // Resolve project type: explicit flag > AI detection > file-based fallback
+          let resolvedType = projectType
+          if (!resolvedType) {
+            // Try AI detection first
+            const aiDetected = await detectProjectTypeWithAI(files)
+            if (aiDetected !== 'unknown') {
+              resolvedType = aiDetected
+              console.log(`[Preview] AI detected project type: ${resolvedType}`)
+            }
+          }
 
-          console.log(`[Preview] Project detection: hasIndexHtml=${hasIndexHtml}, hasViteConfig=${hasViteConfig}, hasNextConfig=${hasNextConfig}, hasExpoConfig=${hasExpoConfig}, hasNuxtConfig=${hasNuxtConfig}, hasPackageJson=${!!packageJson}, isClassicHtmlTemplate=${isClassicHtmlTemplate}, isHtmlProject=${isHtmlProject}`)
+          const isHtmlProject = resolvedType
+            ? resolvedType === 'html'
+            : (hasIndexHtml && !hasAnyFrameworkConfig && !hasAnyFrameworkDeps) ||
+              (!packageJson && !hasAnyFrameworkConfig) ||
+              isClassicHtmlTemplate
+
+          console.log(`[Preview] Project detection: projectType=${projectType || 'none'}, aiResolved=${resolvedType || 'none'}, hasIndexHtml=${hasIndexHtml}, hasViteConfig=${hasViteConfig}, hasNextConfig=${hasNextConfig}, hasExpoConfig=${hasExpoConfig}, hasNuxtConfig=${hasNuxtConfig}, hasPackageJson=${!!packageJson}, isHtmlProject=${isHtmlProject}`)
           console.log(`[Preview] File paths: ${files.map((f: any) => f.path).join(', ')}`)
 
           if (isHtmlProject) {
@@ -1140,7 +1161,8 @@ async function handleStreamingPreview(req: Request) {
             return
           }
 
-          const isExpoProject = hasExpoConfig || !!hasExpoDepInPkg
+          const isExpoProject = resolvedType === 'expo' || hasExpoConfig || !!hasExpoDepInPkg
+          const isViteProject = resolvedType === 'vite-react' || hasViteConfig
           const template = "pipilot-expo"
 
           // 🔹 Create sandbox (only for non-HTML projects)
@@ -1299,7 +1321,7 @@ async function handleStreamingPreview(req: Request) {
           }
           let buildCommand = "npm run build && PORT=3000 npm run preview" // Default to Vite
 
-          if (hasViteConfig) {
+          if (isViteProject) {
             // Vite project - build and host on Supabase storage
             send({ type: "log", message: "Detected Vite project, will build and host on pipilot" })
             
@@ -1311,9 +1333,18 @@ async function handleStreamingPreview(req: Request) {
               timeoutMs: 300000, // 5 minutes for build
               envVars,
               onStdout: (data) => send({ type: "log", message: data.trim() }),
-              onStderr: (data) => send({ type: "error", message: data.trim() })
+              onStderr: (data) => {
+                const msg = data.trim()
+                // Vite/npm/pnpm output warnings and notices to stderr that aren't errors
+                const isHarmless = msg.includes('npm notice') || msg.includes('chunks are larger than') ||
+                  msg.includes('DeprecationWarning') || msg.includes('DEP0') || msg.includes('Consider:') ||
+                  msg.includes('dynamic import()') || msg.includes('manualChunks') || msg.includes('chunkSizeWarningLimit') ||
+                  msg.includes('rollupOptions') || msg.includes('npm install -g') || msg.includes('New minor version') ||
+                  msg.includes('Changelog:') || msg.includes('To update run:')
+                send({ type: isHarmless ? "warning" : "error", message: msg })
+              }
             })
-            
+
             if (buildResult.exitCode !== 0) {
               send({ type: "error", message: `Vite build failed: ${buildResult.stderr}` })
               throw new Error(`Vite build failed: ${buildResult.stderr}`)
@@ -1566,9 +1597,9 @@ async function handleRegularPreview(req: Request) {
     let files: any[]
     let authUserId: string | undefined
     let authUsername: string | undefined
-
-    let isProduction = false;
-    let customDomainId: string | undefined;
+    let isProduction = false
+    let customDomainId: string | undefined
+    let projectType: string | undefined
 
     if (contentType.includes('application/octet-stream')) {
       // Handle compressed data (LZ4 + Zip)
@@ -1578,30 +1609,36 @@ async function handleRegularPreview(req: Request) {
       projectId = extractedData.projectId
       projectSlug = extractedData.projectSlug
       files = extractedData.files
-      // Extract auth info from metadata if available
       authUserId = extractedData.metadata?.authUserId
       authUsername = extractedData.metadata?.authUsername
       isProduction = extractedData.metadata?.isProduction || false
       customDomainId = extractedData.metadata?.customDomainId
+      projectType = extractedData.metadata?.projectType
     } else {
-      // Handle JSON format (backward compatibility)
+      // Handle JSON format
       console.log('[Preview] 📄 Received JSON data for regular preview')
-      const { 
-        projectId: jsonProjectId, 
-        projectSlug: jsonProjectSlug, 
+      const {
+        projectId: jsonProjectId,
+        projectSlug: jsonProjectSlug,
         files: jsonFiles,
         authUserId: parsedAuthUserId,
         authUsername: parsedAuthUsername,
         isProduction: jsonIsProduction,
-        customDomainId: jsonCustomDomainId
+        customDomainId: jsonCustomDomainId,
+        projectType: jsonProjectType
       } = await req.json()
       projectId = jsonProjectId
-      projectSlug = jsonProjectSlug || projectId // fallback to projectId
+      projectSlug = jsonProjectSlug || projectId
       files = jsonFiles
       authUserId = parsedAuthUserId
       authUsername = parsedAuthUsername
       isProduction = jsonIsProduction || false
       customDomainId = jsonCustomDomainId
+      projectType = jsonProjectType
+    }
+
+    if (projectType) {
+      console.log(`[Preview] Caller provided projectType: ${projectType}`)
     }
 
     if (!projectId) {
@@ -1687,7 +1724,11 @@ async function handleRegularPreview(req: Request) {
     )
     const hasExpoConfig = files.some((f: any) => f.path === 'app.json' || f.path === 'app.config.js')
     const hasExpoDepInPkg = packageJson && packageJson.dependencies && packageJson.dependencies['expo']
-    const hasViteDepInPkg = packageJson && packageJson.dependencies && (packageJson.dependencies['vite'] || packageJson.dependencies['react'])
+    const hasViteDepInPkg = packageJson && (
+      packageJson.dependencies?.['vite'] || packageJson.dependencies?.['react'] ||
+      packageJson.devDependencies?.['vite'] || packageJson.devDependencies?.['@vitejs/plugin-react'] ||
+      packageJson.devDependencies?.['@vitejs/plugin-react-swc']
+    )
     const hasNuxtConfig = files.some((f: any) =>
       f.path === 'nuxt.config.js' || f.path === 'nuxt.config.ts'
     )
@@ -1706,15 +1747,23 @@ async function handleRegularPreview(req: Request) {
     })
     const isClassicHtmlTemplate = hasRootScriptJs && hasRootStylesCss
 
-    // HTML/static project = ANY of:
-    // 1. Has index.html with no framework configs/deps
-    // 2. No package.json at all (nothing to install/build)
-    // 3. Classic HTML template pattern (script.js + styles.css in root)
-    const isHtmlProject = (hasIndexHtml && !hasAnyFrameworkConfig && !hasAnyFrameworkDeps) ||
-      !packageJson ||
-      isClassicHtmlTemplate
+    // Resolve project type: explicit flag > AI detection > file-based fallback
+    let resolvedType = projectType
+    if (!resolvedType) {
+      const aiDetected = await detectProjectTypeWithAI(files)
+      if (aiDetected !== 'unknown') {
+        resolvedType = aiDetected
+        console.log(`[Preview] AI detected project type: ${resolvedType}`)
+      }
+    }
 
-    console.log(`[Preview] Project detection: hasIndexHtml=${hasIndexHtml}, hasViteConfig=${hasViteConfig}, hasNextConfig=${hasNextConfig}, hasExpoConfig=${hasExpoConfig}, hasNuxtConfig=${hasNuxtConfig}, hasPackageJson=${!!packageJson}, isClassicHtmlTemplate=${isClassicHtmlTemplate}, isHtmlProject=${isHtmlProject}`)
+    const isHtmlProject = resolvedType
+      ? resolvedType === 'html'
+      : (hasIndexHtml && !hasAnyFrameworkConfig && !hasAnyFrameworkDeps) ||
+        (!packageJson && !hasAnyFrameworkConfig) ||
+        isClassicHtmlTemplate
+
+    console.log(`[Preview] Project detection: projectType=${projectType || 'none'}, aiResolved=${resolvedType || 'none'}, hasIndexHtml=${hasIndexHtml}, hasViteConfig=${hasViteConfig}, hasNextConfig=${hasNextConfig}, hasExpoConfig=${hasExpoConfig}, hasNuxtConfig=${hasNuxtConfig}, hasPackageJson=${!!packageJson}, isHtmlProject=${isHtmlProject}`)
     console.log(`[Preview] File paths: ${files.map((f: any) => f.path).join(', ')}`)
 
     if (isHtmlProject) {
@@ -1794,7 +1843,8 @@ async function handleRegularPreview(req: Request) {
       })
     }
 
-    const isExpoProject = hasExpoConfig || !!hasExpoDepInPkg
+    const isExpoProject = resolvedType === 'expo' || hasExpoConfig || !!hasExpoDepInPkg
+    const isViteProject = resolvedType === 'vite-react' || hasViteConfig
     const template = "pipilot-expo"
 
     // Create enhanced E2B sandbox with environment variables (only for non-HTML projects)
@@ -1994,7 +2044,19 @@ devDependencies:
           timeoutMs: 300000, // 5 minutes for build
           envVars,
           onStdout: (data) => console.log(`[Preview] Build stdout: ${data.trim()}`),
-          onStderr: (data) => console.error(`[Preview] Build stderr: ${data.trim()}`)
+          onStderr: (data) => {
+            const msg = data.trim()
+            const isHarmless = msg.includes('npm notice') || msg.includes('chunks are larger than') ||
+              msg.includes('DeprecationWarning') || msg.includes('DEP0') || msg.includes('Consider:') ||
+              msg.includes('dynamic import()') || msg.includes('manualChunks') || msg.includes('chunkSizeWarningLimit') ||
+              msg.includes('rollupOptions') || msg.includes('npm install -g') || msg.includes('New minor version') ||
+              msg.includes('Changelog:') || msg.includes('To update run:')
+            if (isHarmless) {
+              console.log(`[Preview] Build warning (harmless): ${msg}`)
+            } else {
+              console.error(`[Preview] Build stderr: ${msg}`)
+            }
+          }
         })
         
         if (buildResult.exitCode !== 0) {
@@ -2121,17 +2183,23 @@ devDependencies:
 
   } catch (error) {
     console.error('Preview API Error:', error)
-    
-    // Enhanced error handling
+
+    // Enhanced error handling — return detailed error messages for debugging
     if (error instanceof SandboxError) {
-      return Response.json({ 
+      return Response.json({
         error: error.message,
         type: error.type,
-        sandboxId: error.sandboxId 
+        sandboxId: error.sandboxId
       }, { status: 500 })
     }
-    
-    return Response.json({ error: 'Failed to create preview' }, { status: 500 })
+
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    return Response.json({
+      error: errorMessage,
+      details: errorMessage.includes('build failed') ? 'Build process failed. Check vite.config and dependencies.' :
+               errorMessage.includes('install') ? 'Dependency installation failed. Check package.json.' :
+               errorMessage.includes('upload') ? 'File upload to hosting failed.' : null
+    }, { status: 500 })
   }
 }
 

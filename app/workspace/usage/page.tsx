@@ -110,8 +110,10 @@ const MODEL_SHORT_NAMES: Record<string, string> = {
   'moonshotai/kimi-k2-thinking': 'Kimi K2',
   'mistral/pixtral-12b-2409': 'Pixtral 12B',
   // Disguised model names (minimax -> Claude branding)
+  'ollama/minimax-m2.7': 'Claude Opus 4.6',
   'ollama/minimax-m2.5': 'Claude Opus 4.6',
   'ollama/minimax-m2.1': 'Claude Sonnet 4.6',
+  'minimax/minimax-m2.7': 'Claude Opus 4.6',
   'minimax/minimax-m2.5': 'Claude Opus 4.6',
   'minimax/minimax-m2.1': 'Claude Sonnet 4.6',
   'Claude Opus 4.6': 'Claude Opus 4.6',

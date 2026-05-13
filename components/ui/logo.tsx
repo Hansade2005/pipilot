@@ -50,7 +50,7 @@ export function Logo({ size = 'md', variant = 'icon', showSubtitle = true, class
       <div className={cn('flex items-center space-x-3', className)}>
         <LogoImage className={sizeClasses[size]} />
         <div className="flex flex-col">
-          <span className={cn('font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 bg-clip-text text-transparent', textSizes[size])}>
+          <span className={cn('font-bold bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600 bg-clip-text text-transparent', textSizes[size])}>
             PiPilot
           </span>
           {showSubtitle && (
@@ -68,7 +68,7 @@ export function Logo({ size = 'md', variant = 'icon', showSubtitle = true, class
     <div className={cn('flex items-center space-x-4', className)}>
       <LogoImage className={sizeClasses[size]} />
       <div className="flex flex-col">
-        <span className={cn('font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 bg-clip-text text-transparent', textSizes[size])}>
+        <span className={cn('font-bold bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600 bg-clip-text text-transparent', textSizes[size])}>
           PiPilot
         </span>
         <span className={cn('text-gray-300 font-medium', size === 'sm' ? 'text-xs' : size === 'md' ? 'text-sm' : size === 'lg' ? 'text-base' : 'text-lg')}>

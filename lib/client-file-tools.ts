@@ -15,8 +15,8 @@ export function parseSearchReplaceBlock(blockText: string) {
   const REPLACE_END = ">>>>>>> REPLACE";
 
   const lines = blockText.split('\n');
-  let searchLines = [];
-  let replaceLines = [];
+  let searchLines: string[] = [];
+  let replaceLines: string[] = [];
   let mode = 'none'; // 'search' | 'replace'
 
   for (let i = 0; i < lines.length; i++) {
@@ -51,12 +51,75 @@ export function parseSearchReplaceBlock(blockText: string) {
 }
 
 /**
+ * Parse ALL search/replace blocks from a multi-block string.
+ * Handles cases where the model sends multiple blocks in one tool call.
+ */
+export function parseAllSearchReplaceBlocks(blockText: string): { search: string, replace: string }[] {
+  const SEARCH_START = "<<<<<<< SEARCH";
+  const DIVIDER = "=======";
+  const REPLACE_END = ">>>>>>> REPLACE";
+
+  const lines = blockText.split('\n');
+  const blocks: { search: string, replace: string }[] = [];
+  let searchLines: string[] = [];
+  let replaceLines: string[] = [];
+  let mode = 'none';
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (line.trim() === SEARCH_START) {
+      searchLines = [];
+      replaceLines = [];
+      mode = 'search';
+    } else if (line.trim() === DIVIDER && mode === 'search') {
+      mode = 'replace';
+    } else if (line.trim() === REPLACE_END && mode === 'replace') {
+      const hasContent = searchLines.some(l => l.trim() !== '') || replaceLines.some(l => l.trim() !== '');
+      if (hasContent) {
+        blocks.push({ search: searchLines.join('\n'), replace: replaceLines.join('\n') });
+      }
+      mode = 'none';
+    } else if (mode === 'search') {
+      searchLines.push(line);
+    } else if (mode === 'replace') {
+      replaceLines.push(line);
+    }
+  }
+
+  return blocks;
+}
+
+/**
+ * Strip any leftover search/replace markers from file content.
+ * Prevents markers from being written into files when edits fail or partially apply.
+ */
+export function stripSearchReplaceMarkers(content: string): string {
+  return content
+    .replace(/^<<<<<<< SEARCH\s*$/gm, '')
+    .replace(/^=======\s*$/gm, '')
+    .replace(/^>>>>>>> REPLACE\s*$/gm, '')
+    // Clean up any resulting double blank lines
+    .replace(/\n{3,}/g, '\n\n');
+}
+
+/**
+ * Dispatch a files-changed event that both refreshes the file explorer
+ * and notifies team sync tracking of the specific changed file path.
+ */
+function dispatchFileChanged(projectId: string, path: string) {
+  window.dispatchEvent(new CustomEvent('files-changed', {
+    detail: { projectId, path, forceRefresh: true }
+  }));
+}
+
+/**
  * Handle client-side file operations following AI SDK pattern
  * @param toolCall The tool call from AI SDK (contains toolName, toolCallId, args)
  * @param projectId The current project ID
  * @param addToolResult Function to add the tool result back to the chat
  * @returns Promise<void>
- * 
+ *
  * CRITICAL: This function MUST NOT await addToolResult() - it causes deadlocks in AI SDK streaming.
  * The function can be async internally, but addToolResult is called synchronously without await.
  */
@@ -155,10 +218,8 @@ export async function handleClientFileOperation(
           });
         }
 
-        // Trigger file refresh event
-        window.dispatchEvent(new CustomEvent('files-changed', {
-          detail: { projectId, forceRefresh: true }
-        }));
+        // Trigger file refresh + team sync tracking
+        dispatchFileChanged(projectId, path);
         break;
       }
 
@@ -281,10 +342,16 @@ export async function handleClientFileOperation(
         const originalLines = currentContent.split('\n');
         const originalLineCount = originalLines.length;
 
-        // Parse the search/replace block
-        const editBlock = parseSearchReplaceBlock(searchReplaceBlock);
+        // Parse ALL search/replace blocks (supports multiple blocks in one call)
+        const editBlocks = parseAllSearchReplaceBlocks(searchReplaceBlock);
 
-        if (!editBlock) {
+        if (editBlocks.length === 0) {
+          // Fallback to single block parser
+          const singleBlock = parseSearchReplaceBlock(searchReplaceBlock);
+          if (singleBlock) editBlocks.push(singleBlock);
+        }
+
+        if (editBlocks.length === 0) {
           addToolResult({
             tool: 'edit_file',
             toolCallId: toolCall.toolCallId,
@@ -294,104 +361,48 @@ export async function handleClientFileOperation(
           return;
         }
 
-        const { search, replace } = editBlock;
-
         // Create backup for potential rollback
         const backupContent = currentContent;
 
         let modifiedContent = currentContent;
-        const appliedEdits = [];
-        const failedEdits = [];
+        const appliedEdits: any[] = [];
+        const failedEdits: any[] = [];
         let replacementCount = 0;
 
         try {
-          if (useRegex) {
-            // Handle regex replacement
-            const regexFlags = replaceAll ? 'g' : '';
-            const regex = new RegExp(search, regexFlags);
+          // Apply each search/replace block sequentially
+          for (const { search, replace } of editBlocks) {
+            if (useRegex) {
+              const regexFlags = replaceAll ? 'g' : '';
+              const regex = new RegExp(search, regexFlags);
 
-            if (regex.test(currentContent)) {
-              modifiedContent = currentContent.replace(regex, replace);
-              replacementCount = replaceAll ? (currentContent.match(regex) || []).length : 1;
-
-              appliedEdits.push({
-                type: 'regex',
-                pattern: search,
-                replacement: replace,
-                flags: regexFlags,
-                occurrences: replacementCount,
-                status: 'applied'
-              });
-            } else {
-              failedEdits.push({
-                type: 'regex',
-                pattern: search,
-                replacement: replace,
-                status: 'failed',
-                reason: 'Regex pattern not found in file content'
-              });
-            }
-          } else {
-            // Handle string replacement
-            if (replaceAll) {
-              // Replace all occurrences
-              let occurrences = 0;
-              const allMatches = [];
-              let searchIndex = 0;
-
-              while ((searchIndex = modifiedContent.indexOf(search, searchIndex)) !== -1) {
-                allMatches.push(searchIndex);
-                searchIndex += search.length;
-                occurrences++;
-              }
-
-              if (occurrences > 0) {
-                modifiedContent = modifiedContent.replaceAll(search, replace);
-                replacementCount = occurrences;
-
-                appliedEdits.push({
-                  type: 'string',
-                  search: search,
-                  replacement: replace,
-                  occurrences: replacementCount,
-                  positions: allMatches,
-                  status: 'applied'
-                });
+              if (regex.test(modifiedContent)) {
+                const count = replaceAll ? (modifiedContent.match(regex) || []).length : 1;
+                modifiedContent = modifiedContent.replace(regex, replace);
+                replacementCount += count;
+                appliedEdits.push({ type: 'regex', occurrences: count, status: 'applied' });
               } else {
-                failedEdits.push({
-                  type: 'string',
-                  search: search,
-                  replacement: replace,
-                  status: 'failed',
-                  reason: 'Search text not found in file content'
-                });
+                failedEdits.push({ type: 'regex', status: 'failed', reason: 'Regex pattern not found' });
               }
             } else {
-              // Replace first occurrence only
               if (modifiedContent.includes(search)) {
-                const searchIndex = modifiedContent.indexOf(search);
-                modifiedContent = modifiedContent.replace(search, replace);
-                replacementCount = 1;
-
-                appliedEdits.push({
-                  type: 'string',
-                  search: search,
-                  replacement: replace,
-                  occurrences: 1,
-                  position: searchIndex,
-                  status: 'applied'
-                });
+                if (replaceAll) {
+                  const count = modifiedContent.split(search).length - 1;
+                  modifiedContent = modifiedContent.replaceAll(search, replace);
+                  replacementCount += count;
+                } else {
+                  modifiedContent = modifiedContent.replace(search, replace);
+                  replacementCount += 1;
+                }
+                appliedEdits.push({ type: 'string', occurrences: 1, status: 'applied' });
               } else {
-                failedEdits.push({
-                  type: 'string',
-                  search: search,
-                  replacement: replace,
-                  status: 'failed',
-                  reason: 'Search text not found in file content'
-                });
+                failedEdits.push({ type: 'string', status: 'failed', reason: 'Search text not found in file content' });
               }
             }
           }
+
+          // Safety: strip any leftover search/replace markers from the content
+          modifiedContent = stripSearchReplaceMarkers(modifiedContent);
 
           // Generate diff information
           const generateDiff = (oldContent: string, newContent: string) => {
@@ -456,10 +467,8 @@ export async function handleClientFileOperation(
               }
             });
 
-            // Trigger file refresh event
-            window.dispatchEvent(new CustomEvent('files-changed', {
-              detail: { projectId, forceRefresh: true }
-            }));
+            // Trigger file refresh + team sync tracking
+            dispatchFileChanged(projectId, filePath);
           } else {
             addToolResult({
               tool: 'edit_file',
@@ -712,10 +721,8 @@ export async function handleClientFileOperation(
               }
             });
 
-            // Trigger file refresh event
-            window.dispatchEvent(new CustomEvent('files-changed', {
-              detail: { projectId, forceRefresh: true }
-            }));
+            // Trigger file refresh + team sync tracking
+            dispatchFileChanged(projectId, filePath);
           } else {
             addToolResult({
               tool: 'client_replace_string_in_file',
@@ -781,10 +788,8 @@ export async function handleClientFileOperation(
             }
           });
 
-          // Trigger file refresh event
-          window.dispatchEvent(new CustomEvent('files-changed', {
-            detail: { projectId, forceRefresh: true }
-          }));
+          // Trigger file refresh + team sync tracking
+          dispatchFileChanged(projectId, path);
         } else {
           addToolResult({
             tool: 'delete_file',
@@ -860,10 +865,10 @@ export async function handleClientFileOperation(
             }
           });
 
-          // Trigger file refresh event
-          window.dispatchEvent(new CustomEvent('files-changed', {
-            detail: { projectId, forceRefresh: true }
-          }));
+          // Trigger file refresh + team sync tracking for each deleted file
+          for (const file of filesToDelete) {
+            dispatchFileChanged(projectId, file.path);
+          }
         } catch (error) {
           console.error(`[ClientFileTool] delete_folder failed:`, error);
           addToolResult({
@@ -961,10 +966,8 @@ export async function handleClientFileOperation(
             }
           });
 
-          // Trigger file refresh event
-          window.dispatchEvent(new CustomEvent('files-changed', {
-            detail: { projectId, forceRefresh: true }
-          }));
+          // Trigger file refresh + team sync tracking
+          dispatchFileChanged(projectId, 'package.json');
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           addToolResult({
@@ -1053,9 +1056,7 @@ export async function handleClientFileOperation(
             detail: { database: result.database, projectId, name }
           }));
 
-          window.dispatchEvent(new CustomEvent('files-changed', {
-            detail: { projectId, forceRefresh: true }
-          }));
+          dispatchFileChanged(projectId, 'database');
 
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -1089,9 +1090,9 @@ ${(techStack || []).map((t: string) => `- ${t}`).join('\n') || '- N/A'}
 
 ## Steps
 
-${steps.map((s: any, i: number) => `### Step ${i + 1}: ${s.title}
+${(Array.isArray(steps) ? steps : []).map((s: any, i: number) => `### Step ${i + 1}: ${s?.title || 'Untitled'}
 - **Status:** [ ] Pending
-- **Description:** ${s.description}
+- **Description:** ${s?.description || ''}
 `).join('\n')}
 
 ---
@@ -1133,9 +1134,7 @@ ${steps.map((s: any, i: number) => `### Step ${i + 1}: ${s.title}
             }
           });
 
-          window.dispatchEvent(new CustomEvent('files-changed', {
-            detail: { projectId, forceRefresh: true }
-          }));
+          dispatchFileChanged(projectId, '.pipilot/plan.md');
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           console.error(`[ClientFileTool] generate_plan error:`, error);
@@ -1198,9 +1197,7 @@ ${steps.map((s: any, i: number) => `### Step ${i + 1}: ${s.title}
             }
           });
 
-          window.dispatchEvent(new CustomEvent('files-changed', {
-            detail: { projectId, forceRefresh: true }
-          }));
+          dispatchFileChanged(projectId, '.pipilot/plan.md');
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           addToolResult({
@@ -1224,10 +1221,10 @@ ${steps.map((s: any, i: number) => `### Step ${i + 1}: ${s.title}
 ${summary}
 
 ## Features
-${features.map((f: string) => `- ${f}`).join('\n')}
+${(Array.isArray(features) ? features : []).map((f: string) => `- ${f}`).join('\n') || '- N/A'}
 
 ## Tech Stack
-${techStack.map((t: string) => `- ${t}`).join('\n')}
+${(Array.isArray(techStack) ? techStack : []).map((t: string) => `- ${t}`).join('\n') || '- N/A'}
 ${keyFiles && keyFiles.length > 0 ? `
 ## Key Files
 | File | Purpose |
@@ -1276,9 +1273,7 @@ ${roadmap.map((r: string) => `- [ ] ${r}`).join('\n')}
             }
           });
 
-          window.dispatchEvent(new CustomEvent('files-changed', {
-            detail: { projectId, forceRefresh: true }
-          }));
+          dispatchFileChanged(projectId, '.pipilot/project.md');
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           addToolResult({
@@ -1287,6 +1282,115 @@ ${roadmap.map((r: string) => `- [ ] ${r}`).join('\n')}
             state: 'output-error',
             errorText: `Failed to update project context: ${errorMessage}`
           });
+        }
+        break;
+      }
+
+      case 'frontend_design_guide': {
+        const { action, projectType, userMessage } = toolCall.args;
+        const designPath = '.pipilot/design.md';
+        console.log(`[ClientFileTool] frontend_design_guide: action=${action}`);
+
+        if (action === 'read') {
+          // Read existing design scheme from persistent storage
+          try {
+            const existingFile = await storageManager.getFile(projectId, designPath);
+            if (existingFile?.content) {
+              console.log(`[ClientFileTool] Read design guide from ${designPath} (${existingFile.content.length} chars)`);
+              addToolResult({
+                tool: 'frontend_design_guide',
+                toolCallId: toolCall.toolCallId,
+                output: {
+                  success: true,
+                  guide: existingFile.content,
+                  action: 'read',
+                  cached: true
+                }
+              });
+            } else {
+              console.log(`[ClientFileTool] No design guide found at ${designPath}`);
+              addToolResult({
+                tool: 'frontend_design_guide',
+                toolCallId: toolCall.toolCallId,
+                output: {
+                  success: false,
+                  guide: null,
+                  action: 'read',
+                  message: 'No design scheme found. Call frontend_design_guide with action: "generate" and projectType to create one.'
+                }
+              });
+            }
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            addToolResult({
+              tool: 'frontend_design_guide',
+              toolCallId: toolCall.toolCallId,
+              state: 'output-error',
+              errorText: `Failed to read design guide: ${errorMessage}`
+            });
+          }
+        } else {
+          // "generate" — call /api/design-guide to get the guide, then persist
+          try {
+            const response = await fetch('/api/design-guide', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ projectType: projectType || 'web application', userMessage: userMessage || undefined })
+            });
+            const data = await response.json();
+            const guide = data.guide || '';
+
+            if (guide) {
+              // Persist to storageManager (same pattern as update_project_context)
+              const existingFile = await storageManager.getFile(projectId, designPath);
+              if (existingFile) {
+                await storageManager.updateFile(projectId, designPath, { content: guide });
+              } else {
+                await storageManager.createFile({
+                  workspaceId: projectId,
+                  name: 'design.md',
+                  path: designPath,
+                  content: guide,
+                  fileType: 'md',
+                  type: 'md',
+                  size: guide.length,
+                  isDirectory: false,
+                  metadata: { createdBy: 'ai' }
+                });
+              }
+
+              console.log(`[ClientFileTool] Persisted design guide to ${designPath}`);
+
+              addToolResult({
+                tool: 'frontend_design_guide',
+                toolCallId: toolCall.toolCallId,
+                output: {
+                  success: true,
+                  guide,
+                  action: 'generate',
+                  projectType,
+                  persisted: true
+                }
+              });
+
+              dispatchFileChanged(projectId, designPath);
+            } else {
+              addToolResult({
+                tool: 'frontend_design_guide',
+                toolCallId: toolCall.toolCallId,
+                state: 'output-error',
+                errorText: 'Failed to generate design guide: empty response from API'
+              });
+            }
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            addToolResult({
+              tool: 'frontend_design_guide',
+              toolCallId: toolCall.toolCallId,
+              state: 'output-error',
+              errorText: `Failed to generate design guide: ${errorMessage}`
+            });
+          }
         }
         break;
       }

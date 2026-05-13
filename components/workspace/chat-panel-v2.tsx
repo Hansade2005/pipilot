@@ -5,7 +5,7 @@
 
 'use client'
 
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useRef, useEffect, useCallback, useMemo, startTransition } from 'react'
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card } from "@/components/ui/card"
@@ -611,6 +611,14 @@ const ToolActivityPanel = ({
         return 'Updating plan progress'
       case 'update_project_context':
         return 'Documenting project'
+      case 'frontend_design_guide':
+        return 'Loading design system'
+      case 'project_file_strategy':
+        return 'Planning file structure'
+      case 'start_build_mode':
+        return 'Entering build mode'
+      case 'finish_build_mode':
+        return 'Finishing build'
       default:
         return t
     }
@@ -944,6 +952,14 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
         return 'Updating plan progress'
       case 'update_project_context':
         return 'Documenting project'
+      case 'frontend_design_guide':
+        return 'Loading design system'
+      case 'project_file_strategy':
+        return 'Planning file structure'
+      case 'start_build_mode':
+        return 'Entering build mode'
+      case 'finish_build_mode':
+        return 'Finishing build'
       default:
         return tool
     }
@@ -1157,7 +1173,7 @@ interface ChatPanelV2Props {
 export function ChatPanelV2({
   project,
   isMobile = false,
-  selectedModel = 'ollama/minimax-m2.5',
+  selectedModel = 'ollama/minimax-m2.7',
   onModelChange,
   userPlan = 'free',
   subscriptionStatus,
@@ -1824,7 +1840,7 @@ export function ChatPanelV2({
     const completedStepNums = new Set<number>()
 
     for (const tc of currentToolCalls) {
-      if (tc.toolName === 'generate_plan' && tc.input?.steps) {
+      if (tc.toolName === 'generate_plan' && Array.isArray(tc.input?.steps)) {
         latestPlanSteps = tc.input.steps
       }
       if (tc.toolName === 'update_plan_progress' && tc.input?.stepNumber && tc.status === 'completed') {
@@ -2062,13 +2078,28 @@ export function ChatPanelV2({
         (tool: any) => ['edit_file', 'write_file', 'delete_file', 'client_replace_string_in_file'].includes(tool.toolName)
       )
 
+      // Use reliable file-based detection to determine project type
+      // Vite/HTML projects deploy to .pipilot.dev — just refresh, don't create E2B sandbox
+      // Next.js/Expo need E2B sandbox preview
+      let projectType = 'unknown'
+      try {
+        const { detectProjectTypeFromFiles } = await import('@/lib/utils')
+        const files = await storageManager.getFiles(project.id)
+        projectType = detectProjectTypeFromFiles(files)
+      } catch {}
+      const isViteOrHtml = projectType === 'vite-react' || projectType === 'html'
+      const needsSandbox = projectType === 'nextjs' || projectType === 'expo'
+
       if (typeof window !== 'undefined' && !isAskMode && hasFileModifications) {
-        console.log('[ChatPanelV2] Dispatching auto-preview event after streaming completion (file modifications detected)')
+        console.log(`[ChatPanelV2] Dispatching auto-preview event (fileModifications: true, projectType: ${projectType}, isViteOrHtml: ${isViteOrHtml})`)
         window.dispatchEvent(new CustomEvent('ai-stream-complete', {
           detail: {
             projectId: project.id,
             shouldSwitchToPreview: true,
-            shouldCreatePreview: true
+            // Vite/HTML → refresh iframe (deployed to .pipilot.dev)
+            // Next.js/Expo → create E2B sandbox preview
+            shouldCreatePreview: needsSandbox,
+            shouldRefreshPreview: isViteOrHtml
           }
         }))
       } else if (!isAskMode && !hasFileModifications) {
@@ -2691,16 +2722,12 @@ export function ChatPanelV2({
     setIsContinuationInProgress(true)
 
     try {
-      // During continuation, the message will continue streaming seamlessly
-      // No need to modify the message content - the existing streaming indicator will show
-
-      // Continue appending to the original assistant message instead of creating new one
-      // Remove the thinking indicator and continue with content
+      // Show "Compacting conversation..." status in the message while preparing
       setMessages(prev => prev.map(msg =>
         msg.id === originalAssistantMessageId
           ? {
             ...msg,
-            content: accumulatedContent, // Remove thinking indicator
+            content: accumulatedContent + '\n\n⏳ *Compacting conversation to continue...*',
             reasoning: accumulatedReasoning,
             reasoningBlocks: [...reasoningBlocks]
           }
@@ -2711,33 +2738,111 @@ export function ChatPanelV2({
       const continuationController = new AbortController()
       setAbortController(continuationController)
 
-      // Prepare continuation request payload
-      // Include accumulated content so AI knows where it left off and can continue seamlessly
-      const continuationPayload = {
-        messages: [], // Don't send messages - full history is in continuationState
-        projectId: project.id,
+      // ═══════════════════════════════════════════════════════════════
+      // COMPRESSED CONTINUATION PAYLOAD
+      // Extract sessionStorage files and compress them using LZ4+Zip
+      // (same format as regular messages). This avoids sending potentially
+      // megabytes of raw JSON file contents over the wire.
+      // Non-file metadata (continuationState without sessionStorage,
+      // partialResponse, etc.) is sent via headers as compact JSON.
+      // ═══════════════════════════════════════════════════════════════
+      const sessionStorageFiles = continuationState.sessionStorage?.files || []
+      const sessionStorageFileTree = continuationState.sessionStorage?.fileTree || []
+
+      // Convert sessionStorage files to the format compressProjectFiles expects
+      const filesToCompress = sessionStorageFiles.map((f: any) => ({
+        path: f.path,
+        name: f.data?.name || f.path.split('/').pop() || f.path,
+        content: f.data?.content || '',
+        type: f.data?.type || f.data?.fileType || 'text'
+      }))
+
+      // Build continuation metadata (everything except the bulky file contents)
+      const continuationMeta = {
+        ...continuationState,
+        sessionStorage: null, // Files are in the compressed binary payload
+        sessionData: {
+          ...continuationState.sessionData,
+          files: [] // Files are in the compressed payload
+        }
+      }
+
+      const continuationMetadata = {
         project,
-        databaseId, // Pass database ID from state (loaded from workspace)
-        // Don't send files/fileTree - they're already in continuationState.sessionStorage
-        modelId: selectedModel,
-        aiMode,
-        chatMode: isAskMode ? 'ask' : 'agent', // Pass the chat mode to the API
-        continuationState, // Include the continuation state
-        // Include accumulated content so AI can continue from where it stopped
+        databaseId,
+        continuationState: continuationMeta,
         partialResponse: {
           content: accumulatedContent,
           reasoning: accumulatedReasoning
         }
       }
 
-      console.log('[ChatPanelV2][Continuation] 📤 Sending continuation request with token:', continuationState.continuationToken)
+      let response: Response
 
-      const response = await fetch('/api/chat-v2', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(continuationPayload),
-        signal: continuationController.signal
-      })
+      if (filesToCompress.length > 0) {
+        // Compress files using the same LZ4+Zip pipeline as regular messages
+        console.log(`[ChatPanelV2][Continuation] 📦 Compressing ${filesToCompress.length} session files for continuation`)
+        const compressedData = await compressProjectFiles(
+          filesToCompress,
+          sessionStorageFileTree,
+          [], // No messages to send — history is in continuationState
+          continuationMetadata
+        )
+
+        console.log(`[ChatPanelV2][Continuation] 📤 Sending compressed continuation (${(compressedData.byteLength / 1024).toFixed(1)}KB) with token:`, continuationState.continuationToken)
+
+        // Continuation metadata (continuationState + partialResponse) is already
+        // included in the compressed body via compressProjectFiles(). No need to
+        // duplicate it in a header — large headers cause nginx 494 errors.
+        response = await fetch('/api/chat-v2', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/octet-stream',
+            'x-model-id': selectedModel,
+            'x-ai-mode': aiMode || '',
+            'x-chat-mode': isAskMode ? 'ask' : 'agent',
+            'x-continuation': 'true'
+          },
+          body: compressedData,
+          signal: continuationController.signal
+        })
+      } else {
+        // No files to compress — send as plain JSON (fallback for edge cases)
+        console.log('[ChatPanelV2][Continuation] 📤 Sending JSON continuation (no session files)')
+        const continuationPayload = {
+          messages: [],
+          projectId: project.id,
+          project,
+          databaseId,
+          modelId: selectedModel,
+          aiMode,
+          chatMode: isAskMode ? 'ask' : 'agent',
+          continuationState,
+          partialResponse: {
+            content: accumulatedContent,
+            reasoning: accumulatedReasoning
+          }
+        }
+
+        response = await fetch('/api/chat-v2', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(continuationPayload),
+          signal: continuationController.signal
+        })
+      }
+
+      // Remove the "Compacting..." status now that stream is starting
+      setMessages(prev => prev.map(msg =>
+        msg.id === originalAssistantMessageId
+          ? {
+            ...msg,
+            content: accumulatedContent,
+            reasoning: accumulatedReasoning,
+            reasoningBlocks: [...reasoningBlocks]
+          }
+          : msg
+      ))
 
       if (!response.ok) {
         throw new Error('Continuation request failed')
@@ -2766,6 +2871,14 @@ export function ChatPanelV2({
         textPosition: number
         reasoningPosition: number
       }> = []
+
+      // Clear activeToolCalls for this message to prevent duplicate pills
+      // (original stream's pills are already saved in the message metadata)
+      setActiveToolCalls(prev => {
+        const newMap = new Map(prev)
+        newMap.delete(originalAssistantMessageId)
+        return newMap
+      })
 
       console.log('[ChatPanelV2][Continuation] 📥 Processing continuation stream')
 
@@ -2851,6 +2964,33 @@ export function ChatPanelV2({
                     : msg
                 ))
               }
+            } else if (parsed.type === 'tool-input-start') {
+              // AI SDK v5: Tool call STARTING — show pill immediately before args arrive
+              // (Same handling as regular stream for accurate pill positioning)
+              const toolId = parsed.toolCallId || parsed.id
+              const toolName = parsed.toolName
+              if (toolId && toolName && !continuationLocalToolCalls.find(tc => tc.toolCallId === toolId)) {
+                const toolCallEntry = {
+                  toolName,
+                  toolCallId: toolId,
+                  input: undefined as any, // Args not yet available
+                  status: 'executing' as 'executing' | 'completed' | 'failed',
+                  // Position relative to FULL content (original + continuation)
+                  textPosition: accumulatedContent.length + continuationAccumulatedContent.length,
+                  reasoningPosition: accumulatedReasoning.length + continuationAccumulatedReasoning.length
+                }
+                continuationLocalToolCalls.push(toolCallEntry)
+                setStreamingToolCalls(prev => [...prev, toolCallEntry])
+                setActiveToolCalls(prev => {
+                  const newMap = new Map(prev)
+                  const messageCalls = newMap.get(originalAssistantMessageId) || []
+                  if (!messageCalls.some(tc => tc.toolCallId === toolId)) {
+                    messageCalls.push(toolCallEntry)
+                    newMap.set(originalAssistantMessageId, messageCalls)
+                  }
+                  return newMap
+                })
+              }
             } else if (parsed.type === 'tool-call') {
               // Handle tool calls in continuation (same logic as main stream)
               const toolCall = {
@@ -2862,36 +3002,47 @@ export function ChatPanelV2({
 
               console.log('[ChatPanelV2][Continuation][ClientTool] 🔧 Continuation tool call:', toolCall.toolName)
 
-              // DEDUPLICATION: Check if this toolCallId already exists to prevent duplicates
+              // Check if pill already created by tool-input-start
               const existingToolCall = continuationLocalToolCalls.find(tc => tc.toolCallId === toolCall.toolCallId)
               if (existingToolCall) {
-                console.log('[ChatPanelV2][Continuation][ClientTool] Skipping duplicate tool call:', toolCall.toolCallId)
-                continue // Skip duplicate tool calls
-              }
-
-              // Track tool call inline with executing status (both local and state)
-              // Calculate positions relative to FULL content (original + continuation)
-              const toolCallEntry = {
-                toolName: toolCall.toolName,
-                toolCallId: toolCall.toolCallId,
-                input: toolCall.args,
-                status: 'executing' as 'executing' | 'completed' | 'failed',
-                textPosition: accumulatedContent.length + continuationAccumulatedContent.length,
-                reasoningPosition: accumulatedReasoning.length + continuationAccumulatedReasoning.length
-              }
-
-              continuationLocalToolCalls.push(toolCallEntry)
-
-              setActiveToolCalls(prev => {
-                const newMap = new Map(prev)
-                const messageCalls = newMap.get(originalAssistantMessageId) || []
-                // DEDUPLICATION: Check before adding to prevent duplicates
-                if (!messageCalls.some(tc => tc.toolCallId === toolCall.toolCallId)) {
-                  messageCalls.push(toolCallEntry)
-                  newMap.set(originalAssistantMessageId, messageCalls)
+                // Update args on the existing pill (was created without args by tool-input-start)
+                existingToolCall.input = toolCall.args
+                setStreamingToolCalls(prev => prev.map(tc =>
+                  tc.toolCallId === toolCall.toolCallId ? { ...tc, input: toolCall.args } : tc
+                ))
+                setActiveToolCalls(prev => {
+                  const newMap = new Map(prev)
+                  const messageCalls = newMap.get(originalAssistantMessageId) || []
+                  const updatedCalls = messageCalls.map(tc =>
+                    tc.toolCallId === toolCall.toolCallId ? { ...tc, input: toolCall.args } : tc
+                  )
+                  newMap.set(originalAssistantMessageId, updatedCalls)
+                  return newMap
+                })
+              } else {
+                // No tool-input-start received — create pill now (fallback)
+                const toolCallEntry = {
+                  toolName: toolCall.toolName,
+                  toolCallId: toolCall.toolCallId,
+                  input: toolCall.args,
+                  status: 'executing' as 'executing' | 'completed' | 'failed',
+                  // Position relative to FULL content (original + continuation)
+                  textPosition: accumulatedContent.length + continuationAccumulatedContent.length,
+                  reasoningPosition: accumulatedReasoning.length + continuationAccumulatedReasoning.length
                 }
-                return newMap
-              })
+
+                continuationLocalToolCalls.push(toolCallEntry)
+                setStreamingToolCalls(prev => [...prev, toolCallEntry])
+                setActiveToolCalls(prev => {
+                  const newMap = new Map(prev)
+                  const messageCalls = newMap.get(originalAssistantMessageId) || []
+                  if (!messageCalls.some(tc => tc.toolCallId === toolCall.toolCallId)) {
+                    messageCalls.push(toolCallEntry)
+                    newMap.set(originalAssistantMessageId, messageCalls)
+                  }
+                  return newMap
+                })
+              }
 
 
               const clientSideTools = [
@@ -2910,7 +3061,8 @@ export function ChatPanelV2({
                 'request_supabase_connection',
                 'generate_plan',
                 'update_plan_progress',
-                'update_project_context'
+                'update_project_context',
+                'frontend_design_guide'
               ]
 
               if (clientSideTools.includes(toolCall.toolName)) {
@@ -2926,6 +3078,13 @@ export function ChatPanelV2({
                   if (localTool) {
                     localTool.status = newStatus
                   }
+
+                  // Update streaming tool calls state (for real-time pill rendering)
+                  setStreamingToolCalls(prev => prev.map(tc =>
+                    tc.toolCallId === toolCall.toolCallId
+                      ? { ...tc, status: newStatus as 'executing' | 'completed' | 'failed' }
+                      : tc
+                  ))
 
                   // Update tool status in state for UI
                   setActiveToolCalls(prev => {
@@ -2950,6 +3109,13 @@ export function ChatPanelV2({
                     if (localTool) {
                       localTool.status = 'failed'
                     }
+
+                    // Update streaming tool calls (for real-time pill rendering)
+                    setStreamingToolCalls(prev => prev.map(tc =>
+                      tc.toolCallId === toolCall.toolCallId
+                        ? { ...tc, status: 'failed' as 'executing' | 'completed' | 'failed' }
+                        : tc
+                    ))
 
                     // Update tool status to failed in state
                     setActiveToolCalls(prev => {
@@ -2976,6 +3142,13 @@ export function ChatPanelV2({
                 localTool.status = resultStatus
               }
 
+              // Update streaming tool calls (for real-time pill rendering)
+              setStreamingToolCalls(prev => prev.map(tc =>
+                tc.toolCallId === parsed.toolCallId
+                  ? { ...tc, status: resultStatus as 'executing' | 'completed' | 'failed' }
+                  : tc
+              ))
+
               // Update tool status to completed or failed for server-side tools
               setActiveToolCalls(prev => {
                 const newMap = new Map(prev)
@@ -2988,6 +3161,36 @@ export function ChatPanelV2({
                 newMap.set(originalAssistantMessageId, updatedCalls)
                 return newMap
               })
+            } else if (parsed.type === 'continuation_signal') {
+              // ── RECURSIVE CONTINUATION: the continuation stream itself timed out ──
+              // Chain another continuation with the merged accumulated content
+              console.log('[ChatPanelV2][Continuation] 🔄 Continuation stream timed out — chaining another continuation')
+
+              toast({
+                title: "Compacting conversation to continue...",
+                description: "Synthesizing session context for seamless handoff.",
+                duration: 4000
+              })
+
+              const mergedContent = accumulatedContent + continuationAccumulatedContent
+              const mergedReasoning = accumulatedReasoning + continuationAccumulatedReasoning
+              const mergedReasoningBlocks = [...reasoningBlocks, ...continuationReasoningBlocks.map(b => ({
+                content: b.content,
+                textPosition: accumulatedContent.length + b.textPosition
+              }))]
+
+              setTimeout(async () => {
+                await handleStreamContinuation(
+                  parsed.continuationState,
+                  originalAssistantMessageId,
+                  mergedContent,
+                  mergedReasoning,
+                  mergedReasoningBlocks
+                )
+              }, 1000)
+
+              // Don't process any more chunks
+              return
             } else if (parsed.type === 'step_progress' || parsed.type === 'credits_exhausted') {
               if (typeof window !== 'undefined') {
                 window.dispatchEvent(new CustomEvent('token-usage-update', {
@@ -3157,6 +3360,8 @@ export function ChatPanelV2({
       const detail = e.detail as { prompt: string; errors: string[] }
       if (detail.prompt) {
         setInput(detail.prompt)
+        // Switch to chat tab on mobile
+        window.dispatchEvent(new CustomEvent('switch-mobile-tab', { detail: { tab: 'chat' } }))
         // Focus the input after setting it
         setTimeout(() => {
           const textarea = document.querySelector('textarea[placeholder*="Message"]') as HTMLTextAreaElement
@@ -3174,6 +3379,59 @@ export function ChatPanelV2({
       window.removeEventListener('ask-ai-to-fix', handleAskAiToFix as EventListener)
     }
   }, [])
+
+  // Listen for "Load Shared Chat" events from team panel
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleLoadSharedChat = async (e: CustomEvent) => {
+      const { messages: sharedMessages, title, projectId: chatProjectId } = e.detail
+      if (chatProjectId !== project?.id || !sharedMessages?.length) return
+
+      try {
+        // Create a new session and populate with shared messages
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+
+        if (currentChatSessionId) {
+          await storageManager.updateChatSession(currentChatSessionId, { isActive: false })
+        }
+
+        const sessions = await storageManager.getChatSessions(project.userId)
+        const sessionNumber = sessions.filter(s => s.workspaceId === project.id).length + 1
+
+        const newSession = await storageManager.createChatSession({
+          userId: project.userId,
+          workspaceId: project.id,
+          title: title || `Shared Chat #${sessionNumber}`,
+          isActive: true,
+        })
+
+        // Save shared messages to the new session
+        for (const msg of sharedMessages) {
+          await storageManager.createMessage({
+            chatSessionId: newSession.id,
+            role: msg.role,
+            content: msg.content,
+          })
+        }
+
+        setCurrentChatSessionId(newSession.id)
+        setMessages(sharedMessages.map((m: any, i: number) => ({
+          id: `shared-${i}-${Date.now()}`,
+          role: m.role,
+          content: m.content,
+        })))
+      } catch (err) {
+        console.error('[ChatPanelV2] Error loading shared chat:', err)
+      }
+    }
+
+    window.addEventListener('load-shared-chat', handleLoadSharedChat as EventListener)
+    return () => {
+      window.removeEventListener('load-shared-chat', handleLoadSharedChat as EventListener)
+    }
+  }, [project?.id, project?.userId, currentChatSessionId])
 
   // Save input to localStorage whenever it changes
   useEffect(() => {
@@ -3438,11 +3696,20 @@ export function ChatPanelV2({
     }
   }, [error, toast])
 
-  // Smart scroll: only auto-scroll when user is near the bottom
+  // Smart scroll: stick to bottom during streaming without causing layout thrashing
+  // Uses scrollTop instead of scrollIntoView to avoid reflow-based shaking
+  const scrollRafRef = useRef<number | null>(null)
   useEffect(() => {
     if (userIsNearBottomRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current)
+      scrollRafRef.current = requestAnimationFrame(() => {
+        const container = scrollContainerRef.current
+        if (container) {
+          container.scrollTop = container.scrollHeight
+        }
+      })
     }
+    return () => { if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current) }
   }, [messages])
 
   // Track scroll position to show/hide scroll-to-bottom button
@@ -3461,7 +3728,10 @@ export function ChatPanelV2({
   }, [])
 
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const container = scrollContainerRef.current
+    if (container) {
+      container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
+    }
   }, [])
 
   // Fetch credit balance
@@ -3656,7 +3926,8 @@ export function ChatPanelV2({
                 'request_supabase_connection',
                 'generate_plan',
                 'update_plan_progress',
-                'update_project_context'
+                'update_project_context',
+                'frontend_design_guide'
               ]
 
               if (clientSideTools.includes(toolCall.toolName)) {
@@ -3830,6 +4101,28 @@ export function ChatPanelV2({
         // Save the partial message to the database
         await saveMessageToIndexedDB(partialMessage)
 
+        // Dispatch preview event if file modifications were made before stop
+        const hasFileModifications = streamingToolCalls.some(
+          (tool: any) => ['edit_file', 'write_file', 'delete_file', 'client_replace_string_in_file'].includes(tool.toolName)
+        )
+        if (typeof window !== 'undefined' && hasFileModifications && project) {
+          try {
+            const { detectProjectTypeFromFiles } = await import('@/lib/utils')
+            const files = await storageManager.getFiles(project.id)
+            const projectType = detectProjectTypeFromFiles(files)
+            const isViteOrHtml = projectType === 'vite-react' || projectType === 'html'
+            const needsSandbox = projectType === 'nextjs' || projectType === 'expo'
+            window.dispatchEvent(new CustomEvent('ai-stream-complete', {
+              detail: {
+                projectId: project.id,
+                shouldSwitchToPreview: true,
+                shouldCreatePreview: needsSandbox,
+                shouldRefreshPreview: isViteOrHtml
+              }
+            }))
+          } catch {}
+        }
+
         // Clear streaming state
         setStreamingMessageId(null)
         setStreamingContent('')
@@ -3857,6 +4150,419 @@ export function ChatPanelV2({
           description: "Generation stopped."
         })
       }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // EXPERIMENTAL: Direct stream with client-driven tool loop
+  // Bypasses AI SDK entirely. Uses raw fetch → SSE parsing → client tool
+  // execution → send results back → loop until stop.
+  // Activated when useDirectStream is true (URL param ?directStream=true)
+  // ═══════════════════════════════════════════════════════════════════════════
+  const sendMessageDirect = async (userMessage: string) => {
+    if (!project || !userMessage.trim()) return
+
+    const assistantMessageId = `direct-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+
+    // Add user message to UI
+    const userMsg = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: userMessage,
+      createdAt: new Date().toISOString(),
+    }
+    setMessages(prev => [...prev, userMsg as any])
+    setInput('')
+    setIsLoading(true)
+
+    // Add assistant placeholder
+    setMessages(prev => [...prev, {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      createdAt: new Date().toISOString(),
+      metadata: { startTime: Date.now() }
+    } as any])
+    setStreamingMessageId(assistantMessageId)
+
+    // Get project files and build workspace context (like reference project)
+    let projectFiles: any[] = []
+    let fileTreeStr = ''
+    let projectType = 'HTML + CSS + JavaScript'
+    try {
+      const { storageManager: sm } = await import('@/lib/storage-manager')
+      await sm.init()
+      const files = await sm.getFiles(project.id)
+      projectFiles = files.map((f: any) => ({ path: f.path, content: f.content }))
+
+      // Build file tree string with line counts
+      fileTreeStr = files
+        .filter((f: any) => f.path && !f.isDirectory)
+        .map((f: any) => `${f.path} (${(f.content || '').split('\n').length} lines)`)
+        .join('\n')
+
+      // Detect project type
+      const paths = files.map((f: any) => (f.path || '').toLowerCase())
+      if (paths.some(p => p.includes('vite.config'))) projectType = 'Vite + React + TypeScript'
+      else if (paths.some(p => p.includes('next.config'))) projectType = 'Next.js'
+      else if (paths.some(p => p.includes('app.json'))) projectType = 'Expo'
+    } catch {}
+
+    // Build system prompt with project context (following reference pattern)
+    const projectContext = fileTreeStr ? `
+## CURRENT PROJECT
+
+**Stack:** ${projectType}
+**Project ID:** ${project.id}
+
+**File tree:**
+\`\`\`
+${fileTreeStr}
+\`\`\`
+
+IMPORTANT: This is a ${projectType} project. Create files in the proper directory structure (src/pages/, src/components/ for Vite+React). Do NOT create standalone HTML files.
+` : ''
+
+    const systemPrompt = `You are PiPilot, an expert full-stack AI coding assistant and UI designer with direct file system access. Build complete, production-ready applications.
+${projectContext}
+## DESIGN EXCELLENCE — ANTI-AI AESTHETIC
+Every site must look like a human designer built it, NOT like AI generated it.
+
+### BANNED: Inter/Poppins as only font, purple-to-pink gradients, gradient blobs, "Innovative solutions" copy, repeating text-left/image-right layouts.
+
+### Typography: Use FONT PAIRINGS (display + body). Good pairings:
+- Elegant: Playfair Display + Source Sans 3
+- Modern/Tech: Sora + Nunito Sans
+- Startup/SaaS: Cabinet Grotesk + Satoshi
+- Clean/Minimal: Instrument Serif + Instrument Sans
+Import via Google Fonts <link> tag in index.html.
+
+### Colors: Define as CSS variables in :root, reference via Tailwind arbitrary values.
+Pick colors matching the industry (navy+gold=finance, sage+cream=wellness, coral+charcoal=food).
+
+### Layout Variety: Mix bento grids, split heroes, asymmetric columns, overlapping elements, masonry grids. NEVER repeat the same pattern twice.
+
+### Visual Polish: rounded-xl/2xl on cards, layered shadows, hover:-translate-y-1 transitions, scroll animations with IntersectionObserver, skeleton loading states, Lucide icons.
+
+### Content: Write specific industry-relevant copy. Real names, prices, dates. Action-specific CTAs ("Book a table" not "Get started").
+
+## CSS Rules
+index.css: UNDER 250 lines. Only :root variables, @keyframes, base reset, @tailwind directives. EVERYTHING ELSE = Tailwind classes in JSX.
+
+## MANDATORY BUILD WORKFLOW
+Follow this exact sequence for EVERY build request:
+1. Call frontend_design_guide with action "read". If empty, call again with action "generate", projectType and userMessage.
+2. Call project_file_strategy with projectType, framework, pages, features to get the minimal file plan.
+3. Call generate_plan with title, description (include colors, fonts, file list), steps, techStack.
+4. Build all files using write_file. Call update_plan_progress after each step.
+5. After ALL files are built: call check_dev_errors with mode "build" to verify.
+6. Fix any errors, then call deploy_preview to deploy to a live .pipilot.dev URL.
+7. Call update_project_context with project summary.
+8. Call suggest_next_steps with 3-4 follow-up options as your LAST action.
+
+## ALL TOOLS ARE AVAILABLE — USE THEM
+You have these tools and MUST use them. Do NOT say "tool not available":
+- **write_file / edit_file / read_file / delete_file** — file operations
+- **list_files** — list project structure
+- **grep_search** — search file contents
+- **semantic_code_navigator** — AST-based code analysis
+- **check_dev_errors** — run build check (mode: "build"). ALWAYS call before deploy.
+- **deploy_preview** — deploy to live .pipilot.dev URL. ALWAYS call after build check passes.
+- **generate_plan** — create build plan
+- **update_plan_progress** — mark steps complete
+- **update_project_context** — save project metadata
+- **suggest_next_steps** — suggest follow-ups (LAST action)
+- **frontend_design_guide** — read/generate design system
+- **project_file_strategy** — get optimal file structure
+
+## RULES
+- Use TypeScript (.tsx) for React components with export default function
+- Use Tailwind CSS for all styling (no custom CSS classes)
+- Mobile-first responsive (375px, 768px, 1024px+)
+- Use real sample data, not lorem ipsum
+- NO emojis in code — use Lucide React icons instead
+- Dark text on light backgrounds, light text on dark backgrounds (ALWAYS)
+- Images: use https://api.a0.dev/assets/image?text={description}&aspect=16:9&seed={number}
+- After building ALL files, provide a brief summary with the live URL`
+
+    // Build OpenAI-format messages from conversation history
+    // System prompt sent separately — server prepends it
+    const apiMessages: any[] = [
+      ...messages
+        .filter((m: any) => m.role === 'user' || m.role === 'assistant')
+        .slice(-20)
+        .map((m: any) => {
+          if (m.role === 'assistant' && m.tool_calls) {
+            return { role: 'assistant', content: m.content || null, tool_calls: m.tool_calls }
+          }
+          return { role: m.role, content: typeof m.content === 'string' ? m.content : '' }
+        }),
+      { role: 'user', content: userMessage },
+    ]
+
+    // Tool definitions in OpenAI format
+    // Client tools: executed on IndexedDB by the client
+    // Server tools: executed by our server via constructToolResult
+    const ALL_TOOLS = [
+      // ── Client-side file tools ──
+      { type: 'function', function: { name: 'write_file', description: 'Create or update a file in the project.', parameters: { type: 'object', properties: { path: { type: 'string', description: 'File path (e.g. src/pages/Home.tsx)' }, content: { type: 'string', description: 'Complete file content' } }, required: ['path', 'content'] } } },
+      { type: 'function', function: { name: 'edit_file', description: 'Edit a file using search/replace blocks. If fails 3x, use write_file instead.', parameters: { type: 'object', properties: { filePath: { type: 'string' }, searchReplaceBlock: { type: 'string', description: '<<<<<<< SEARCH\\n[old]\\n=======\\n[new]\\n>>>>>>> REPLACE' } }, required: ['filePath', 'searchReplaceBlock'] } } },
+      { type: 'function', function: { name: 'read_file', description: 'Read file contents (max 150 lines per read). Use startLine/endLine for large files.', parameters: { type: 'object', properties: { path: { type: 'string' }, startLine: { type: 'number' }, endLine: { type: 'number' } }, required: ['path'] } } },
+      { type: 'function', function: { name: 'delete_file', description: 'Delete a file.', parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] } } },
+      // ── Server-side tools (executed by PiPilot server) ──
+      { type: 'function', function: { name: 'list_files', description: 'List all files and directories in the project.', parameters: { type: 'object', properties: { path: { type: 'string', description: 'Optional directory path' } } } } },
+      { type: 'function', function: { name: 'grep_search', description: 'Search file contents for text or regex patterns.', parameters: { type: 'object', properties: { query: { type: 'string', description: 'Search query' }, includePattern: { type: 'string', description: 'Glob pattern (e.g. **/*.tsx)' } }, required: ['query'] } } },
+      { type: 'function', function: { name: 'semantic_code_navigator', description: 'Advanced semantic code search with TypeScript AST analysis. Find components, functions, hooks, types.', parameters: { type: 'object', properties: { query: { type: 'string', description: 'Natural language query (e.g. "hero features pricing sections")' }, filePath: { type: 'string' }, analysisDepth: { type: 'string', enum: ['basic', 'detailed', 'comprehensive'] } }, required: ['query'] } } },
+      { type: 'function', function: { name: 'check_dev_errors', description: 'Run build check to find errors. Use mode "build" for production build check.', parameters: { type: 'object', properties: { mode: { type: 'string', enum: ['dev', 'build'], description: 'Check mode' } }, required: ['mode'] } } },
+      { type: 'function', function: { name: 'deploy_preview', description: 'Deploy project to a live .pipilot.dev URL. Only call after check_dev_errors passes.', parameters: { type: 'object', properties: { framework: { type: 'string', description: 'Project framework (vite-react, nextjs, html)' } } } } },
+      { type: 'function', function: { name: 'generate_plan', description: 'Generate a build plan. Call before building.', parameters: { type: 'object', properties: { title: { type: 'string' }, description: { type: 'string' }, steps: { type: 'array', items: { type: 'string' } }, techStack: { type: 'array', items: { type: 'string' } }, estimatedFiles: { type: 'number' } }, required: ['title', 'description', 'steps'] } } },
+      { type: 'function', function: { name: 'update_plan_progress', description: 'Mark a plan step as completed.', parameters: { type: 'object', properties: { stepNumber: { type: 'number' }, notes: { type: 'string' } }, required: ['stepNumber'] } } },
+      { type: 'function', function: { name: 'update_project_context', description: 'Save project context to .pipilot/project.md.', parameters: { type: 'object', properties: { projectName: { type: 'string' }, summary: { type: 'string' }, features: { type: 'array', items: { type: 'string' } }, techStack: { type: 'array', items: { type: 'string' } } }, required: ['projectName'] } } },
+      { type: 'function', function: { name: 'suggest_next_steps', description: 'Suggest 3-4 next steps for the user. Call as the LAST action.', parameters: { type: 'object', properties: { suggestions: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, description: { type: 'string' } } } } }, required: ['suggestions'] } } },
+      { type: 'function', function: { name: 'frontend_design_guide', description: 'Read or generate the design system. Call with action "read" first, then "generate" if empty.', parameters: { type: 'object', properties: { action: { type: 'string', enum: ['read', 'generate'] }, projectType: { type: 'string' }, userMessage: { type: 'string' } }, required: ['action'] } } },
+      { type: 'function', function: { name: 'project_file_strategy', description: 'Get optimal minimal file structure for the project.', parameters: { type: 'object', properties: { projectType: { type: 'string' }, framework: { type: 'string', enum: ['vite-react', 'nextjs', 'expo', 'html'] }, pages: { type: 'array', items: { type: 'string' } }, features: { type: 'array', items: { type: 'string' } } }, required: ['projectType', 'framework'] } } },
+      // web_search, web_extract, image_generation are BUILT-IN to the proxy — do NOT redefine
+      { type: 'function', function: { name: 'browse_web', description: 'Browse a URL — extract text, links, and page content. Use for cloning websites, checking deployed sites, or researching.', parameters: { type: 'object', properties: { url: { type: 'string', description: 'URL to browse' }, action: { type: 'string', enum: ['screenshot', 'extract', 'both'], description: 'Action (default: both)' }, fullPage: { type: 'boolean' }, viewport: { type: 'string', description: 'e.g. 1280x720' }, javascript: { type: 'string', description: 'JS to execute on page' } }, required: ['url'] } } },
+      { type: 'function', function: { name: 'publish_to_showcase', description: 'Publish project to PiPilot showcase. Call with action "check" first, then "publish" with details.', parameters: { type: 'object', properties: { action: { type: 'string', enum: ['check', 'publish'] }, title: { type: 'string' }, description: { type: 'string' }, liveUrl: { type: 'string' }, screenshotUrl: { type: 'string' }, category: { type: 'string' }, techStack: { type: 'array', items: { type: 'string' } } }, required: ['action'] } } },
+    ]
+
+    const directController = new AbortController()
+    setAbortController(directController)
+
+    let accumulatedContent = ''
+    let accumulatedReasoning = ''
+    const localToolCalls: any[] = []
+
+    // RAF-batched UI update (same pattern as main stream)
+    let flushScheduled = false
+    const scheduleFlush = () => {
+      if (flushScheduled) return
+      flushScheduled = true
+      requestAnimationFrame(() => {
+        flushScheduled = false
+        setStreamingContent(accumulatedContent)
+        setStreamingReasoning(accumulatedReasoning)
+        setMessages(prev => prev.map(msg =>
+          msg.id === assistantMessageId
+            ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
+            : msg
+        ))
+      })
+    }
+
+    try {
+      // ── The client-driven tool loop ──
+      let loopCount = 0
+      const maxLoops = 100
+
+      while (loopCount < maxLoops) {
+        loopCount++
+        console.log(`[DirectStream] Loop ${loopCount}/${maxLoops}`)
+
+        const response = await fetch('/api/chat-v2', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-direct-stream': 'true',
+            'x-model-id': selectedModel || '',
+          },
+          body: JSON.stringify({
+            messages: apiMessages,
+            systemPrompt,
+            modelId: selectedModel,
+            project,
+            projectId: project.id,
+            files: projectFiles,
+            tools: ALL_TOOLS,
+            maxSteps: 100,
+          }),
+          signal: directController.signal,
+        })
+
+        if (!response.ok) {
+          const errText = await response.text().catch(() => 'Unknown error')
+          console.error(`[DirectStream] API error ${response.status}: ${errText.slice(0, 500)}`)
+          accumulatedContent += `\n\nError: ${response.status}`
+          scheduleFlush()
+          break
+        }
+
+        // Consume the newline-delimited JSON stream
+        const reader = response.body?.getReader()
+        if (!reader) break
+
+        const decoder = new TextDecoder()
+        let lineBuffer = ''
+        const pendingClientToolCalls: any[] = []
+        let gotClientToolsPending = false
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          lineBuffer += decoder.decode(value, { stream: true })
+          const lines = lineBuffer.split('\n')
+          lineBuffer = lines.pop() || ''
+
+          for (const line of lines) {
+            if (!line.trim()) continue
+            try {
+              const parsed = JSON.parse(line)
+
+              if (parsed.type === 'text-delta' && parsed.text) {
+                accumulatedContent += parsed.text
+                scheduleFlush()
+              } else if (parsed.type === 'reasoning-delta' && parsed.text) {
+                accumulatedReasoning += parsed.text
+                scheduleFlush()
+              } else if (parsed.type === 'tool-call') {
+                // Show pill immediately (even without text)
+                const toolEntry = {
+                  toolName: parsed.toolName,
+                  toolCallId: parsed.toolCallId,
+                  input: parsed.input,
+                  status: 'executing' as const,
+                  textPosition: accumulatedContent.length,
+                  reasoningPosition: accumulatedReasoning.length,
+                }
+                localToolCalls.push(toolEntry)
+                setStreamingToolCalls([...localToolCalls])
+                scheduleFlush() // Flush so pills render even without text
+                setActiveToolCalls(prev => {
+                  const newMap = new Map(prev)
+                  const calls = newMap.get(assistantMessageId) || []
+                  calls.push(toolEntry)
+                  newMap.set(assistantMessageId, calls)
+                  return newMap
+                })
+              } else if (parsed.type === 'tool-result') {
+                // Server-side tool completed
+                const lt = localToolCalls.find(t => t.toolCallId === parsed.toolCallId)
+                if (lt) {
+                  lt.status = parsed.result?.error ? 'failed' : 'completed'
+                  setStreamingToolCalls([...localToolCalls])
+                  setActiveToolCalls(prev => {
+                    const newMap = new Map(prev)
+                    const calls = (newMap.get(assistantMessageId) || []).map((c: any) =>
+                      c.toolCallId === parsed.toolCallId
+                        ? { ...c, status: lt.status }
+                        : c
+                    )
+                    newMap.set(assistantMessageId, calls)
+                    return newMap
+                  })
+                  scheduleFlush() // Update UI with completed pill status
+                }
+              } else if (parsed.type === 'client_tool_calls_pending') {
+                // Client tools need execution
+                pendingClientToolCalls.push(...(parsed.toolCalls || []))
+                gotClientToolsPending = true
+              } else if (parsed.type === 'finish') {
+                // Done
+              }
+            } catch {
+              // Skip unparseable lines
+            }
+          }
+        }
+
+        // If no client tool calls pending, we're done
+        if (!gotClientToolsPending || pendingClientToolCalls.length === 0) {
+          console.log('[DirectStream] No more tool calls — done')
+          break
+        }
+
+        // ── Execute client tools on IndexedDB ──
+        console.log(`[DirectStream] Executing ${pendingClientToolCalls.length} client tools`)
+
+        // Add assistant message with tool_calls to apiMessages
+        apiMessages.push({
+          role: 'assistant',
+          content: accumulatedContent || null,
+          tool_calls: pendingClientToolCalls.map((tc: any) => ({
+            id: tc.toolCallId,
+            type: 'function',
+            function: { name: tc.toolName, arguments: JSON.stringify(tc.input || {}) },
+          })),
+        })
+
+        for (const tc of pendingClientToolCalls) {
+          let toolResult: string
+          try {
+            const { handleClientFileOperation } = await import('@/lib/client-file-tools')
+            toolResult = await new Promise<string>((resolve) => {
+              handleClientFileOperation(
+                { toolName: tc.toolName, toolCallId: tc.toolCallId, args: tc.input, dynamic: false },
+                project.id,
+                (result: any) => {
+                  resolve(result.output?.message || result.errorText || JSON.stringify(result.output || { success: true }))
+                }
+              ).catch((err: any) => resolve(`Error: ${err.message}`))
+            })
+
+            // Update pill to completed
+            const lt = localToolCalls.find(t => t.toolCallId === tc.toolCallId)
+            if (lt) lt.status = 'completed'
+          } catch (err) {
+            toolResult = `Error: ${err instanceof Error ? err.message : 'Tool failed'}`
+            const lt = localToolCalls.find(t => t.toolCallId === tc.toolCallId)
+            if (lt) lt.status = 'failed'
+          }
+
+          setStreamingToolCalls([...localToolCalls])
+
+          // Add tool result to apiMessages (OpenAI format)
+          apiMessages.push({
+            role: 'tool',
+            tool_call_id: tc.toolCallId,
+            content: toolResult,
+          })
+        }
+
+        // Clear pending and loop back — send new request with tool results
+        console.log(`[DirectStream] Tool results sent, looping back for step ${loopCount + 1}`)
+      }
+
+      // ── Stream complete — save message ──
+      setMessages(prev => prev.map(msg =>
+        msg.id === assistantMessageId
+          ? { ...msg, content: accumulatedContent, streaming: false }
+          : msg
+      ))
+
+      if (accumulatedContent.trim() || localToolCalls.length > 0) {
+        const toolInvocations = localToolCalls.map(t => ({
+          toolName: t.toolName,
+          toolCallId: t.toolCallId,
+          args: t.input,
+          state: t.status === 'completed' ? 'result' : 'call',
+          result: t.status === 'completed' ? { success: true } : undefined,
+          textPosition: t.textPosition,
+        }))
+        await saveAssistantMessageAfterStreaming(
+          assistantMessageId,
+          accumulatedContent,
+          accumulatedReasoning,
+          toolInvocations
+        )
+      }
+
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        console.error('[DirectStream] Error:', error)
+        setMessages(prev => prev.map(msg =>
+          msg.id === assistantMessageId
+            ? { ...msg, content: accumulatedContent + '\n\n*Stream interrupted.*', streaming: false }
+            : msg
+        ))
+      }
+    } finally {
+      setIsLoading(false)
+      setStreamingMessageId(null)
+      setStreamingContent('')
+      setStreamingReasoning('')
+      setStreamingToolCalls([])
+      setAbortController(null)
     }
   }
 
@@ -4125,7 +4831,8 @@ export function ChatPanelV2({
                   'delete_file', 'delete_folder', 'remove_package',
                   'read_file', 'list_files', 'grep_search', 'semantic_code_navigator',
                   'create_database', 'pipilotdb_create_database', 'request_supabase_connection',
-                  'generate_plan', 'update_plan_progress', 'update_project_context'
+                  'generate_plan', 'update_plan_progress', 'update_project_context',
+                  'frontend_design_guide'
                 ]
 
                 if (clientSideTools.includes(parsed.toolName)) {
@@ -4538,6 +5245,59 @@ export function ChatPanelV2({
         description: 'Type / to see all available commands. Use ↑↓ to navigate, Enter to select.'
       })
     },
+    onShareToTeam: async () => {
+      if (!project?.isTeamWorkspace || !project?.organizationId) {
+        toast({ title: 'Not a team workspace', description: 'Convert to a team workspace first to share chats' })
+        return
+      }
+      if (messages.length === 0) {
+        toast({ title: 'No messages', description: 'Add some messages first to share' })
+        return
+      }
+
+      try {
+        const supabase = (await import('@/lib/supabase/client')).createClient()
+        const { data: { user: currentUser } } = await supabase.auth.getUser()
+        if (!currentUser) {
+          toast({ title: 'Not authenticated', description: 'Please sign in to share chats', variant: 'destructive' })
+          return
+        }
+
+        // Build a clean title from the first user message
+        const firstUserMsg = messages.find(m => m.role === 'user')
+        const title = firstUserMsg
+          ? (typeof firstUserMsg.content === 'string' ? firstUserMsg.content : 'Shared Chat').slice(0, 100)
+          : 'Shared Chat'
+
+        // Clean messages for sharing (text only, strip large content)
+        const cleanMessages = messages.map(m => ({
+          role: m.role,
+          content: typeof m.content === 'string'
+            ? m.content.slice(0, 3000)
+            : Array.isArray(m.content)
+              ? m.content.filter((p: any) => p.type === 'text').map((p: any) => p.text).join('\n').slice(0, 3000)
+              : '[Complex content]'
+        }))
+
+        const { error } = await supabase
+          .from('team_shared_chats')
+          .insert({
+            workspace_id: project.teamWorkspaceId,
+            organization_id: project.organizationId,
+            project_id: project.id,
+            title,
+            messages: cleanMessages,
+            shared_by: currentUser.id,
+          })
+
+        if (error) throw error
+
+        toast({ title: 'Shared to team', description: `"${title.slice(0, 50)}${title.length > 50 ? '...' : ''}" is now visible to your team` })
+      } catch (err: any) {
+        console.error('[ChatPanelV2] Share to team error:', err)
+        toast({ title: 'Failed to share', description: err.message || 'Could not share chat to team', variant: 'destructive' })
+      }
+    },
   })
 
   // Handle slash command selection
@@ -4774,6 +5534,18 @@ export function ChatPanelV2({
     if (!loadingCredits && creditBalance !== null && creditBalance <= 0) {
       setShowCreditExhaustionModal(true)
       return
+    }
+
+    // ── EXPERIMENTAL: Direct stream mode (bypasses AI SDK) ──
+    // Activated by URL param ?directStream=true
+    try {
+      if (typeof window !== 'undefined' && window.location.search.includes('directStream=true')) {
+        console.log('[ChatPanelV2] Using experimental direct stream mode')
+        sendMessageDirect(input.trim())
+        return
+      }
+    } catch (e) {
+      console.warn('[ChatPanelV2] Direct stream check failed, using regular path:', e)
     }
 
     // Build enhanced message content with attachments
@@ -5288,63 +6060,57 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
               continue
             }
 
-            console.log('[ChatPanelV2][DataStream] Parsed stream part:', parsed)
-
             // Handle different stream part types
+            // RAF-batched state updates: accumulate locally, flush to React at ~60fps
+            let flushScheduled = false
+            const scheduleFlush = () => {
+              if (!flushScheduled) {
+                flushScheduled = true
+                requestAnimationFrame(() => {
+                  flushScheduled = false
+                  startTransition(() => {
+                    setStreamingContent(accumulatedContent)
+                    setStreamingReasoning(accumulatedReasoning)
+                    setMessages(prev => prev.map(msg =>
+                      msg.id === assistantMessageId
+                        ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, reasoningBlocks: [...reasoningBlocks] }
+                        : msg
+                    ))
+                  })
+                })
+              }
+            }
+
             if (parsed.type === 'text-delta') {
-              // Text delta - accumulate the text
               if (parsed.text) {
-                // CRITICAL FIX: Filter out tool result JSON that shouldn't be displayed
-                // Some models output tool results as text instead of keeping them internal
                 const textToAdd = parsed.text
-                
-                // Check if this text looks like a tool result JSON
+                // Filter out tool result JSON that some models output as text
                 const trimmedText = textToAdd.trim()
-                const looksLikeToolResult = (
-                  (trimmedText.startsWith('{') || trimmedText.startsWith('Assistant:')) && 
-                  (trimmedText.includes('"success"') || trimmedText.includes('"toolCallId"') || 
-                   trimmedText.includes('"executionTimeMs"') || trimmedText.includes('"databaseId"'))
-                )
-                
-                // Skip text that appears to be a raw tool result JSON
+                const looksLikeToolResult = trimmedText.startsWith('{') &&
+                  (trimmedText.includes('"success"') || trimmedText.includes('"toolCallId"') || trimmedText.includes('"executionTimeMs"'))
+
                 if (!looksLikeToolResult) {
                   accumulatedContent += textToAdd
                   lastDeltaType = 'text'
-                  setStreamingContent(accumulatedContent) // Store in component state
-                  setMessages(prev => prev.map(msg =>
-                    msg.id === assistantMessageId
-                      ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, reasoningBlocks: [...reasoningBlocks] }
-                      : msg
-                  ))
-                  // Update stream recovery progress (debounced)
+                  scheduleFlush()
+                  // Update stream recovery progress (debounced internally)
                   streamRecoveryManager.updateStreamProgress(assistantMessageId, {
                     accumulatedContent,
                     accumulatedReasoning,
                     toolCalls: localToolCalls,
                     inlineToolCalls: localToolCalls
                   })
-                } else {
-                  console.log('[ChatPanelV2][Filter] Filtered out tool result JSON from text content:', trimmedText.substring(0, 100))
                 }
               }
             } else if (parsed.type === 'reasoning-delta') {
-              // Reasoning delta - accumulate reasoning separately and track position
               if (parsed.text) {
-                // Start a new reasoning block when transitioning from text/null to reasoning
                 if (lastDeltaType !== 'reasoning') {
                   reasoningBlocks.push({ content: '', textPosition: accumulatedContent.length })
                 }
                 reasoningBlocks[reasoningBlocks.length - 1].content += parsed.text
                 lastDeltaType = 'reasoning'
-
                 accumulatedReasoning += parsed.text
-                setStreamingReasoning(accumulatedReasoning) // Store in component state
-                setMessages(prev => prev.map(msg =>
-                  msg.id === assistantMessageId
-                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, reasoningBlocks: [...reasoningBlocks] }
-                    : msg
-                ))
-                // Update stream recovery progress (debounced)
+                scheduleFlush()
                 streamRecoveryManager.updateStreamProgress(assistantMessageId, {
                   accumulatedContent,
                   accumulatedReasoning,
@@ -5363,9 +6129,9 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
 
               // Show continuation message to user
               toast({
-                title: "Continuing conversation...",
-                description: "Stream will continue seamlessly due to time constraints.",
-                duration: 3000
+                title: "Compacting conversation to continue...",
+                description: "Synthesizing session context for seamless handoff.",
+                duration: 4000
               })
 
               // Automatically trigger continuation after a brief delay
@@ -5375,53 +6141,84 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
 
               // Don't process any more chunks after continuation signal
               break
+            } else if (parsed.type === 'tool-input-start') {
+              // AI SDK v5: Tool call STARTING — show pill immediately before args arrive
+              const toolId = parsed.toolCallId || parsed.id
+              const toolName = parsed.toolName
+              if (toolId && toolName && !localToolCalls.find(tc => tc.toolCallId === toolId)) {
+                const toolCallEntry = {
+                  toolName,
+                  toolCallId: toolId,
+                  input: undefined, // Args not yet available
+                  status: 'executing' as 'executing' | 'completed' | 'failed',
+                  textPosition: accumulatedContent.length,
+                  reasoningPosition: accumulatedReasoning.length
+                }
+                localToolCalls.push(toolCallEntry)
+                setStreamingToolCalls([...localToolCalls])
+                setActiveToolCalls(prev => {
+                  const newMap = new Map(prev)
+                  const messageCalls = newMap.get(assistantMessageId) || []
+                  if (!messageCalls.some(tc => tc.toolCallId === toolId)) {
+                    messageCalls.push(toolCallEntry)
+                    newMap.set(assistantMessageId, messageCalls)
+                  }
+                  return newMap
+                })
+              }
+
             } else if (parsed.type === 'tool-call') {
-              // CLIENT-SIDE TOOL EXECUTION: Execute file operation tools on IndexedDB
+              // Tool call COMPLETE — args are now available, update existing pill or create new one
               const toolCall = {
                 toolName: parsed.toolName,
                 toolCallId: parsed.toolCallId,
-                args: parsed.input, // AI SDK sends 'input' not 'args'
-                dynamic: false // We don't use dynamic tools
+                args: parsed.input,
+                dynamic: false
               }
 
               console.log('[ChatPanelV2][ClientTool] 🔧 Tool call received:', {
                 toolName: toolCall.toolName,
                 toolCallId: toolCall.toolCallId,
-                args: toolCall.args
               })
 
-              // Track tool call inline with executing status (both local and state)
-              // DEDUPLICATION: Check if this toolCallId already exists to prevent duplicates
+              // Check if pill already created by tool-input-start
               const existingToolCall = localToolCalls.find(tc => tc.toolCallId === toolCall.toolCallId)
               if (existingToolCall) {
-                console.log('[ChatPanelV2][ClientTool] Skipping duplicate tool call:', toolCall.toolCallId)
-                continue // Skip duplicate tool calls
-              }
-
-              const toolCallEntry = {
-                toolName: toolCall.toolName,
-                toolCallId: toolCall.toolCallId,
-                input: toolCall.args,
-                status: 'executing' as 'executing' | 'completed' | 'failed',
-                textPosition: accumulatedContent.length, // Track where in text this tool was called
-                reasoningPosition: accumulatedReasoning.length // Track where in reasoning this tool was called
-              }
-
-              localToolCalls.push(toolCallEntry)
-
-              // Store in component state for handleStop access
-              setStreamingToolCalls([...localToolCalls])
-
-              setActiveToolCalls(prev => {
-                const newMap = new Map(prev)
-                const messageCalls = newMap.get(assistantMessageId) || []
-                // DEDUPLICATION: Check before adding to prevent duplicates
-                if (!messageCalls.some(tc => tc.toolCallId === toolCall.toolCallId)) {
-                  messageCalls.push(toolCallEntry)
-                  newMap.set(assistantMessageId, messageCalls)
+                // Update args on the existing pill (was created without args)
+                existingToolCall.input = toolCall.args
+                setStreamingToolCalls([...localToolCalls])
+                setActiveToolCalls(prev => {
+                  const newMap = new Map(prev)
+                  const messageCalls = newMap.get(assistantMessageId) || []
+                  const updatedCalls = messageCalls.map(tc =>
+                    tc.toolCallId === toolCall.toolCallId ? { ...tc, input: toolCall.args } : tc
+                  )
+                  newMap.set(assistantMessageId, updatedCalls)
+                  return newMap
+                })
+              } else {
+                // No tool-input-start received — create pill now (fallback for models that skip it)
+                const toolCallEntry = {
+                  toolName: toolCall.toolName,
+                  toolCallId: toolCall.toolCallId,
+                  input: toolCall.args,
+                  status: 'executing' as 'executing' | 'completed' | 'failed',
+                  textPosition: accumulatedContent.length,
+                  reasoningPosition: accumulatedReasoning.length
                 }
-                return newMap
-              })
+
+                localToolCalls.push(toolCallEntry)
+                setStreamingToolCalls([...localToolCalls])
+                setActiveToolCalls(prev => {
+                  const newMap = new Map(prev)
+                  const messageCalls = newMap.get(assistantMessageId) || []
+                  if (!messageCalls.some(tc => tc.toolCallId === toolCall.toolCallId)) {
+                    messageCalls.push(toolCallEntry)
+                    newMap.set(assistantMessageId, messageCalls)
+                  }
+                  return newMap
+                })
+              }
 
 
               // Check if this is a client-side tool (both read and write operations)
@@ -5441,7 +6238,8 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 'request_supabase_connection',
                 'generate_plan',
                 'update_plan_progress',
-                'update_project_context'
+                'update_project_context',
+                'frontend_design_guide'
               ]
 
               if (clientSideTools.includes(toolCall.toolName)) {
@@ -5662,6 +6460,28 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
           }
           return msg
         }).filter(Boolean) as any)
+        // Dispatch preview event if file modifications were made before error
+        const errorToolCalls = streamingToolCalls.length > 0 ? streamingToolCalls : []
+        const hasFileModsBeforeError = errorToolCalls.some(
+          (tool: any) => ['edit_file', 'write_file', 'delete_file', 'client_replace_string_in_file'].includes(tool.toolName)
+        )
+        if (typeof window !== 'undefined' && hasFileModsBeforeError && project) {
+          try {
+            const { detectProjectTypeFromFiles } = await import('@/lib/utils')
+            const files = await storageManager.getFiles(project.id)
+            const projectType = detectProjectTypeFromFiles(files)
+            const isViteOrHtml = projectType === 'vite-react' || projectType === 'html'
+            const needsSandbox = projectType === 'nextjs' || projectType === 'expo'
+            window.dispatchEvent(new CustomEvent('ai-stream-complete', {
+              detail: {
+                projectId: project.id,
+                shouldSwitchToPreview: true,
+                shouldCreatePreview: needsSandbox,
+                shouldRefreshPreview: isViteOrHtml
+              }
+            }))
+          } catch {}
+        }
         // Clean up tool calls for failed message
         setActiveToolCalls(prev => {
           const newMap = new Map(prev)
@@ -6155,7 +6975,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
         <div
           ref={scrollContainerRef}
           className={`h-full min-w-0 overflow-y-auto overflow-x-hidden space-y-5 ${isMobile ? 'px-4 pt-4 pb-20' : 'px-4 pt-4 pb-4'}`}
-          style={{ backgroundColor: 'rgba(17, 24, 39, 0.8)' }}
+          style={{ backgroundColor: 'rgba(17, 24, 39, 0.8)', overflowAnchor: 'auto', willChange: 'scroll-position' }}
         >
         {messages.length === 0 && (
           <div className="flex items-center justify-center h-full text-gray-500">
@@ -6429,14 +7249,10 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                   {/* Pass inline tool calls with positions to MessageWithTools for inline rendering */}
                   {(() => {
                     const toolCalls = activeToolCalls.get(message.id) || []
-                    // Filter out tools with special rendering
+                    // Only filter tools that have special card rendering (not pills)
                     const inlineToolCalls = toolCalls.filter(tc =>
                       tc.toolName !== 'request_supabase_connection' &&
-                      tc.toolName !== 'continue_backend_implementation' &&
-                      tc.toolName !== 'suggest_next_steps' &&
-                      tc.toolName !== 'generate_plan' &&
-                      tc.toolName !== 'update_plan_progress' &&
-                      tc.toolName !== 'update_project_context'
+                      tc.toolName !== 'continue_backend_implementation'
                     )
                     // Don't render MessageWithTools if this is a billing error (content is empty)
                     const hasBillingError = (message as any).metadata?.billingError
@@ -6455,14 +7271,10 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                   {/* Tool Activity Panel - Always show for summary/tracking purposes */}
                   {(() => {
                     const toolCalls = activeToolCalls.get(message.id)
-                    // Filter out tools with special rendering (like request_supabase_connection, continue_backend_implementation, suggest_next_steps, generate_plan)
+                    // Only filter tools that have special card rendering
                     const regularToolCalls = toolCalls?.filter(tc =>
                       tc.toolName !== 'request_supabase_connection' &&
-                      tc.toolName !== 'continue_backend_implementation' &&
-                      tc.toolName !== 'suggest_next_steps' &&
-                      tc.toolName !== 'generate_plan' &&
-                      tc.toolName !== 'update_plan_progress' &&
-                      tc.toolName !== 'update_project_context'
+                      tc.toolName !== 'continue_backend_implementation'
                     )
                     return regularToolCalls && regularToolCalls.length > 0 ? (
                       <ToolActivityPanel
@@ -6512,12 +7324,6 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                       onClick={() => downloadMessageAsMarkdown(message)}
                     >
                       <Download className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
-                    </Action>
-                    <Action
-                      tooltip="Download as JSON"
-                      onClick={() => downloadMessageAsJSON(message)}
-                    >
-                      <FileJson className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
                     </Action>
                     <Action
                       tooltip="Delete message"

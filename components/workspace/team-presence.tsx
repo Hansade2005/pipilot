@@ -25,9 +25,10 @@ interface TeamPresenceProps {
   workspaceId: string
   organizationId?: string | null
   className?: string
+  compact?: boolean
 }
 
-export function TeamPresence({ workspaceId, organizationId, className }: TeamPresenceProps) {
+export function TeamPresence({ workspaceId, organizationId, className, compact = false }: TeamPresenceProps) {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -39,77 +40,56 @@ export function TeamPresence({ workspaceId, organizationId, className }: TeamPre
       return
     }
 
-    const fetchTeamMembers = async () => {
-      try {
-        const supabase = createClient()
+    const supabase = createClient()
+    const onlineUserIds = new Set<string>()
 
+    const fetchAndEnrichMembers = async () => {
+      try {
         // Get current user
         const { data: { user } } = await supabase.auth.getUser()
         setCurrentUserId(user?.id || null)
 
-        // Fetch team members from team_members table
+        // Fetch team members
         const { data: members, error } = await supabase
           .from('team_members')
-          .select(`
-            user_id,
-            role
-          `)
+          .select('user_id, role')
           .eq('organization_id', organizationId)
           .eq('status', 'active')
 
-        if (error) {
-          console.error('[TeamPresence] Error fetching team members:', error)
+        if (error || !members || members.length === 0) {
           setTeamMembers([])
+          setLoading(false)
           return
         }
 
-        // If we have members, fetch user data separately
-        let transformedMembers: TeamMember[] = []
-        if (members && members.length > 0) {
-          // Get unique user IDs
-          const userIds = members.map((member: any) => member.user_id)
+        const userIds = members.map((m: any) => m.user_id)
 
-          // Fetch user data for all members
-          const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('id, email, raw_user_meta_data')
-            .in('id', userIds)
+        // Fetch profiles
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, email, full_name, avatar_url')
+          .in('id', userIds)
 
-          if (userError) {
-            console.error('[TeamPresence] Error fetching user data:', userError)
-          }
+        const profileMap = new Map(
+          (profiles || []).map((p: any) => [p.id, p])
+        )
 
-          // Create a map of user data
-          const userMap = new Map()
-          if (userData) {
-            userData.forEach((user: any) => {
-              userMap.set(user.id, user)
-            })
-          }
-
-          // Transform members with user data
-          transformedMembers = members.map((member: any) => {
-            const user = userMap.get(member.user_id)
+        const enriched: TeamMember[] = members
+          .map((m: any) => {
+            const profile = profileMap.get(m.user_id)
             return {
-              id: user?.id || '',
-              email: user?.email || '',
-              name: user?.raw_user_meta_data?.full_name || user?.email?.split('@')[0],
-              avatar_url: user?.raw_user_meta_data?.avatar_url,
-              isOnline: false, // Will be updated by presence system
+              id: m.user_id,
+              email: profile?.email || '',
+              name: profile?.full_name || profile?.email?.split('@')[0],
+              avatar_url: profile?.avatar_url,
+              isOnline: onlineUserIds.has(m.user_id),
               lastSeen: new Date().toISOString()
             }
-          }).filter(m => m.id) // Filter out any invalid members
+          })
+          .filter((m: TeamMember) => m.id)
 
-          setTeamMembers(transformedMembers)
-          setLoading(false)
-
-          // TODO: Implement real-time presence tracking
-          // For now, mark all as potentially online (mock data)
-          // In production, use Supabase Realtime presence
-        } else {
-          setTeamMembers([])
-          setLoading(false)
-        }
+        setTeamMembers(enriched)
+        setLoading(false)
       } catch (error) {
         console.error('[TeamPresence] Error:', error)
         setTeamMembers([])
@@ -117,7 +97,68 @@ export function TeamPresence({ workspaceId, organizationId, className }: TeamPre
       }
     }
 
-    fetchTeamMembers()
+    // Set up Realtime presence channel
+    const channel = supabase.channel(`presence:${organizationId}:${workspaceId}`, {
+      config: { presence: { key: '' } } // Will be set on track
+    })
+
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState()
+        onlineUserIds.clear()
+        Object.values(state).forEach((presences: any) => {
+          presences.forEach((p: any) => {
+            if (p.user_id) onlineUserIds.add(p.user_id)
+          })
+        })
+        // Update online status on existing members
+        setTeamMembers(prev =>
+          prev.map(m => ({
+            ...m,
+            isOnline: onlineUserIds.has(m.id)
+          }))
+        )
+      })
+      .on('presence', { event: 'join' }, ({ newPresences }) => {
+        newPresences.forEach((p: any) => {
+          if (p.user_id) onlineUserIds.add(p.user_id)
+        })
+        setTeamMembers(prev =>
+          prev.map(m => ({
+            ...m,
+            isOnline: onlineUserIds.has(m.id)
+          }))
+        )
+      })
+      .on('presence', { event: 'leave' }, ({ leftPresences }) => {
+        leftPresences.forEach((p: any) => {
+          if (p.user_id) onlineUserIds.delete(p.user_id)
+        })
+        setTeamMembers(prev =>
+          prev.map(m => ({
+            ...m,
+            isOnline: onlineUserIds.has(m.id)
+          }))
+        )
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          // Track our own presence
+          const { data: { user } } = await supabase.auth.getUser()
+          if (user) {
+            await channel.track({
+              user_id: user.id,
+              online_at: new Date().toISOString()
+            })
+          }
+        }
+      })
+
+    fetchAndEnrichMembers()
+
+    return () => {
+      channel.unsubscribe()
+    }
   }, [workspaceId, organizationId])
 
   if (!organizationId || loading) {
@@ -137,24 +178,24 @@ export function TeamPresence({ workspaceId, organizationId, className }: TeamPre
     <TooltipProvider>
       <div className={`flex items-center gap-2 ${className}`}>
         <div className="flex items-center">
-          <Users className="h-3.5 w-3.5 text-muted-foreground mr-2" />
-          <div className="flex -space-x-2">
+          <Users className={`${compact ? 'h-3 w-3' : 'h-3.5 w-3.5'} text-muted-foreground mr-1.5`} />
+          <div className={`flex ${compact ? '-space-x-1.5' : '-space-x-2'}`}>
             {displayMembers.map((member) => (
               <Tooltip key={member.id}>
                 <TooltipTrigger asChild>
                   <div className="relative">
-                    <Avatar className="h-7 w-7 border-2 border-background hover:z-10 transition-transform hover:scale-110">
+                    <Avatar className={`${compact ? 'h-5 w-5 border' : 'h-7 w-7 border-2'} border-background hover:z-10 transition-transform hover:scale-110`}>
                       <AvatarImage src={member.avatar_url} alt={member.name || member.email} />
-                      <AvatarFallback className="text-xs bg-gradient-to-br from-blue-400 to-purple-400 text-white">
+                      <AvatarFallback className={`${compact ? 'text-[8px]' : 'text-xs'} bg-gradient-to-br from-orange-500 to-orange-600 text-white`}>
                         {(member.name || member.email).charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     {member.isOnline && (
-                      <div className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-background" />
+                      <div className={`absolute bottom-0 right-0 rounded-full bg-green-500 ${compact ? 'h-1.5 w-1.5 border border-background' : 'h-2.5 w-2.5 border-2 border-background'}`} />
                     )}
                   </div>
                 </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">
+                <TooltipContent side={compact ? 'top' : 'bottom'} className="text-xs">
                   <div>
                     <p className="font-medium">{member.name || member.email}</p>
                     <p className="text-muted-foreground text-[10px]">
@@ -167,18 +208,18 @@ export function TeamPresence({ workspaceId, organizationId, className }: TeamPre
             {remainingCount > 0 && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="flex items-center justify-center h-7 w-7 rounded-full bg-muted border-2 border-background text-xs font-medium text-muted-foreground hover:z-10 transition-transform hover:scale-110 cursor-default">
+                  <div className={`flex items-center justify-center rounded-full bg-muted ${compact ? 'h-5 w-5 border text-[8px]' : 'h-7 w-7 border-2 text-xs'} border-background font-medium text-muted-foreground hover:z-10 transition-transform hover:scale-110 cursor-default`}>
                     +{remainingCount}
                   </div>
                 </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">
+                <TooltipContent side={compact ? 'top' : 'bottom'} className="text-xs">
                   {remainingCount} more team member{remainingCount !== 1 ? 's' : ''}
                 </TooltipContent>
               </Tooltip>
             )}
           </div>
         </div>
-        <Badge variant="outline" className="h-5 px-2 text-[10px] text-muted-foreground border-muted">
+        <Badge variant="outline" className={`${compact ? 'h-4 px-1.5 text-[9px]' : 'h-5 px-2 text-[10px]'} text-muted-foreground border-muted`}>
           {teamMembers.length} member{teamMembers.length !== 1 ? 's' : ''}
         </Badge>
       </div>

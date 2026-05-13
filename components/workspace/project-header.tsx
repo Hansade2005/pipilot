@@ -2,7 +2,8 @@
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Play, GitBranch, Share2, Settings, Plus, Rocket, Upload, Database, Zap, Cloud } from "lucide-react"
+import { Play, GitBranch, Share2, Settings, Plus, Rocket, Upload, Database, Zap, Cloud, Bell } from "lucide-react"
+import { NotificationCenter } from "@/components/notification-center"
 import { Logo } from "@/components/ui/logo"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import React, { useState, useEffect } from 'react'
@@ -364,6 +365,9 @@ export function ProjectHeader({
       </div>
 
       <div className="flex items-center space-x-2">
+           {/* Notification Bell */}
+           <NotificationCenter />
+
            {/* Create project button */}
           <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
             setIsCreateDialogOpen(open)
@@ -372,10 +376,10 @@ export function ProjectHeader({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    className="h-8 px-3"
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 px-3 hidden sm:flex"
                     onClick={() => window.location.href = '/workspace'}
                   >
                     <Plus className="h-4 w-4" />

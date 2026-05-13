@@ -129,6 +129,10 @@ const sectionGroups: SectionGroup[] = [
     items: ["Slash Commands System", "Conversation Branching", "AI Memory System", "Multi-Chat Session Support", "Browser Testing", "Codebase Search & Replace", "Project Plan", "Project Context", "BYOK (Bring Your Own Key)"]
   },
   {
+    label: "API Products",
+    items: ["Search API"]
+  },
+  {
     label: "Support",
     items: ["AI Support System"]
   }
@@ -156,6 +160,7 @@ const sectionIcons: Record<string, any> = {
   'Project Context': FolderOpen,
   'BYOK (Bring Your Own Key)': Key,
   'Developer Power Tools': Wrench,
+  'Search API': Globe,
 }
 
 // Extract headings from markdown content for TOC
@@ -954,6 +959,19 @@ export default function DocsPage() {
             </div>
           </aside>
         )}
+      </div>
+
+      {/* ===== DOCS FOOTER ===== */}
+      <div className="hidden lg:block border-t border-gray-800/60 bg-gray-900/30 px-6 py-4">
+        <div className="max-w-3xl mx-auto flex items-center justify-between text-xs text-gray-500">
+          <span>&copy; {new Date().getFullYear()} PiPilot. All rights reserved.</span>
+          <div className="flex items-center gap-4">
+            <a href="https://status.pipilot.dev/" target="_blank" rel="noopener noreferrer" className="hover:text-orange-400 transition-colors">Status</a>
+            <a href="/support" className="hover:text-orange-400 transition-colors">Support</a>
+            <a href="/privacy" className="hover:text-orange-400 transition-colors">Privacy</a>
+            <a href="/terms" className="hover:text-orange-400 transition-colors">Terms</a>
+          </div>
+        </div>
       </div>
 
       {/* ===== MOBILE BOTTOM NAVIGATION ===== */}

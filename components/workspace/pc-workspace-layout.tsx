@@ -851,26 +851,21 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     }
   }
 
-  // Sync data from server if client has no projects
+  // Load projects from IndexedDB if client has none
   useEffect(() => {
     if (clientProjects.length === 0 && newProjectId && typeof window !== 'undefined') {
-      console.log('WorkspaceLayout: No projects found, attempting to sync from server...')
-      const syncFromServer = async () => {
+      const syncFromStorage = async () => {
         try {
-          // Try to fetch from server API
-          const response = await fetch('/api/workspaces')
-          if (response.ok) {
-            const data = await response.json()
-            if (data.workspaces && data.workspaces.length > 0) {
-              console.log('WorkspaceLayout: Synced workspaces from server:', data.workspaces.length)
-              setClientProjects(data.workspaces)
-            }
+          await storageManager.init()
+          const workspaces = await storageManager.getWorkspaces(user.id)
+          if (workspaces && workspaces.length > 0) {
+            setClientProjects(workspaces)
           }
         } catch (error) {
-          console.error('Error syncing from server:', error)
+          // Error loading from storage - silently fail
         }
       }
-      syncFromServer()
+      syncFromStorage()
     }
   }, [clientProjects.length, newProjectId])
 
@@ -1104,6 +1099,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                   const params = new URLSearchParams(searchParams.toString())
                   params.set('projectId', newProject.id)
                   params.set('newProject', newProject.id) // ✅ CRITICAL: This prevents auto-restore from running
+                  params.set('directStream', 'true')
                   router.push(`/workspace?${params.toString()}`)
                   
                   console.log('✅ WorkspaceLayout: Navigating to NEW project with newProject flag:', newProject.id)
@@ -1214,6 +1210,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     const params = new URLSearchParams(searchParams.toString())
                     params.set('projectId', newProject.id)
                     params.set('newProject', newProject.id) // ✅ CRITICAL: This prevents auto-restore from running
+                  params.set('directStream', 'true')
                     router.push(`/workspace?${params.toString()}`)
                     
                     console.log('✅ WorkspaceLayout: Navigating to NEW project with newProject flag:', newProject.id)
@@ -1912,6 +1909,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                           const params = new URLSearchParams(searchParams.toString())
                           params.set('projectId', newProject.id)
                           params.set('newProject', newProject.id) // ✅ CRITICAL: This prevents auto-restore from running
+                  params.set('directStream', 'true')
                           router.push(`/workspace?${params.toString()}`)
                           
                           console.log('✅ WorkspaceLayout: Navigating to NEW project with newProject flag:', newProject.id)

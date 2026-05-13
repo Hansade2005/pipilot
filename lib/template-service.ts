@@ -374,8 +374,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       name: 'App.tsx',
       path: 'src/App.tsx',
       content: `import { Routes, Route } from 'react-router-dom'
-import { Home } from './pages/Home'
-import { NotFound } from './components/NotFound'
+import Home from './pages/Home'
+import NotFound from './components/NotFound'
 
 function App() {
   return (
@@ -1814,6 +1814,7 @@ export function LoadingOverlay() {
 export function NotFound() {
   const navigate = useNavigate()
 
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="text-center">
@@ -1862,7 +1863,9 @@ export function NotFound() {
       </div>
     </div>
   )
-}`,
+}
+
+export default NotFound`,
       fileType: 'tsx',
       type: 'tsx',
       size: 0,
@@ -1871,126 +1874,35 @@ export function NotFound() {
     {
       name: 'Home.tsx',
       path: 'src/pages/Home.tsx',
-      content: `import { Link } from 'react-router-dom'
+      content: `// ┌─────────────────────────────────────────────────────────┐
+// │  DEFAULT TEMPLATE — This is NOT the user's app.        │
+// │  Replace this ENTIRE file with the user's homepage.     │
+// │  Use write_file to overwrite it completely.             │
+// └─────────────────────────────────────────────────────────┘
 
 export function Home() {
-  const features = [
-    {
-      icon: '⚡',
-      title: 'Lightning Fast',
-      description: 'Built with Vite for instant hot module replacement and blazing fast builds.'
-    },
-    {
-      icon: '🎨',
-      title: 'Tailwind CSS',
-      description: 'Utility-first CSS framework loaded via CDN for rapid UI development.'
-    },
-    {
-      icon: '⚛️',
-      title: 'React 18',
-      description: 'Latest React features including concurrent rendering and automatic batching.'
-    },
-    {
-      icon: '📱',
-      title: 'Responsive',
-      description: 'Mobile-first design that looks great on any device or screen size.'
-    },
-    {
-      icon: '🔧',
-      title: 'TypeScript',
-      description: 'Full TypeScript support for type-safe development and better DX.'
-    },
-    {
-      icon: '🚀',
-      title: 'Production Ready',
-      description: 'Optimized build configuration ready for deployment anywhere.'
-    }
-  ]
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Hero Section */}
-      <header className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white">
-        <nav className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="text-2xl font-bold">MyApp</div>
-          <div className="flex gap-6">
-            <Link to="/" className="hover:text-blue-200 transition-colors">Home</Link>
-            <Link to="/about" className="hover:text-blue-200 transition-colors">About</Link>
-            <Link to="/contact" className="hover:text-blue-200 transition-colors">Contact</Link>
-          </div>
-        </nav>
-
-        <div className="container mx-auto px-4 py-20 text-center">
-          <h1 className="text-5xl md:text-6xl font-bold mb-6">
-            Build Amazing Apps
-          </h1>
-          <p className="text-xl md:text-2xl text-blue-100 mb-8 max-w-2xl mx-auto">
-            A modern React starter template with Vite, TypeScript, and Tailwind CSS.
-            Start building your next project in minutes.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="px-8 py-4 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition-colors shadow-lg">
-              Get Started
-            </button>
-            <button className="px-8 py-4 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-400 transition-colors border border-blue-400">
-              Learn More
-            </button>
-          </div>
+    <div className="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center px-4">
+      <div className="text-center max-w-lg">
+        <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
         </div>
-      </header>
-
-      {/* Features Section */}
-      <section className="container mx-auto px-4 py-20">
-        <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-800 mb-4">
-          Everything You Need
-        </h2>
-        <p className="text-gray-600 text-center mb-12 max-w-2xl mx-auto">
-          This template comes with all the tools and configurations you need to build modern web applications.
+        <h1 className="text-3xl font-bold mb-3">Welcome to PiPilot</h1>
+        <p className="text-gray-400 mb-6">
+          This is the default template. Tell the AI what you want to build and it will replace this page with your app.
         </p>
-
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {features.map((feature, index) => (
-            <div
-              key={index}
-              className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow border border-gray-100"
-            >
-              <div className="text-4xl mb-4">{feature.icon}</div>
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">
-                {feature.title}
-              </h3>
-              <p className="text-gray-600">
-                {feature.description}
-              </p>
-            </div>
-          ))}
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-800 text-sm text-gray-400 border border-gray-700">
+          <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span>
+          Waiting for your first prompt...
         </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="bg-gray-800 text-white py-20">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Ready to Get Started?
-          </h2>
-          <p className="text-gray-300 mb-8 max-w-xl mx-auto">
-            Start building your application today. Edit the files in src/ to customize this template.
-          </p>
-          <button className="px-8 py-4 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">
-            Start Building
-          </button>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-gray-900 text-gray-400 py-8">
-        <div className="container mx-auto px-4 text-center">
-          <p>Built with React + Vite + Tailwind CSS</p>
-          <p className="mt-2 text-sm">© 2025 MyApp. All rights reserved.</p>
-        </div>
-      </footer>
+      </div>
     </div>
   )
-}`,
+}
+
+export default Home`,
       fileType: 'tsx',
       type: 'tsx',
       size: 0,

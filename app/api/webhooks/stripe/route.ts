@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
+import * as crypto from 'crypto'
 import { headers } from 'next/headers'
 import { PRODUCT_CONFIGS, EXTRA_CREDITS_PRODUCT } from '@/lib/stripe-config'
 import { addCredits } from '@/lib/billing/credit-manager'
@@ -52,6 +53,12 @@ export async function POST(request: NextRequest) {
 
         if (!userId) {
           console.error('No user_id in subscription metadata')
+          break
+        }
+
+        // Check if this is a Search API subscription
+        if (subscription.metadata.product === 'search-api') {
+          await handleSearchApiSubscriptionUpdate(subscription)
           break
         }
 
@@ -112,6 +119,12 @@ export async function POST(request: NextRequest) {
           break
         }
 
+        // Check if this is a Search API subscription
+        if (subscription.metadata.product === 'search-api') {
+          await handleSearchApiSubscriptionDeleted(subscription)
+          break
+        }
+
         // Update wallet to inactive status, keep current credits
         const { error } = await supabase
           .from('wallet')
@@ -135,9 +148,16 @@ export async function POST(request: NextRequest) {
         const subscriptionId = (invoice as any).subscription as string
 
         if (subscriptionId) {
-          // This is a subscription renewal - grant monthly credits
+          // This is a subscription renewal
           const subscription = await stripe.subscriptions.retrieve(subscriptionId)
           const userId = subscription.metadata.user_id
+
+          // Search API renewal - just update period end in KV
+          if (subscription.metadata.product === 'search-api' && userId) {
+            await handleSearchApiSubscriptionUpdate(subscription)
+            console.log(`Search API: Invoice payment succeeded for user ${userId}`)
+            break
+          }
 
           if (userId) {
             const planId = getPlanFromPriceId(subscription.items.data[0]?.price.id) || 'free'
@@ -196,6 +216,18 @@ export async function POST(request: NextRequest) {
           break
         }
 
+        // Search API payment failure - update KV status
+        if (subscription.metadata.product === 'search-api') {
+          const existing = await kvGet(`user:${userId}:subscription`)
+          if (existing) {
+            existing.status = 'past_due'
+            existing.updatedAt = new Date().toISOString()
+            await kvPut(`user:${userId}:subscription`, existing)
+            console.log(`Search API: Payment failed for user ${userId}`)
+          }
+          break
+        }
+
         // Update subscription status to past_due
         const { error } = await supabase
           .from('wallet')
@@ -214,9 +246,15 @@ export async function POST(request: NextRequest) {
       }
 
       case 'checkout.session.completed': {
-        // Handle one-time credit purchases or marketplace purchases
         const session = event.data.object as Stripe.Checkout.Session
 
+        // Handle Search API subscription checkout
+        if (session.mode === 'subscription' && session.metadata?.product === 'search-api') {
+          await handleSearchApiCheckoutCompleted(session)
+          break
+        }
+
+        // Handle one-time credit purchases or marketplace purchases
         if (session.mode === 'payment' && session.metadata?.user_id) {
           await handleCreditPurchase(session, supabase)
         } else if (session.mode === 'payment' && session.metadata?.purchase_type) {
@@ -511,4 +549,196 @@ async function handleMarketplaceCharge(charge: Stripe.Charge, supabase: any, typ
     })
 
   console.log(`${type === 'sale' ? '✅' : '⚠️'} Marketplace ${type}: ${creatorId}, amount: $${Math.abs(walletAdjustment)}`)
+}
+
+// ============================================================
+// Search API Helpers (Cloudflare KV-based)
+// ============================================================
+
+const SEARCH_API_KV_NAMESPACE = 'e3b571cde10d48e38fdb107e0b9e2911'
+
+async function kvPut(key: string, value: any): Promise<boolean> {
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID
+  const apiToken = process.env.CLOUDFLARE_API_TOKEN
+  if (!accountId || !apiToken) {
+    console.error('Search API webhook: Cloudflare credentials not configured')
+    return false
+  }
+
+  const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${SEARCH_API_KV_NAMESPACE}/values/${encodeURIComponent(key)}`
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(value),
+  })
+  return res.ok
+}
+
+async function kvGet(key: string): Promise<any | null> {
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID
+  const apiToken = process.env.CLOUDFLARE_API_TOKEN
+  if (!accountId || !apiToken) return null
+
+  const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${SEARCH_API_KV_NAMESPACE}/values/${encodeURIComponent(key)}`
+  const res = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${apiToken}` },
+  })
+  if (!res.ok) return null
+  try {
+    return JSON.parse(await res.text())
+  } catch {
+    return null
+  }
+}
+
+// Handle Search API checkout completion: store subscription in KV + auto-generate API key
+async function handleSearchApiCheckoutCompleted(session: Stripe.Checkout.Session) {
+  const userId = session.metadata?.user_id
+  const userEmail = session.metadata?.user_email
+  const tier = session.metadata?.tier
+
+  if (!userId || !tier) {
+    console.error('Search API checkout: missing user_id or tier in metadata')
+    return
+  }
+
+  // Store subscription in KV
+  const subscriptionData = {
+    tier,
+    status: 'active',
+    stripeCustomerId: session.customer as string,
+    stripeSubscriptionId: session.subscription as string,
+    periodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+
+  const subStored = await kvPut(`user:${userId}:subscription`, subscriptionData)
+  if (!subStored) {
+    console.error(`Search API checkout: failed to store subscription for user ${userId}`)
+    return
+  }
+
+  console.log(`Search API: Subscription stored for user ${userId}, tier: ${tier}`)
+
+  // Auto-generate an API key for the paid user
+  const prefix = 'pk_live_'
+  const randomBytes = crypto.randomBytes(24).toString('hex')
+  const apiKey = prefix + randomBytes
+  const keyId = crypto.randomUUID()
+
+  const keyData = {
+    id: keyId,
+    name: `${tier.charAt(0).toUpperCase() + tier.slice(1)} API Key`,
+    tier,
+    userId,
+    userEmail: userEmail || '',
+    createdAt: new Date().toISOString(),
+    totalRequests: 0,
+    lastUsedAt: null,
+    revoked: false,
+    rateLimit: tier === 'starter' ? 5000 : tier === 'pro' ? 10000 : 50000,
+  }
+
+  // Store the API key in KV
+  const keyStored = await kvPut(apiKey, keyData)
+  if (!keyStored) {
+    console.error(`Search API checkout: failed to store API key for user ${userId}`)
+    return
+  }
+
+  // Add key to user's key list
+  const existingKeys: string[] = (await kvGet(`user:${userId}:keys`)) || []
+  existingKeys.push(apiKey)
+  await kvPut(`user:${userId}:keys`, existingKeys)
+
+  console.log(`Search API: Auto-generated ${tier} API key for user ${userId}`)
+}
+
+// Handle Search API subscription updates (plan changes, renewals)
+async function handleSearchApiSubscriptionUpdate(subscription: Stripe.Subscription) {
+  const userId = subscription.metadata.user_id
+  const tier = subscription.metadata.tier
+  if (!userId) return
+
+  const status = subscription.status
+  const subAny = subscription as any
+  const periodEnd = subAny.current_period_end
+    ? new Date(subAny.current_period_end * 1000).toISOString()
+    : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+
+  const subscriptionData = {
+    tier: tier || 'starter',
+    status: status === 'active' || status === 'trialing' ? 'active' : status,
+    stripeCustomerId: subscription.customer as string,
+    stripeSubscriptionId: subscription.id,
+    periodEnd,
+    updatedAt: new Date().toISOString(),
+  }
+
+  // Merge with existing data to preserve createdAt
+  const existing = await kvGet(`user:${userId}:subscription`)
+  if (existing?.createdAt) {
+    (subscriptionData as any).createdAt = existing.createdAt
+  } else {
+    (subscriptionData as any).createdAt = new Date().toISOString()
+  }
+
+  const stored = await kvPut(`user:${userId}:subscription`, subscriptionData)
+  if (stored) {
+    console.log(`Search API: Subscription updated for user ${userId}, status: ${status}, tier: ${tier}`)
+
+    // If tier changed, update existing API keys to new tier rate limits
+    if (tier && existing?.tier && tier !== existing.tier) {
+      const userKeys: string[] = (await kvGet(`user:${userId}:keys`)) || []
+      const newRateLimit = tier === 'starter' ? 5000 : tier === 'pro' ? 10000 : 50000
+      for (const key of userKeys) {
+        const keyData = await kvGet(key)
+        if (keyData && !keyData.revoked) {
+          keyData.tier = tier
+          keyData.rateLimit = newRateLimit
+          await kvPut(key, keyData)
+        }
+      }
+      console.log(`Search API: Updated ${userKeys.length} API keys to tier ${tier}`)
+    }
+  }
+}
+
+// Handle Search API subscription cancellation
+async function handleSearchApiSubscriptionDeleted(subscription: Stripe.Subscription) {
+  const userId = subscription.metadata.user_id
+  if (!userId) return
+
+  // Update subscription status to cancelled but keep the record
+  const existing = await kvGet(`user:${userId}:subscription`)
+  const subscriptionData = {
+    ...(existing || {}),
+    tier: existing?.tier || 'free',
+    status: 'cancelled',
+    stripeSubscriptionId: null,
+    updatedAt: new Date().toISOString(),
+  }
+
+  const stored = await kvPut(`user:${userId}:subscription`, subscriptionData)
+  if (stored) {
+    console.log(`Search API: Subscription cancelled for user ${userId}`)
+
+    // Downgrade all API keys to free tier rate limits
+    const userKeys: string[] = (await kvGet(`user:${userId}:keys`)) || []
+    for (const key of userKeys) {
+      const keyData = await kvGet(key)
+      if (keyData && !keyData.revoked) {
+        keyData.tier = 'free'
+        keyData.rateLimit = 1000
+        await kvPut(key, keyData)
+      }
+    }
+    if (userKeys.length > 0) {
+      console.log(`Search API: Downgraded ${userKeys.length} API keys to free tier`)
+    }
+  }
 }

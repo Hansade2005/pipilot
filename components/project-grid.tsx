@@ -2,7 +2,7 @@
 
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ExternalLink, Trash2, Upload, Share2, Copy } from "lucide-react"
+import { ExternalLink, Trash2, Upload, Share2, Copy, Users, GitBranch } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { useState, useEffect } from "react"
@@ -38,6 +38,11 @@ interface Project {
   description: string
   category: string
   createdAt: string
+  isTeamProject?: boolean
+  isGitHubBacked?: boolean
+  githubRepoUrl?: string
+  organizationName?: string
+  teamWorkspaceId?: string
 }
 
 interface ProjectGridProps {
@@ -495,6 +500,52 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
             }
           })
 
+        // Fetch team workspaces the user has access to
+        try {
+          const { data: memberships } = await supabase
+            .from('team_members')
+            .select('organization_id, organizations:organization_id (id, name)')
+            .eq('user_id', user.id)
+            .eq('status', 'active')
+
+          if (memberships && memberships.length > 0) {
+            const orgIds = memberships.map((m: any) => m.organization_id)
+            const orgMap = new Map(
+              memberships
+                .filter((m: any) => m.organizations)
+                .map((m: any) => [m.organization_id, (m.organizations as any).name])
+            )
+
+            const { data: teamWorkspaces } = await supabase
+              .from('team_workspaces')
+              .select('id, name, created_at, organization_id, visibility, github_repo_owner, github_repo_name, github_repo_url')
+              .in('organization_id', orgIds)
+              .order('created_at', { ascending: false })
+
+            if (teamWorkspaces) {
+              const teamProjectData: Project[] = teamWorkspaces.map((tw: any) => ({
+                id: tw.id,
+                name: tw.name,
+                thumbnail: generateThumbnailUrl(tw.name, 'Team workspace', tw.id.slice(-3)),
+                description: tw.github_repo_url
+                  ? `${orgMap.get(tw.organization_id) || 'Team'} · ${tw.github_repo_owner}/${tw.github_repo_name}`
+                  : `Shared by ${orgMap.get(tw.organization_id) || 'Team'}`,
+                category: 'Team',
+                createdAt: tw.created_at,
+                isTeamProject: true,
+                isGitHubBacked: !!(tw.github_repo_owner && tw.github_repo_name),
+                githubRepoUrl: tw.github_repo_url || undefined,
+                organizationName: orgMap.get(tw.organization_id) || 'Team',
+                teamWorkspaceId: tw.id,
+              }))
+
+              projectData = [...projectData, ...teamProjectData]
+            }
+          }
+        } catch (teamError) {
+          console.error('Error fetching team workspaces:', teamError)
+        }
+
         // Apply filtering
         if (filterBy !== 'all') {
           const now = new Date()
@@ -671,8 +722,8 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {displayedProjects.map((project) => (
           <div key={project.id} className="relative group">
-            <Link href={`/workspace?projectId=${project.id}`} className="group">
-              <Card className="bg-white/5 border-white/10 hover:bg-white/10 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl cursor-pointer overflow-hidden">
+            <Link href={project.isTeamProject ? `/workspace?teamWorkspaceId=${project.teamWorkspaceId}` : `/workspace?projectId=${project.id}`} className="group">
+              <Card className={`bg-white/5 border-white/10 hover:bg-white/10 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl cursor-pointer overflow-hidden ${project.isTeamProject ? 'ring-1 ring-orange-500/20' : ''}`}>
                 <div className="relative aspect-video overflow-hidden bg-gradient-to-br from-orange-950/30 via-gray-900/50 to-gray-950/50">
                   <Image
                     src={project.thumbnail}
@@ -681,7 +732,19 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
                     className="object-cover group-hover:scale-110 transition-transform duration-500"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-                  <div className="absolute top-3 right-3">
+                  <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                    {project.isTeamProject && (
+                      <Badge variant="secondary" className="bg-orange-500/90 backdrop-blur-sm text-white border-orange-400/30 font-medium shadow-lg">
+                        <Users className="w-3 h-3 mr-1" />
+                        {project.organizationName}
+                      </Badge>
+                    )}
+                    {project.isGitHubBacked && (
+                      <Badge variant="secondary" className="bg-gray-900/90 backdrop-blur-sm text-white border-gray-700/50 font-medium shadow-lg">
+                        <GitBranch className="w-3 h-3 mr-1" />
+                        GitHub
+                      </Badge>
+                    )}
                     <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm text-gray-900 border-white/30 font-medium shadow-lg">
                       {project.category}
                     </Badge>
@@ -713,27 +776,31 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
                 </CardContent>
               </Card>
             </Link>
-            <button
-              onClick={(e) => handleDeleteProject(project.id, e)}
-              className="absolute top-3 left-3 p-2 bg-red-500/90 hover:bg-red-600 backdrop-blur-sm text-white rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 z-10 shadow-lg hover:scale-110"
-              title="Delete project"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-            <button
-              onClick={(e) => handleCloneProject(project.id, e)}
-              className="absolute top-3 left-16 p-2 bg-orange-500/90 hover:bg-orange-600 backdrop-blur-sm text-white rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 z-10 shadow-lg hover:scale-110"
-              title="Clone project"
-            >
-              <Copy className="w-4 h-4" />
-            </button>
-            <button
-              onClick={(e) => handlePublishTemplate(project.id, e)}
-              className="absolute top-3 left-24 p-2 bg-green-500/90 hover:bg-green-600 backdrop-blur-sm text-white rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 z-10 shadow-lg hover:scale-110"
-              title="Publish as template"
-            >
-              <Upload className="w-4 h-4" />
-            </button>
+            {!project.isTeamProject && (
+              <>
+                <button
+                  onClick={(e) => handleDeleteProject(project.id, e)}
+                  className="absolute top-3 left-3 p-2 bg-red-500/90 hover:bg-red-600 backdrop-blur-sm text-white rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 z-10 shadow-lg hover:scale-110"
+                  title="Delete project"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={(e) => handleCloneProject(project.id, e)}
+                  className="absolute top-3 left-16 p-2 bg-orange-500/90 hover:bg-orange-600 backdrop-blur-sm text-white rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 z-10 shadow-lg hover:scale-110"
+                  title="Clone project"
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={(e) => handlePublishTemplate(project.id, e)}
+                  className="absolute top-3 left-24 p-2 bg-green-500/90 hover:bg-green-600 backdrop-blur-sm text-white rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 z-10 shadow-lg hover:scale-110"
+                  title="Publish as template"
+                >
+                  <Upload className="w-4 h-4" />
+                </button>
+              </>
+            )}
           </div>
         ))}
       </div>

@@ -261,12 +261,18 @@ export default function ProjectPage() {
         toast({ title: "No Files", description: "Project has no files to deploy", variant: "destructive" })
         return
       }
+      // AI-powered project type detection
+      const { detectProjectTypeWithAI } = await import('@/lib/utils')
+      const aiProjectType = await detectProjectTypeWithAI(files)
+      const resolvedProjectType = aiProjectType !== 'unknown' ? aiProjectType : 'html'
+
       const response = await fetch('/api/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectId: project.id, projectSlug: project.slug, files, authUserId: currentUserId,
           authUsername: project.name || 'user', isProduction,
+          projectType: resolvedProjectType,
           customDomainId: isProduction && productionSite?.custom_domain_id ? productionSite.custom_domain_id : undefined
         })
       })

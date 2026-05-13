@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loading...</title>
+<style>
+  body { margin: 0; background: #111; color: #888; font-family: sans-serif; display: flex; align-items: center; justify-center: center; height: 100vh; }
+  .loader { text-align: center; }
+  .spinner { width: 24px; height: 24px; border: 2px solid #333; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.6s linear infinite; margin: 0 auto 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error { color: #ef4444; }
+</style>
+</head>
+<body>
+<div class="loader" id="loader">
+  <div class="spinner"></div>
+  <div>Loading site...</div>
+</div>
+<script>
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  var slug = params.get('slug');
+
+  if (!slug) {
+    document.getElementById('loader').innerHTML = '<div class="error">No site specified</div>';
+    return;
+  }
+
+  var BASE = 'https://efbajxuvfxrvniuyohho.supabase.co/functions/v1/serve-site/' + slug;
+  var PROXY_ORIGIN = window.location.origin;
+  var PROXY_PATH = window.location.pathname + '?slug=' + encodeURIComponent(slug);
+
+  fetch(BASE)
+    .then(function(res) {
+      if (!res.ok) throw new Error('Site not found (HTTP ' + res.status + ')');
+      return res.text();
+    })
+    .then(function(html) {
+      // Rewrite relative asset URLs to point to the serve endpoint
+      // BUT skip hash links (#) and absolute URLs (https://, //, data:)
+
+      // CSS links
+      html = html.replace(
+        /(<link[^>]+href=["'])(?!https?:\/\/|\/\/|data:|#)([^"'#]+)(["'])/gi,
+        '$1' + BASE + '/$2$3'
+      );
+
+      // Script sources
+      html = html.replace(
+        /(<script[^>]+src=["'])(?!https?:\/\/|\/\/|data:|#)([^"'#]+)(["'])/gi,
+        '$1' + BASE + '/$2$3'
+      );
+
+      // Image sources
+      html = html.replace(
+        /(<img[^>]+src=["'])(?!https?:\/\/|\/\/|data:|#)([^"'#]+)(["'])/gi,
+        '$1' + BASE + '/$2$3'
+      );
+
+      // CSS url()
+      html = html.replace(
+        /(url\(["']?)(?!https?:\/\/|\/\/|data:|#)([^"')#]+)(["']?\))/gi,
+        '$1' + BASE + '/$2$3'
+      );
+
+      // Audio/Video sources
+      html = html.replace(
+        /(<(?:source|audio|video)[^>]+src=["'])(?!https?:\/\/|\/\/|data:|#)([^"'#]+)(["'])/gi,
+        '$1' + BASE + '/$2$3'
+      );
+
+      // Rewrite anchor href that point to non-hash relative pages
+      // e.g. href="about.html" → href="BASE/about.html"
+      // BUT keep hash links as-is: href="#/about" stays href="#/about"
+      html = html.replace(
+        /(<a[^>]+href=["'])(?!https?:\/\/|\/\/|mailto:|tel:|data:|#)([^"'#]+)(["'])/gi,
+        '$1' + BASE + '/$2$3'
+      );
+
+      // NO <base> tag — it breaks hash routing by making # links resolve against the serve URL
+
+      // Write the page
+      document.open();
+      document.write(html);
+      document.close();
+    })
+    .catch(function(err) {
+      document.getElementById('loader').innerHTML = '<div class="error">' + err.message + '</div>';
+    });
+})();
+</script>
+</body>
+</html>

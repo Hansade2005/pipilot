@@ -22,8 +22,8 @@ let _xaiProvider: ReturnType<typeof createXai> | null = null;
 let _anthropicProvider: ReturnType<typeof createAnthropic> | null = null;
 let _openrouterProvider: ReturnType<typeof createOpenAICompatible> | null = null;
 let _kiloGateway: ReturnType<typeof createOpenAICompatible> | null = null;
-// Ollama API key rotation: supports comma-separated keys in OLLAMA_API_KEY
-let _ollamaKeyIndex = 0;
+// Ollama API key rotation: DB-backed smart rotation (see getNextOllamaKeyFromDB)
+let _ollamaKeyIndex = 0; // fallback for env-based rotation
 // Bonsai API key rotation: supports comma-separated keys in BONSAI_API_KEY
 let _bonsaiKeyIndex = 0;
 // Kilo API key rotation: supports comma-separated keys in KILO_API_KEY
@@ -120,7 +120,6 @@ function getOpenRouterProvider() {
 
 function getKiloGateway() {
   // Always create fresh to pick the next rotated key.
-  // Use OpenAI-compatible (not createOpenAI) because Kilo only accepts /chat/completions
   return createOpenAICompatible({
     name: 'kilo-gateway',
     baseURL: 'https://api.kilo.ai/api/gateway',
@@ -129,13 +128,161 @@ function getKiloGateway() {
 }
 
 function getOllamaCloudProvider() {
-  // Always create a fresh provider to pick the next rotated key.
-  // When only one key is configured this is equivalent to caching.
-  return createOpenAICompatible({
+  // Fallback: env-based rotation (used when DB is unavailable)
+  // Using createOpenAI for parallel tool call support
+  return createOpenAI({
     name: 'ollama-cloud',
     baseURL: 'https://ollama.com/v1',
     apiKey: getNextOllamaKey(),
   });
+}
+
+/**
+ * DB-backed Ollama provider — acquires the best available key from the database,
+ * respecting concurrency (1 req at a time), 5hr window limits, and weekly limits.
+ * Call releaseOllamaKey() when the request completes.
+ */
+async function getOllamaCloudProviderFromDB(): Promise<{ provider: ReturnType<typeof createOpenAI>, keyId: number } | null> {
+  try {
+    const { getServerSupabase } = await import('@/lib/supabase')
+    const supabase = getServerSupabase()
+
+    const now = new Date().toISOString()
+    const fiveHoursAgo = new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString()
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+
+    // Reset stale concurrency locks (keys stuck in_use for >3 minutes = crashed request)
+    await supabase
+      .from('ollama_keys')
+      .update({ in_use: false, in_use_since: null })
+      .eq('in_use', true)
+      .lt('in_use_since', new Date(Date.now() - 3 * 60 * 1000).toISOString())
+
+    // Reset 5hr window counters for keys whose window expired
+    await supabase
+      .from('ollama_keys')
+      .update({ requests_in_window: 0, window_start_at: null })
+      .lt('window_start_at', fiveHoursAgo)
+      .gt('requests_in_window', 0)
+
+    // Reset weekly counters for keys whose week expired
+    await supabase
+      .from('ollama_keys')
+      .update({ requests_in_week: 0, week_start_at: null })
+      .lt('week_start_at', sevenDaysAgo)
+      .gt('requests_in_week', 0)
+
+    // Pick the best available key:
+    // - Must be active and not in_use (concurrency = 1)
+    // - Prefer keys with fewer requests_in_window (spread load)
+    // - Prefer keys with oldest last_used_at (maximize cooldown)
+    // - Skip keys with too many errors
+    const { data: keys, error } = await supabase
+      .from('ollama_keys')
+      .select('id, api_key, requests_in_window, requests_in_week, last_used_at')
+      .eq('is_active', true)
+      .eq('in_use', false)
+      .lt('consecutive_errors', 5)
+      .order('requests_in_window', { ascending: true })
+      .order('last_used_at', { ascending: true, nullsFirst: true })
+      .limit(1)
+
+    if (error || !keys || keys.length === 0) {
+      console.warn('[OllamaDB] No available keys from DB, falling back to env rotation')
+      return null
+    }
+
+    const key = keys[0]
+
+    // Acquire the key: mark in_use + update counters atomically
+    const { error: updateError } = await supabase
+      .from('ollama_keys')
+      .update({
+        in_use: true,
+        in_use_since: now,
+        last_used_at: now,
+        requests_in_window: key.requests_in_window + 1,
+        window_start_at: key.requests_in_window === 0 ? now : undefined,
+        requests_in_week: key.requests_in_week + 1,
+        week_start_at: key.requests_in_week === 0 ? now : undefined,
+        updated_at: now,
+      })
+      .eq('id', key.id)
+      .eq('in_use', false) // Optimistic lock — if another request grabbed it, this fails
+
+    if (updateError) {
+      console.warn('[OllamaDB] Failed to acquire key (race condition), falling back')
+      return null
+    }
+
+    console.log(`[OllamaDB] Acquired key #${key.id} (window: ${key.requests_in_window + 1}, week: ${key.requests_in_week + 1})`)
+
+    const provider = createOpenAI({
+      name: 'ollama-cloud',
+      baseURL: 'https://ollama.com/v1',
+      apiKey: key.api_key,
+    })
+
+    return { provider, keyId: key.id }
+  } catch (err) {
+    console.error('[OllamaDB] Error acquiring key:', err)
+    return null
+  }
+}
+
+/**
+ * Release an Ollama key after request completes.
+ * Call with success=true on success, success=false on provider error.
+ */
+export async function releaseOllamaKey(keyId: number, success: boolean, errorMessage?: string) {
+  try {
+    const { getServerSupabase } = await import('@/lib/supabase')
+    const supabase = getServerSupabase()
+
+    const update: Record<string, any> = {
+      in_use: false,
+      in_use_since: null,
+      updated_at: new Date().toISOString(),
+    }
+
+    if (success) {
+      update.consecutive_errors = 0
+    } else {
+      update.last_error_at = new Date().toISOString()
+      update.last_error_message = errorMessage?.slice(0, 500) || 'Unknown error'
+      // Increment consecutive_errors — will be auto-disabled at 5
+    }
+
+    if (success) {
+      await supabase
+        .from('ollama_keys')
+        .update(update)
+        .eq('id', keyId)
+    } else {
+      // Use RPC-like approach: read then write to increment
+      const { data: current } = await supabase
+        .from('ollama_keys')
+        .select('consecutive_errors')
+        .eq('id', keyId)
+        .single()
+
+      const newErrors = (current?.consecutive_errors || 0) + 1
+      update.consecutive_errors = newErrors
+      if (newErrors >= 5) {
+        update.is_active = false
+        console.warn(`[OllamaDB] Key #${keyId} disabled after ${newErrors} consecutive errors`)
+      }
+
+      await supabase
+        .from('ollama_keys')
+        .update(update)
+        .eq('id', keyId)
+    }
+
+    console.log(`[OllamaDB] Released key #${keyId} (success: ${success})`)
+  } catch (err) {
+    console.error('[OllamaDB] Error releasing key:', err)
+  }
 }
 
 /**
@@ -430,13 +577,19 @@ function createModelInstance(modelId: string): any {
     case 'kilo/step-3.5-flash-free':
       return getKiloGateway()('stepfun/step-3.5-flash:free');
 
-    // Ollama Cloud models
+    // Ollama Cloud models — sync fallback (env-based rotation)
+    // For DB-backed rotation, use getOllamaModel() instead
     case 'ollama/devstral-2:123b':
+    case 'ollama/qwen3-coder:480b':
+    case 'ollama/qwen3-coder-next':
+    case 'ollama/qwen3.5:397b':
+    case 'ollama/deepseek-v3.1:671b':
     case 'ollama/deepseek-v3.2':
     case 'ollama/glm-4.6':
     case 'ollama/glm-4.7':
     case 'ollama/kimi-k2.5':
     case 'ollama/kimi-k2-thinking':
+    case 'ollama/minimax-m2.7':
     case 'ollama/minimax-m2.5':
     case 'ollama/minimax-m2.1':
     case 'ollama/kimi-k2:1t': {
@@ -499,6 +652,30 @@ export function isProviderError(error: unknown): boolean {
     msg.includes('overloaded') || msg.includes('capacity') || msg.includes('unavailable') ||
     msg.includes('gateway') || msg.includes('upstream')
   )
+}
+
+/**
+ * Get an Ollama model with DB-backed key rotation.
+ * Returns { model, keyId } where keyId must be passed to releaseOllamaKey() after use.
+ * Falls back to env-based rotation if DB is unavailable.
+ */
+export async function getOllamaModel(modelId: string): Promise<{ model: any, keyId: number | null }> {
+  const ollamaModelName = modelId.replace('ollama/', '')
+
+  // Try DB-backed rotation first
+  const dbResult = await getOllamaCloudProviderFromDB()
+  if (dbResult) {
+    return {
+      model: dbResult.provider(ollamaModelName),
+      keyId: dbResult.keyId,
+    }
+  }
+
+  // Fallback to env-based rotation
+  return {
+    model: getOllamaCloudProvider()(ollamaModelName),
+    keyId: null,
+  }
 }
 
 // Helper function to get a model by ID (lazy creation with caching)

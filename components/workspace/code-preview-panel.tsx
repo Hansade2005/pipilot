@@ -896,6 +896,9 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
   const [isResizing, setIsResizing] = useState(false)
   const resizeRef = useRef<HTMLDivElement>(null)
   const [browserLogs, setBrowserLogs] = useState<string[]>([])
+  const [iframeNavHistory, setIframeNavHistory] = useState<string[]>([])
+  const [iframeNavIndex, setIframeNavIndex] = useState(-1)
+  const [currentIframeUrl, setCurrentIframeUrl] = useState<string>("")
   const [isExpoProject, setIsExpoProject] = useState(false)
   const [isViteProject, setIsViteProject] = useState(false)
   const [showSandpackPreview, setShowSandpackPreview] = useState(false)
@@ -990,11 +993,39 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
     const checkProjectFramework = async () => {
       try {
         const { storageManager } = await import('@/lib/storage-manager')
+        const { detectProjectTypeWithAI } = await import('@/lib/utils')
         const files = await storageManager.getFiles(project.id)
 
-        // Check Expo: app.json or app.config.js or expo in dependencies
-        const hasExpoConfig = files.some((f: StorageFile) => f.path === 'app.json' || f.path === 'app.config.js')
-        const packageJsonFile = files.find((f: StorageFile) => f.path === 'package.json')
+        // Use AI detection for accurate framework classification
+        const aiType = await detectProjectTypeWithAI(files)
+        console.log(`[CodePreviewPanel] AI detected project type: ${aiType}`)
+
+        if (aiType === 'expo') {
+          setIsExpoProject(true)
+          setIsViteProject(false)
+          return
+        }
+
+        if (aiType === 'vite-react') {
+          setIsExpoProject(false)
+          setIsViteProject(true)
+          return
+        }
+
+        if (aiType !== 'unknown') {
+          // nextjs or html — neither expo nor vite
+          setIsExpoProject(false)
+          setIsViteProject(false)
+          return
+        }
+
+        // Fallback: manual detection with normalized paths (handles leading /)
+        const normalize = (p: string) => p?.startsWith('/') ? p.slice(1) : p
+        const hasExpoConfig = files.some((f: StorageFile) => {
+          const p = normalize(f.path)
+          return p === 'app.json' || p === 'app.config.js'
+        })
+        const packageJsonFile = files.find((f: StorageFile) => normalize(f.path) === 'package.json')
         let packageJson: any = null
         if (packageJsonFile) {
           try { packageJson = JSON.parse(packageJsonFile.content) } catch {}
@@ -1007,11 +1038,12 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
         }
         setIsExpoProject(false)
 
-        // Check Vite: vite.config.ts/js/mjs or vite in devDependencies
-        const hasViteConfig = files.some((f: StorageFile) =>
-          f.path === 'vite.config.ts' || f.path === 'vite.config.js' || f.path === 'vite.config.mjs'
-        )
-        const hasViteDep = !!(packageJson?.devDependencies?.vite || packageJson?.dependencies?.vite)
+        const hasViteConfig = files.some((f: StorageFile) => {
+          const p = normalize(f.path)
+          return p === 'vite.config.ts' || p === 'vite.config.js' || p === 'vite.config.mjs'
+        })
+        const hasViteDep = !!(packageJson?.devDependencies?.vite || packageJson?.dependencies?.vite ||
+          packageJson?.devDependencies?.['@vitejs/plugin-react'] || packageJson?.devDependencies?.['@vitejs/plugin-react-swc'])
         setIsViteProject(hasViteConfig || hasViteDep)
       } catch (error) {
         console.error('Error checking project framework:', error)
@@ -1023,23 +1055,38 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
     checkProjectFramework()
   }, [project])
 
-  // Auto-load preview URL from project slug on preview tab switch
-  // Projects already have a slug field - use it to construct the preview URL directly
+  // Auto-load preview URL from the deployed slug in the sites DB (always accurate)
+  // Falls back to local project.slug if no DB record exists yet
   useEffect(() => {
     if (
       activeTab === 'preview' &&
       isViteProject &&
       !isExpoProject &&
       project?.id &&
-      project?.slug &&
       !preview.url &&
       !preview.isLoading
     ) {
-      const previewUrl = `https://${project.slug}.pipilot.dev/`
-      console.log('[CodePreviewPanel] Constructed preview URL from project slug:', previewUrl)
-      setPreview(prev => ({ ...prev, url: previewUrl }))
+      // Fetch the actual deployed slug from the sites table (agent cloud DB)
+      fetch(`/api/sites/slug?projectId=${project.id}`)
+        .then(res => res.json())
+        .then(data => {
+          const slug = data.slug || project?.slug
+          if (slug) {
+            const previewUrl = `https://${slug}.pipilot.dev/`
+            console.log('[CodePreviewPanel] Preview URL from DB slug:', previewUrl, data.slug ? '(from sites DB)' : '(fallback to local slug)')
+            setPreview(prev => ({ ...prev, url: previewUrl }))
+          }
+        })
+        .catch(() => {
+          // Fallback to local slug if API fails
+          if (project?.slug) {
+            const previewUrl = `https://${project.slug}.pipilot.dev/`
+            console.log('[CodePreviewPanel] Preview URL from local slug (API failed):', previewUrl)
+            setPreview(prev => ({ ...prev, url: previewUrl }))
+          }
+        })
     }
-  }, [activeTab, isViteProject, isExpoProject, project?.id, project?.slug, preview.url, preview.isLoading])
+  }, [activeTab, isViteProject, isExpoProject, project?.id, preview.url, preview.isLoading])
 
   // Track if files have changed since last preview was created
   const filesChangedSincePreviewRef = useRef(false)
@@ -1128,6 +1175,23 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
       // Only process if from our iframe or a trusted domain
       if (!isFromIframe && !isFromPipilotDomain) {
         return
+      }
+
+      // Handle iframe navigation URL changes
+      if (event.data?.type === 'iframe-navigation' && event.data?.url) {
+        const navUrl = event.data.url
+        setCurrentIframeUrl(navUrl)
+        // Push to navigation history (trim forward history if we navigated back then go somewhere new)
+        setIframeNavIndex(prevIndex => {
+          setIframeNavHistory(prev => {
+            const newHistory = [...prev.slice(0, prevIndex + 1), navUrl]
+            return newHistory
+          })
+          return prevIndex + 1
+        })
+        // Update WebPreview context URL display
+        setCustomUrl(navUrl)
+        onUrlChange?.(navUrl)
       }
 
       // Handle legacy console messages
@@ -1257,6 +1321,46 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
                   }, '*');
                 });
 
+                // Track navigation changes and report URL to parent
+                var lastUrl = window.location.href;
+                window.parent.postMessage({
+                  type: 'iframe-navigation',
+                  url: lastUrl
+                }, '*');
+
+                var origPushState = history.pushState;
+                var origReplaceState = history.replaceState;
+                history.pushState = function() {
+                  origPushState.apply(this, arguments);
+                  var newUrl = window.location.href;
+                  if (newUrl !== lastUrl) {
+                    lastUrl = newUrl;
+                    window.parent.postMessage({ type: 'iframe-navigation', url: newUrl }, '*');
+                  }
+                };
+                history.replaceState = function() {
+                  origReplaceState.apply(this, arguments);
+                  var newUrl = window.location.href;
+                  if (newUrl !== lastUrl) {
+                    lastUrl = newUrl;
+                    window.parent.postMessage({ type: 'iframe-navigation', url: newUrl }, '*');
+                  }
+                };
+                window.addEventListener('popstate', function() {
+                  var newUrl = window.location.href;
+                  if (newUrl !== lastUrl) {
+                    lastUrl = newUrl;
+                    window.parent.postMessage({ type: 'iframe-navigation', url: newUrl }, '*');
+                  }
+                });
+                window.addEventListener('hashchange', function() {
+                  var newUrl = window.location.href;
+                  if (newUrl !== lastUrl) {
+                    lastUrl = newUrl;
+                    window.parent.postMessage({ type: 'iframe-navigation', url: newUrl }, '*');
+                  }
+                });
+
                 // Send initial message to confirm interceptor is loaded
                 window.parent.postMessage({
                   type: 'console',
@@ -1368,6 +1472,51 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
                   }, '*');
                 });
 
+                // Track navigation changes and report URL to parent
+                var lastUrl = window.location.href;
+                window.parent.postMessage({
+                  type: 'iframe-navigation',
+                  url: lastUrl
+                }, '*');
+
+                // Intercept pushState and replaceState
+                var origPushState = history.pushState;
+                var origReplaceState = history.replaceState;
+                history.pushState = function() {
+                  origPushState.apply(this, arguments);
+                  var newUrl = window.location.href;
+                  if (newUrl !== lastUrl) {
+                    lastUrl = newUrl;
+                    window.parent.postMessage({ type: 'iframe-navigation', url: newUrl }, '*');
+                  }
+                };
+                history.replaceState = function() {
+                  origReplaceState.apply(this, arguments);
+                  var newUrl = window.location.href;
+                  if (newUrl !== lastUrl) {
+                    lastUrl = newUrl;
+                    window.parent.postMessage({ type: 'iframe-navigation', url: newUrl }, '*');
+                  }
+                };
+
+                // Listen for popstate (back/forward within iframe)
+                window.addEventListener('popstate', function() {
+                  var newUrl = window.location.href;
+                  if (newUrl !== lastUrl) {
+                    lastUrl = newUrl;
+                    window.parent.postMessage({ type: 'iframe-navigation', url: newUrl }, '*');
+                  }
+                });
+
+                // Listen for hashchange
+                window.addEventListener('hashchange', function() {
+                  var newUrl = window.location.href;
+                  if (newUrl !== lastUrl) {
+                    lastUrl = newUrl;
+                    window.parent.postMessage({ type: 'iframe-navigation', url: newUrl }, '*');
+                  }
+                });
+
                 // Send initial message to confirm interceptor is loaded
                 window.parent.postMessage({
                   type: 'console',
@@ -1376,7 +1525,7 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
                 }, '*');
               })();
             `;
-            
+
             // Try multiple methods to inject the script
             try {
               // Method 1: Direct script injection
@@ -1390,14 +1539,14 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
               }
             } catch (scriptError) {
               console.warn('Script element injection failed, trying eval method:', scriptError)
-              
+
               // Method 2: Try eval (may be blocked by sandbox)
               try {
                 (iframe.contentWindow as any)?.eval(script)
                 console.log('Console interceptor injected via eval')
               } catch (evalError) {
                 console.warn('Eval injection failed, trying postMessage method:', evalError)
-                
+
                 // Method 3: PostMessage to iframe (requires iframe to listen)
                 iframe.contentWindow?.postMessage({
                   type: 'inject-console-interceptor',
@@ -1453,7 +1602,10 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
     setCurrentLog("Booting VM...")
     setRocketPhase('cruising') // Start with cruise rocket
     setConsoleOutput([]) // Clear previous console output
-    
+    setIframeNavHistory([]) // Reset navigation history
+    setIframeNavIndex(-1)
+    setCurrentIframeUrl("")
+
     // Dispatch preview starting event
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('preview-starting', { 
@@ -1517,12 +1669,19 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
       const filteredFiles = filterUnwantedFiles(files)
       console.log(`[CodePreviewPanel] Filtered files for preview: ${filteredFiles.length} of ${files.length} (removed ${files.length - filteredFiles.length} unwanted files)`)
 
+      // AI-powered project type detection
+      const { detectProjectTypeWithAI } = await import('@/lib/utils')
+      const aiProjectType = await detectProjectTypeWithAI(filteredFiles)
+      const resolvedProjectType = aiProjectType !== 'unknown' ? aiProjectType : (isExpoProject ? 'expo' : isViteProject ? 'vite-react' : 'html')
+      console.log(`[CodePreviewPanel] Project type: AI=${aiProjectType}, resolved=${resolvedProjectType}`)
+
       // Compress the project files for efficient transfer
-      const compressedData = await compressProjectFiles(filteredFiles, [], [], { 
+      const compressedData = await compressProjectFiles(filteredFiles, [], [], {
         project,
         authUserId,
         authUsername,
-        isProduction: false // This is a preview site, should show badge
+        isProduction: false,
+        projectType: resolvedProjectType
       })
 
       // Create a streaming request with EventSource-like handling
@@ -2947,7 +3106,7 @@ export default function TodoApp() {
           >
           <WebPreview
             className="h-full"
-            defaultUrl={syncedUrl || preview.url || ""}
+            defaultUrl={currentIframeUrl || syncedUrl || preview.url || ""}
             defaultDevice={previewViewMode === 'mobile' ? DEVICE_PRESETS.find(d => d.name === 'iPhone 12/13') || null : null}
             onUrlChange={(url) => {
               setCustomUrl(url)
@@ -3008,10 +3167,42 @@ export default function TodoApp() {
               )}
 
               <WebPreviewUrl
+                onGoBack={() => {
+                  if (iframeNavIndex > 0) {
+                    const newIndex = iframeNavIndex - 1
+                    const targetUrl = iframeNavHistory[newIndex]
+                    setIframeNavIndex(newIndex)
+                    setCurrentIframeUrl(targetUrl)
+                    setCustomUrl(targetUrl)
+                    onUrlChange?.(targetUrl)
+                    // Navigate the iframe
+                    const iframe = previewIframeRef.current
+                    if (iframe?.contentWindow) {
+                      try { iframe.contentWindow.history.back() } catch { /* cross-origin */ }
+                    }
+                  }
+                }}
+                onGoForward={() => {
+                  if (iframeNavIndex < iframeNavHistory.length - 1) {
+                    const newIndex = iframeNavIndex + 1
+                    const targetUrl = iframeNavHistory[newIndex]
+                    setIframeNavIndex(newIndex)
+                    setCurrentIframeUrl(targetUrl)
+                    setCustomUrl(targetUrl)
+                    onUrlChange?.(targetUrl)
+                    const iframe = previewIframeRef.current
+                    if (iframe?.contentWindow) {
+                      try { iframe.contentWindow.history.forward() } catch { /* cross-origin */ }
+                    }
+                  }
+                }}
+                canGoBack={iframeNavIndex > 0}
+                canGoForward={iframeNavIndex < iframeNavHistory.length - 1}
                 onRefresh={refreshPreview}
                 onOpenExternal={() => {
-                  if (preview.url) {
-                    window.open(preview.url, '_blank')
+                  const urlToOpen = currentIframeUrl || preview.url
+                  if (urlToOpen) {
+                    window.open(urlToOpen, '_blank')
                   }
                 }}
                 refreshDisabled={!preview.url}
@@ -3202,19 +3393,19 @@ export default function TodoApp() {
               terminalLogs={consoleOutput}
               browserLogs={browserLogs}
               onAskAiToFix={(errors) => {
-                // Dispatch custom event to fill chat input with error debugging request
                 const errorList = errors.map((err, i) => `${i + 1}. ${err}`).join('\n')
-                const prompt = `Debug and fix these browser console errors:\n\n${errorList}\n\nPlease analyze these errors and use your file edit tools to fix them.`
+                const routeInfo = currentIframeUrl ? `\n\nCurrent route where errors occurred: ${currentIframeUrl}` : ''
+                const prompt = `Fix these browser console errors:\n\n${errorList}${routeInfo}\n\nIMPORTANT: Read the file ONCE, identify ALL issues, fix them ALL in one edit, then check_dev_errors once. Do NOT read the same file multiple times or fix errors one at a time.`
                 window.dispatchEvent(new CustomEvent('ask-ai-to-fix', {
-                  detail: { prompt, errors }
+                  detail: { prompt, errors, currentRoute: currentIframeUrl || undefined }
                 }))
               }}
               onAskAiToFixTerminal={(errors) => {
-                // Dispatch custom event to fill chat input with terminal error debugging request
                 const errorList = errors.map((err, i) => `${i + 1}. ${err}`).join('\n')
-                const prompt = `Debug and fix these terminal errors:\n\n${errorList}\n\nPlease analyze these errors and use your file edit tools to fix them.`
+                const routeInfo = currentIframeUrl ? `\n\nCurrent route where errors occurred: ${currentIframeUrl}` : ''
+                const prompt = `Fix these terminal/build errors:\n\n${errorList}${routeInfo}\n\nIMPORTANT: Read the erroring file ONCE, identify ALL similar issues throughout the file, fix them ALL in one write_file call, then check_dev_errors once. Do NOT fix one error at a time — find the pattern and fix all occurrences at once.`
                 window.dispatchEvent(new CustomEvent('ask-ai-to-fix', {
-                  detail: { prompt, errors }
+                  detail: { prompt, errors, currentRoute: currentIframeUrl || undefined }
                 }))
               }}
               onClearBrowserLogs={() => {

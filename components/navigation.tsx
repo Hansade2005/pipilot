@@ -243,6 +243,15 @@ export function Navigation() {
                       </div>
                     </DropdownMenuItem>
                   </Link>
+                  <Link href="/api">
+                    <DropdownMenuItem className="text-white hover:bg-gray-700 cursor-pointer">
+                      <Server className="w-4 h-4 mr-2" />
+                      <div>
+                        <div className="font-medium">Search API</div>
+                        <div className="text-xs text-gray-400">AI search for your apps</div>
+                      </div>
+                    </DropdownMenuItem>
+                  </Link>
                   <a href="https://swe.pipilot.dev" target="_blank" rel="noopener noreferrer">
                     <DropdownMenuItem className="text-white hover:bg-gray-700 cursor-pointer">
                       <Code className="w-4 h-4 mr-2" />
@@ -255,14 +264,14 @@ export function Navigation() {
                 </DropdownMenuContent>
               </DropdownMenu>
               
-              <Link href="/community" className="text-white hover:text-orange-400 transition-colors">
-                Community
+              <Link href="/showcase" className="text-white hover:text-orange-400 transition-colors">
+                Showcase
               </Link>
               <Link href="/enterprise" className="text-white hover:text-orange-400 transition-colors">
                 Business
               </Link>
               <Link href="/pricing" className="text-white hover:text-orange-400 transition-colors">
-                Plans
+                Pricing
               </Link>
               <Link href="/docs" className="text-white hover:text-orange-400 transition-colors">
                 Docs

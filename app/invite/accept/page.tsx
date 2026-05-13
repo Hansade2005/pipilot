@@ -283,12 +283,12 @@ function AcceptInvitationContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <Card className="w-full max-w-md">
+      <div className="min-h-screen flex items-center justify-center bg-gray-950">
+        <Card className="w-full max-w-md bg-gray-900 border-gray-800">
           <CardContent className="flex flex-col items-center justify-center p-8">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Validating Invitation</h2>
-            <p className="text-gray-600 text-center">Please wait while we verify your invitation...</p>
+            <Loader2 className="h-8 w-8 animate-spin text-orange-500 mb-4" />
+            <h2 className="text-xl font-semibold text-gray-100 mb-2">Validating Invitation</h2>
+            <p className="text-gray-400 text-center">Please wait while we verify your invitation...</p>
           </CardContent>
         </Card>
       </div>
@@ -297,14 +297,14 @@ function AcceptInvitationContent() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-pink-100">
-        <Card className="w-full max-w-md">
+      <div className="min-h-screen flex items-center justify-center bg-gray-950">
+        <Card className="w-full max-w-md bg-gray-900 border-gray-800">
           <CardContent className="flex flex-col items-center justify-center p-8">
-            <XCircle className="h-12 w-12 text-red-600 mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Invalid Invitation</h2>
-            <p className="text-gray-600 text-center mb-6">{error}</p>
-            <Button onClick={() => router.push('/workspace/teams')} variant="outline">
-              Go to Teams
+            <XCircle className="h-12 w-12 text-red-500 mb-4" />
+            <h2 className="text-xl font-semibold text-gray-100 mb-2">Invalid Invitation</h2>
+            <p className="text-gray-400 text-center mb-6">{error}</p>
+            <Button onClick={() => router.push('/workspace')} variant="outline" className="border-gray-700 text-gray-300 hover:bg-gray-800">
+              Go to Workspace
             </Button>
           </CardContent>
         </Card>
@@ -314,18 +314,18 @@ function AcceptInvitationContent() {
 
   if (accepted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-100">
-        <Card className="w-full max-w-md">
+      <div className="min-h-screen flex items-center justify-center bg-gray-950">
+        <Card className="w-full max-w-md bg-gray-900 border-gray-800">
           <CardContent className="flex flex-col items-center justify-center p-8">
-            <CheckCircle className="h-12 w-12 text-green-600 mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Welcome to the Team!</h2>
-            <p className="text-gray-600 text-center mb-6">
-              You've successfully joined <strong>{invitationData?.organization.name}</strong> as a <strong>{invitationData?.role}</strong>.
+            <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
+            <h2 className="text-xl font-semibold text-gray-100 mb-2">Welcome to the Team!</h2>
+            <p className="text-gray-400 text-center mb-6">
+              You've successfully joined <strong className="text-gray-200">{invitationData?.organization.name}</strong> as a <strong className="text-orange-400 capitalize">{invitationData?.role}</strong>.
             </p>
-            <p className="text-sm text-gray-500 mb-6">Redirecting to your teams...</p>
-            <Button onClick={() => router.push('/workspace/teams')} className="w-full">
+            <p className="text-sm text-gray-500 mb-6">Redirecting to workspace...</p>
+            <Button onClick={() => router.push('/workspace')} className="w-full bg-orange-600 hover:bg-orange-500 text-white">
               <ArrowRight className="h-4 w-4 mr-2" />
-              Go to Teams
+              Go to Workspace
             </Button>
           </CardContent>
         </Card>
@@ -334,32 +334,34 @@ function AcceptInvitationContent() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-gray-950">
+      <Card className="w-full max-w-md bg-gray-900 border-gray-800">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <Users className="h-12 w-12 text-blue-600" />
+            <div className="h-14 w-14 rounded-full bg-orange-600/15 flex items-center justify-center">
+              <Users className="h-7 w-7 text-orange-400" />
+            </div>
           </div>
-          <CardTitle className="text-2xl">Team Invitation</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-2xl text-gray-100">Team Invitation</CardTitle>
+          <CardDescription className="text-gray-400">
             You've been invited to join a team
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="text-center space-y-2">
-            <h3 className="text-lg font-semibold text-gray-900">
+            <h3 className="text-lg font-semibold text-gray-100">
               {invitationData?.organization.name}
             </h3>
-            <p className="text-gray-600">
+            <p className="text-gray-400">
               Invited by {invitationData?.inviter.name}
             </p>
             <p className="text-sm text-gray-500">
-              Role: <span className="font-medium capitalize">{invitationData?.role}</span>
+              Role: <span className="font-medium capitalize text-orange-400">{invitationData?.role}</span>
             </p>
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-800">
+          <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4">
+            <p className="text-sm text-orange-300">
               By accepting this invitation, you'll be able to collaborate with the team on projects and workspaces.
             </p>
           </div>
@@ -367,7 +369,7 @@ function AcceptInvitationContent() {
           <Button
             onClick={handleAcceptInvitation}
             disabled={accepting}
-            className="w-full"
+            className="w-full bg-orange-600 hover:bg-orange-500 text-white shadow-lg shadow-orange-500/20"
             size="lg"
           >
             {accepting ? (
@@ -384,11 +386,11 @@ function AcceptInvitationContent() {
           </Button>
 
           <Button
-            onClick={() => router.push('/workspace/teams')}
+            onClick={() => router.push('/workspace')}
             variant="outline"
-            className="w-full"
+            className="w-full border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-gray-100"
           >
-            View My Teams
+            Go to Workspace
           </Button>
         </CardContent>
       </Card>
@@ -400,10 +402,10 @@ export default function AcceptInvitationPage() {
   usePageTitle('Accept Invitation')
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-950">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading invitation...</p>
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-orange-500" />
+          <p className="text-gray-400">Loading invitation...</p>
         </div>
       </div>
     }>

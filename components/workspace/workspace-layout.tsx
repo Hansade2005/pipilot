@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import React, { useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import type { User } from "@supabase/supabase-js"
+import { createClient } from "@/lib/supabase/client"
 import type { Workspace, File } from "@/lib/storage-manager"
 import { Sidebar } from "./sidebar"
 import { ModernSidebar } from "./modern-sidebar"
@@ -25,9 +26,17 @@ import { DatabaseTab } from "./database-tab"
 import { AIPplatformTab } from "./ai-platform-tab"
 import { CloudTab } from "./cloud-tab"
 import { AuditTab } from "./audit-tab"
+import { MonitorTab } from "./monitor-tab"
+import { TeamPanel } from "./team-panel"
+import { ConvertToTeamDialog } from "./convert-to-team-dialog"
+import { TeamSyncButton } from "./team-sync-button"
+import { TeamPresence } from "./team-presence"
+import { TeamActivityFeed } from "./team-activity-feed"
+import { TeamSharedChats } from "./team-shared-chats"
+import { SourceControlTab } from "./source-control-tab"
 import { ActivitySearchPanel } from "./activity-search-panel"
 import { ActivityChatPanel } from "./activity-chat-panel"
-import { Github, Globe, Rocket, Settings, PanelLeft, PanelLeftClose, PanelLeftOpen, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, DatabaseBackup, Square, Monitor, Smartphone, Database, Cloud, Shield, Search, Folder, BarChart3, Bot, CalendarClock, GitPullRequestArrow, HeartPulse, Archive, KeyRound, LayoutGrid } from "lucide-react"
+import { Github, Globe, Rocket, Settings, PanelLeft, PanelLeftClose, PanelLeftOpen, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, DatabaseBackup, Square, Monitor, Smartphone, Database, Cloud, Shield, Search, Folder, BarChart3, Bot, CalendarClock, GitPullRequestArrow, HeartPulse, Archive, KeyRound, LayoutGrid, Users, GitBranch } from "lucide-react"
 import { storageManager } from "@/lib/storage-manager"
 import { useToast } from '@/hooks/use-toast'
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -35,6 +44,10 @@ import { useCloudSync } from '@/hooks/use-cloud-sync'
 import { useAutoCloudBackup } from '@/hooks/use-auto-cloud-backup'
 import { useRealtimeSync } from '@/hooks/use-realtime-sync'
 import { useSubscriptionCache } from '@/hooks/use-subscription-cache'
+import { useAutoMonitor } from '@/hooks/use-auto-monitor'
+import { useTeamFileSync } from '@/hooks/use-team-file-sync'
+import { useTeamSync } from '@/hooks/use-team-sync'
+import { useGitHubSync } from '@/hooks/use-github-sync'
 import { restoreBackupFromCloud, isCloudSyncEnabled } from '@/lib/cloud-sync'
 import { generateFileUpdate, type StyleChange } from '@/lib/visual-editor'
 
@@ -77,11 +90,13 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const { subscription } = useSubscriptionCache(user?.id)
   const userPlan = subscription?.plan || 'free'
   const subscriptionStatus = subscription?.status || 'inactive'
-  const [activeTab, setActiveTab] = useState<"code" | "preview" | "cloud" | "audit">("code")
+  const [activeTab, setActiveTab] = useState<"code" | "preview" | "cloud" | "audit" | "monitor" | "team">("code")
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true) // Changed from false to true
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const { toast } = useToast()
+  const [aiFileChanges, setAiFileChanges] = useState(0)
   const [gitHubConnected, setGitHubConnected] = useState(false)
+  const [gitHubToken, setGitHubToken] = useState<string | undefined>(undefined)
   const [clientProjects, setClientProjects] = useState<Workspace[]>(projects)
   const [isLoadingProjects, setIsLoadingProjects] = useState(false)
   const [fileExplorerKey, setFileExplorerKey] = useState<number>(0) // Force file explorer refresh
@@ -92,7 +107,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   
   // Mobile-specific state
   const isMobile = useIsMobile()
-  const [mobileTab, setMobileTab] = useState<"chat" | "files" | "editor" | "preview" | "cloud" | "audit">("chat")
+  const [mobileTab, setMobileTab] = useState<"chat" | "files" | "editor" | "preview" | "cloud" | "audit" | "monitor" | "team">("chat")
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_CHAT_MODEL)
   const [aiMode, setAiMode] = useState<AIMode>('agent')
@@ -107,7 +122,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const sidebarRef = useRef<HTMLDivElement>(null)
 
   // VS Code-like code view state
-  const [codeViewPanel, setCodeViewPanel] = useState<'files' | 'search' | 'chat' | 'settings' | null>('files')
+  const [codeViewPanel, setCodeViewPanel] = useState<'files' | 'search' | 'chat' | 'settings' | 'source' | null>('files')
   const [openFiles, setOpenFiles] = useState<File[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [editorSettings, setEditorSettings] = useState<EditorSettings>(defaultEditorSettings)
@@ -199,6 +214,77 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       }
     }
   })
+
+  // Auto-monitor: creates a monitor when project is deployed
+  useAutoMonitor(
+    selectedProject?.id,
+    selectedProject?.name,
+    selectedProject?.vercelDeploymentUrl || selectedProject?.netlifyDeploymentUrl
+  )
+
+  // Convert-to-team dialog state
+  const [showConvertToTeam, setShowConvertToTeam] = useState(false)
+
+  // Team file sync (locks + real-time file changes)
+  const {
+    fileLocks,
+    isLockedByOther,
+    acquireLock,
+    releaseLock,
+    broadcastFileChange
+  } = useTeamFileSync({
+    workspaceId: selectedProject?.teamWorkspaceId,
+    organizationId: selectedProject?.organizationId,
+    userId: user.id,
+    enabled: !!selectedProject?.isTeamWorkspace
+  })
+
+  // Team sync: tracks dirty files and provides sync-to-team functionality
+  const {
+    changedFiles: teamChangedFiles,
+    deletedFiles: teamDeletedFiles,
+    pendingCount: teamPendingCount,
+    isSyncing: isTeamSyncing,
+    lastSyncAt: teamLastSyncAt,
+    syncError: teamSyncError,
+    syncToTeam,
+    clearPending: clearTeamPending,
+  } = useTeamSync({
+    workspaceId: selectedProject?.id,
+    teamWorkspaceId: selectedProject?.teamWorkspaceId,
+    isTeamWorkspace: !!selectedProject?.isTeamWorkspace,
+    userId: user.id,
+  })
+
+  // GitHub-backed team workspace sync
+  const {
+    changedFiles: ghChangedFiles,
+    deletedFiles: ghDeletedFiles,
+    pendingCount: ghPendingCount,
+    isSyncing: isGhSyncing,
+    isPulling: isGhPulling,
+    lastKnownSha,
+    hasRemoteChanges,
+    syncError: ghSyncError,
+    commitToGitHub,
+    pullFromGitHub,
+    clearPending: clearGhPending,
+    setLastKnownSha,
+  } = useGitHubSync({
+    workspaceId: selectedProject?.id,
+    teamWorkspaceId: selectedProject?.teamWorkspaceId,
+    isTeamWorkspace: !!selectedProject?.isTeamWorkspace,
+    isGitHubBacked: !!selectedProject?.isGitHubBacked,
+  })
+
+  // Use GitHub sync values when GitHub-backed, otherwise legacy team sync
+  const isCurrentGitHub = !!selectedProject?.isGitHubBacked
+  const effectiveChangedFiles = isCurrentGitHub ? ghChangedFiles : teamChangedFiles
+  const effectiveDeletedFiles = isCurrentGitHub ? ghDeletedFiles : teamDeletedFiles
+  const effectivePendingCount = isCurrentGitHub ? ghPendingCount : teamPendingCount
+  const effectiveIsSyncing = isCurrentGitHub ? isGhSyncing : isTeamSyncing
+  const effectiveSyncError = isCurrentGitHub ? ghSyncError : teamSyncError
+  const effectiveClearPending = isCurrentGitHub ? clearGhPending : clearTeamPending
 
   // GitHub push functionality
   const { pushToGitHub, checkGitHubConnection, isPushing } = useGitHubPush()
@@ -545,7 +631,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     }
 
     const handleAiStreamComplete = (event: CustomEvent) => {
-      const { shouldSwitchToPreview, shouldCreatePreview } = event.detail
+      const { shouldSwitchToPreview, shouldCreatePreview, shouldRefreshPreview } = event.detail
 
       // Stream is complete — clear streaming state immediately so the preview panel
       // doesn't keep showing <AIRespondingView/>. Without this, on mobile there's a
@@ -560,10 +646,17 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         }
       }
 
-      if (shouldCreatePreview) {
-        // Trigger preview creation with a longer delay to ensure all file writes
-        // to IndexedDB are fully committed before we read them for preview.
-        // Users reported that auto-started previews had stale/old file states.
+      if (shouldRefreshPreview) {
+        // AI already deployed via deploy_preview (Vite/HTML projects).
+        // Just refresh the iframe to show the latest deployed version.
+        console.log('[WorkspaceLayout] AI deployed changes — refreshing preview iframe')
+        setTimeout(() => {
+          if (codePreviewRef.current) {
+            codePreviewRef.current.refreshPreview()
+          }
+        }, 500)
+      } else if (shouldCreatePreview) {
+        // Non-deployed projects (Next.js, Expo) — create E2B sandbox preview
         setTimeout(() => {
           if (codePreviewRef.current) {
             codePreviewRef.current.createPreview()
@@ -592,7 +685,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       try {
         await storageManager.init()
         const files = await storageManager.getFiles(selectedProject.id)
-        const file = files.find(f => f.path === filePath)
+        // Try exact match, then with/without leading / (imported projects may differ)
+        const normalizedPath = filePath.startsWith('/') ? filePath.slice(1) : filePath
+        const file = files.find(f => f.path === filePath || f.path === normalizedPath || f.path === '/' + normalizedPath)
 
         if (file) {
           setSelectedFile(file)
@@ -632,6 +727,28 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     window.addEventListener('ai-streaming-state', handleAiStreamingState as EventListener)
     window.addEventListener('openFileInEditor', handleOpenFileInEditor as EventListener)
 
+    // Listen for mobile tab switch requests (e.g., from "Ask AI to Fix" button)
+    const handleSwitchMobileTab = (e: CustomEvent) => {
+      const tab = e.detail?.tab
+      if (tab && isMobile) {
+        setMobileTab(tab)
+      }
+    }
+    window.addEventListener('switch-mobile-tab', handleSwitchMobileTab as EventListener)
+
+    // Listen for backup size exclusion notifications
+    const handleBackupExcluded = (e: CustomEvent) => {
+      const { excluded, message } = e.detail || {}
+      if (excluded?.length > 0) {
+        toast({
+          title: `${excluded.length} project${excluded.length > 1 ? 's' : ''} excluded from backup`,
+          description: message || 'Some projects are too large for cloud backup. Use GitHub sync instead.',
+          duration: 8000
+        })
+      }
+    }
+    window.addEventListener('backup-projects-excluded', handleBackupExcluded as EventListener)
+
     return () => {
       window.removeEventListener('preview-state-changed', handlePreviewStateChange as EventListener)
       window.removeEventListener('preview-url-changed', handlePreviewUrlChange as EventListener)
@@ -641,6 +758,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       window.removeEventListener('ai-stream-complete', handleAiStreamComplete as EventListener)
       window.removeEventListener('ai-streaming-state', handleAiStreamingState as EventListener)
       window.removeEventListener('openFileInEditor', handleOpenFileInEditor as EventListener)
+      window.removeEventListener('switch-mobile-tab', handleSwitchMobileTab as EventListener)
+      window.removeEventListener('backup-projects-excluded', handleBackupExcluded as EventListener)
     }
   }, [selectedProject, isMobile, toast])
 
@@ -738,7 +857,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
         // Update URL to ADD projectId alongside newProject (KEEP BOTH for protection)
         // DO NOT delete newProject parameter - it's needed to prevent auto-restore contamination!
-        if (searchParams.get('newProject') && !searchParams.get('projectId')) {
+        if (searchParams.get('newProject')) {
           const params = new URLSearchParams(searchParams.toString())
           // ✅ CRITICAL FIX: Keep newProject parameter AND add projectId
           // This ensures auto-restore is skipped during the initial load period
@@ -784,6 +903,112 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       }
     }
   }, [searchParams, clientProjects, selectedProject, router, isLoadingProjects])
+
+  // Handle team workspace loading from URL param (teamWorkspaceId)
+  useEffect(() => {
+    const teamWorkspaceId = searchParams.get('teamWorkspaceId')
+    if (!teamWorkspaceId || selectedProject?.teamWorkspaceId === teamWorkspaceId) return
+
+    const loadTeamWorkspace = async () => {
+      try {
+        const supabase = createClient()
+        const { data: tw, error } = await supabase
+          .from('team_workspaces')
+          .select('id, name, organization_id, files, created_at, created_by, visibility, github_repo_owner, github_repo_name, github_repo_url, github_default_branch, github_last_synced_sha')
+          .eq('id', teamWorkspaceId)
+          .single()
+
+        if (error || !tw) {
+          toast({ title: 'Team workspace not found', variant: 'destructive' })
+          return
+        }
+
+        const isGitHubBacked = !!(tw as any).github_repo_owner && !!(tw as any).github_repo_name
+
+        // Create a virtual workspace object for the team workspace
+        const teamWorkspace: Workspace = {
+          id: `team-${tw.id}`,
+          name: tw.name,
+          description: `Team workspace`,
+          slug: tw.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          userId: tw.created_by || user.id,
+          isPublic: tw.visibility === 'public',
+          isTemplate: false,
+          createdAt: tw.created_at,
+          updatedAt: tw.created_at,
+          lastActivity: tw.created_at,
+          deploymentStatus: 'not_deployed',
+          isTeamWorkspace: true,
+          teamWorkspaceId: tw.id,
+          organizationId: tw.organization_id,
+          isGitHubBacked,
+          githubRepoUrl: (tw as any).github_repo_url || undefined,
+          githubLastSyncedSha: (tw as any).github_last_synced_sha || undefined,
+        }
+
+        // Add to client projects if not already there
+        setClientProjects(prev => {
+          if (prev.find(p => p.id === teamWorkspace.id)) return prev
+          return [...prev, teamWorkspace]
+        })
+
+        setSelectedProject(teamWorkspace)
+
+        // Load team workspace files into IndexedDB for the file explorer
+        await storageManager.init()
+
+        // Check if we already have files for this virtual workspace
+        const existingFiles = await storageManager.getFiles(teamWorkspace.id)
+        if (existingFiles.length === 0) {
+          if (isGitHubBacked) {
+            // Fetch files from GitHub via API route
+            try {
+              const { fetchAllFiles } = await import('@/lib/github-client')
+              const { files: githubFiles } = await fetchAllFiles(tw.id)
+              for (const file of githubFiles) {
+                const path = file.path.startsWith('/') ? file.path : `/${file.path}`
+                const name = path.split('/').pop() || file.path
+                await storageManager.createFile({
+                  workspaceId: teamWorkspace.id,
+                  name,
+                  path,
+                  content: file.content || '',
+                  fileType: path.split('.').pop() || 'text',
+                  type: 'file',
+                  size: file.content?.length || 0,
+                  isDirectory: false,
+                })
+              }
+            } catch (err) {
+              console.error('Error loading files from GitHub:', err)
+              toast({ title: 'Failed to load files from GitHub', variant: 'destructive' })
+            }
+          } else if (tw.files && Array.isArray(tw.files)) {
+            // Legacy: Sync team files from JSONB to local IndexedDB
+            for (const file of tw.files as any[]) {
+              await storageManager.createFile({
+                workspaceId: teamWorkspace.id,
+                name: file.name,
+                path: file.path,
+                content: file.content || '',
+                fileType: file.fileType || file.type || 'text',
+                type: file.type || 'file',
+                size: file.size || (file.content?.length || 0),
+                isDirectory: file.isDirectory || false,
+              })
+            }
+          }
+        }
+
+        // Refresh file explorer
+        setTimeout(() => setFileExplorerKey(prev => prev + 1), 200)
+      } catch (err) {
+        console.error('Error loading team workspace:', err)
+      }
+    }
+
+    loadTeamWorkspace()
+  }, [searchParams, user.id])
 
   // Update browser tab title based on selected project
   useEffect(() => {
@@ -879,8 +1104,20 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       }
     }
 
+    // Also count AI file changes for the source control badge
+    const handleAiFileChange = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      if (detail?.projectId === selectedProject?.id) {
+        setAiFileChanges(prev => prev + 1)
+      }
+    }
+
     window.addEventListener('files-changed', handleFilesChanged as EventListener)
-    return () => window.removeEventListener('files-changed', handleFilesChanged as EventListener)
+    window.addEventListener('files-changed', handleAiFileChange as EventListener)
+    return () => {
+      window.removeEventListener('files-changed', handleFilesChanged as EventListener)
+      window.removeEventListener('files-changed', handleAiFileChange as EventListener)
+    }
   }, [selectedProject])
 
   // Handle modal close - reset form fields
@@ -969,24 +1206,21 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     }
   }
 
-  // Sync data from server if client has no projects
+  // Load projects from IndexedDB if client has none (e.g. fresh page with newProjectId)
   useEffect(() => {
     if (clientProjects.length === 0 && newProjectId && typeof window !== 'undefined') {
-      const syncFromServer = async () => {
+      const syncFromStorage = async () => {
         try {
-          // Try to fetch from server API
-          const response = await fetch('/api/workspaces')
-          if (response.ok) {
-            const data = await response.json()
-            if (data.workspaces && data.workspaces.length > 0) {
-              setClientProjects(data.workspaces)
-            }
+          await storageManager.init()
+          const workspaces = await storageManager.getWorkspaces(user.id)
+          if (workspaces && workspaces.length > 0) {
+            setClientProjects(workspaces)
           }
         } catch (error) {
-          // Error syncing from server - silently fail
+          // Error loading from storage - silently fail
         }
       }
-      syncFromServer()
+      syncFromStorage()
     }
   }, [clientProjects.length, newProjectId])
 
@@ -1012,15 +1246,40 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     const checkConnection = async () => {
       if (!selectedProject) {
         setGitHubConnected(false)
+        setGitHubToken(undefined)
         return
       }
 
-      const connectionStatus = await checkGitHubConnection(selectedProject)
-      setGitHubConnected(connectionStatus.connected)
+      // Refresh project data from IndexedDB to get latest githubRepoUrl
+      let projectToCheck = selectedProject
+      try {
+        await storageManager.init()
+        const workspaces = await storageManager.getWorkspaces(user.id)
+        const fresh = workspaces.find(w => w.id === selectedProject.id)
+        if (fresh && fresh.githubRepoUrl && !selectedProject.githubRepoUrl) {
+          const updated = { ...selectedProject, githubRepoUrl: fresh.githubRepoUrl, githubRepoName: fresh.githubRepoName }
+          setSelectedProject(updated)
+          projectToCheck = updated
+        }
+      } catch {}
+
+      const connectionStatus = await checkGitHubConnection(projectToCheck)
+      setGitHubConnected(connectionStatus.hasToken)
+
+      // Load token for source control (check hasToken, not connected — repo may not exist yet)
+      if (connectionStatus.hasToken) {
+        try {
+          const { getDeploymentTokens } = await import('@/lib/cloud-sync')
+          const tokens = await getDeploymentTokens(user.id)
+          setGitHubToken(tokens?.github || undefined)
+        } catch {}
+      } else {
+        setGitHubToken(undefined)
+      }
     }
 
     checkConnection()
-  }, [selectedProject, checkGitHubConnection])
+  }, [selectedProject, checkGitHubConnection, user.id])
 
   // Auto-switch to editor tab when file is selected on mobile
   React.useEffect(() => {
@@ -1233,6 +1492,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     const params = new URLSearchParams(searchParams.toString())
                     params.set('projectId', newProject.id)
                     params.set('newProject', newProject.id) // ✅ CRITICAL: This prevents auto-restore from running
+                          params.set('directStream', 'true')
                     router.push(`/workspace?${params.toString()}`)
                     
                                         
@@ -1301,7 +1561,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
                 {/* Right Panel - VS Code Layout */}
                 <ResizablePanel defaultSize={chatPanelVisible ? 60 : 100} minSize={30}>
-                  <div className="h-full flex flex-col overflow-hidden">
+                  <div className="h-full flex flex-col overflow-hidden relative">
+                    {/* Team indicators moved to status bar */}
                     {/* Content Area */}
                     {activeTab === "code" ? (
                       /* VS Code-like Layout: Activity Bar + Sidebar + Editor */
@@ -1366,6 +1627,33 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                             )}
                           </button>
 
+                          <button
+                            onClick={() => {
+                              setCodeViewPanel(codeViewPanel === 'source' ? null : 'source')
+                              setActiveTab("code")
+                              // Clear the AI file changes counter when opening source control
+                              if (codeViewPanel !== 'source') setAiFileChanges(0)
+                            }}
+                            className={`w-10 h-10 flex items-center justify-center rounded-lg mb-0.5 transition-colors relative ${
+                              codeViewPanel === 'source'
+                                ? 'text-orange-400 bg-orange-500/10'
+                                : 'text-gray-500 hover:text-gray-300'
+                            }`}
+                            title="Source Control"
+                          >
+                            <GitBranch className="size-5" />
+                            {aiFileChanges > 0 ? (
+                              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-orange-600 text-[10px] font-medium text-white leading-none">
+                                {aiFileChanges > 99 ? '99+' : aiFileChanges}
+                              </span>
+                            ) : hasRemoteChanges ? (
+                              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                            ) : null}
+                            {codeViewPanel === 'source' && (
+                              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-orange-500 rounded-r" />
+                            )}
+                          </button>
+
                           <div className="flex-1" />
 
                           {/* Bottom activity bar icons */}
@@ -1389,6 +1677,34 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                             title="Code Audit"
                           >
                             <Shield className="size-5" />
+                          </button>
+                          <button
+                            onClick={() => setActiveTab("monitor")}
+                            className={`w-10 h-10 flex items-center justify-center rounded-lg mb-0.5 transition-colors relative ${
+                              activeTab === 'monitor'
+                                ? 'text-orange-400 bg-orange-500/10'
+                                : 'text-gray-500 hover:text-gray-300'
+                            }`}
+                            title="AppCare Monitor"
+                          >
+                            <HeartPulse className="size-5" />
+                            {activeTab === 'monitor' && (
+                              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-orange-500 rounded-r" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => setActiveTab("team")}
+                            className={`w-10 h-10 flex items-center justify-center rounded-lg mb-0.5 transition-colors relative ${
+                              activeTab === 'team'
+                                ? 'text-orange-400 bg-orange-500/10'
+                                : 'text-gray-500 hover:text-gray-300'
+                            }`}
+                            title="Teams"
+                          >
+                            <Users className="size-5" />
+                            {activeTab === 'team' && (
+                              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-orange-500 rounded-r" />
+                            )}
                           </button>
                           <button
                             onClick={() => setCodeViewPanel(codeViewPanel === 'settings' ? null : 'settings')}
@@ -1636,6 +1952,39 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                                 </div>
                               </div>
                             )}
+                            {codeViewPanel === 'source' && (
+                              <SourceControlTab
+                                projectId={selectedProject?.id}
+                                teamWorkspaceId={selectedProject?.teamWorkspaceId}
+                                organizationId={selectedProject?.organizationId}
+                                isTeamWorkspace={!!selectedProject?.isTeamWorkspace}
+                                isGitHubBacked={!!selectedProject?.isGitHubBacked}
+                                githubRepoUrl={selectedProject?.githubRepoUrl}
+                                userId={user.id}
+                                lastKnownSha={lastKnownSha}
+                                hasRemoteChanges={hasRemoteChanges}
+                                isPulling={isGhPulling}
+                                onPull={pullFromGitHub}
+                                githubConnected={gitHubConnected}
+                                githubToken={gitHubToken}
+                                onPushToGitHub={async () => {
+                                  if (!selectedProject) return
+                                  await pushToGitHub(selectedProject as any)
+                                }}
+                                onRepoLinked={(repoUrl) => {
+                                  if (selectedProject) {
+                                    setSelectedProject({ ...selectedProject, githubRepoUrl: repoUrl })
+                                    // Also update in storage
+                                    storageManager.init().then(() => {
+                                      storageManager.updateWorkspace(selectedProject.id, {
+                                        ...selectedProject,
+                                        githubRepoUrl: repoUrl,
+                                      } as any)
+                                    }).catch(() => {})
+                                  }
+                                }}
+                              />
+                            )}
                           </div>
                         )}
 
@@ -1731,6 +2080,91 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                           <AuditTab user={user} selectedProject={selectedProject} />
                         </div>
                       </div>
+                    ) : activeTab === "monitor" ? (
+                      /* AppCare Monitor Tab */
+                      <div className="flex-1 flex flex-col min-h-0">
+                        <div className="flex items-center px-3 py-1.5 border-b border-gray-800/60 bg-gray-950">
+                          <button
+                            onClick={() => setActiveTab("code")}
+                            className="h-7 px-2 flex items-center gap-1.5 rounded-lg text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
+                          >
+                            <Code className="size-3.5" />
+                            <span>Back to Code</span>
+                          </button>
+                        </div>
+                        <div className="flex-1 min-h-0">
+                          <MonitorTab
+                            projectId={selectedProject?.id}
+                            projectName={selectedProject?.name}
+                            deploymentUrl={selectedProject?.vercelDeploymentUrl || selectedProject?.netlifyDeploymentUrl}
+                            userId={user.id}
+                          />
+                        </div>
+                      </div>
+                    ) : activeTab === "team" ? (
+                      /* Teams Tab */
+                      <div className="flex-1 flex flex-col min-h-0">
+                        <div className="flex items-center px-3 py-1.5 border-b border-gray-800/60 bg-gray-950">
+                          <button
+                            onClick={() => setActiveTab("code")}
+                            className="h-7 px-2 flex items-center gap-1.5 rounded-lg text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
+                          >
+                            <Code className="size-3.5" />
+                            <span>Back to Code</span>
+                          </button>
+                        </div>
+                        <div className="flex-1 min-h-0 overflow-y-auto">
+                          <TeamPanel
+                            userId={user.id}
+                            projectId={selectedProject?.id}
+                            projectName={selectedProject?.name}
+                            organizationId={selectedProject?.organizationId}
+                            teamWorkspaceId={selectedProject?.teamWorkspaceId}
+                            isGitHubBacked={!!selectedProject?.isGitHubBacked}
+                            githubRepoUrl={selectedProject?.githubRepoUrl}
+                            onWorkspaceDeleted={() => {
+                              setSelectedProject(null)
+                              window.location.href = '/workspace'
+                            }}
+                          />
+                          {/* Team Activity Section */}
+                          {selectedProject?.isTeamWorkspace && (
+                            <div className="border-t border-gray-800/60 px-4 py-2">
+                              <TeamActivityFeed
+                                workspaceId={selectedProject?.teamWorkspaceId || selectedProject?.id || ''}
+                                organizationId={selectedProject?.organizationId}
+                                inline
+                              />
+                            </div>
+                          )}
+                          {/* Shared Chats Section */}
+                          <div className="border-t border-gray-800/60">
+                            <TeamSharedChats
+                              workspaceId={selectedProject?.teamWorkspaceId}
+                              organizationId={selectedProject?.organizationId}
+                              userId={user.id}
+                              onLoadChat={(messages, title) => {
+                                window.dispatchEvent(new CustomEvent('load-shared-chat', {
+                                  detail: { messages, title, projectId: selectedProject?.id }
+                                }))
+                                toast({ title: 'Chat loaded', description: `"${title.slice(0, 40)}" loaded into chat` })
+                              }}
+                            />
+                          </div>
+                          {/* Convert to Team button for non-team workspaces */}
+                          {!selectedProject?.isTeamWorkspace && selectedProject && (
+                            <div className="border-t border-gray-800/60 p-4">
+                              <Button
+                                onClick={() => setShowConvertToTeam(true)}
+                                className="w-full bg-orange-600 hover:bg-orange-500 text-white"
+                              >
+                                <Users className="h-4 w-4 mr-2" />
+                                Convert to Team Workspace
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     ) : (
                       /* Database Tab - fallback */
                       <DatabaseTab workspaceId={selectedProject?.id || ""} />
@@ -1767,6 +2201,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       const params = new URLSearchParams(searchParams.toString())
                       params.set('projectId', newProject.id)
                       params.set('newProject', newProject.id)
+                      params.set('directStream', 'true')
                       router.push(`/workspace?${params.toString()}`)
                       
                       // Prevent auto-restore for newly created project
@@ -2034,6 +2469,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                           const params = new URLSearchParams(searchParams.toString())
                           params.set('projectId', newProject.id)
                           params.set('newProject', newProject.id) // ✅ CRITICAL: This prevents auto-restore from running
+                          params.set('directStream', 'true')
                           router.push(`/workspace?${params.toString()}`)
                           
                                                     
@@ -2125,6 +2561,25 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             <div className="flex items-center space-x-1">
               {selectedProject ? (
                 <>
+                  {/* Team Sync Button (mobile) */}
+                  {selectedProject?.isTeamWorkspace && (effectivePendingCount > 0 || hasRemoteChanges) && (
+                    <TeamSyncButton
+                      changedFiles={effectiveChangedFiles}
+                      deletedFiles={effectiveDeletedFiles}
+                      pendingCount={effectivePendingCount}
+                      isSyncing={effectiveIsSyncing}
+                      lastSyncAt={teamLastSyncAt}
+                      syncError={effectiveSyncError}
+                      isGitHubBacked={isCurrentGitHub}
+                      hasRemoteChanges={hasRemoteChanges}
+                      onSync={syncToTeam}
+                      onClearPending={effectiveClearPending}
+                      onOpenSourceControl={() => {
+                        setCodeViewPanel('source')
+                        setActiveTab("code")
+                      }}
+                    />
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
@@ -2215,6 +2670,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       const params = new URLSearchParams(searchParams.toString())
                       params.set('projectId', newProject.id)
                       params.set('newProject', newProject.id)
+                      params.set('directStream', 'true')
                       router.push(`/workspace?${params.toString()}`)
                       // Prevent auto-restore for newly created project
                       setJustCreatedProject(true)
@@ -2238,10 +2694,11 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               )
             ) : (
               <Tabs value={mobileTab} onValueChange={(value) => setMobileTab(value as any)} className="h-full flex flex-col">
-                <TabsContent value="chat" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
+                {/* Chat tab uses CSS visibility to keep the stream alive when switching tabs */}
+                <div className={`flex-1 flex flex-col overflow-hidden ${mobileTab === "chat" ? "" : "hidden"}`}>
                   <div className="h-full overflow-hidden">
                     <ChatPanelV2
-                      key={`chat-mobile-${selectedProject.id}-${chatSessionKey}`}
+                      key={`chat-${selectedProject.id}-${chatSessionKey}`}
                       project={selectedProject}
                       isMobile={true}
                       selectedModel={selectedModel}
@@ -2256,7 +2713,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       onClearTaggedComponent={() => setTaggedComponent(null)}
                     />
                   </div>
-                </TabsContent>
+                </div>
+                {/* Empty TabsContent to keep Tabs component happy */}
+                <TabsContent value="chat" className="flex-1 m-0 hidden" />
                 
                 <TabsContent value="files" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
                   <div className="h-full overflow-hidden">
@@ -2330,6 +2789,46 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     <AuditTab user={user} selectedProject={selectedProject} />
                   </div>
                 </TabsContent>
+                <TabsContent value="monitor" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
+                  <div className="h-full overflow-hidden">
+                    <MonitorTab
+                      projectId={selectedProject?.id}
+                      projectName={selectedProject?.name}
+                      deploymentUrl={selectedProject?.vercelDeploymentUrl || selectedProject?.netlifyDeploymentUrl}
+                      userId={user.id}
+                    />
+                  </div>
+                </TabsContent>
+                <TabsContent value="team" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
+                  <div className="h-full overflow-y-auto">
+                    <TeamPanel
+                      userId={user.id}
+                      projectId={selectedProject?.id}
+                      projectName={selectedProject?.name}
+                      organizationId={selectedProject?.organizationId}
+                      teamWorkspaceId={selectedProject?.teamWorkspaceId}
+                      isGitHubBacked={!!selectedProject?.isGitHubBacked}
+                      githubRepoUrl={selectedProject?.githubRepoUrl}
+                      onWorkspaceDeleted={() => {
+                        setSelectedProject(null)
+                        window.location.href = '/workspace'
+                      }}
+                    />
+                    <div className="border-t border-gray-800/60">
+                      <TeamSharedChats
+                        workspaceId={selectedProject?.teamWorkspaceId}
+                        organizationId={selectedProject?.organizationId}
+                        userId={user.id}
+                        onLoadChat={(messages, title) => {
+                          window.dispatchEvent(new CustomEvent('load-shared-chat', {
+                            detail: { messages, title, projectId: selectedProject?.id }
+                          }))
+                          toast({ title: 'Chat loaded', description: `"${title.slice(0, 40)}" loaded into chat` })
+                        }}
+                      />
+                    </div>
+                  </div>
+                </TabsContent>
               </Tabs>
             )}
           </div>
@@ -2382,6 +2881,24 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 >
                   <Shield className={`h-5 w-5 ${mobileTab === "audit" ? "stroke-[2.5]" : ""}`} />
                   <span className={`text-[10px] font-medium ${mobileTab === "audit" ? "text-orange-400" : ""}`}>Audit</span>
+                </button>
+                <button
+                  onClick={() => setMobileTab("monitor")}
+                  className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-xl transition-all ${
+                    mobileTab === "monitor" ? "text-orange-400" : "text-gray-500 hover:text-gray-300"
+                  }`}
+                >
+                  <HeartPulse className={`h-5 w-5 ${mobileTab === "monitor" ? "stroke-[2.5]" : ""}`} />
+                  <span className={`text-[10px] font-medium ${mobileTab === "monitor" ? "text-orange-400" : ""}`}>Monitor</span>
+                </button>
+                <button
+                  onClick={() => setMobileTab("team")}
+                  className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-xl transition-all ${
+                    mobileTab === "team" ? "text-orange-400" : "text-gray-500 hover:text-gray-300"
+                  }`}
+                >
+                  <Users className={`h-5 w-5 ${mobileTab === "team" ? "stroke-[2.5]" : ""}`} />
+                  <span className={`text-[10px] font-medium ${mobileTab === "team" ? "text-orange-400" : ""}`}>Team</span>
                 </button>
               </div>
             </div>
@@ -2439,6 +2956,19 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Convert to Team Dialog */}
+      {selectedProject && (
+        <ConvertToTeamDialog
+          open={showConvertToTeam}
+          onOpenChange={setShowConvertToTeam}
+          workspaceId={selectedProject.id}
+          workspaceName={selectedProject.name}
+          onConversionComplete={() => {
+            setShowConvertToTeam(false)
+          }}
+        />
+      )}
 
     </div>
   );

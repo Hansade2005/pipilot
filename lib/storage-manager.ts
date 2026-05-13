@@ -33,6 +33,13 @@ export interface Workspace {
   supabaseServiceRoleKey?: string
   supabaseConnected?: boolean
   supabaseConnectionUpdatedAt?: string
+  // Team workspace properties
+  isTeamWorkspace?: boolean
+  teamWorkspaceId?: string
+  organizationId?: string
+  // GitHub-backed team workspace
+  isGitHubBacked?: boolean
+  githubLastSyncedSha?: string
   createdAt: string
   updatedAt: string
 }
@@ -569,10 +576,34 @@ class InMemoryStorage implements StorageInterface {
 
   // File methods
   async createFile(file: Omit<File, 'id' | 'createdAt' | 'updatedAt'>): Promise<File> {
+    // Normalize path to always have a leading /
+    const normalizedPath = file.path && !file.path.startsWith('/') ? `/${file.path}` : file.path
+    const altPath = normalizedPath.replace(/^\//, '')
+
+    // Check for existing file at either path format to prevent duplicates
+    const existing = Array.from(this.files.values()).find(
+      f => f.workspaceId === file.workspaceId && (f.path === normalizedPath || f.path === altPath)
+    )
+
+    if (existing) {
+      // Update existing file instead of creating a duplicate
+      const updatedFile: File = {
+        ...existing,
+        ...file,
+        path: normalizedPath,
+        id: existing.id,
+        createdAt: existing.createdAt,
+        updatedAt: new Date().toISOString()
+      }
+      this.files.set(existing.id, updatedFile)
+      return updatedFile
+    }
+
     const id = this.generateId()
     const now = new Date().toISOString()
     const newFile: File = {
       ...file,
+      path: normalizedPath,
       id,
       createdAt: now,
       updatedAt: now
@@ -582,7 +613,12 @@ class InMemoryStorage implements StorageInterface {
   }
 
   async getFile(workspaceId: string, path: string): Promise<File | null> {
-    return Array.from(this.files.values()).find(f => f.workspaceId === workspaceId && f.path === path) || null
+    // Check both with and without leading / for path matching
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`
+    const altPath = normalizedPath.replace(/^\//, '')
+    return Array.from(this.files.values()).find(
+      f => f.workspaceId === workspaceId && (f.path === normalizedPath || f.path === altPath)
+    ) || null
   }
 
   async getFiles(workspaceId: string): Promise<File[]> {
@@ -1633,10 +1669,41 @@ class IndexedDBStorage implements StorageInterface {
   async createFile(file: Omit<File, 'id' | 'createdAt' | 'updatedAt'>): Promise<File> {
     if (!this.db) throw new Error('Database not initialized')
 
+    // Normalize path to always have a leading /
+    const normalizedPath = file.path && !file.path.startsWith('/') ? `/${file.path}` : file.path
+
+    // Check for existing file at either path format to prevent duplicates
+    const existing = await this.getFile(file.workspaceId, normalizedPath)
+
+    if (existing) {
+      // Update existing file instead of creating a duplicate
+      const updatedFile: File = {
+        ...existing,
+        ...file,
+        path: normalizedPath,
+        id: existing.id,
+        createdAt: existing.createdAt,
+        updatedAt: new Date().toISOString()
+      }
+
+      return new Promise((resolve, reject) => {
+        const transaction = this.db!.transaction(['files'], 'readwrite')
+        const store = transaction.objectStore('files')
+        const request = store.put(updatedFile)
+
+        request.onsuccess = async () => {
+          await emitStorageEvent('files', 'update', existing.id, updatedFile)
+          resolve(updatedFile)
+        }
+        request.onerror = () => reject(request.error)
+      })
+    }
+
     const id = this.generateId()
     const now = new Date().toISOString()
     const newFile: File = {
       ...file,
+      path: normalizedPath,
       id,
       createdAt: now,
       updatedAt: now
@@ -1659,6 +1726,10 @@ class IndexedDBStorage implements StorageInterface {
   async getFile(workspaceId: string, path: string): Promise<File | null> {
     if (!this.db) throw new Error('Database not initialized')
 
+    // Check both with and without leading / for path matching
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`
+    const altPath = normalizedPath.replace(/^\//, '')
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['files'], 'readonly')
       const store = transaction.objectStore('files')
@@ -1666,7 +1737,9 @@ class IndexedDBStorage implements StorageInterface {
 
       request.onsuccess = () => {
         const files = request.result || []
-        const file = files.find(f => f.workspaceId === workspaceId && f.path === path)
+        const file = files.find(
+          f => f.workspaceId === workspaceId && (f.path === normalizedPath || f.path === altPath)
+        )
         resolve(file || null)
       }
       request.onerror = () => reject(request.error)
