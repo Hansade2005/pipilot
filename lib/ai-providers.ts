@@ -579,20 +579,19 @@ function createModelInstance(modelId: string): any {
 
     // Ollama Cloud models — sync fallback (env-based rotation)
     // For DB-backed rotation, use getOllamaModel() instead
+    case 'ollama/nemotron-3-super':
     case 'ollama/devstral-2:123b':
     case 'ollama/qwen3-coder:480b':
     case 'ollama/qwen3-coder-next':
-    case 'ollama/qwen3.5:397b':
-    case 'ollama/deepseek-v3.1:671b':
-    case 'ollama/deepseek-v3.2':
-    case 'ollama/glm-4.6':
-    case 'ollama/glm-4.7':
-    case 'ollama/kimi-k2.5':
-    case 'ollama/kimi-k2-thinking':
-    case 'ollama/minimax-m2.7':
     case 'ollama/minimax-m2.5':
     case 'ollama/minimax-m2.1':
-    case 'ollama/kimi-k2:1t': {
+    case 'ollama/cogito-2.1:671b':
+    case 'ollama/gemma4:31b':
+    case 'ollama/glm-4.6':
+    case 'ollama/gpt-oss:120b':
+    case 'ollama/gpt-oss:20b':
+    case 'ollama/qwen3-vl:235b':
+    case 'ollama/nemotron-3-nano:30b': {
       const ollamaModelName = modelId.replace('ollama/', '');
       return getOllamaCloudProvider()(ollamaModelName);
     }

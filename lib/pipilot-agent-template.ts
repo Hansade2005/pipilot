@@ -24,7 +24,7 @@ export const AI_GATEWAY_BASE_URL = 'https://ai-gateway.vercel.sh'
 // Available models through Vercel AI Gateway
 export const AVAILABLE_MODELS = {
   sonnet: 'xai/grok-code-fast-1',      // Fast code generation
-  opus: 'zai/glm-4.7',                  // High quality
+  opus: 'ollama/nemotron-3-super',       // High quality
   haiku: 'mistral/devstral-small-2',   // Quick tasks
 } as const
 

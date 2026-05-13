@@ -1,4 +1,4 @@
-export const DEFAULT_CHAT_MODEL: string = 'ollama/minimax-m2.7';
+export const DEFAULT_CHAT_MODEL: string = 'ollama/nemotron-3-super';
 
 export interface ChatModel {
   id: string;
@@ -100,82 +100,82 @@ export const chatModels: Array<ChatModel> = [
 
   // Ollama Cloud Models
   {
+    id: 'ollama/nemotron-3-super',
+    name: 'Titan Pro',
+    description: 'Fastest all-rounder — 80 tok/s, strong on architecture and system design',
+    provider: 'ollama',
+  },
+  {
     id: 'ollama/devstral-2:123b',
-    name: 'Devstral 2 123B',
-    description: 'Devstral 2 123B via Ollama Cloud',
+    name: 'Devstral Code 123B',
+    description: 'Precision code specialist — cleanest output, fewest bugs',
     provider: 'ollama',
   },
   {
     id: 'ollama/qwen3-coder:480b',
-    name: 'Qwen3 Coder 480B',
-    description: 'Qwen3 Coder 480B - Purpose-built for coding via Ollama Cloud',
+    name: 'Qwen Coder 480B',
+    description: '480B MoE built for coding agents — massive context window',
     provider: 'ollama',
   },
   {
     id: 'ollama/qwen3-coder-next',
-    name: 'Qwen3 Coder Next',
-    description: 'Qwen3 Coder Next - Next-gen coding model via Ollama Cloud',
+    name: 'Qwen Coder Next',
+    description: 'Next-gen Qwen coding model with extended context',
     provider: 'ollama',
   },
   {
-    id: 'ollama/qwen3.5:397b',
-    name: 'Qwen3.5 397B',
-    description: 'Qwen3.5 397B - Latest flagship with excellent reasoning via Ollama Cloud',
+    id: 'ollama/minimax-m2.5',
+    name: 'Atlas M2.5',
+    description: 'Deep analysis and reasoning — best at finding bugs and edge cases',
     provider: 'ollama',
   },
   {
-    id: 'ollama/deepseek-v3.1:671b',
-    name: 'DeepSeek V3.1 671B',
-    description: 'DeepSeek V3.1 671B - Proven for code, full model via Ollama Cloud',
+    id: 'ollama/minimax-m2.1',
+    name: 'Atlas M2.1',
+    description: 'Solid general-purpose coding with reliable output',
     provider: 'ollama',
   },
   {
-    id: 'ollama/deepseek-v3.2',
-    name: 'DeepSeek V3.2',
-    description: 'DeepSeek V3.2 via Ollama Cloud',
+    id: 'ollama/cogito-2.1:671b',
+    name: 'Cogito 671B',
+    description: '671B reasoning-heavy model for complex logic and algorithms',
+    provider: 'ollama',
+  },
+  {
+    id: 'ollama/gemma4:31b',
+    name: 'Gemma 4',
+    description: 'Google Gemma 4 — fast and capable for frontend scaffolding',
     provider: 'ollama',
   },
   {
     id: 'ollama/glm-4.6',
     name: 'GLM 4.6',
-    description: 'GLM 4.6 via Ollama Cloud',
+    description: 'Strong multi-purpose model for code and reasoning',
     provider: 'ollama',
   },
   {
-    id: 'ollama/glm-4.7',
-    name: 'GLM 4.7',
-    description: 'GLM 4.7 via Ollama Cloud',
+    id: 'ollama/gpt-oss:120b',
+    name: 'Nova 120B',
+    description: '120B open-source powerhouse for large codebases',
     provider: 'ollama',
   },
   {
-    id: 'ollama/kimi-k2.5',
-    name: 'Kimi K2.5',
-    description: 'Kimi K2.5 via Ollama Cloud - 262K context',
+    id: 'ollama/gpt-oss:20b',
+    name: 'Nova Flash',
+    description: 'Ultra-fast 20B model for quick edits and autocomplete',
+    provider: 'ollama',
+  },
+  {
+    id: 'ollama/qwen3-vl:235b',
+    name: 'Qwen Vision 235B',
+    description: '235B multimodal model — understands images and screenshots',
     provider: 'ollama',
     supportsVision: true,
   },
   {
-    id: 'ollama/kimi-k2-thinking',
-    name: 'Kimi K2 Thinking',
-    description: 'Kimi K2 Thinking via Ollama Cloud',
-    provider: 'ollama',
-  },
-  {
-    id: 'ollama/minimax-m2.7',
-    name: 'Claude Opus 4.6',
-    description: 'Most capable model for ambitious, complex work',
-    provider: 'ollama',
-  },
-  {
-    id: 'ollama/minimax-m2.1',
-    name: 'Claude Sonnet 4.6',
-    description: 'Best balance of speed and quality for coding',
-    provider: 'ollama',
-  },
-  {
-    id: 'ollama/kimi-k2:1t',
-    name: 'Kimi K2 1T',
-    description: 'Kimi K2 1T parameter model via Ollama Cloud',
+    id: 'ollama/nemotron-3-nano:30b',
+    name: 'Titan Nano',
+    description: 'Lightweight 30B model for fast iterations and small tasks',
     provider: 'ollama',
   },
 

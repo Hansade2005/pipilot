@@ -26,19 +26,19 @@ const shortNameMap = new Map<string, string>([
   ['mistral/devstral-small-2', 'Devstral S2'],
   ['xai/grok-code-fast-1', 'Grok Fast'],
   // Ollama Cloud models
-  ['ollama/devstral-2:123b', 'Devstral 123B'],
-  ['ollama/qwen3-coder:480b', 'Qwen3 Coder'],
-  ['ollama/qwen3-coder-next', 'Qwen3 Coder Next'],
-  ['ollama/qwen3.5:397b', 'Qwen3.5 397B'],
-  ['ollama/deepseek-v3.1:671b', 'DeepSeek V3.1'],
-  ['ollama/deepseek-v3.2', 'DeepSeek V3.2'],
+  ['ollama/nemotron-3-super', 'Titan Pro'],
+  ['ollama/devstral-2:123b', 'Devstral Code 123B'],
+  ['ollama/qwen3-coder:480b', 'Qwen Coder 480B'],
+  ['ollama/qwen3-coder-next', 'Qwen Coder Next'],
+  ['ollama/minimax-m2.5', 'Atlas M2.5'],
+  ['ollama/minimax-m2.1', 'Atlas M2.1'],
+  ['ollama/cogito-2.1:671b', 'Cogito 671B'],
+  ['ollama/gemma4:31b', 'Gemma 4'],
   ['ollama/glm-4.6', 'GLM 4.6'],
-  ['ollama/glm-4.7', 'GLM 4.7'],
-  ['ollama/kimi-k2.5', 'Kimi K2.5'],
-  ['ollama/kimi-k2-thinking', 'Kimi K2'],
-  ['ollama/minimax-m2.7', 'Claude Opus 4.6'],
-  ['ollama/minimax-m2.1', 'Claude Sonnet 4.6'],
-  ['ollama/kimi-k2:1t', 'Kimi K2 1T'],
+  ['ollama/gpt-oss:120b', 'Nova 120B'],
+  ['ollama/gpt-oss:20b', 'Nova Flash'],
+  ['ollama/qwen3-vl:235b', 'Qwen Vision 235B'],
+  ['ollama/nemotron-3-nano:30b', 'Titan Nano'],
   // Kilo AI Gateway models
   ['kilo/auto-free', 'Kilo Auto'],
   ['kilo/minimax-m2.5-free', 'MiniMax M2.5'],
@@ -54,19 +54,19 @@ const descriptionMap = new Map<string, string>([
   ['mistral/devstral-small-2', 'Lightweight and efficient'],
   ['xai/grok-code-fast-1', 'Fast code with xAI'],
   // Ollama Cloud models
-  ['ollama/devstral-2:123b', 'Devstral 123B via Ollama Cloud'],
-  ['ollama/qwen3-coder:480b', 'Qwen3 Coder 480B - Purpose-built for code'],
+  ['ollama/nemotron-3-super', 'Fastest all-rounder with strong architecture'],
+  ['ollama/devstral-2:123b', 'Precision code specialist, fewest bugs'],
+  ['ollama/qwen3-coder:480b', '480B MoE built for coding agents'],
   ['ollama/qwen3-coder-next', 'Next-gen Qwen coding model'],
-  ['ollama/qwen3.5:397b', 'Qwen3.5 flagship - Reasoning + code'],
-  ['ollama/deepseek-v3.1:671b', 'DeepSeek V3.1 671B - Proven for code'],
-  ['ollama/deepseek-v3.2', 'DeepSeek V3.2 via Ollama Cloud'],
-  ['ollama/glm-4.6', 'GLM 4.6 via Ollama Cloud'],
-  ['ollama/glm-4.7', 'GLM 4.7 via Ollama Cloud'],
-  ['ollama/kimi-k2.5', 'Kimi K2.5 - 262K context'],
-  ['ollama/kimi-k2-thinking', 'Kimi K2 Thinking via Ollama'],
-  ['ollama/minimax-m2.7', 'Most capable model for ambitious work'],
-  ['ollama/minimax-m2.1', 'Best balance of speed and quality'],
-  ['ollama/kimi-k2:1t', 'Kimi K2 1T params via Ollama'],
+  ['ollama/minimax-m2.5', 'Deep analysis and bug-finding'],
+  ['ollama/minimax-m2.1', 'Reliable general-purpose coding'],
+  ['ollama/cogito-2.1:671b', '671B reasoning for complex logic'],
+  ['ollama/gemma4:31b', 'Google Gemma 4 for fast scaffolding'],
+  ['ollama/glm-4.6', 'Strong multi-purpose coding model'],
+  ['ollama/gpt-oss:120b', '120B open-source powerhouse'],
+  ['ollama/gpt-oss:20b', 'Ultra-fast for quick edits'],
+  ['ollama/qwen3-vl:235b', '235B multimodal with vision'],
+  ['ollama/nemotron-3-nano:30b', 'Lightweight 30B for fast iterations'],
   // Kilo AI Gateway models
   ['kilo/auto-free', 'Auto-picks best model via Kilo'],
   ['kilo/minimax-m2.5-free', 'MiniMax M2.5 via Kilo'],
@@ -105,7 +105,7 @@ export function ModelSelector({
 
   const effectiveStatus = subscriptionStatus || (userPlan === 'free' ? 'active' : 'inactive')
   const isPremium = ['pro', 'creator', 'teams', 'collaborate', 'enterprise', 'scale'].includes(userPlan)
-  const defaultSelectedModel: string = 'ollama/minimax-m2.7'
+  const defaultSelectedModel: string = 'ollama/nemotron-3-super'
   const effectiveSelectedModel = selectedModel || defaultSelectedModel
 
   // Determine active BYOK providers
@@ -166,20 +166,24 @@ export function ModelSelector({
   if (userPlan === 'free') {
     allowedModels = [
       'xai/grok-code-fast-1', 'mistral/devstral-2', 'mistral/devstral-small-2',
-      'ollama/minimax-m2.7', 'ollama/minimax-m2.1',
-      'ollama/devstral-2:123b', 'ollama/qwen3-coder:480b', 'ollama/qwen3-coder-next', 'ollama/qwen3.5:397b',
-      'ollama/deepseek-v3.1:671b', 'ollama/deepseek-v3.2', 'ollama/glm-4.6', 'ollama/glm-4.7',
-      'ollama/kimi-k2.5', 'ollama/kimi-k2-thinking', 'ollama/kimi-k2:1t',
+      'ollama/nemotron-3-super', 'ollama/devstral-2:123b',
+      'ollama/qwen3-coder:480b', 'ollama/qwen3-coder-next',
+      'ollama/minimax-m2.5', 'ollama/minimax-m2.1',
+      'ollama/cogito-2.1:671b', 'ollama/gemma4:31b', 'ollama/glm-4.6',
+      'ollama/gpt-oss:120b', 'ollama/gpt-oss:20b',
+      'ollama/qwen3-vl:235b', 'ollama/nemotron-3-nano:30b',
       'kilo/auto-free', 'kilo/minimax-m2.5-free', 'kilo/kimi-k2.5-free',
       'kilo/giga-potato', 'kilo/step-3.5-flash-free'
     ]
   } else if (isPremium && effectiveStatus === 'active') {
     allowedModels = [
       'auto', 'mistral/devstral-2', 'mistral/devstral-small-2', 'xai/grok-code-fast-1',
-      'ollama/devstral-2:123b', 'ollama/qwen3-coder:480b', 'ollama/qwen3-coder-next', 'ollama/qwen3.5:397b',
-      'ollama/deepseek-v3.1:671b', 'ollama/deepseek-v3.2', 'ollama/glm-4.6', 'ollama/glm-4.7',
-      'ollama/kimi-k2.5', 'ollama/kimi-k2-thinking', 'ollama/minimax-m2.7', 'ollama/minimax-m2.1',
-      'ollama/kimi-k2:1t',
+      'ollama/nemotron-3-super', 'ollama/devstral-2:123b',
+      'ollama/qwen3-coder:480b', 'ollama/qwen3-coder-next',
+      'ollama/minimax-m2.5', 'ollama/minimax-m2.1',
+      'ollama/cogito-2.1:671b', 'ollama/gemma4:31b', 'ollama/glm-4.6',
+      'ollama/gpt-oss:120b', 'ollama/gpt-oss:20b',
+      'ollama/qwen3-vl:235b', 'ollama/nemotron-3-nano:30b',
       'kilo/auto-free', 'kilo/minimax-m2.5-free', 'kilo/kimi-k2.5-free',
       'kilo/giga-potato', 'kilo/step-3.5-flash-free'
     ]
@@ -226,12 +230,13 @@ export function ModelSelector({
 
   // Ordered model list for the dropdown
   const modelOrder = [
-    'ollama/minimax-m2.7', 'ollama/minimax-m2.1',
+    'ollama/nemotron-3-super', 'ollama/devstral-2:123b', 'ollama/minimax-m2.5',
     'mistral/devstral-2', 'mistral/devstral-small-2',
     'xai/grok-code-fast-1',
-    'ollama/devstral-2:123b', 'ollama/qwen3-coder:480b', 'ollama/qwen3-coder-next', 'ollama/qwen3.5:397b',
-    'ollama/deepseek-v3.1:671b', 'ollama/deepseek-v3.2', 'ollama/kimi-k2.5', 'ollama/kimi-k2-thinking',
-    'ollama/kimi-k2:1t', 'ollama/glm-4.6', 'ollama/glm-4.7',
+    'ollama/qwen3-coder:480b', 'ollama/qwen3-coder-next',
+    'ollama/minimax-m2.1', 'ollama/cogito-2.1:671b', 'ollama/gemma4:31b',
+    'ollama/glm-4.6', 'ollama/gpt-oss:120b', 'ollama/gpt-oss:20b',
+    'ollama/qwen3-vl:235b', 'ollama/nemotron-3-nano:30b',
     'kilo/auto-free', 'kilo/minimax-m2.5-free', 'kilo/kimi-k2.5-free',
     'kilo/giga-potato', 'kilo/step-3.5-flash-free',
     'auto',

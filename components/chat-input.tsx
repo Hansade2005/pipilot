@@ -191,9 +191,9 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   // Get user subscription for model availability
   const { plan: userPlan, status: subscriptionStatus } = useSubscriptionCache(user?.id)
 
-  // Set default model: Claude Opus 4.6 for all users
+  // Set default model: Titan Pro for all users
   useEffect(() => {
-    setSelectedModel('ollama/minimax-m2.7')
+    setSelectedModel('ollama/nemotron-3-super')
   }, [userPlan])
 
   // Save prompt to localStorage whenever it changes

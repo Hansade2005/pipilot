@@ -1173,7 +1173,7 @@ interface ChatPanelV2Props {
 export function ChatPanelV2({
   project,
   isMobile = false,
-  selectedModel = 'ollama/minimax-m2.7',
+  selectedModel = 'ollama/nemotron-3-super',
   onModelChange,
   userPlan = 'free',
   subscriptionStatus,

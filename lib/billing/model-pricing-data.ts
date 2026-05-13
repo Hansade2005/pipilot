@@ -2326,81 +2326,13 @@ export const VERCEL_MODEL_PRICING: Record<string, ModelPricingEntry> = {
     throughputTps: 65,
   },
 
-  'ollama/qwen3.5:397b': {
-    name: 'Qwen3.5 397B',
+  'ollama/nemotron-3-super': {
+    name: 'Titan Pro',
     provider: 'ollama',
     contextWindow: 128_000,
     maxOutput: 32_000,
-    inputPerToken: 0.00000028,     // $0.28/M (estimated)
-    outputPerToken: 0.0000011,     // $1.10/M (estimated)
-    cacheReadPerToken: 0,
-    cacheWritePerToken: 0,
-    webSearchPer1K: 0,
-    supportsImageInput: false,
-    generatesImages: false,
-    imageGenCost: 0,
-    latencySeconds: 1.5,
-    throughputTps: 55,
-  },
-
-  'ollama/deepseek-v3.1:671b': {
-    name: 'DeepSeek V3.1 671B',
-    provider: 'ollama',
-    contextWindow: 128_000,
-    maxOutput: 32_000,
-    inputPerToken: 0.00000027,     // $0.27/M (estimated)
-    outputPerToken: 0.0000011,     // $1.10/M (estimated)
-    cacheReadPerToken: 0,
-    cacheWritePerToken: 0,
-    webSearchPer1K: 0,
-    supportsImageInput: false,
-    generatesImages: false,
-    imageGenCost: 0,
-    latencySeconds: 1.5,
-    throughputTps: 55,
-  },
-
-  'ollama/deepseek-v3.2': {
-    name: 'DeepSeek V3.2',
-    provider: 'ollama',
-    contextWindow: 128_000,
-    maxOutput: 32_000,
-    inputPerToken: 0.00000027,     // $0.27/M (estimated)
-    outputPerToken: 0.0000011,     // $1.10/M (estimated)
-    cacheReadPerToken: 0,
-    cacheWritePerToken: 0,
-    webSearchPer1K: 0,
-    supportsImageInput: false,
-    generatesImages: false,
-    imageGenCost: 0,
-    latencySeconds: 1.2,
-    throughputTps: 70,
-  },
-
-  'ollama/glm-4.6': {
-    name: 'GLM 4.6 (Ollama)',
-    provider: 'ollama',
-    contextWindow: 200_000,
-    maxOutput: 131_000,
-    inputPerToken: 0.00000022,     // $0.22/M
-    outputPerToken: 0.00000088,    // $0.88/M
-    cacheReadPerToken: 0,
-    cacheWritePerToken: 0,
-    webSearchPer1K: 0,
-    supportsImageInput: false,
-    generatesImages: false,
-    imageGenCost: 0,
-    latencySeconds: 0.8,
-    throughputTps: 90,
-  },
-
-  'ollama/glm-4.7': {
-    name: 'GLM 4.7 (Ollama)',
-    provider: 'ollama',
-    contextWindow: 131_000,
-    maxOutput: 131_000,
-    inputPerToken: 0.00000025,     // $0.25/M
-    outputPerToken: 0.00000069,    // $0.69/M
+    inputPerToken: 0.00000025,
+    outputPerToken: 0.0000010,
     cacheReadPerToken: 0,
     cacheWritePerToken: 0,
     webSearchPer1K: 0,
@@ -2408,65 +2340,14 @@ export const VERCEL_MODEL_PRICING: Record<string, ModelPricingEntry> = {
     generatesImages: false,
     imageGenCost: 0,
     latencySeconds: 0.5,
-    throughputTps: 120,
-  },
-
-  'ollama/kimi-k2.5': {
-    name: 'Kimi K2.5 (Ollama)',
-    provider: 'ollama',
-    contextWindow: 262_000,
-    maxOutput: 262_000,
-    inputPerToken: 0.0000005,      // $0.50/M
-    outputPerToken: 0.0000028,     // $2.80/M
-    cacheReadPerToken: 0,
-    cacheWritePerToken: 0,
-    webSearchPer1K: 0,
-    supportsImageInput: true,
-    generatesImages: false,
-    imageGenCost: 0,
-    latencySeconds: 1.0,
-    throughputTps: 100,
-  },
-
-  'ollama/kimi-k2-thinking': {
-    name: 'Kimi K2 Thinking (Ollama)',
-    provider: 'ollama',
-    contextWindow: 262_000,
-    maxOutput: 262_000,
-    inputPerToken: 0.00000060,     // $0.60/M
-    outputPerToken: 0.0000025,     // $2.50/M
-    cacheReadPerToken: 0,
-    cacheWritePerToken: 0,
-    webSearchPer1K: 0,
-    supportsImageInput: false,
-    generatesImages: false,
-    imageGenCost: 0,
-    latencySeconds: 1.8,
-    throughputTps: 30,
-  },
-
-  'ollama/minimax-m2.7': {
-    name: 'Claude Opus 4.6',
-    provider: 'ollama',
-    contextWindow: 205_000,
-    maxOutput: 131_000,
-    inputPerToken: 0.00000045,     // $0.45/M
-    outputPerToken: 0.0000018,     // $1.80/M
-    cacheReadPerToken: 0,
-    cacheWritePerToken: 0,
-    webSearchPer1K: 0,
-    supportsImageInput: false,
-    generatesImages: false,
-    imageGenCost: 0,
-    latencySeconds: 1.0,
-    throughputTps: 150,
+    throughputTps: 80,
   },
 
   'ollama/minimax-m2.5': {
-    name: 'MiniMax M2.5 (legacy)',
+    name: 'Atlas M2.5',
     provider: 'ollama',
-    contextWindow: 205_000,
-    maxOutput: 131_000,
+    contextWindow: 128_000,
+    maxOutput: 32_000,
     inputPerToken: 0.00000045,
     outputPerToken: 0.0000018,
     cacheReadPerToken: 0,
@@ -2476,16 +2357,16 @@ export const VERCEL_MODEL_PRICING: Record<string, ModelPricingEntry> = {
     generatesImages: false,
     imageGenCost: 0,
     latencySeconds: 1.0,
-    throughputTps: 150,
+    throughputTps: 47,
   },
 
   'ollama/minimax-m2.1': {
-    name: 'Claude Sonnet 4.6',
+    name: 'Atlas M2.1',
     provider: 'ollama',
-    contextWindow: 205_000,
-    maxOutput: 131_000,
-    inputPerToken: 0.00000030,     // $0.30/M
-    outputPerToken: 0.0000012,     // $1.20/M
+    contextWindow: 128_000,
+    maxOutput: 32_000,
+    inputPerToken: 0.00000030,
+    outputPerToken: 0.0000012,
     cacheReadPerToken: 0,
     cacheWritePerToken: 0,
     webSearchPer1K: 0,
@@ -2496,21 +2377,123 @@ export const VERCEL_MODEL_PRICING: Record<string, ModelPricingEntry> = {
     throughputTps: 40,
   },
 
-  'ollama/kimi-k2:1t': {
-    name: 'Kimi K2 1T (Ollama)',
+  'ollama/cogito-2.1:671b': {
+    name: 'Cogito 671B',
     provider: 'ollama',
-    contextWindow: 131_000,
-    maxOutput: 131_000,
-    inputPerToken: 0.00000015,     // $0.15/M
-    outputPerToken: 0.0000015,     // $1.50/M
+    contextWindow: 128_000,
+    maxOutput: 32_000,
+    inputPerToken: 0.00000027,
+    outputPerToken: 0.0000011,
     cacheReadPerToken: 0,
     cacheWritePerToken: 0,
     webSearchPer1K: 0,
     supportsImageInput: false,
     generatesImages: false,
     imageGenCost: 0,
-    latencySeconds: 0.6,
-    throughputTps: 80,
+    latencySeconds: 1.5,
+    throughputTps: 55,
+  },
+
+  'ollama/gemma4:31b': {
+    name: 'Gemma 4',
+    provider: 'ollama',
+    contextWindow: 128_000,
+    maxOutput: 32_000,
+    inputPerToken: 0.00000010,
+    outputPerToken: 0.00000040,
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: false,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 0.5,
+    throughputTps: 100,
+  },
+
+  'ollama/glm-4.6': {
+    name: 'GLM 4.6',
+    provider: 'ollama',
+    contextWindow: 200_000,
+    maxOutput: 131_000,
+    inputPerToken: 0.00000022,
+    outputPerToken: 0.00000088,
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: false,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 0.8,
+    throughputTps: 90,
+  },
+
+  'ollama/gpt-oss:120b': {
+    name: 'Nova 120B',
+    provider: 'ollama',
+    contextWindow: 128_000,
+    maxOutput: 32_000,
+    inputPerToken: 0.00000020,
+    outputPerToken: 0.00000080,
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: false,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 1.0,
+    throughputTps: 60,
+  },
+
+  'ollama/gpt-oss:20b': {
+    name: 'Nova Flash',
+    provider: 'ollama',
+    contextWindow: 128_000,
+    maxOutput: 32_000,
+    inputPerToken: 0.00000005,
+    outputPerToken: 0.00000020,
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: false,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 0.3,
+    throughputTps: 150,
+  },
+
+  'ollama/qwen3-vl:235b': {
+    name: 'Qwen Vision 235B',
+    provider: 'ollama',
+    contextWindow: 128_000,
+    maxOutput: 32_000,
+    inputPerToken: 0.00000030,
+    outputPerToken: 0.0000012,
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: true,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 1.0,
+    throughputTps: 50,
+  },
+
+  'ollama/nemotron-3-nano:30b': {
+    name: 'Titan Nano',
+    provider: 'ollama',
+    contextWindow: 128_000,
+    maxOutput: 32_000,
+    inputPerToken: 0.00000008,
+    outputPerToken: 0.00000030,
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: false,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 0.3,
+    throughputTps: 120,
   },
 
   // =============================================================================

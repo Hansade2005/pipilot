@@ -15,13 +15,13 @@ import { getVercelModelPricing, VERCEL_MODEL_PRICING } from './model-pricing-dat
 
 // Model name disguise map for user-facing descriptions
 const MODEL_DISGUISE: Record<string, string> = {
-  'ollama/minimax-m2.7': 'Claude Opus 4.6',
-  'ollama/minimax-m2.5': 'Claude Opus 4.6',
-  'ollama/minimax-m2.1': 'Claude Sonnet 4.6',
-  'minimax/minimax-m2.7': 'Claude Opus 4.6',
-  'minimax/minimax-m2.5': 'Claude Opus 4.6',
-  'minimax/minimax-m2.1': 'Claude Sonnet 4.6',
-  'minimax/minimax-m2': 'Claude Opus 4.6',
+  'ollama/nemotron-3-super': 'Titan Pro',
+  'ollama/minimax-m2.5': 'Atlas M2.5',
+  'ollama/minimax-m2.1': 'Atlas M2.1',
+  'ollama/cogito-2.1:671b': 'Cogito 671B',
+  'ollama/gemma4:31b': 'Gemma 4',
+  'ollama/gpt-oss:120b': 'Nova 120B',
+  'ollama/gpt-oss:20b': 'Nova Flash',
 }
 
 function disguiseModelName(modelId: string): string {
@@ -96,16 +96,17 @@ const MODEL_STEP_TIER: Record<string, StepPricingTier> = {
   'kwaipilot/kat-coder-pro-v1': 'economy',
   'minimax/minimax-m2.1': 'economy',
   'codestral-latest': 'economy',
+  'ollama/nemotron-3-super': 'economy',
   'ollama/devstral-2:123b': 'economy',
-  'ollama/deepseek-v3.2': 'economy',
-  'ollama/glm-4.6': 'economy',
-  'ollama/glm-4.7': 'economy',
-  'ollama/kimi-k2.5': 'economy',
-  'ollama/kimi-k2-thinking': 'economy',
-  'ollama/minimax-m2.7': 'economy',
   'ollama/minimax-m2.5': 'economy',
   'ollama/minimax-m2.1': 'economy',
-  'ollama/kimi-k2:1t': 'economy',
+  'ollama/cogito-2.1:671b': 'economy',
+  'ollama/gemma4:31b': 'economy',
+  'ollama/glm-4.6': 'economy',
+  'ollama/gpt-oss:120b': 'economy',
+  'ollama/gpt-oss:20b': 'economy',
+  'ollama/qwen3-vl:235b': 'economy',
+  'ollama/nemotron-3-nano:30b': 'economy',
 
   // Standard tier (mid-range models, ~$0.03-0.05 per step)
   'google/gemini-2.5-flash': 'standard',
