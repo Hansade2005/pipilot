@@ -1279,23 +1279,6 @@ export const VERCEL_MODEL_PRICING: Record<string, ModelPricingEntry> = {
   // MISTRAL
   // =============================================================================
 
-  'mistral/devstral-2': {
-    name: 'Devstral 2',
-    provider: 'mistral',
-    contextWindow: 256_000,
-    maxOutput: 256_000,
-    inputPerToken: 0,              // Free
-    outputPerToken: 0,             // Free
-    cacheReadPerToken: 0,
-    cacheWritePerToken: 0,
-    webSearchPer1K: 0,
-    supportsImageInput: false,
-    generatesImages: false,
-    imageGenCost: 0,
-    latencySeconds: 3.9,
-    throughputTps: 75,
-  },
-
   'mistral/devstral-small-2': {
     name: 'Devstral Small 2',
     provider: 'mistral',
@@ -2275,23 +2258,6 @@ export const VERCEL_MODEL_PRICING: Record<string, ModelPricingEntry> = {
   // OLLAMA CLOUD
   // =============================================================================
 
-  'ollama/devstral-2:123b': {
-    name: 'Devstral 2 123B',
-    provider: 'ollama',
-    contextWindow: 128_000,
-    maxOutput: 32_000,
-    inputPerToken: 0.00000030,     // $0.30/M (estimated)
-    outputPerToken: 0.0000012,     // $1.20/M (estimated)
-    cacheReadPerToken: 0,
-    cacheWritePerToken: 0,
-    webSearchPer1K: 0,
-    supportsImageInput: false,
-    generatesImages: false,
-    imageGenCost: 0,
-    latencySeconds: 1.5,
-    throughputTps: 60,
-  },
-
   'ollama/qwen3-coder:480b': {
     name: 'Qwen3 Coder 480B',
     provider: 'ollama',
@@ -2341,23 +2307,6 @@ export const VERCEL_MODEL_PRICING: Record<string, ModelPricingEntry> = {
     imageGenCost: 0,
     latencySeconds: 0.5,
     throughputTps: 80,
-  },
-
-  'ollama/minimax-m2.5': {
-    name: 'Atlas M2.5',
-    provider: 'ollama',
-    contextWindow: 128_000,
-    maxOutput: 32_000,
-    inputPerToken: 0.00000045,
-    outputPerToken: 0.0000018,
-    cacheReadPerToken: 0,
-    cacheWritePerToken: 0,
-    webSearchPer1K: 0,
-    supportsImageInput: false,
-    generatesImages: false,
-    imageGenCost: 0,
-    latencySeconds: 1.0,
-    throughputTps: 47,
   },
 
   'ollama/minimax-m2.1': {

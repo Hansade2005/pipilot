@@ -22,15 +22,12 @@ interface ModelSelectorProps {
 // Short, clean display names (like Anthropic's "Opus 4.6", "Sonnet 4.5")
 const shortNameMap = new Map<string, string>([
   ['auto', 'Auto'],
-  ['mistral/devstral-2', 'Devstral 2'],
   ['mistral/devstral-small-2', 'Devstral S2'],
   ['xai/grok-code-fast-1', 'Grok Fast'],
   // Ollama Cloud models
   ['ollama/nemotron-3-super', 'Titan Pro'],
-  ['ollama/devstral-2:123b', 'Devstral Code 123B'],
   ['ollama/qwen3-coder:480b', 'Qwen Coder 480B'],
   ['ollama/qwen3-coder-next', 'Qwen Coder Next'],
-  ['ollama/minimax-m2.5', 'Atlas M2.5'],
   ['ollama/minimax-m2.1', 'Atlas M2.1'],
   ['ollama/cogito-2.1:671b', 'Cogito 671B'],
   ['ollama/gemma4:31b', 'Gemma 4'],
@@ -50,15 +47,12 @@ const shortNameMap = new Map<string, string>([
 // Descriptions for dropdown
 const descriptionMap = new Map<string, string>([
   ['auto', 'Automatically picks the best model'],
-  ['mistral/devstral-2', 'Fast code generation'],
   ['mistral/devstral-small-2', 'Lightweight and efficient'],
   ['xai/grok-code-fast-1', 'Fast code with xAI'],
   // Ollama Cloud models
   ['ollama/nemotron-3-super', 'Fastest all-rounder with strong architecture'],
-  ['ollama/devstral-2:123b', 'Precision code specialist, fewest bugs'],
   ['ollama/qwen3-coder:480b', '480B MoE built for coding agents'],
   ['ollama/qwen3-coder-next', 'Next-gen Qwen coding model'],
-  ['ollama/minimax-m2.5', 'Deep analysis and bug-finding'],
   ['ollama/minimax-m2.1', 'Reliable general-purpose coding'],
   ['ollama/cogito-2.1:671b', '671B reasoning for complex logic'],
   ['ollama/gemma4:31b', 'Google Gemma 4 for fast scaffolding'],
@@ -165,10 +159,10 @@ export function ModelSelector({
   let allowedModels: string[]
   if (userPlan === 'free') {
     allowedModels = [
-      'xai/grok-code-fast-1', 'mistral/devstral-2', 'mistral/devstral-small-2',
-      'ollama/nemotron-3-super', 'ollama/devstral-2:123b',
+      'xai/grok-code-fast-1', 'mistral/devstral-small-2',
+      'ollama/nemotron-3-super',
       'ollama/qwen3-coder:480b', 'ollama/qwen3-coder-next',
-      'ollama/minimax-m2.5', 'ollama/minimax-m2.1',
+      'ollama/minimax-m2.1',
       'ollama/cogito-2.1:671b', 'ollama/gemma4:31b', 'ollama/glm-4.6',
       'ollama/gpt-oss:120b', 'ollama/gpt-oss:20b',
       'ollama/qwen3-vl:235b', 'ollama/nemotron-3-nano:30b',
@@ -177,10 +171,10 @@ export function ModelSelector({
     ]
   } else if (isPremium && effectiveStatus === 'active') {
     allowedModels = [
-      'auto', 'mistral/devstral-2', 'mistral/devstral-small-2', 'xai/grok-code-fast-1',
-      'ollama/nemotron-3-super', 'ollama/devstral-2:123b',
+      'auto', 'mistral/devstral-small-2', 'xai/grok-code-fast-1',
+      'ollama/nemotron-3-super',
       'ollama/qwen3-coder:480b', 'ollama/qwen3-coder-next',
-      'ollama/minimax-m2.5', 'ollama/minimax-m2.1',
+      'ollama/minimax-m2.1',
       'ollama/cogito-2.1:671b', 'ollama/gemma4:31b', 'ollama/glm-4.6',
       'ollama/gpt-oss:120b', 'ollama/gpt-oss:20b',
       'ollama/qwen3-vl:235b', 'ollama/nemotron-3-nano:30b',
@@ -230,8 +224,8 @@ export function ModelSelector({
 
   // Ordered model list for the dropdown
   const modelOrder = [
-    'ollama/nemotron-3-super', 'ollama/devstral-2:123b', 'ollama/minimax-m2.5',
-    'mistral/devstral-2', 'mistral/devstral-small-2',
+    'ollama/nemotron-3-super',
+    'mistral/devstral-small-2',
     'xai/grok-code-fast-1',
     'ollama/qwen3-coder:480b', 'ollama/qwen3-coder-next',
     'ollama/minimax-m2.1', 'ollama/cogito-2.1:671b', 'ollama/gemma4:31b',

@@ -92,7 +92,6 @@ interface AnalyticsData {
 }
 
 const MODEL_SHORT_NAMES: Record<string, string> = {
-  'mistral/devstral-2': 'Devstral 2',
   'mistral/devstral-small-2': 'Devstral Small',
   'anthropic/claude-sonnet-4-5': 'Claude Sonnet 4.5',
   'anthropic/claude-opus-4-5': 'Claude Opus 4.5',
@@ -112,10 +111,8 @@ const MODEL_SHORT_NAMES: Record<string, string> = {
   'kilo/minimax-m2.5-free': 'MiniMax M2.5',
   // Ollama Cloud models
   'ollama/nemotron-3-super': 'Titan Pro',
-  'ollama/devstral-2:123b': 'Devstral Code 123B',
   'ollama/qwen3-coder:480b': 'Qwen Coder 480B',
   'ollama/qwen3-coder-next': 'Qwen Coder Next',
-  'ollama/minimax-m2.5': 'Atlas M2.5',
   'ollama/minimax-m2.1': 'Atlas M2.1',
   'ollama/cogito-2.1:671b': 'Cogito 671B',
   'ollama/gemma4:31b': 'Gemma 4',

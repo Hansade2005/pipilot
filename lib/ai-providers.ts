@@ -580,10 +580,8 @@ function createModelInstance(modelId: string): any {
     // Ollama Cloud models — sync fallback (env-based rotation)
     // For DB-backed rotation, use getOllamaModel() instead
     case 'ollama/nemotron-3-super':
-    case 'ollama/devstral-2:123b':
     case 'ollama/qwen3-coder:480b':
     case 'ollama/qwen3-coder-next':
-    case 'ollama/minimax-m2.5':
     case 'ollama/minimax-m2.1':
     case 'ollama/cogito-2.1:671b':
     case 'ollama/gemma4:31b':
@@ -607,7 +605,6 @@ function createModelInstance(modelId: string): any {
 
 // Models that support vision through Mistral provider (with correct Mistral API model names)
 const devstralVisionModels: Record<string, string> = {
-  'mistral/devstral-2': 'devstral-2512',
   'mistral/devstral-small-2': 'labs-devstral-small-2512',
 };
 

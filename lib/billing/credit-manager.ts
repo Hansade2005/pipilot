@@ -16,7 +16,6 @@ import { getVercelModelPricing, VERCEL_MODEL_PRICING } from './model-pricing-dat
 // Model name disguise map for user-facing descriptions
 const MODEL_DISGUISE: Record<string, string> = {
   'ollama/nemotron-3-super': 'Titan Pro',
-  'ollama/minimax-m2.5': 'Atlas M2.5',
   'ollama/minimax-m2.1': 'Atlas M2.1',
   'ollama/cogito-2.1:671b': 'Cogito 671B',
   'ollama/gemma4:31b': 'Gemma 4',
@@ -88,7 +87,6 @@ const MODEL_STEP_TIER: Record<string, StepPricingTier> = {
   'auto': 'economy',
   'a0-dev-llm': 'economy',
   'pixtral-12b-2409': 'economy',
-  'mistral/devstral-2': 'economy',
   'mistral/devstral-small-2': 'economy',
   'xai/grok-code-fast-1': 'economy',
   'zai/glm-4.7-flash': 'economy',
@@ -97,8 +95,6 @@ const MODEL_STEP_TIER: Record<string, StepPricingTier> = {
   'minimax/minimax-m2.1': 'economy',
   'codestral-latest': 'economy',
   'ollama/nemotron-3-super': 'economy',
-  'ollama/devstral-2:123b': 'economy',
-  'ollama/minimax-m2.5': 'economy',
   'ollama/minimax-m2.1': 'economy',
   'ollama/cogito-2.1:671b': 'economy',
   'ollama/gemma4:31b': 'economy',

@@ -12409,7 +12409,6 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
     // Models that need Anthropic format for images (Devstral through Anthropic provider)
     // These use Anthropic SDK format: { type: 'image', source: { type: 'base64', media_type: '...', data: '...' } }
     const devstralModels = [
-      'mistral/devstral-2',
       'mistral/devstral-small-2',
     ];
     const isDevstralModel = devstralModels.includes(modelId);
@@ -12560,7 +12559,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
     // For Qwen thinking models, wrap with extractReasoningMiddleware to parse <think> tags
     // and cap reasoning output to 800 tokens via maxTokens on the wrapped model
     const isQwenThinking = modelId === 'alibaba/qwen3-vl-thinking'
-    const isOllamaReasoningModel = modelId === 'ollama/nemotron-3-super' || modelId === 'ollama/minimax-m2.5' || modelId === 'ollama/minimax-m2.1' || modelId === 'ollama/cogito-2.1:671b'
+    const isOllamaReasoningModel = modelId === 'ollama/nemotron-3-super' || modelId === 'ollama/minimax-m2.1' || modelId === 'ollama/cogito-2.1:671b'
     let baseModel: any
     let ollamaKeyId: number | null = null
     if (isByokMode && byokKeys) {

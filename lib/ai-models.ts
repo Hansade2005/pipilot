@@ -43,14 +43,7 @@ export const chatModels: Array<ChatModel> = [
     supportsVision: true,
   },
 
-  // Vercel AI Gateway Models (kept: Devstral + Grok Fast only)
-  {
-    id: 'mistral/devstral-2',
-    name: 'Mistral Devstral 2',
-    description: 'Mistral Devstral 2 via Vercel AI Gateway',
-    provider: 'vercel-gateway',
-    supportsVision: true,
-  },
+  // Vercel AI Gateway Models
   {
     id: 'mistral/devstral-small-2',
     name: 'Mistral Devstral Small 2',
@@ -106,12 +99,6 @@ export const chatModels: Array<ChatModel> = [
     provider: 'ollama',
   },
   {
-    id: 'ollama/devstral-2:123b',
-    name: 'Devstral Code 123B',
-    description: 'Precision code specialist — cleanest output, fewest bugs',
-    provider: 'ollama',
-  },
-  {
     id: 'ollama/qwen3-coder:480b',
     name: 'Qwen Coder 480B',
     description: '480B MoE built for coding agents — massive context window',
@@ -121,12 +108,6 @@ export const chatModels: Array<ChatModel> = [
     id: 'ollama/qwen3-coder-next',
     name: 'Qwen Coder Next',
     description: 'Next-gen Qwen coding model with extended context',
-    provider: 'ollama',
-  },
-  {
-    id: 'ollama/minimax-m2.5',
-    name: 'Atlas M2.5',
-    description: 'Deep analysis and reasoning — best at finding bugs and edge cases',
     provider: 'ollama',
   },
   {
