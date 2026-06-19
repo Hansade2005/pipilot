@@ -1,0 +1,66 @@
+name: Deploy PiPilot v4 E2B Template
+
+on:
+  workflow_dispatch:
+    inputs:
+      e2b_access_token:
+        description: 'E2B Access Token (leave blank to use the repo E2B_ACCESS_TOKEN secret)'
+        required: false
+        type: string
+      template_name:
+        description: 'Template Name'
+        required: true
+        type: string
+        default: 'pipilot-v4'
+      cpu_count:
+        description: 'CPU Cores (default: 2, Pro plan required for >2)'
+        required: false
+        type: string
+        default: '2'
+      memory_mb:
+        description: 'Memory in MB (default: 4096, Pro plan required for >4096)'
+        required: false
+        type: string
+        default: '4096'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install pnpm
+      run: npm install -g pnpm
+
+    - name: Install E2B CLI
+      run: pnpm add @e2b/cli
+
+    - name: Build and deploy PiPilot v4 E2B template
+      run: |
+        npx e2b template build \
+          --name ${{ inputs.template_name }} \
+          --dockerfile e2b-v4.Dockerfile \
+          --cpu-count ${{ inputs.cpu_count }} \
+          --memory-mb ${{ inputs.memory_mb }}
+      env:
+        E2B_ACCESS_TOKEN: ${{ inputs.e2b_access_token || secrets.E2B_ACCESS_TOKEN }}
+
+    - name: Display template info
+      run: |
+        echo "PiPilot v4 template deployed: ${{ inputs.template_name }}"
+        echo "CPU: ${{ inputs.cpu_count }}  Memory: ${{ inputs.memory_mb }}MB"
+        echo ""
+        echo "Included:"
+        echo "  - Node 20 LTS + pnpm + git"
+        echo "  - Deploy CLIs: wrangler, vercel, netlify, neonctl, gh, supabase, stripe"
+        echo "  - Warm React 18 + Vite 5 + Tailwind v4 starter cache in /home/user/project"
+        echo ""
+        echo "Usage:"
+        echo '  const sandbox = await Sandbox.create("${{ inputs.template_name }}")'
