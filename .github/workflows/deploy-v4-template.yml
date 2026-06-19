@@ -40,7 +40,10 @@ jobs:
       # Global + isolated: `pnpm add` at repo root pulls in the whole Next.js
       # project and pnpm v10 then exits non-zero on ignored build scripts
       # (sharp/oxide). npm -g sidesteps the project entirely.
-      run: npm install -g @e2b/cli
+      # Pinned to 2.2.4: newer CLIs hard-fail the v1 `template build --name
+      # --dockerfile` flags (deprecated for the v2 build system). 2.2.4 still
+      # runs v1 (warns but succeeds).
+      run: npm install -g @e2b/cli@2.2.4
 
     - name: Build and deploy PiPilot v4 E2B template
       run: |
