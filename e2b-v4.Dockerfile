@@ -43,9 +43,12 @@ RUN ARCH=$(dpkg --print-architecture) \
  && rm /tmp/supabase.tgz \
  && supabase --version
 
-# Node toolchain + provider CLIs (global, on PATH for every user).
+# Node toolchain + provider CLIs (global, on PATH for every user) + Claude Code
+# (so this same template powers Mission Runners — headless `claude` agents that
+# also need the deploy CLIs below).
 RUN npm install -g npm@latest pnpm@9.15.0 \
       wrangler@latest vercel@latest netlify-cli@latest neonctl@latest \
+      @anthropic-ai/claude-code@latest \
  && npm cache clean --force
 
 # Non-root user + pre-created CLI config dirs (avoid first-write failures).
