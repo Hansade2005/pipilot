@@ -33,11 +33,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && apt-get update && apt-get install -y --no-install-recommends gh stripe \
  && rm -rf /var/lib/apt/lists/*
 
-# Supabase CLI (.deb from latest release — not on apt or npm).
+# Supabase CLI — versionless `/latest/download/` tarball (no API call / version
+# parse, so no rate-limit or locale flakiness). Extract just the binary to PATH.
 RUN ARCH=$(dpkg --print-architecture) \
- && VER=$(curl -fsSL https://api.github.com/repos/supabase/cli/releases/latest | grep -oP '"tag_name": "v\K[^"]+') \
- && curl -fsSL -o /tmp/supabase.deb "https://github.com/supabase/cli/releases/download/v${VER}/supabase_${VER}_linux_${ARCH}.deb" \
- && dpkg -i /tmp/supabase.deb && rm /tmp/supabase.deb
+ && curl -fsSL -o /tmp/supabase.tgz "https://github.com/supabase/cli/releases/latest/download/supabase_linux_${ARCH}.tar.gz" \
+ && tar -xzf /tmp/supabase.tgz -C /usr/local/bin supabase \
+ && rm /tmp/supabase.tgz \
+ && supabase --version
 
 # Node toolchain + provider CLIs (global, on PATH for every user).
 RUN npm install -g npm@latest pnpm@9.15.0 \
