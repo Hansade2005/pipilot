@@ -36,11 +36,11 @@ jobs:
       with:
         node-version: '22'
 
-    - name: Install pnpm
-      run: npm install -g pnpm
-
     - name: Install E2B CLI
-      run: pnpm add @e2b/cli
+      # Global + isolated: `pnpm add` at repo root pulls in the whole Next.js
+      # project and pnpm v10 then exits non-zero on ignored build scripts
+      # (sharp/oxide). npm -g sidesteps the project entirely.
+      run: npm install -g @e2b/cli
 
     - name: Build and deploy PiPilot v4 E2B template
       run: |
@@ -51,9 +51,9 @@ jobs:
         # Idempotent: drop any existing alias first so a re-build never 403s with
         # "alias already used". e2b.mjs creates by NAME, so a fresh id is fine.
         echo "Removing existing '$NAME' template (if any)..."
-        npx e2b template delete "$NAME" -y || true
+        e2b template delete "$NAME" -y || true
         echo "Building '$NAME' with ${CPU} vCPU / ${MEM} MB"
-        npx e2b template build \
+        e2b template build \
           --name "$NAME" \
           --dockerfile e2b-v4.Dockerfile \
           --cpu-count "$CPU" \
