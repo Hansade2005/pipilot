@@ -34,7 +34,7 @@ jobs:
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '22'
 
     - name: Install pnpm
       run: npm install -g pnpm
@@ -48,6 +48,10 @@ jobs:
         NAME="${{ inputs.template_name }}"; NAME="${NAME:-pipilot-v4}"
         CPU="$(printf '%s' "${{ inputs.cpu_count }}" | tr -cd '0-9')"; CPU="${CPU:-2}"
         MEM="$(printf '%s' "${{ inputs.memory_mb }}" | tr -cd '0-9')"; MEM="${MEM:-4096}"
+        # Idempotent: drop any existing alias first so a re-build never 403s with
+        # "alias already used". e2b.mjs creates by NAME, so a fresh id is fine.
+        echo "Removing existing '$NAME' template (if any)..."
+        npx e2b template delete "$NAME" -y || true
         echo "Building '$NAME' with ${CPU} vCPU / ${MEM} MB"
         npx e2b template build \
           --name "$NAME" \
@@ -63,7 +67,7 @@ jobs:
         echo "CPU: ${{ inputs.cpu_count }}  Memory: ${{ inputs.memory_mb }}MB"
         echo ""
         echo "Included:"
-        echo "  - Node 20 LTS + pnpm + git"
+        echo "  - Node 22 LTS + pnpm + git"
         echo "  - Deploy CLIs: wrangler, vercel, netlify, neonctl, gh, supabase, stripe"
         echo "  - Warm React 18 + Vite 5 + Tailwind v4 starter cache in /home/user/project"
         echo ""
