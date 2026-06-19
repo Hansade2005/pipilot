@@ -3,7 +3,9 @@
 # lean: NO Expo/EAS, NO xfce/VNC desktop (those belong to the old image).
 #
 # What it provides:
-#   - Node 20 LTS + pnpm (npm/npx are rewritten -> pnpm by builder-src/api/e2b.mjs)
+#   - Node 22 LTS + pnpm (npm/npx are rewritten -> pnpm by builder-src/api/e2b.mjs)
+#     22.x is required: wrangler (+ other deploy CLIs) want Node 20+/22+; 20 was
+#     too old for our target and 25 (the old image) was non-LTS and broke wrangler.
 #   - git, python3/make/g++ (node-gyp safety for arbitrary npm deps the agent adds)
 #   - Provider CLIs baked in for the headless-deploy / oneshot path: wrangler,
 #     vercel, netlify, neonctl (npm global) + gh, stripe (apt) + supabase (.deb)
@@ -13,7 +15,7 @@
 # The dev server + Host-rewriting proxy (:8080 -> Vite :5173) are started at
 # runtime by builder-src/api/e2b.mjs. This image only provides the environment.
 # Template name: pipilot-v4  (deploy via .github/workflows/deploy-v4-template.yml)
-FROM node:20-slim
+FROM node:22-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DEBCONF_NONINTERACTIVE_SEEN=true
