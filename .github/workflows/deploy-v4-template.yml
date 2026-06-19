@@ -44,11 +44,16 @@ jobs:
 
     - name: Build and deploy PiPilot v4 E2B template
       run: |
+        # Strip any non-digits (e.g. a "8,192" thousands separator) and default.
+        NAME="${{ inputs.template_name }}"; NAME="${NAME:-pipilot-v4}"
+        CPU="$(printf '%s' "${{ inputs.cpu_count }}" | tr -cd '0-9')"; CPU="${CPU:-2}"
+        MEM="$(printf '%s' "${{ inputs.memory_mb }}" | tr -cd '0-9')"; MEM="${MEM:-4096}"
+        echo "Building '$NAME' with ${CPU} vCPU / ${MEM} MB"
         npx e2b template build \
-          --name ${{ inputs.template_name }} \
+          --name "$NAME" \
           --dockerfile e2b-v4.Dockerfile \
-          --cpu-count ${{ inputs.cpu_count }} \
-          --memory-mb ${{ inputs.memory_mb }}
+          --cpu-count "$CPU" \
+          --memory-mb "$MEM"
       env:
         E2B_ACCESS_TOKEN: ${{ inputs.e2b_access_token || secrets.E2B_ACCESS_TOKEN }}
 
