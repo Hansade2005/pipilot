@@ -1,5 +1,4 @@
 name: Deploy E2B Template
-
 on:
   workflow_dispatch:
     inputs:
@@ -22,30 +21,23 @@ on:
         required: false
         type: string
         default: '4096'
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
-
+        node-version: '22'
     - name: Install pnpm
-      run: npm install -g pnpm
-
+      uses: pnpm/action-setup@v4
+      with:
+        version: 9
     - name: Install E2B CLI
-      run: pnpm add @e2b/cli
-
-    - name: Set E2B Access Token
-      run: echo "E2B_ACCESS_TOKEN=${{ inputs.e2b_access_token }}" >> $GITHUB_ENV
-
+      run: pnpm add -g @e2b/cli
     - name: Build and deploy E2B template
-      run: npx e2b template build --name ${{ inputs.template_name }} --cpu-count ${{ inputs.cpu_count }} --memory-mb ${{ inputs.memory_mb }}
+      run: e2b template build --name ${{ inputs.template_name }} --cpu-count ${{ inputs.cpu_count }} --memory-mb ${{ inputs.memory_mb }}
       env:
         E2B_ACCESS_TOKEN: ${{ inputs.e2b_access_token }}
