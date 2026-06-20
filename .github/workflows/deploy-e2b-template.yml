@@ -3,8 +3,8 @@ on:
   workflow_dispatch:
     inputs:
       e2b_access_token:
-        description: 'E2B Access Token (from https://e2b.dev/dashboard?tab=personal)'
-        required: true
+        description: 'E2B Access Token (leave blank to use the repo E2B_ACCESS_TOKEN secret)'
+        required: false
         type: string
       template_name:
         description: 'Template Name'
@@ -31,13 +31,19 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '22'
-    - name: Install pnpm
-      uses: pnpm/action-setup@v4
-      with:
-        version: 9
+    # Pin @e2b/cli@2.2.4: newer CLIs HARD-FAIL the deprecated v1 `template build`
+    # (deprecation banner -> exit 1). Use npm -g (not pnpm add -g) so pnpm v10's
+    # ignored-build-scripts check doesn't exit non-zero at the repo root.
     - name: Install E2B CLI
-      run: pnpm add -g @e2b/cli
+      run: npm install -g @e2b/cli@2.2.4
     - name: Build and deploy E2B template
-      run: e2b template build --name ${{ inputs.template_name }} --cpu-count ${{ inputs.cpu_count }} --memory-mb ${{ inputs.memory_mb }}
+      run: |
+        NAME="${{ inputs.template_name }}"; NAME="${NAME:-pipilot}"
+        CPU="$(printf '%s' "${{ inputs.cpu_count }}" | tr -cd '0-9')"; CPU="${CPU:-2}"
+        MEM="$(printf '%s' "${{ inputs.memory_mb }}" | tr -cd '0-9')"; MEM="${MEM:-4096}"
+        echo "Removing existing '$NAME' template alias (if any) so a rebuild never 403s..."
+        e2b template delete "$NAME" -y || true
+        echo "Building '$NAME' from e2b.Dockerfile with ${CPU} vCPU / ${MEM} MB"
+        e2b template build --name "$NAME" --dockerfile e2b.Dockerfile --cpu-count "$CPU" --memory-mb "$MEM"
       env:
-        E2B_ACCESS_TOKEN: ${{ inputs.e2b_access_token }}
+        E2B_ACCESS_TOKEN: ${{ inputs.e2b_access_token || secrets.E2B_ACCESS_TOKEN }}
