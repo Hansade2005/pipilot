@@ -55,4 +55,4 @@ RUN apt-get update \
 
 # Start command that brings up Xvfb -> XFCE -> x11vnc -> noVNC.
 COPY start_command.sh /start_command.sh
-RUN chmod +x /start_command.sh
+RUN sed -i 's/$//' /start_command.sh && chmod +x /start_command.sh
