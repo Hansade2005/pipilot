@@ -56,3 +56,16 @@ RUN apt-get update \
 # Start command that brings up Xvfb -> XFCE -> x11vnc -> noVNC.
 COPY start_command.sh /start_command.sh
 RUN sed -i 's/$//' /start_command.sh && chmod +x /start_command.sh
+
+# --- Warm Electron deps: first preview's `npm install` is near-instant ---------
+# E2B runs the sandbox as `user`. Create it, then prefetch the Electron binary +
+# vite/react/electron-builder into /home/user/app/node_modules. Keep this
+# package.json in sync with the ELECTRON scaffold in
+# builder-src/src/builder/frameworks.ts (deps + devDependencies).
+RUN useradd -m -s /bin/bash user \
+ && mkdir -p /home/user/app /home/user/.npm /home/user/.cache \
+ && chown -R user:user /home/user
+USER user
+WORKDIR /home/user/app
+COPY --chown=user:user pipilot-desktop-template/package.json /home/user/app/package.json
+RUN npm install --no-audit --no-fund
