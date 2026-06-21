@@ -24,7 +24,7 @@ RUN yes | unminimize \
  && apt-get install -y --no-install-recommends \
       xserver-xorg xorg x11-xserver-utils xvfb x11-utils xauth \
       xfce4 xfce4-goodies util-linux sudo curl git wget python3-pip \
-      xdotool scrot ffmpeg x11vnc net-tools netcat \
+      xdotool scrot ffmpeg x11vnc dbus-x11 net-tools netcat \
       x11-apps libreoffice xpdf gedit xpaint tint2 galculator pcmanfm \
  && rm -rf /var/lib/apt/lists/*
 
