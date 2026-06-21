@@ -59,7 +59,7 @@ jobs:
         e2b template build \
           --name "$NAME" \
           --dockerfile e2b-desktop.Dockerfile \
-          --start-cmd "/start_command.sh" \
+          -c "/start_command.sh" \
           --cpu-count "$CPU" \
           --memory-mb "$MEM"
       env:
