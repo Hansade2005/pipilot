@@ -1,0 +1,81 @@
+name: Deploy PiPilot Desktop E2B Template
+
+on:
+  workflow_dispatch:
+    inputs:
+      e2b_access_token:
+        description: 'E2B Access Token (leave blank to use the repo E2B_ACCESS_TOKEN secret)'
+        required: false
+        type: string
+      template_name:
+        description: 'Template Name'
+        required: true
+        type: string
+        default: 'pipilot-desktop'
+      cpu_count:
+        description: 'CPU Cores (default: 4, Pro plan required for >2)'
+        required: false
+        type: string
+        default: '4'
+      memory_mb:
+        description: 'Memory in MB (default: 4096, Pro plan required for >4096)'
+        required: false
+        type: string
+        default: '4096'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '24'
+
+    - name: Install E2B CLI
+      # Global + isolated: `pnpm add` at repo root pulls in the whole Next.js
+      # project and pnpm v10 then exits non-zero on ignored build scripts
+      # (sharp/oxide). npm -g sidesteps the project entirely.
+      # Pinned to 2.2.4: newer CLIs hard-fail the v1 `template build --name
+      # --dockerfile` flags (deprecated for the v2 build system). 2.2.4 still
+      # runs v1 (warns but succeeds).
+      run: npm install -g @e2b/cli@2.2.4
+
+    - name: Build and deploy PiPilot Desktop E2B template
+      run: |
+        # Strip any non-digits (e.g. a "8,192" thousands separator) and default.
+        NAME="${{ inputs.template_name }}"; NAME="${NAME:-pipilot-desktop}"
+        CPU="$(printf '%s' "${{ inputs.cpu_count }}" | tr -cd '0-9')"; CPU="${CPU:-4}"
+        MEM="$(printf '%s' "${{ inputs.memory_mb }}" | tr -cd '0-9')"; MEM="${MEM:-4096}"
+        # Idempotent: drop any existing alias first so a re-build never 403s with
+        # "alias already used". A fresh template id is fine.
+        echo "Removing existing '$NAME' template (if any)..."
+        e2b template delete "$NAME" -y || true
+        echo "Building '$NAME' from e2b-desktop.Dockerfile with ${CPU} vCPU / ${MEM} MB"
+        e2b template build \
+          --name "$NAME" \
+          --dockerfile e2b-desktop.Dockerfile \
+          --start-cmd "/start_command.sh" \
+          --cpu-count "$CPU" \
+          --memory-mb "$MEM"
+      env:
+        E2B_ACCESS_TOKEN: ${{ inputs.e2b_access_token || secrets.E2B_ACCESS_TOKEN }}
+
+    - name: Display template info
+      run: |
+        echo "PiPilot Desktop template deployed: ${{ inputs.template_name }}"
+        echo "CPU: ${{ inputs.cpu_count }}  Memory: ${{ inputs.memory_mb }}MB"
+        echo ""
+        echo "Included:"
+        echo "  - Ubuntu 22.04 + XFCE desktop + Xvfb + x11vnc + noVNC on port 6080"
+        echo "  - Node.js 22 + Electron headless runtime libs (libgtk-3, libnss3, libgbm1, ...)"
+        echo ""
+        echo "Start command: /start_command.sh (Xvfb -> XFCE -> x11vnc -> noVNC :6080)"
+        echo ""
+        echo "Usage:"
+        echo '  const sandbox = await Sandbox.create("${{ inputs.template_name }}")'
+        echo '  // then: npx electron . --no-sandbox  (renders on the streamed display)'

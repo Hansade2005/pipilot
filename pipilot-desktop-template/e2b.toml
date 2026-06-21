@@ -1,0 +1,24 @@
+# PiPilot Desktop E2B template spec.
+#
+# NOTE: the repo's build mechanism drives everything through e2b CLI flags in
+# .github/workflows/deploy-desktop-template.yml
+# (`e2b template build --name --dockerfile --cpu-count --memory-mb`), matching
+# the pipilot-v4 / playwright templates. This e2b.toml documents the template's
+# canonical shape and lets `e2b template build` work from this directory too.
+#
+# The desktop image is heavier than the web-app sandboxes, so it allocates more
+# resources than the 2 vCPU / 4096 MB web default — mirroring E2B's own
+# `Template.build('desktop', { cpuCount: 8, memoryMB: 8192 })`. The workflow
+# default is 4 vCPU / 4096 MB (bump to 8 / 8192 on a Pro plan for heavier apps).
+
+template_name = "pipilot-desktop"
+dockerfile = "e2b-desktop.Dockerfile"
+start_cmd = "/start_command.sh"
+
+# Readiness: the noVNC HTTP/WebSocket server must be answering on :6080 before
+# the sandbox is handed to a preview session.
+[ready_cmd]
+cmd = "nc -z localhost 6080"
+
+cpu_count = 4
+memory_mb = 4096
