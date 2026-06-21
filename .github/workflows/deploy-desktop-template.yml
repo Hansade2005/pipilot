@@ -51,9 +51,13 @@ jobs:
         NAME="${{ inputs.template_name }}"; NAME="${NAME:-pipilot-desktop}"
         CPU="$(printf '%s' "${{ inputs.cpu_count }}" | tr -cd '0-9')"; CPU="${CPU:-4}"
         MEM="$(printf '%s' "${{ inputs.memory_mb }}" | tr -cd '0-9')"; MEM="${MEM:-4096}"
-        # Idempotent: drop any existing alias first so a re-build never 403s with
-        # "alias already used". A fresh template id is fine.
+        # Idempotent: drop any existing template so a re-build never 403s with
+        # "alias already used". `e2b template delete <alias>` 404s in CLI v1 (it
+        # can't resolve the alias), so resolve the 20-char template ID from the
+        # list and delete THAT (then also try by name as a fallback).
         echo "Removing existing '$NAME' template (if any)..."
+        TID="$(e2b template list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | awk -v n="$NAME" '$0 ~ ("[[:space:]]" n "[[:space:]]") {for(i=1;i<=NF;i++) if($i ~ /^[a-z0-9]{20}$/){print $i; exit}}')"
+        if [ -n "$TID" ]; then echo "Found id $TID for $NAME — deleting by id"; e2b template delete "$TID" -y || true; fi
         e2b template delete "$NAME" -y || true
         echo "Building '$NAME' from e2b-desktop.Dockerfile with ${CPU} vCPU / ${MEM} MB"
         e2b template build \
