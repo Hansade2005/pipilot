@@ -51,6 +51,19 @@ RUN apt-get update \
       libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils \
       libatspi2.0-0 libdrm2 libgbm1 libasound2 libxshmfence1 libcups2 \
  && rm -rf /var/lib/apt/lists/*
+
+# --- Tauri Linux build deps --------------------------------------------------
+# Tauri v2 renders its window through webkit2gtk (not Chromium) and links the
+# GTK/GLib/libsoup/appindicator stack at compile + run time. patchelf + file are
+# used by the bundler; build-essential/pkg-config/libssl are needed to compile
+# the Rust crates (`tao`/`wry`/`tauri`). Installed as root so `tauri dev`/`cargo
+# build` succeed with no per-preview apt install.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev patchelf \
+      libayatana-appindicator3-dev build-essential libssl-dev \
+      libsoup-3.0-dev pkg-config file \
+ && rm -rf /var/lib/apt/lists/*
 # -----------------------------------------------------------------------------
 
 # Start command that brings up Xvfb -> XFCE -> x11vnc -> noVNC.
@@ -69,3 +82,31 @@ USER user
 WORKDIR /home/user/app
 COPY --chown=user:user pipilot-desktop-template/package.json /home/user/app/package.json
 RUN npm install --no-audit --no-fund
+
+# --- Rust toolchain for `user` (Tauri backend) -------------------------------
+# Install rustup non-interactively as `user` so cargo/rustc are owned by and on
+# PATH for the sandbox runtime (which executes commands as `user`). Putting
+# ~/.cargo/bin on PATH via both ENV (covers non-login `npx tauri dev`) and
+# .bashrc (covers interactive shells) guarantees `cargo`/`rustc` resolve.
+ENV PATH=/home/user/.cargo/bin:$PATH
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+      | sh -s -- -y --default-toolchain stable --profile minimal \
+ && echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> /home/user/.bashrc \
+ && rustc --version && cargo --version
+
+# --- Warm Tauri cache: first `tauri dev`'s npm + cargo fetch is near-instant --
+# Copy the TAURI scaffold to a throwaway dir, `npm install` (Vite + @tauri-apps
+# CLI/api) into ~/.npm, then `cargo fetch` to prime ~/.cargo/registry with the
+# tauri/tao/wry crate graph. We deliberately stop at `cargo fetch` (download +
+# resolve) rather than `cargo build`: a full debug build of the Tauri/webkit
+# crate graph would add ~1-2 GB of target/ artifacts and several minutes to the
+# image for a cache that's invalidated as soon as the user's Cargo.toml differs
+# — `cargo fetch` gives most of the speedup (no network round-trips on first
+# dev) at a fraction of the size. The temp dir is removed afterward; only the
+# durable ~/.cargo registry + ~/.npm cache are kept.
+COPY --chown=user:user pipilot-desktop-template/tauri-warm /home/user/tauri-warm
+RUN cd /home/user/tauri-warm \
+ && npm install --no-audit --no-fund \
+ && cd src-tauri && cargo fetch \
+ && cd /home/user && rm -rf /home/user/tauri-warm
+WORKDIR /home/user/app
