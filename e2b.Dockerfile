@@ -24,6 +24,16 @@ RUN npm install -g pnpm@9.15.0
 RUN npm install -g @expo/cli@latest
 RUN npm install -g eas-cli@latest
 
+# GitHub CLI (gh) — mission runners on this template (web->mobile conversion etc.)
+# use `gh repo create`/push. Static binary to /usr/local/bin (on PATH for every
+# user) + verify so it can never silently miss the way it did before.
+RUN ARCH=$(dpkg --print-architecture) \
+ && curl -fsSL -o /tmp/gh.tgz "https://github.com/cli/cli/releases/download/v2.62.0/gh_2.62.0_linux_${ARCH}.tar.gz" \
+ && tar -xzf /tmp/gh.tgz -C /tmp \
+ && install -m 0755 /tmp/gh_2.62.0_linux_${ARCH}/bin/gh /usr/local/bin/gh \
+ && rm -rf /tmp/gh.tgz /tmp/gh_2.62.0_linux_* \
+ && gh --version
+
 # Clean npm cache to prevent corruption
 RUN npm cache clean --force
 
