@@ -3,8 +3,8 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import type { CookieOptions } from '@supabase/ssr'
 
-// Admin email for role-based access
-const ADMIN_EMAIL = 'hanscadx8@gmail.com'
+// Admin email for role-based access — loaded from environment
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || ''
 
 // Reserved subdomains that should NOT be treated as site subdomains
 const RESERVED_SUBDOMAINS = ['www', 'app', 'api', 'admin', 'auth', 'dashboard']
@@ -49,7 +49,7 @@ export async function middleware(request: NextRequest) {
     return new NextResponse(null, {
       status: 200,
       headers: {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://pipilot.dev',
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       },
@@ -73,7 +73,7 @@ export async function middleware(request: NextRequest) {
     console.log(`[Multi-tenant] Rewriting ${hostname}${originalPath} → ${targetPath}`);
 
     const rewriteResponse = NextResponse.rewrite(url);
-    rewriteResponse.headers.set('Access-Control-Allow-Origin', '*')
+    rewriteResponse.headers.set('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || 'https://pipilot.dev')
     rewriteResponse.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
     rewriteResponse.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 
@@ -83,7 +83,7 @@ export async function middleware(request: NextRequest) {
   // Skip Supabase auth for public API routes
   if (request.nextUrl.pathname.startsWith('/api/v1')) {
     const response = NextResponse.next();
-    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || 'https://pipilot.dev');
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     return response;
@@ -154,7 +154,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Add CORS headers to all responses
-  response.headers.set('Access-Control-Allow-Origin', '*')
+  response.headers.set('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || 'https://pipilot.dev')
   response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
   response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 
