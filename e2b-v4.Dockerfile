@@ -33,7 +33,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && echo "deb [signed-by=/usr/share/keyrings/stripe.gpg] https://packages.stripe.dev/stripe-cli-debian-local stable main" \
       > /etc/apt/sources.list.d/stripe.list \
  && apt-get update && apt-get install -y --no-install-recommends gh stripe \
- && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/* \
+ # gh is critical (missions, GitHub Pages deploy, repo/PR work) — if the apt repo
+ # flaked and gh didn't land, fall back to the arch-matched static binary, then
+ # VERIFY (so the build FAILS loudly instead of shipping a template with no gh).
+ && ( command -v gh >/dev/null 2>&1 || ( ARCH=$(dpkg --print-architecture) \
+      && curl -fsSL -o /tmp/gh.tgz "https://github.com/cli/cli/releases/download/v2.62.0/gh_2.62.0_linux_${ARCH}.tar.gz" \
+      && tar -xzf /tmp/gh.tgz -C /tmp \
+      && install -m 0755 /tmp/gh_2.62.0_linux_${ARCH}/bin/gh /usr/local/bin/gh \
+      && rm -rf /tmp/gh.tgz /tmp/gh_2.62.0_linux_* ) ) \
+ && gh --version
 
 # Supabase CLI — versionless `/latest/download/` tarball (no API call / version
 # parse, so no rate-limit or locale flakiness). Extract just the binary to PATH.
