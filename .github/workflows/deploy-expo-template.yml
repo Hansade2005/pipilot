@@ -58,14 +58,17 @@ jobs:
         e2b template delete "$NAME" -y || true
         echo "Building '$NAME' with ${CPU} vCPU / ${MEM} MB"
         # --cmd = the START COMMAND run on every sandbox boot (self-starts the Expo
-        # dev server). --ready-cmd gates readiness on the tunnel URL being published.
+        # dev server). --ready-cmd gates readiness on Metro's LOCAL web server (:8081)
+        # responding - fast (~30-60s) and reliable. The exp:// tunnel is resolved in a
+        # background loop inside expo-start.sh (slow/flaky external dep) and MUST NOT
+        # gate readiness, else builds time out waiting on ngrok.
         e2b template build \
           --name "$NAME" \
           --dockerfile e2b-expo.Dockerfile \
           --cpu-count "$CPU" \
           --memory-mb "$MEM" \
           --cmd "/usr/local/bin/expo-start.sh" \
-          --ready-cmd "test -f /tmp/expUrl"
+          --ready-cmd "curl -sf -o /dev/null http://localhost:8081/status"
       env:
         E2B_ACCESS_TOKEN: ${{ inputs.e2b_access_token || secrets.E2B_ACCESS_TOKEN }}
 
