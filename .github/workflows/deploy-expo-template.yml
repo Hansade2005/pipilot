@@ -1,0 +1,77 @@
+name: Deploy PiPilot Expo E2B Template
+
+# Builds the `pipilot-expo` sandbox template: a COMPLETE latest-SDK Expo app that
+# self-starts its dev server (web :8081 + Expo Go tunnel) on boot and publishes the
+# exp:// URL to /tmp/expUrl. Scaffolded with create-expo-app@latest, so each build
+# tracks the newest stable Expo SDK.
+on:
+  workflow_dispatch:
+    inputs:
+      e2b_access_token:
+        description: 'E2B Access Token (leave blank to use the repo E2B_ACCESS_TOKEN secret)'
+        required: false
+        type: string
+      template_name:
+        description: 'Template Name'
+        required: true
+        type: string
+        default: 'pipilot-expo'
+      cpu_count:
+        description: 'CPU Cores (Metro is heavy; 2 min, Pro plan for >2)'
+        required: false
+        type: string
+        default: '2'
+      memory_mb:
+        description: 'Memory in MB (Metro is memory-hungry; 4096 min)'
+        required: false
+        type: string
+        default: '4096'
+  # ALWAYS-LATEST: rebuild on the 1st of each month so the baked Expo SDK stays
+  # current (store Expo Go connects with no downgrade). Uses the repo secret token.
+  schedule:
+    - cron: '0 6 1 * *'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+
+    - name: Install E2B CLI
+      # Pinned to 2.2.4 like the other templates: newer CLIs drop the v1
+      # `template build --name --dockerfile` flags. 2.2.4 still runs v1.
+      run: npm install -g @e2b/cli@2.2.4
+
+    - name: Build and deploy pipilot-expo E2B template
+      run: |
+        NAME="${{ inputs.template_name }}"; NAME="${NAME:-pipilot-expo}"
+        CPU="$(printf '%s' "${{ inputs.cpu_count }}" | tr -cd '0-9')"; CPU="${CPU:-2}"
+        MEM="$(printf '%s' "${{ inputs.memory_mb }}" | tr -cd '0-9')"; MEM="${MEM:-4096}"
+        # Idempotent: drop any existing alias so a re-build never 403s.
+        echo "Removing existing '$NAME' template (if any)..."
+        e2b template delete "$NAME" -y || true
+        echo "Building '$NAME' with ${CPU} vCPU / ${MEM} MB"
+        # --cmd = the START COMMAND run on every sandbox boot (self-starts the Expo
+        # dev server). --ready-cmd gates readiness on the tunnel URL being published.
+        e2b template build \
+          --name "$NAME" \
+          --dockerfile e2b-expo.Dockerfile \
+          --cpu-count "$CPU" \
+          --memory-mb "$MEM" \
+          --cmd "/usr/local/bin/expo-start.sh" \
+          --ready-cmd "test -f /tmp/expUrl"
+      env:
+        E2B_ACCESS_TOKEN: ${{ inputs.e2b_access_token || secrets.E2B_ACCESS_TOKEN }}
+
+    - name: Display template info
+      run: |
+        echo "pipilot-expo template deployed."
+        echo "Self-starts: expo start --tunnel (web :8081 + Expo Go tunnel) → /tmp/expUrl"
+        echo "Scaffold: create-expo-app@latest (blank-typescript) + react-native-web + @expo/metro-runtime + @expo/ngrok"
+        echo 'Usage: const sandbox = await Sandbox.create("pipilot-expo")  // server already up; read /tmp/expUrl'
