@@ -18,6 +18,7 @@
 //             font?: 'sans'|'serif'|'mono' | '<Google Fonts family>' },  // per-VIDEO card design
 //   voice?:    string,          // default Piper TTS voice for scene `say` narration
 //   captions?: boolean,         // burn narration text as subtitles
+//   transition_duration?: number,  // crossfade seconds between scenes (default 0.6, max 2.5)
 //   music?:  { mood: string, minDur?: number }   // resolved via stockdb (Jamendo)
 //          | { url: string, credit?: string }     // explicit track
 //          | null,
@@ -27,9 +28,11 @@
 // Scene kinds:
 //   { kind:'title',     dur, title, sub?, style?, typewriter? }   // typewriter: type the title out
 //   ANY scene also supports: say (narration text), voice (override), caption (burned text overlay),
-//     transition (the xfade INTO this scene).  credits are OPTIONAL (only for on-screen attribution).
-//   { kind:'video',     dur, q, pick?, start? }                     // Pixabay b-roll
-//   { kind:'still',     dur, keyword|topic|collection|id, pick?, color?, orientation?, forward? }  // Unsplash via stockdb
+//     transition (the xfade INTO this scene).  A narrated scene AUTO-EXTENDS to fit its
+//     voiceover, so `say` never bleeds across the cut.  credits are OPTIONAL.
+//   { kind:'video',     dur, q | prompt, pick?, start? }            // Pixabay b-roll; falls back to an a0 image (from `prompt`|`q`) with no key/match
+//   { kind:'image',     dur, prompt, forward? }                     // bespoke a0.dev-generated image (accurate to the scene; NO text in image — image models misspell)
+//   { kind:'still',     dur, prompt | keyword|topic|collection|id, pick?, color?, orientation?, forward? }  // a0 `prompt` OR Unsplash stock
 //   { kind:'screencast', dur?, url, steps:[Step] }                  // drive the live app
 //   { kind:'credits',   dur }                                       // auto-built attribution
 //
@@ -46,7 +49,7 @@
 // 1080-class canvases (was 720p) — noticeably sharper, and large outputs now go
 // to Drive rather than an inline cap, so the size bump is handled.
 const ASPECTS = { '16:9': [1920, 1080], '9:16': [1080, 1920], '1:1': [1080, 1080], '4:5': [1080, 1350] }
-const SCENE_KINDS = ['title', 'video', 'still', 'screencast', 'credits']
+const SCENE_KINDS = ['title', 'video', 'still', 'image', 'screencast', 'credits']
 const STILL_SOURCES = ['keyword', 'topic', 'collection', 'id']
 const STEP_ACTIONS = {
   goto: ['path'], click: [], type: ['text'], hover: [], scrollTo: [], press: ['key'], wait: ['ms'],
@@ -65,6 +68,7 @@ export function validateStoryboard(sb) {
     if (sb[k] != null && (!isNum(sb[k]) || sb[k] <= 0)) e.push(`${k} must be a positive number`)
   }
   if (sb.title != null && typeof sb.title !== 'string') e.push('title must be a string')
+  if (sb.transition_duration != null && (!isNum(sb.transition_duration) || sb.transition_duration < 0)) e.push('transition_duration must be a non-negative number (seconds)')
 
   // music (optional)
   if (sb.music != null) {
@@ -92,13 +96,17 @@ export function validateStoryboard(sb) {
       if (!isStr(s.title)) e.push(`${at}.title is required`)
       if (s.sub != null && typeof s.sub !== 'string') e.push(`${at}.sub must be a string`)
     } else if (s.kind === 'video') {
-      if (!isStr(s.q)) e.push(`${at}.q (Pixabay search term) is required`)
+      // Pixabay `q` (b-roll) OR `prompt` (a0 image fallback) — at least one.
+      if (!isStr(s.q) && !isStr(s.prompt)) e.push(`${at} needs a \`q\` (Pixabay search term) or \`prompt\` (a0 image)`)
       if (s.pick != null && !isNum(s.pick)) e.push(`${at}.pick must be a number`)
       if (s.start != null && !isNum(s.start)) e.push(`${at}.start must be a number (seconds)`)
-    } else if (s.kind === 'still') {
-      const srcs = STILL_SOURCES.filter((k) => s[k] != null)
-      if (srcs.length === 0) e.push(`${at} needs one source: ${STILL_SOURCES.join(' | ')}`)
-      if (srcs.length > 1) e.push(`${at} has multiple sources (${srcs.join(', ')}) — use exactly one`)
+    } else if (s.kind === 'still' || s.kind === 'image') {
+      // `prompt` → a bespoke a0-generated image; otherwise exactly one stock source.
+      if (!isStr(s.prompt)) {
+        const srcs = STILL_SOURCES.filter((k) => s[k] != null)
+        if (srcs.length === 0) e.push(`${at} needs a \`prompt\` (a0 image) or one stock source: ${STILL_SOURCES.join(' | ')}`)
+        if (srcs.length > 1) e.push(`${at} has multiple sources (${srcs.join(', ')}) — use exactly one`)
+      }
       if (s.orientation != null && !['horizontal', 'vertical'].includes(s.orientation)) e.push(`${at}.orientation must be horizontal|vertical`)
       if (s.forward != null && typeof s.forward !== 'boolean') e.push(`${at}.forward must be a boolean`)
     } else if (s.kind === 'screencast') {

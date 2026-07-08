@@ -31,8 +31,26 @@ const check = validateStoryboard(SB)
 if (!check.ok) { console.error('Invalid storyboard:\n' + check.errors.join('\n')); process.exit(2) }
 
 const { width: W, height: H, fps: FPS } = resolveCanvas(SB)
-const XF = 0.6 // crossfade seconds
+// Crossfade seconds — the agent can tune the transition length per storyboard
+// (`transition_duration`). Clamped so it can't swallow a whole scene.
+const XF = Math.max(0, Math.min(2.5, Number(SB.transition_duration ?? SB.transitionDuration ?? 0.6) || 0.6))
 const KEY = process.env.PIXABAY_KEY
+// a0.dev keyless image generation — resolves a scene's `prompt` to a bespoke image
+// at render time (accurate, unlike stock keyword guessing). Returns a 302→webp URL
+// that curl -L + ffmpeg consume directly. Image models misspell text, so we append
+// a strict no-text guard (use title/caption cards for any on-screen words).
+const A0_ASPECTS = new Set(['1:1', '16:9', '9:16', '4:5', '5:4', '4:3', '3:4', '2:3', '3:2'])
+function a0ImageUrl(prompt, seedBase = 0) {
+  const asp = A0_ASPECTS.has(SB.aspect) ? SB.aspect : (W >= H ? '16:9' : '9:16')
+  const p = String(prompt || '').trim()
+  const guarded = /\bno\s+(text|words|lettering|type)\b/i.test(p)
+    ? p
+    : `${p}. Pure visual imagery only — do NOT render any text, words, letters, numbers, captions, labels or watermarks.`
+  const key = p + ':' + seedBase
+  let sd = 0; for (let i = 0; i < key.length; i++) sd = (sd * 31 + key.charCodeAt(i)) | 0
+  const seed = Math.abs(sd) % 1_000_000_000
+  return `https://api.a0.dev/assets/image?text=${encodeURIComponent(guarded)}&aspect=${encodeURIComponent(asp)}&seed=${seed}`
+}
 // DRAFT=1 → fast, low-res preview (ultrafast encode, downscaled, skip Google fonts).
 const DRAFT = process.env.DRAFT === '1' || process.env.DRAFT === 'true'
 // WATERMARK set (a label, or '1' for the default) → burn a corner watermark on the
@@ -42,8 +60,10 @@ const WM_TEXT = WM && WM !== '1' && WM !== 'true' ? String(WM).slice(0, 40) : 'M
 const PIPER_DIR = process.env.PIPER_DIR || '/opt/piper'
 const DEFAULT_VOICE = 'amy'
 const CAPTIONS = SB.captions === true || SB.captions === 'true'
+// `video` scenes prefer Pixabay b-roll, but fall back to an a0-generated image when
+// no key is connected — so a missing PIXABAY_KEY no longer fails the whole render.
 const needsPixabay = SB.scenes.some((s) => s.kind === 'video')
-if (needsPixabay && !KEY) { console.error('This storyboard has `video` scenes — set PIXABAY_KEY (connect Pixabay).'); process.exit(2) }
+if (needsPixabay && !KEY) console.log('   (no PIXABAY_KEY — `video` scenes fall back to a0-generated images)')
 
 const CACHE = path.join(import.meta.dirname, '.cache')
 const WORK = path.join(import.meta.dirname, '.work')
@@ -367,14 +387,21 @@ function capDraw(text, start, end) {
   // its typing to the narration length (voice-synced typewriter).
   const durOf = (s) => (s.kind === 'screencast' ? (s.dur || 12) : (s.dur || 6))
   const durs = SB.scenes.map(durOf)
-  const starts = []; { let a = 0; for (let i = 0; i < durs.length; i++) { starts.push(a); a += durs[i] - (i < durs.length - 1 ? XF : 0) } }
-  const narr = []
+  // Synthesize narration FIRST, then EXTEND each narrated scene so its voiceover fits
+  // inside its own scene (+ a short tail). Otherwise a long `say` runs past the cut and
+  // bleeds into the next scene. Offsets are computed AFTER, from the corrected durations.
+  const narrRaw = []
   for (let i = 0; i < SB.scenes.length; i++) {
-    const s = SB.scenes[i]; if (!s.say) continue
+    const s = SB.scenes[i]
+    if (!s.say) { narrRaw.push(null); continue }
     const v = s.voice || SB.voice
     const w = tts(s.say, v, path.join(WORK, `narr_${i}.wav`))
-    if (w) { narr.push({ i, start: starts[i], dur: w.dur, wav: w.wav, text: s.say, end: starts[i] + durs[i] }); console.log(`   · narration ${i} (${v || DEFAULT_VOICE}) — ${w.dur.toFixed(1)}s`) }
+    narrRaw.push(w || null)
+    if (w) { durs[i] = Math.max(durs[i], w.dur + 0.6); console.log(`   · narration ${i} (${v || DEFAULT_VOICE}) — ${w.dur.toFixed(1)}s`) }
   }
+  const starts = []; { let a = 0; for (let i = 0; i < durs.length; i++) { starts.push(a); a += durs[i] - (i < durs.length - 1 ? XF : 0) } }
+  const narr = []
+  for (let i = 0; i < narrRaw.length; i++) { const w = narrRaw[i]; if (w) narr.push({ i, start: starts[i], dur: w.dur, wav: w.wav, text: SB.scenes[i].say, end: starts[i] + durs[i] }) }
   const narrByScene = new Map(narr.map((n) => [n.i, n]))
   const hasNarr = narr.length > 0
   try {
@@ -386,15 +413,30 @@ function capDraw(text, start, end) {
         // Typewriter cards sync their type duration to the narration when present.
         await cardSeg(out, dur, titleCard(s, s.typewriter ? (narrByScene.get(i)?.dur || dur * 0.7) : 0))
       } else if (s.kind === 'video') {
-        const h = pixabayVideo(s.q)[(s.pick || 0) % 30]
-        credits.push(`${h.user} / Pixabay`)
-        brollSeg(out, (h.videos.medium || h.videos.small || h.videos.tiny).url, dur, s.start || 0)
-      } else if (s.kind === 'still') {
-        const src = s.id ? { id: s.id } : s.topic ? { topic: s.topic } : s.collection ? { collection: s.collection } : { keyword: s.keyword }
-        const [photo] = pickPhotos({ ...src, color: s.color, orientation: s.orientation, n: 1, seed: (s.pick || 0) + i })
-        if (!photo?.url) throw new Error(`no photo resolved for scene ${i}`)
-        credits.push(photo.credit)
-        kenBurnsSeg(out, photo.url, dur, s.forward !== false)
+        // Prefer Pixabay b-roll; fall back to an a0-generated image (Ken Burns) when
+        // there's no key or no match, so `video` scenes always resolve.
+        const hits = KEY ? pixabayVideo(s.q || s.prompt || '') : []
+        const h = hits[(s.pick || 0) % Math.max(1, hits.length)]
+        if (h) {
+          credits.push(`${h.user} / Pixabay`)
+          brollSeg(out, (h.videos.medium || h.videos.small || h.videos.tiny).url, dur, s.start || 0)
+        } else {
+          credits.push('AI-generated (a0)')
+          kenBurnsSeg(out, a0ImageUrl(s.prompt || s.q || 'cinematic abstract background', i), dur, s.forward !== false)
+        }
+      } else if (s.kind === 'still' || s.kind === 'image') {
+        // A `prompt` → a bespoke a0-generated image (accurate to the scene). Otherwise
+        // fall back to the stock corpus by keyword/topic/collection/id.
+        if (s.prompt) {
+          credits.push('AI-generated (a0)')
+          kenBurnsSeg(out, a0ImageUrl(s.prompt, (s.pick || 0) + i), dur, s.forward !== false)
+        } else {
+          const src = s.id ? { id: s.id } : s.topic ? { topic: s.topic } : s.collection ? { collection: s.collection } : { keyword: s.keyword }
+          const [photo] = pickPhotos({ ...src, color: s.color, orientation: s.orientation, n: 1, seed: (s.pick || 0) + i })
+          if (!photo?.url) throw new Error(`no photo resolved for scene ${i}`)
+          credits.push(photo.credit)
+          kenBurnsSeg(out, photo.url, dur, s.forward !== false)
+        }
       } else if (s.kind === 'screencast') {
         await screencastSeg(out, s.url, s.steps, s.dur || 12)
       } else { // credits (only rendered when the storyboard explicitly includes a credits scene)
