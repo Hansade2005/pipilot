@@ -57,7 +57,10 @@ jobs:
         # template id from the list and delete by that.
         echo "Removing existing '$NAME' template (if any)..."
         e2b template delete "$NAME" -y 2>&1 || true
-        TID="$(e2b template list 2>/dev/null | grep -iw "$NAME" | grep -oiE '[a-z0-9]{16,}' | head -1)"
+        # delete-by-alias 404s on this template, so resolve the numeric template id
+        # from the list and delete by that. Strip ANSI color codes first (the CLI
+        # colorizes output; otherwise the id gets a "\e[37m" prefix and 404s too).
+        TID="$(e2b template list 2>/dev/null | sed -r 's/\x1b\[[0-9;]*m//g' | grep -w "$NAME" | grep -oE '\b[a-z0-9]{18,24}\b' | head -1)"
         if [ -n "$TID" ]; then echo "Also deleting by id: $TID"; e2b template delete "$TID" -y 2>&1 || true; fi
         echo "Building '$NAME' with ${CPU} vCPU / ${MEM} MB"
         e2b template build \
