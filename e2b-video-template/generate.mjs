@@ -393,7 +393,10 @@ function titleCard(scene, typeDur = 0) {
   if (!typeDur || typeDur <= 0) return base
   // Typewriter: type the H1 out over `typeDur`s (synced to narration when present),
   // with a blinking caret; the subtitle fades in once typing finishes.
-  const tw = `<style>@keyframes blink{50%{opacity:0}}</style><script>(function(){var h=document.querySelector('h1');if(!h)return;var full=h.textContent;h.textContent='';h.style.opacity='1';h.style.transform='none';h.style.animation='none';var car=document.createElement('span');car.textContent='|';car.style.cssText='opacity:.7;margin-left:2px;animation:blink 1s steps(1) infinite';h.appendChild(car);var sub=document.querySelector('p');if(sub){sub.style.opacity='0';sub.style.animation='none';}var n=full.length,ms=Math.max(18,${Math.round(typeDur * 1000)}/Math.max(1,n)),i=0;var tm=setInterval(function(){i++;car.remove();h.textContent=full.slice(0,i);h.appendChild(car);if(i>=n){clearInterval(tm);setTimeout(function(){car.remove();if(sub){sub.style.transition='opacity .5s';sub.style.opacity='1';}},200);}},ms);})();</script>`
+  // Speed is CAPPED (32–70ms/char) so a short title never types agonizingly slowly when
+  // synced to a long narration — it types snappily then holds. Only a dedicated text span
+  // is mutated per tick (caret is a stable sibling) so there's no per-frame reflow jank.
+  const tw = `<style>@keyframes blink{50%{opacity:0}}</style><script>(function(){var h=document.querySelector('h1');if(!h)return;var full=h.textContent;h.textContent='';h.style.opacity='1';h.style.transform='none';h.style.animation='none';var t=document.createElement('span');h.appendChild(t);var car=document.createElement('span');car.textContent='|';car.style.cssText='margin-left:3px;animation:blink 1s steps(1) infinite';h.appendChild(car);var sub=document.querySelector('p');if(sub){sub.style.opacity='0';sub.style.animation='none';}var n=full.length,ms=Math.min(70,Math.max(32,${Math.round(typeDur * 1000)}/Math.max(1,n))),i=0;var tm=setInterval(function(){i++;t.textContent=full.slice(0,i);if(i>=n){clearInterval(tm);setTimeout(function(){car.style.display='none';if(sub){sub.style.transition='opacity .5s';sub.style.opacity='1';}},250);}},ms);})();</script>`
   return base + tw
 }
 function creditsCard(lines, scene) {
@@ -434,11 +437,27 @@ function xfadeConcat(out, segs, durs, transFor = []) {
 // preset at the same CRF is only marginally larger).
 const finalPreset = (t) => (t <= 20 ? 'slow' : t <= 60 ? 'medium' : t <= 120 ? 'fast' : 'veryfast')
 const WMFONT = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
-// A burned-in caption (drawtext) shown only during [start,end] of the final timeline.
-function capDraw(text, start, end) {
-  const t = String(text).replace(/[\\':%]/g, '').replace(/\s+/g, ' ').slice(0, 140)
+// A burned-in caption (drawtext). ffmpeg text is STATIC, so a "typewriter" caption is
+// built as a CHAIN of reveals (cumulative substrings, each enabled for one time slice).
+const _capText = (text) => String(text).replace(/[\\':%]/g, '').replace(/\s+/g, ' ').slice(0, 140)
+function drawtextFor(text, start, end) {
   const fsz = Math.round(H / 22)
-  return `drawtext=fontfile=${WMFONT}:text='${t}':fontcolor=white:fontsize=${fsz}:x=(w-tw)/2:y=h-th-${Math.round(H * 0.09)}:box=1:boxcolor=black@0.55:boxborderw=${Math.round(fsz * 0.5)}:enable='between(t,${start.toFixed(2)},${end.toFixed(2)})'`
+  return `drawtext=fontfile=${WMFONT}:text='${text}':fontcolor=white:fontsize=${fsz}:x=(w-tw)/2:y=h-th-${Math.round(H * 0.09)}:box=1:boxcolor=black@0.55:boxborderw=${Math.round(fsz * 0.5)}:enable='between(t,${start.toFixed(3)},${end.toFixed(3)})'`
+}
+function capDraw(text, start, end) { return drawtextFor(_capText(text), start, end) }
+// Returns ONE OR MORE drawtext filters. For typewriter, one per character reveal (each
+// active for a single slice) — capped to 64 chars (longer just burns static, since typing
+// a paragraph char-by-char reads poorly and bloats the filtergraph).
+function capDraws(text, start, end, typewriter) {
+  const t = _capText(text)
+  const n = t.length
+  if (!typewriter || n <= 1 || n > 64) return [capDraw(text, start, end)]
+  const span = Math.max(0.1, end - start)
+  const typeDur = Math.max(0.3, Math.min(span * 0.7, n * 0.05, 2.2)) // ~20 cps, capped 2.2s
+  const dt = typeDur / n
+  const out = []
+  for (let k = 1; k <= n; k++) out.push(drawtextFor(t.slice(0, k), start + (k - 1) * dt, k < n ? start + k * dt : end))
+  return out
 }
 
 // ── run ─────────────────────────────────────────────────────────────────────
@@ -550,10 +569,15 @@ function capDraw(text, start, end) {
   // top-level `captions:true` — the narration text as subtitles.
   const overlays = []
   SB.scenes.forEach((s, i) => {
-    if (s.caption) overlays.push({ text: typeof s.caption === 'string' ? s.caption : (s.caption.text || ''), start: starts[i], end: starts[i] + durs[i] })
-    else if (CAPTIONS && s.say) { const n = narrByScene.get(i); overlays.push({ text: s.say, start: starts[i], end: Math.min(starts[i] + durs[i], starts[i] + (n?.dur || durs[i]) + 0.4) }) }
+    if (s.caption) {
+      const obj = typeof s.caption === 'string' ? { text: s.caption } : (s.caption || {})
+      overlays.push({ text: obj.text || '', typewriter: obj.typewriter === true, start: starts[i], end: starts[i] + durs[i] })
+    } else if (CAPTIONS && s.say) { const n = narrByScene.get(i); overlays.push({ text: s.say, typewriter: false, start: starts[i], end: Math.min(starts[i] + durs[i], starts[i] + (n?.dur || durs[i]) + 0.4) }) }
   })
-  overlays.forEach((o, k) => { if (!o.text) return; const oo = `cap${k}`; vParts.push(`[${cur}]${capDraw(o.text, o.start, o.end)}[${oo}]`); cur = oo })
+  overlays.forEach((o, k) => {
+    if (!o.text) return
+    capDraws(o.text, o.start, o.end, o.typewriter).forEach((d, j) => { const oo = `cap${k}_${j}`; vParts.push(`[${cur}]${d}[${oo}]`); cur = oo })
+  })
 
   // ── audio: ducked music + narration (each placed at its scene offset) ──
   const aParts = [], mixLabels = []

@@ -27,7 +27,8 @@
 //
 // Scene kinds:
 //   { kind:'title',     dur, title, sub?, style?, typewriter? }   // typewriter: type the title out
-//   ANY scene also supports: say (narration text), voice (override), caption (burned text overlay),
+//   ANY scene also supports: say (narration text), voice (override), caption (burned text
+//     overlay — a string, or { text, typewriter?:true } to TYPE it on-screen char-by-char),
 //     transition (the xfade INTO this scene).  A narrated scene AUTO-EXTENDS to fit its
 //     voiceover, so `say` never bleeds across the cut.  credits are OPTIONAL.
 //   { kind:'video',     dur, q | prompt, pick?, start? }            // Pixabay b-roll; falls back to an a0 image (from `prompt`|`q`) with no key/match
