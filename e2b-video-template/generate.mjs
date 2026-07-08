@@ -18,6 +18,13 @@ import { chromium } from 'playwright'
 import { pickMusic, pickPhotos } from './stockdb.mjs'
 import { validateStoryboard, resolveCanvas } from './storyboard.mjs'
 
+// Pin the baked Chromium location. E2B's SDK command execution doesn't reliably
+// inherit the image's Docker ENV, so relying on PLAYWRIGHT_BROWSERS_PATH being
+// present at runtime fails (Playwright falls back to ~/.cache/ms-playwright and
+// finds nothing). Playwright reads this env at launch(), not import, so setting
+// it here — before any getBrowser() — takes effect. Matches the Dockerfile path.
+process.env.PLAYWRIGHT_BROWSERS_PATH = process.env.PLAYWRIGHT_BROWSERS_PATH || '/opt/ms-playwright'
+
 // ── load + validate the storyboard ──────────────────────────────────────────
 const sbPath = process.argv[2]
 const SB = sbPath ? JSON.parse(fs.readFileSync(sbPath, 'utf8')) : JSON.parse(process.env.STORYBOARD_JSON || '{}')

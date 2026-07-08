@@ -64,11 +64,13 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # The render engine lives at /opt/pipilot-video. Its only npm dep is playwright
-# (ffmpeg + curl are system binaries); chromium installs into node_modules so any
-# user can launch it (PLAYWRIGHT_BROWSERS_PATH=0).
+# (ffmpeg + curl are system binaries). Install Chromium to a FIXED absolute path
+# (/opt/ms-playwright) rather than node_modules or ~/.cache: E2B's SDK command
+# execution doesn't reliably inherit the image's Docker ENV, so the browser must
+# live at a path the engine can pin itself (generate.mjs sets the same default).
 WORKDIR /opt/pipilot-video
 RUN npm init -y && npm install playwright
-RUN PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
+RUN PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright npx playwright install --with-deps chromium
 COPY e2b-video-template/generate.mjs e2b-video-template/stockdb.mjs e2b-video-template/storyboard.mjs ./
 
 # The zero-API stock corpus (music moods + unsplash photos/topics/collections).
@@ -77,7 +79,7 @@ COPY e2b-video-template/stockdb /opt/stockdb
 
 # Let the runtime user read the engine/corpus and write render scratch
 # (.cache/.work/out under the engine dir).
-RUN chmod -R a+rwX /opt/pipilot-video /opt/stockdb
+RUN chmod -R a+rwX /opt/pipilot-video /opt/stockdb /opt/ms-playwright
 
 # E2B non-root runtime user.
 RUN useradd -m -s /bin/bash user
@@ -87,7 +89,7 @@ USER user
 WORKDIR /home/user
 
 ENV NODE_ENV=development
-ENV PLAYWRIGHT_BROWSERS_PATH=0
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 ENV STOCKDB_DIR=/opt/stockdb
 
 CMD ["/bin/bash"]
