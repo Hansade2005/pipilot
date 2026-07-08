@@ -1,0 +1,17 @@
+# PiPilot Video E2B template spec.
+#
+# The repo's build mechanism drives everything through e2b CLI flags in
+# .github/workflows/deploy-video-template.yml
+# (`e2b template build --name --dockerfile --cpu-count --memory-mb`), matching the
+# pipilot-v4 / playwright / desktop templates. This e2b.toml documents the
+# template's canonical shape and lets `e2b template build` work from this dir too.
+#
+# Video rendering is CPU-bound (ffmpeg encode + parallel-ish segment builds +
+# headless Chromium), so it allocates 8 vCPU / 8192 MB — mirroring the desktop
+# heavy profile. Requires an E2B Pro plan for >2 vCPU / >4096 MB.
+
+template_name = "pipilot-video"
+dockerfile = "../e2b-video.Dockerfile"
+
+cpu_count = 8
+memory_mb = 8192

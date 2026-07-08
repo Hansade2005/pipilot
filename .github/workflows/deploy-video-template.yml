@@ -1,0 +1,73 @@
+name: Deploy Video E2B Template
+
+on:
+  workflow_dispatch:
+    inputs:
+      e2b_access_token:
+        description: 'E2B Access Token (from https://e2b.dev/dashboard?tab=personal)'
+        required: true
+        type: string
+      template_name:
+        description: 'Template Name'
+        required: true
+        type: string
+        default: 'pipilot-video'
+      cpu_count:
+        description: 'CPU Cores (video rendering is CPU-bound; Pro plan required for >2)'
+        required: false
+        type: string
+        default: '8'
+      memory_mb:
+        description: 'Memory in MB (Pro plan required for >4096)'
+        required: false
+        type: string
+        default: '8192'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install pnpm
+      run: npm install -g pnpm
+
+    - name: Install E2B CLI
+      run: pnpm add @e2b/cli
+
+    - name: Set E2B Access Token
+      run: echo "E2B_ACCESS_TOKEN=${{ inputs.e2b_access_token }}" >> $GITHUB_ENV
+
+    - name: Build and deploy Video E2B template
+      run: |
+        npx e2b template build \
+          --name ${{ inputs.template_name }} \
+          --dockerfile e2b-video.Dockerfile \
+          --cpu-count ${{ inputs.cpu_count }} \
+          --memory-mb ${{ inputs.memory_mb }}
+      env:
+        E2B_ACCESS_TOKEN: ${{ inputs.e2b_access_token }}
+
+    - name: Display template info
+      run: |
+        echo "Template deployed successfully!"
+        echo "Template name: ${{ inputs.template_name }}"
+        echo "CPU cores: ${{ inputs.cpu_count }}"
+        echo "Memory: ${{ inputs.memory_mb }}MB"
+        echo ""
+        echo "Features:"
+        echo "  - Playwright + Chromium (motion-graphics cards + live-app screencast)"
+        echo "  - ffmpeg (compositing, Ken Burns, xfade, music mux, encode)"
+        echo "  - Zero-API stock corpus at /opt/stockdb (Jamendo moods + Unsplash)"
+        echo "  - Storyboard render engine at /opt/pipilot-video/generate.mjs"
+        echo ""
+        echo "Usage:"
+        echo '  const sandbox = await Sandbox.create("${{ inputs.template_name }}")'
+        echo '  # PIXABAY_KEY=<user key> node /opt/pipilot-video/generate.mjs storyboard.json'
