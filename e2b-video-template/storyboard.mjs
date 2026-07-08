@@ -13,6 +13,9 @@
 //   title?: string,
 //   width?:  number = 1280,   height?: number = 720,   fps?: number = 30,
 //   aspect?: '16:9' | '9:16' | '1:1' | '4:5',   // convenience → sets width/height
+//   theme?:  { style?: 'spotlight'|'bold'|'gradient'|'minimal'|'editorial',
+//             bg?: hex | [hex,hex], bg2?: hex, accent?: hex, text?: hex, sub?: hex,
+//             font?: 'sans'|'serif'|'mono' | '<Google Fonts family>' },  // per-VIDEO card design
 //   music?:  { mood: string, minDur?: number }   // resolved via stockdb (Jamendo)
 //          | { url: string, credit?: string }     // explicit track
 //          | null,
@@ -20,7 +23,8 @@
 // }
 //
 // Scene kinds:
-//   { kind:'title',     dur, title, sub? }
+//   { kind:'title',     dur, title, sub?, style? }   // style: preset string or theme-override object
+//   ... credits are OPTIONAL — only include a credits scene when attribution should be shown on-screen
 //   { kind:'video',     dur, q, pick?, start? }                     // Pixabay b-roll
 //   { kind:'still',     dur, keyword|topic|collection|id, pick?, color?, orientation?, forward? }  // Unsplash via stockdb
 //   { kind:'screencast', dur?, url, steps:[Step] }                  // drive the live app

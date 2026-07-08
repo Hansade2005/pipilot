@@ -166,21 +166,72 @@ async function runStep(page, st, baseUrl) {
   }
 }
 
-// ── HTML cards (branding) ────────────────────────────────────────────────────
-const FONT = `-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif`
-const titleCard = (t, s) => `<style>html,body{margin:0;height:100%;overflow:hidden}
- .bg{position:fixed;inset:0;background:radial-gradient(120% 120% at 20% 10%,#12324a 0%,#0E1726 55%,#080d16 100%)}
- .w{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:${FONT}}
- .k{width:64px;height:5px;border-radius:3px;background:#00C2A8;transform:scaleX(0);animation:g .8s .1s forwards cubic-bezier(.2,.8,.2,1)}
- h1{margin:0;color:#fff;font-size:88px;font-weight:800;letter-spacing:-2px;opacity:0;transform:translateY(24px);animation:r .9s .25s forwards cubic-bezier(.2,.8,.2,1);text-align:center;padding:0 6%}
- p{margin:0;color:#9fb2c4;font-size:26px;font-weight:500;opacity:0;animation:f 1s .7s forwards}
- @keyframes g{to{transform:scaleX(1)}}@keyframes r{to{opacity:1;transform:none}}@keyframes f{to{opacity:1}}</style>
- <div class="bg"></div><div class="w"><div class="k"></div><h1>${t}</h1>${s ? `<p>${s}</p>` : ''}</div>`
-const creditsCard = (lines) => `<style>html,body{margin:0;height:100%;background:#0E1726;overflow:hidden}
- .w{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;font-family:${FONT};opacity:0;animation:f .8s .1s forwards}
- .t{color:#00C2A8;font-size:22px;font-weight:700;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px}
- .l{color:#c7d3df;font-size:20px}@keyframes f{to{opacity:1}}</style>
- <div class="w"><div class="t">Credits</div>${lines.map((l) => `<div class="l">${l}</div>`).join('')}</div>`
+// ── HTML cards (themeable branding) ──────────────────────────────────────────
+// Cards are unique PER VIDEO: the storyboard's `theme` (and per-scene overrides)
+// pick a style PRESET + colors + fonts. Chromium has network in the sandbox, so
+// `font` can be a Google Fonts family (loaded via <link>) for real custom type;
+// known keywords (sans/serif/mono) use the baked system fonts as a safe default.
+const esc = (v) => String(v == null ? '' : v).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))
+const DEFAULT_THEME = { bg: '#0E1726', bg2: '#12324a', accent: '#00C2A8', text: '#ffffff', sub: '#9fb2c4', style: 'spotlight', font: 'sans' }
+function resolveTheme(scene) {
+  return { ...DEFAULT_THEME, ...(SB.theme || {}), ...(scene?.style && typeof scene.style === 'object' ? scene.style : {}), ...(typeof scene?.style === 'string' ? { style: scene.style } : {}) }
+}
+function fontFor(font) {
+  const keys = { sans: `'Liberation Sans','DejaVu Sans',Arial,sans-serif`, serif: `'Liberation Serif','Noto Serif',Georgia,serif`, mono: `'Liberation Mono','DejaVu Sans Mono',monospace` }
+  if (!font || keys[font]) return { face: keys[font] || keys.sans, link: '' }
+  const fam = String(font).trim().replace(/[^\w \-]/g, '')
+  return { face: `'${fam}','Liberation Sans',Arial,sans-serif`, link: `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${fam.replace(/\s+/g, '+')}:wght@400;600;700;800&display=swap">` }
+}
+function bgFor(t) {
+  if (Array.isArray(t.bg)) return `linear-gradient(135deg, ${t.bg.map(esc).join(', ')})`
+  if (typeof t.bg === 'string' && /gradient\(/.test(t.bg)) return t.bg
+  const base = t.bg || '#0E1726'
+  return `radial-gradient(120% 120% at 20% 10%, ${esc(t.bg2 || base)} 0%, ${esc(base)} 62%, ${esc(base)} 100%)`
+}
+// Style presets — distinct layouts/typography/motion. Each gets resolved colors + font face.
+const STYLES = {
+  spotlight: (t, s, c) => `<div class="bg" style="position:fixed;inset:0;background:${c.bg}"></div>
+    <div class="w" style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:${c.face}">
+      <div style="width:64px;height:5px;border-radius:3px;background:${c.accent};transform:scaleX(0);animation:g .8s .1s forwards cubic-bezier(.2,.8,.2,1)"></div>
+      <h1 style="margin:0;color:${c.text};font-size:88px;font-weight:800;letter-spacing:-2px;opacity:0;transform:translateY(24px);animation:r .9s .25s forwards cubic-bezier(.2,.8,.2,1);text-align:center;padding:0 6%">${esc(t)}</h1>
+      ${s ? `<p style="margin:0;color:${c.sub};font-size:26px;font-weight:500;opacity:0;animation:f 1s .7s forwards">${esc(s)}</p>` : ''}</div>`,
+  bold: (t, s, c) => `<div style="position:fixed;inset:0;background:${c.bg}"></div>
+    <div style="position:fixed;inset:0;display:flex;flex-direction:column;justify-content:center;gap:18px;padding:0 9%;font-family:${c.face}">
+      <div style="width:120px;height:14px;background:${c.accent};opacity:0;transform:translateX(-30px);animation:r .7s .1s forwards cubic-bezier(.2,.8,.2,1)"></div>
+      <h1 style="margin:0;color:${c.text};font-size:104px;font-weight:800;line-height:.98;letter-spacing:-3px;opacity:0;transform:translateY(28px);animation:r .9s .25s forwards cubic-bezier(.2,.8,.2,1)">${esc(t)}</h1>
+      ${s ? `<p style="margin:0;color:${c.sub};font-size:30px;font-weight:600;opacity:0;animation:f 1s .7s forwards">${esc(s)}</p>` : ''}</div>`,
+  gradient: (t, s, c) => `<div style="position:fixed;inset:0;background:${Array.isArray(SB.theme?.bg) || /gradient\(/.test(String(SB.theme?.bg||'')) ? c.bg : `linear-gradient(135deg, ${c.accent} 0%, ${c.bgSolid} 100%)`}"></div>
+    <div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;font-family:${c.face}">
+      <h1 style="margin:0;color:${c.text};font-size:92px;font-weight:800;letter-spacing:-2px;text-align:center;padding:0 7%;opacity:0;transform:scale(.94);animation:r .9s .2s forwards cubic-bezier(.2,.8,.2,1)">${esc(t)}</h1>
+      ${s ? `<p style="margin:0;padding:10px 24px;border-radius:99px;background:rgba(255,255,255,.14);backdrop-filter:blur(6px);color:${c.text};font-size:24px;font-weight:600;opacity:0;animation:f 1s .7s forwards">${esc(s)}</p>` : ''}</div>`,
+  minimal: (t, s, c) => `<div style="position:fixed;inset:0;background:${c.bgSolid}"></div>
+    <div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;font-family:${c.face}">
+      <div style="width:10px;height:10px;border-radius:99px;background:${c.accent};opacity:0;transform:scale(0);animation:r .6s .1s forwards cubic-bezier(.2,.8,.2,1)"></div>
+      <h1 style="margin:0;color:${c.text};font-size:76px;font-weight:600;letter-spacing:-1px;text-align:center;padding:0 8%;opacity:0;transform:translateY(16px);animation:r .9s .3s forwards cubic-bezier(.2,.8,.2,1)">${esc(t)}</h1>
+      ${s ? `<p style="margin:0;color:${c.sub};font-size:22px;font-weight:400;letter-spacing:.5px;opacity:0;animation:f 1s .7s forwards">${esc(s)}</p>` : ''}</div>`,
+  editorial: (t, s, c) => `<div style="position:fixed;inset:0;background:${c.bgSolid}"></div>
+    <div style="position:fixed;inset:0;display:flex;flex-direction:column;justify-content:center;gap:22px;padding:0 10%;font-family:${c.face}">
+      <div style="height:3px;background:${c.accent};transform:scaleX(0);transform-origin:left;animation:g .8s .1s forwards cubic-bezier(.2,.8,.2,1)"></div>
+      <h1 style="margin:0;color:${c.text};font-size:88px;font-weight:700;line-height:1.02;letter-spacing:-1.5px;opacity:0;transform:translateY(20px);animation:r .9s .3s forwards cubic-bezier(.2,.8,.2,1)">${esc(t)}</h1>
+      ${s ? `<p style="margin:0;color:${c.sub};font-size:26px;font-weight:500;opacity:0;animation:f 1s .7s forwards">${esc(s)}</p>` : ''}
+      <div style="height:3px;background:${c.accent};opacity:.5;transform:scaleX(0);transform-origin:left;animation:g .8s .5s forwards cubic-bezier(.2,.8,.2,1)"></div></div>`,
+}
+const KF = `@keyframes g{to{transform:scaleX(1)}}@keyframes r{to{opacity:1;transform:none}}@keyframes f{to{opacity:1}}`
+function titleCard(scene) {
+  const t = resolveTheme(scene)
+  const c = { ...t, ...fontFor(t.font), bg: bgFor(t), bgSolid: Array.isArray(t.bg) ? t.bg[0] : (typeof t.bg === 'string' && !/gradient\(/.test(t.bg) ? t.bg : '#0E1726') }
+  const render = STYLES[t.style] || STYLES.spotlight
+  return `${c.link}<style>html,body{margin:0;height:100%;overflow:hidden}${KF}</style>${render(scene.title, scene.sub, c)}`
+}
+function creditsCard(lines, scene) {
+  const t = resolveTheme(scene)
+  const c = { ...t, ...fontFor(t.font), bgSolid: Array.isArray(t.bg) ? t.bg[0] : (typeof t.bg === 'string' && !/gradient\(/.test(t.bg) ? t.bg : '#0E1726') }
+  return `${c.link}<style>html,body{margin:0;height:100%;background:${c.bgSolid};overflow:hidden}
+ .w{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;font-family:${c.face};opacity:0;animation:f .8s .1s forwards}
+ .t{color:${c.accent};font-size:22px;font-weight:700;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px}
+ .l{color:${c.sub};font-size:20px}@keyframes f{to{opacity:1}}</style>
+ <div class="w"><div class="t">Credits</div>${lines.map((l) => `<div class="l">${esc(l)}</div>`).join('')}</div>`
+}
 
 // ── assemble ────────────────────────────────────────────────────────────────
 function xfadeConcat(out, segs, durs) {
@@ -211,7 +262,7 @@ const finalPreset = (t) => (t <= 60 ? 'veryslow' : t <= 180 ? 'slow' : 'medium')
       const out = path.join(WORK, `seg_${String(i).padStart(2, '0')}.mp4`)
       const dur = s.dur || 6
       if (s.kind === 'title') {
-        await cardSeg(out, dur, titleCard(s.title, s.sub))
+        await cardSeg(out, dur, titleCard(s))
       } else if (s.kind === 'video') {
         const h = pixabayVideo(s.q)[(s.pick || 0) % 30]
         credits.push(`${h.user} / Pixabay`)
@@ -224,8 +275,8 @@ const finalPreset = (t) => (t <= 60 ? 'veryslow' : t <= 180 ? 'slow' : 'medium')
         kenBurnsSeg(out, photo.url, dur, s.forward !== false)
       } else if (s.kind === 'screencast') {
         await screencastSeg(out, s.url, s.steps, s.dur || 12)
-      } else { // credits
-        await cardSeg(out, dur, creditsCard([...new Set([...credits, musicCredit].filter(Boolean))]))
+      } else { // credits (only rendered when the storyboard explicitly includes a credits scene)
+        await cardSeg(out, dur, creditsCard([...new Set([...credits, musicCredit].filter(Boolean))], s))
       }
       segs.push(out); durs.push(dur)
       console.log(`  · seg ${i} (${s.kind}) — ${secs().toFixed(1)}s`)
@@ -246,6 +297,15 @@ const finalPreset = (t) => (t <= 60 ? 'veryslow' : t <= 180 ? 'slow' : 'medium')
   } else {
     ff(['-i', silent, '-c:v', 'libx264', '-crf', '30', '-preset', finalPreset(total), '-pix_fmt', 'yuv420p', '-movflags', '+faststart', finalOut])
   }
+
+  // Thumbnail: grab a crisp frame from the opening (into the animated title card
+  // if there is one → an on-brand poster). out/thumb.jpg, read back by the app.
+  try {
+    const thumbOut = path.join(OUT, 'thumb.jpg')
+    const at = Math.min(1.4, Math.max(0.3, total * 0.12))
+    ff(['-ss', at.toFixed(2), '-i', finalOut, '-frames:v', '1', '-q:v', '3', '-vf', `scale=${W}:${H}`, thumbOut])
+    if (fs.existsSync(thumbOut)) console.log(`   thumb: ${path.relative(process.cwd(), thumbOut)}`)
+  } catch (e) { console.log(`   (thumb skipped: ${e.message})`) }
 
   const mb = (fs.statSync(finalOut).size / 1048576).toFixed(2)
   console.log(`\n✅ ${path.relative(process.cwd(), finalOut)} · ${total.toFixed(1)}s · ${mb} MB`)
