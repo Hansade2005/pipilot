@@ -16,6 +16,8 @@
 //   theme?:  { style?: 'spotlight'|'bold'|'gradient'|'minimal'|'editorial',
 //             bg?: hex | [hex,hex], bg2?: hex, accent?: hex, text?: hex, sub?: hex,
 //             font?: 'sans'|'serif'|'mono' | '<Google Fonts family>' },  // per-VIDEO card design
+//   voice?:    string,          // default Piper TTS voice for scene `say` narration
+//   captions?: boolean,         // burn narration text as subtitles
 //   music?:  { mood: string, minDur?: number }   // resolved via stockdb (Jamendo)
 //          | { url: string, credit?: string }     // explicit track
 //          | null,
@@ -23,8 +25,9 @@
 // }
 //
 // Scene kinds:
-//   { kind:'title',     dur, title, sub?, style? }   // style: preset string or theme-override object
-//   ... credits are OPTIONAL — only include a credits scene when attribution should be shown on-screen
+//   { kind:'title',     dur, title, sub?, style?, typewriter? }   // typewriter: type the title out
+//   ANY scene also supports: say (narration text), voice (override), caption (burned text overlay),
+//     transition (the xfade INTO this scene).  credits are OPTIONAL (only for on-screen attribution).
 //   { kind:'video',     dur, q, pick?, start? }                     // Pixabay b-roll
 //   { kind:'still',     dur, keyword|topic|collection|id, pick?, color?, orientation?, forward? }  // Unsplash via stockdb
 //   { kind:'screencast', dur?, url, steps:[Step] }                  // drive the live app
@@ -40,7 +43,9 @@
 //   wait     { ms }
 // ────────────────────────────────────────────────────────────────────────
 
-const ASPECTS = { '16:9': [1280, 720], '9:16': [720, 1280], '1:1': [1080, 1080], '4:5': [1080, 1350] }
+// 1080-class canvases (was 720p) — noticeably sharper, and large outputs now go
+// to Drive rather than an inline cap, so the size bump is handled.
+const ASPECTS = { '16:9': [1920, 1080], '9:16': [1080, 1920], '1:1': [1080, 1080], '4:5': [1080, 1350] }
 const SCENE_KINDS = ['title', 'video', 'still', 'screencast', 'credits']
 const STILL_SOURCES = ['keyword', 'topic', 'collection', 'id']
 const STEP_ACTIONS = {

@@ -39,6 +39,9 @@ const DRAFT = process.env.DRAFT === '1' || process.env.DRAFT === 'true'
 // final video (free tier). SERVER sets this from the user's plan; the engine just honors it.
 const WM = process.env.WATERMARK
 const WM_TEXT = WM && WM !== '1' && WM !== 'true' ? String(WM).slice(0, 40) : 'Made with PiPilot'
+const PIPER_DIR = process.env.PIPER_DIR || '/opt/piper'
+const DEFAULT_VOICE = 'amy'
+const CAPTIONS = SB.captions === true || SB.captions === 'true'
 const needsPixabay = SB.scenes.some((s) => s.kind === 'video')
 if (needsPixabay && !KEY) { console.error('This storyboard has `video` scenes — set PIXABAY_KEY (connect Pixabay).'); process.exit(2) }
 
@@ -53,6 +56,27 @@ const hash = (s) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 
 
 // ── ffmpeg + curl helpers ───────────────────────────────────────────────────
 const ff = (a) => execFileSync('ffmpeg', ['-y', '-loglevel', 'error', ...a], { stdio: ['ignore', 'ignore', 'inherit'] })
+// ── Piper TTS (narration) ────────────────────────────────────────────────────
+// Resolve a voice name → the baked .onnx model, falling back to the default (or
+// any available voice) so a bad/unknown name never breaks the render.
+function voiceModel(name) {
+  const dir = path.join(PIPER_DIR, 'voices')
+  const tryNames = [name, DEFAULT_VOICE].filter(Boolean)
+  for (const n of tryNames) { const f = path.join(dir, `${n}.onnx`); if (fs.existsSync(f)) return f }
+  try { const any = fs.readdirSync(dir).find((f) => f.endsWith('.onnx')); if (any) return path.join(dir, any) } catch { /* no voices */ }
+  return null
+}
+const audioDur = (f) => { try { return parseFloat(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', f]).toString().trim()) || 0 } catch { return 0 } }
+// Synthesize text → wav. Returns { wav, dur } or null if TTS is unavailable/fails.
+function tts(text, voice, outWav) {
+  const model = voiceModel(voice)
+  if (!model) return null
+  try {
+    execFileSync(path.join(PIPER_DIR, 'piper'), ['--model', model, '--output_file', outWav], { input: String(text).slice(0, 1200), cwd: PIPER_DIR, stdio: ['pipe', 'ignore', 'ignore'] })
+    if (!fs.existsSync(outWav)) return null
+    return { wav: outWav, dur: audioDur(outWav) }
+  } catch (e) { console.log(`   (tts failed for "${String(voice)}": ${e.message})`); return null }
+}
 function curl(url, dest) {
   if (fs.existsSync(dest) && fs.statSync(dest).size > 0) return dest
   try { execFileSync('curl', ['-f', '-sS', '-L', '--max-time', '120', '-o', dest, url], { stdio: ['ignore', 'ignore', 'inherit'] }) }
@@ -273,11 +297,16 @@ const STYLES = {
       <div style="height:3px;background:${c.accent};opacity:.5;transform:scaleX(0);transform-origin:left;animation:g .8s .5s forwards cubic-bezier(.2,.8,.2,1)"></div></div>`,
 }
 const KF = `@keyframes g{to{transform:scaleX(1)}}@keyframes r{to{opacity:1;transform:none}}@keyframes f{to{opacity:1}}`
-function titleCard(scene) {
+function titleCard(scene, typeDur = 0) {
   const t = resolveTheme(scene)
   const c = { ...t, ...fontFor(t.font), bg: bgFor(t), bgSolid: Array.isArray(t.bg) ? t.bg[0] : (typeof t.bg === 'string' && !/gradient\(/.test(t.bg) ? t.bg : '#0E1726') }
   const render = STYLES[t.style] || STYLES.spotlight
-  return `${c.link}<style>html,body{margin:0;height:100%;overflow:hidden}${KF}</style>${render(scene.title, scene.sub, c)}`
+  const base = `${c.link}<style>html,body{margin:0;height:100%;overflow:hidden}${KF}</style>${render(scene.title, scene.sub, c)}`
+  if (!typeDur || typeDur <= 0) return base
+  // Typewriter: type the H1 out over `typeDur`s (synced to narration when present),
+  // with a blinking caret; the subtitle fades in once typing finishes.
+  const tw = `<style>@keyframes blink{50%{opacity:0}}</style><script>(function(){var h=document.querySelector('h1');if(!h)return;var full=h.textContent;h.textContent='';h.style.opacity='1';h.style.transform='none';h.style.animation='none';var car=document.createElement('span');car.textContent='|';car.style.cssText='opacity:.7;margin-left:2px;animation:blink 1s steps(1) infinite';h.appendChild(car);var sub=document.querySelector('p');if(sub){sub.style.opacity='0';sub.style.animation='none';}var n=full.length,ms=Math.max(18,${Math.round(typeDur * 1000)}/Math.max(1,n)),i=0;var tm=setInterval(function(){i++;car.remove();h.textContent=full.slice(0,i);h.appendChild(car);if(i>=n){clearInterval(tm);setTimeout(function(){car.remove();if(sub){sub.style.transition='opacity .5s';sub.style.opacity='1';}},200);}},ms);})();</script>`
+  return base + tw
 }
 function creditsCard(lines, scene) {
   const t = resolveTheme(scene)
@@ -290,18 +319,22 @@ function creditsCard(lines, scene) {
 }
 
 // ── assemble ────────────────────────────────────────────────────────────────
-function xfadeConcat(out, segs, durs) {
+// The ffmpeg xfade transitions we allow a storyboard to request per scene.
+const XF_TRANSITIONS = new Set(['fade', 'fadeblack', 'fadewhite', 'dissolve', 'wipeleft', 'wiperight', 'wipeup', 'wipedown', 'slideleft', 'slideright', 'slideup', 'slidedown', 'smoothleft', 'smoothright', 'smoothup', 'smoothdown', 'circleopen', 'circleclose', 'circlecrop', 'rectcrop', 'radial', 'zoomin', 'pixelize', 'hlslice', 'hrslice', 'vuslice', 'vdslice', 'diagtl', 'diagtr', 'diagbl', 'diagbr', 'horzopen', 'horzclose', 'vertopen', 'vertclose'])
+// A varied default rotation (more interesting than fade-only) when a scene doesn't pick.
+const XF_DEFAULTS = ['fade', 'slideleft', 'smoothup', 'circleopen', 'wiperight', 'dissolve', 'slideup', 'radial', 'wipeleft', 'zoomin']
+function xfadeConcat(out, segs, durs, transFor = []) {
   // Single scene: nothing to crossfade — just normalize/encode the one segment
   // (an empty xfade filter would make ffmpeg fail on a missing [v] output).
   if (segs.length === 1) {
     ff(['-i', segs[0], '-c:v', 'libx264', '-crf', '20', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', out])
     return durs[0]
   }
-  const trans = ['fade', 'slideleft', 'fade', 'slideup', 'fade']
   let filter = '', prev = '[0:v]', acc = durs[0]
   for (let i = 1; i < segs.length; i++) {
     const label = i === segs.length - 1 ? '[v]' : `[x${i}]`
-    filter += `${prev}[${i}:v]xfade=transition=${trans[(i - 1) % trans.length]}:duration=${XF}:offset=${(acc - XF).toFixed(3)}${label};`
+    const tr = transFor[i] || XF_DEFAULTS[(i - 1) % XF_DEFAULTS.length]
+    filter += `${prev}[${i}:v]xfade=transition=${tr}:duration=${XF}:offset=${(acc - XF).toFixed(3)}${label};`
     acc += durs[i] - XF; prev = label
   }
   ff([...segs.flatMap((s) => ['-i', s]), '-filter_complex', filter.replace(/;$/, ''),
@@ -309,22 +342,46 @@ function xfadeConcat(out, segs, durs) {
   return acc
 }
 const finalPreset = (t) => (t <= 60 ? 'veryslow' : t <= 180 ? 'slow' : 'medium')
+const WMFONT = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
+// A burned-in caption (drawtext) shown only during [start,end] of the final timeline.
+function capDraw(text, start, end) {
+  const t = String(text).replace(/[\\':%]/g, '').replace(/\s+/g, ' ').slice(0, 140)
+  const fsz = Math.round(H / 22)
+  return `drawtext=fontfile=${WMFONT}:text='${t}':fontcolor=white:fontsize=${fsz}:x=(w-tw)/2:y=h-th-${Math.round(H * 0.09)}:box=1:boxcolor=black@0.55:boxborderw=${Math.round(fsz * 0.5)}:enable='between(t,${start.toFixed(2)},${end.toFixed(2)})'`
+}
 
 // ── run ─────────────────────────────────────────────────────────────────────
 ;(async () => {
-  console.log(`▶  ${W}x${H}@${FPS} · ${SB.scenes.length} scenes${DRAFT ? ' · DRAFT' : ''}${WM ? ' · watermark' : ''}\n`)
-  const credits = [], segs = [], durs = []
+  const nSay = SB.scenes.filter((s) => s.say).length
+  console.log(`▶  ${W}x${H}@${FPS} · ${SB.scenes.length} scenes${nSay ? ` · ${nSay} narrated${CAPTIONS ? '+captions' : ''}` : ''}${DRAFT ? ' · DRAFT' : ''}${WM ? ' · watermark' : ''}\n`)
+  const credits = [], segs = []
   // Resolve music up front — the credits card needs its attribution string.
   let musicUrl = null, musicCredit = null
   if (SB.music?.url) { musicUrl = SB.music.url; musicCredit = SB.music.credit || 'music' }
   else if (SB.music?.mood) { const m = pickMusic({ mood: SB.music.mood }); musicUrl = m.url; musicCredit = m.credit }
+  // Durations + start offsets are deterministic from the storyboard, so compute them
+  // UP FRONT — narration is synth'd before cards render so a typewriter card can time
+  // its typing to the narration length (voice-synced typewriter).
+  const durOf = (s) => (s.kind === 'screencast' ? (s.dur || 12) : (s.dur || 6))
+  const durs = SB.scenes.map(durOf)
+  const starts = []; { let a = 0; for (let i = 0; i < durs.length; i++) { starts.push(a); a += durs[i] - (i < durs.length - 1 ? XF : 0) } }
+  const narr = []
+  for (let i = 0; i < SB.scenes.length; i++) {
+    const s = SB.scenes[i]; if (!s.say) continue
+    const v = s.voice || SB.voice
+    const w = tts(s.say, v, path.join(WORK, `narr_${i}.wav`))
+    if (w) { narr.push({ i, start: starts[i], dur: w.dur, wav: w.wav, text: s.say, end: starts[i] + durs[i] }); console.log(`   · narration ${i} (${v || DEFAULT_VOICE}) — ${w.dur.toFixed(1)}s`) }
+  }
+  const narrByScene = new Map(narr.map((n) => [n.i, n]))
+  const hasNarr = narr.length > 0
   try {
     for (let i = 0; i < SB.scenes.length; i++) {
       const s = SB.scenes[i]
       const out = path.join(WORK, `seg_${String(i).padStart(2, '0')}.mp4`)
-      const dur = s.dur || 6
+      const dur = durs[i]
       if (s.kind === 'title') {
-        await cardSeg(out, dur, titleCard(s))
+        // Typewriter cards sync their type duration to the narration when present.
+        await cardSeg(out, dur, titleCard(s, s.typewriter ? (narrByScene.get(i)?.dur || dur * 0.7) : 0))
       } else if (s.kind === 'video') {
         const h = pixabayVideo(s.q)[(s.pick || 0) % 30]
         credits.push(`${h.user} / Pixabay`)
@@ -340,7 +397,7 @@ const finalPreset = (t) => (t <= 60 ? 'veryslow' : t <= 180 ? 'slow' : 'medium')
       } else { // credits (only rendered when the storyboard explicitly includes a credits scene)
         await cardSeg(out, dur, creditsCard([...new Set([...credits, musicCredit].filter(Boolean))], s))
       }
-      segs.push(out); durs.push(dur)
+      segs.push(out)
       console.log(`  · seg ${i} (${s.kind}) — ${secs().toFixed(1)}s`)
     }
     // Pre-render the watermark while the shared browser is still open (the finally
@@ -349,7 +406,9 @@ const finalPreset = (t) => (t <= 60 ? 'veryslow' : t <= 180 ? 'slow' : 'medium')
   } finally { if (_browser) await _browser.close() }
 
   const silent = path.join(WORK, 'silent.mp4')
-  const total = xfadeConcat(silent, segs, durs)
+  // Per-boundary transitions: scene i may set `transition`; otherwise a varied default.
+  const transFor = SB.scenes.map((s) => (s.transition && XF_TRANSITIONS.has(s.transition) ? s.transition : null))
+  const total = xfadeConcat(silent, segs, durs, transFor)
 
   const finalOut = path.join(OUT, 'video.mp4')
   const crf = DRAFT ? '32' : '30'
@@ -358,31 +417,52 @@ const finalPreset = (t) => (t <= 60 ? 'veryslow' : t <= 180 ? 'slow' : 'medium')
   // on a subtle dark pill for contrast), overlaid bottom-right. Free tier only.
   // Use the copy pre-rendered above (browser is closed now); null if it failed.
   const wmPath = _wmPath
-  // Assemble a single ffmpeg call handling any combo of: draft downscale, logo
-  // overlay, and music. Inputs: silent [+ music] [+ looped logo png].
+  // Assemble ONE ffmpeg call handling any combo of: draft downscale, logo overlay,
+  // burned-in captions, ducked music, and narration. Inputs: silent [+ music]
+  // [+ logo png] [+ one wav per narration line].
   const inputs = ['-i', silent]
   let idx = 1, musicIdx = -1, wmIdx = -1
   if (musicUrl) { const music = curl(musicUrl, path.join(CACHE, `music_${hash(musicUrl)}.mp3`)); inputs.push('-i', music); musicIdx = idx++ }
   // NO -loop on the logo: a single-frame image + overlay's default eof_action=repeat
   // persists it for the whole video. -loop 1 makes it infinite and hangs the encode.
   if (wmPath) { inputs.push('-i', wmPath); wmIdx = idx++ }
+  const narrIdx = []
+  for (const n of narr) { inputs.push('-i', n.wav); narrIdx.push(idx++) }
+
+  // ── video filter chain ──
   const vParts = []; let cur = '0:v'
   if (DRAFT) { vParts.push(`[${cur}]scale=640:-2[vs]`); cur = 'vs' }
   if (wmIdx >= 0) { const m = Math.round(H / 34); vParts.push(`[${cur}][${wmIdx}:v]overlay=W-w-${m}:H-h-${m}[vw]`); cur = 'vw' }
-  const aParts = []
+  // Text overlays: an explicit per-scene `caption` (always burned), or — when
+  // top-level `captions:true` — the narration text as subtitles.
+  const overlays = []
+  SB.scenes.forEach((s, i) => {
+    if (s.caption) overlays.push({ text: typeof s.caption === 'string' ? s.caption : (s.caption.text || ''), start: starts[i], end: starts[i] + durs[i] })
+    else if (CAPTIONS && s.say) { const n = narrByScene.get(i); overlays.push({ text: s.say, start: starts[i], end: Math.min(starts[i] + durs[i], starts[i] + (n?.dur || durs[i]) + 0.4) }) }
+  })
+  overlays.forEach((o, k) => { if (!o.text) return; const oo = `cap${k}`; vParts.push(`[${cur}]${capDraw(o.text, o.start, o.end)}[${oo}]`); cur = oo })
+
+  // ── audio: ducked music + narration (each placed at its scene offset) ──
+  const aParts = [], mixLabels = []
   if (musicIdx >= 0) {
     const fIn = Math.min(1.5, total), fOutStart = Math.max(0, total - 2), fOutDur = Math.min(2, total - fOutStart)
-    aParts.push(`[${musicIdx}:a]atrim=0:${total.toFixed(2)},afade=t=in:st=0:d=${fIn.toFixed(2)},afade=t=out:st=${fOutStart.toFixed(2)}:d=${fOutDur.toFixed(2)},volume=0.85[a]`)
+    const vol = hasNarr ? 0.22 : 0.85 // duck music under narration
+    aParts.push(`[${musicIdx}:a]atrim=0:${total.toFixed(2)},afade=t=in:st=0:d=${fIn.toFixed(2)},afade=t=out:st=${fOutStart.toFixed(2)}:d=${fOutDur.toFixed(2)},volume=${vol}[amus]`)
+    mixLabels.push('[amus]')
   }
+  narr.forEach((n, k) => { const ms = Math.round(n.start * 1000); aParts.push(`[${narrIdx[k]}:a]adelay=${ms}|${ms},volume=1.35[nd${k}]`); mixLabels.push(`[nd${k}]`) })
+  let haveAudio = false
+  if (mixLabels.length === 1) { aParts.push(`${mixLabels[0]}anull[a]`); haveAudio = true }
+  else if (mixLabels.length > 1) { aParts.push(`${mixLabels.join('')}amix=inputs=${mixLabels.length}:normalize=0:duration=longest[a]`); haveAudio = true }
+
   const fc = [...vParts, ...aParts].join(';')
   const args = [...inputs]
   if (fc) args.push('-filter_complex', fc)
   args.push('-map', vParts.length ? `[${cur}]` : '0:v')
-  if (musicIdx >= 0) args.push('-map', '[a]')
+  if (haveAudio) args.push('-map', '[a]')
   args.push('-c:v', 'libx264', '-crf', crf, '-preset', preset, '-pix_fmt', 'yuv420p', '-movflags', '+faststart')
-  if (musicIdx >= 0) args.push('-c:a', 'aac', '-b:a', '128k')
-  // Bound the output to the (finite) video/music when a music stream is present;
-  // the single-frame logo overlay follows the main video length on its own.
+  if (haveAudio) args.push('-c:a', 'aac', '-b:a', '128k')
+  // Bound to the finite video when music is present (music is trimmed to `total`).
   if (musicIdx >= 0) args.push('-shortest')
   args.push(finalOut)
   ff(args)
