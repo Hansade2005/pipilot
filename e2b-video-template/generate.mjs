@@ -14,7 +14,6 @@
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { chromium } from 'playwright'
 import { pickMusic, pickPhotos } from './stockdb.mjs'
 import { validateStoryboard, resolveCanvas } from './storyboard.mjs'
 
@@ -85,8 +84,11 @@ function kenBurnsSeg(out, url, dur, forward = true) {
 }
 
 // One shared browser for ALL cards + screencasts (launching per item costs ~4.5s).
+// Playwright is imported dynamically (not a hoisted static import) so the
+// PLAYWRIGHT_BROWSERS_PATH override set at module top is in effect before the
+// package resolves its browser registry — a static import would evaluate first.
 let _browser = null
-const getBrowser = async () => (_browser ??= await chromium.launch())
+const getBrowser = async () => (_browser ??= await (await import('playwright')).chromium.launch())
 
 async function cardSeg(out, dur, html) {
   const vdir = fs.mkdtempSync(path.join(WORK, 'card-'))
