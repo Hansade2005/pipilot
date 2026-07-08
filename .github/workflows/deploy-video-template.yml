@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       e2b_access_token:
-        description: 'E2B Access Token (from https://e2b.dev/dashboard?tab=personal)'
-        required: true
+        description: 'E2B Access Token (leave blank to use the repo E2B_ACCESS_TOKEN secret)'
+        required: false
         type: string
       template_name:
         description: 'Template Name'
@@ -34,35 +34,39 @@ jobs:
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
-
-    - name: Install pnpm
-      run: npm install -g pnpm
+        node-version: '22'
 
     - name: Install E2B CLI
-      run: pnpm add @e2b/cli
-
-    - name: Set E2B Access Token
-      run: echo "E2B_ACCESS_TOKEN=${{ inputs.e2b_access_token }}" >> $GITHUB_ENV
+      # npm -g (not `pnpm add`, which pulls the whole Next.js project + fails on
+      # ignored build scripts). Pinned to 2.2.4: newer CLIs hard-fail the v1
+      # `template build --name --dockerfile` flags. Matches the v4/desktop builds.
+      run: npm install -g @e2b/cli@2.2.4
 
     - name: Build and deploy Video E2B template
       run: |
-        npx e2b template build \
-          --name ${{ inputs.template_name }} \
+        # Strip any non-digits (e.g. a "8,192" thousands separator) and default.
+        NAME="${{ inputs.template_name }}"; NAME="${NAME:-pipilot-video}"
+        CPU="$(printf '%s' "${{ inputs.cpu_count }}" | tr -cd '0-9')"; CPU="${CPU:-8}"
+        MEM="$(printf '%s' "${{ inputs.memory_mb }}" | tr -cd '0-9')"; MEM="${MEM:-8192}"
+        # Idempotent: drop any existing alias first so a re-build never 403s with
+        # "alias already used".
+        echo "Removing existing '$NAME' template (if any)..."
+        e2b template delete "$NAME" -y || true
+        echo "Building '$NAME' with ${CPU} vCPU / ${MEM} MB"
+        e2b template build \
+          --name "$NAME" \
           --dockerfile e2b-video.Dockerfile \
-          --cpu-count ${{ inputs.cpu_count }} \
-          --memory-mb ${{ inputs.memory_mb }}
+          --cpu-count "$CPU" \
+          --memory-mb "$MEM"
       env:
-        E2B_ACCESS_TOKEN: ${{ inputs.e2b_access_token }}
+        E2B_ACCESS_TOKEN: ${{ inputs.e2b_access_token || secrets.E2B_ACCESS_TOKEN }}
 
     - name: Display template info
       run: |
-        echo "Template deployed successfully!"
-        echo "Template name: ${{ inputs.template_name }}"
-        echo "CPU cores: ${{ inputs.cpu_count }}"
-        echo "Memory: ${{ inputs.memory_mb }}MB"
+        echo "Video template deployed: ${{ inputs.template_name }}"
+        echo "CPU: ${{ inputs.cpu_count }}  Memory: ${{ inputs.memory_mb }}MB"
         echo ""
-        echo "Features:"
+        echo "Included:"
         echo "  - Playwright + Chromium (motion-graphics cards + live-app screencast)"
         echo "  - ffmpeg (compositing, Ken Burns, xfade, music mux, encode)"
         echo "  - Zero-API stock corpus at /opt/stockdb (Jamendo moods + Unsplash)"
