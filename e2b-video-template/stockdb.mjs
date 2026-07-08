@@ -102,7 +102,7 @@ function toPhoto(p) {
 // → array of resolved photos (url + credit + color/aspect). Pack ids that aren't
 // in the 25k photos file are silently skipped.
 export function pickPhotos({ keyword, topic, collection, id, n = 1, color, orientation, seed = 0 } = {}) {
-  let pool = []
+  let pool = [], keywordSearch = false
   if (id) {
     const p = photoById().get(id)
     return p ? [toPhoto(p)] : []
@@ -113,10 +113,41 @@ export function pickPhotos({ keyword, topic, collection, id, n = 1, color, orien
     const c = collections().find((x) => String(x.collection_id) === String(collection) || x.title?.toLowerCase() === String(collection).toLowerCase())
     pool = (c?.photo_ids || []).map((pid) => photoById().get(pid)).filter(Boolean)
   } else if (keyword) {
-    const kw = String(keyword).toLowerCase()
-    pool = photos().filter((p) =>
-      (p.keywords || []).some((k) => k.toLowerCase().includes(kw)) ||
-      (p.description || '').toLowerCase().includes(kw))
+    // RANKED keyword match. The human-written `description` is the only TRUSTWORTHY
+    // signal — the Unsplash `keywords` are ~80 noisy auto-tags per photo (a coyote photo
+    // gets tagged "fine"+"dining"). So match on descriptions FIRST (accurate but sparse),
+    // and only backfill from keyword tags when descriptions can't fill `n`. A whole-phrase
+    // query like "fine dining" won't appear verbatim, so also score per-token.
+    keywordSearch = true
+    const kw = String(keyword).toLowerCase().trim()
+    const toks = [...new Set(kw.split(/[^a-z0-9]+/).filter((t) => t.length > 1))]
+    const rank = (text) => {
+      const h = String(text || '').toLowerCase(); if (!h) return 0
+      if (kw && h.includes(kw)) return 1000
+      let s = 0; for (const t of toks) if (h.includes(t)) s++
+      return s
+    }
+    const rankBy = (field) => {
+      const scored = []
+      for (const p of photos()) { const s = rank(p[field]); if (s > 0) scored.push([p, s]) }
+      return scored.sort((a, b) => b[1] - a[1]).map(([p]) => p)
+    }
+    const descPool = rankBy('description')
+    pool = descPool
+    if (descPool.length < Math.max(n, 6)) {
+      const seen = new Set(descPool.map((p) => p.photo_id))
+      // keyword-tag matches (noisier) ranked by how many query words appear as tags
+      const kwPool = []
+      for (const p of photos()) {
+        if (seen.has(p.photo_id)) continue
+        const h = (p.keywords || []).join(' ').toLowerCase()
+        let s = kw && h.includes(kw) ? 1000 : 0
+        if (!s) for (const t of toks) if (h.includes(t)) s++
+        if (s > 0) kwPool.push([p, s])
+      }
+      kwPool.sort((a, b) => b[1] - a[1])
+      pool = [...descPool, ...kwPool.map(([p]) => p)]
+    }
   } else {
     pool = photos()
   }
