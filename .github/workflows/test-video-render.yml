@@ -1,0 +1,47 @@
+name: Test Video Render
+
+# One-off end-to-end proof that the pipilot-video template actually renders:
+# spins up a sandbox, runs a Pixabay-free/screencast-free storyboard through
+# the full engine (Chromium cards + Unsplash Ken Burns + Jamendo music + the
+# ffmpeg xfade/concat/mux path), and uploads the resulting MP4 as an artifact.
+
+on:
+  workflow_dispatch:
+    inputs:
+      e2b_access_token:
+        description: 'E2B key (leave blank to use the repo E2B_ACCESS_TOKEN secret)'
+        required: false
+        type: string
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+
+    - name: Render a test storyboard
+      run: |
+        # Install the e2b SDK in an isolated dir so it never touches the repo's
+        # Next.js project (npm install at the repo root drags the whole app in).
+        mkdir -p /tmp/rt && cd /tmp/rt
+        npm init -y >/dev/null 2>&1
+        npm install e2b@^1 >/dev/null 2>&1
+        cp "$GITHUB_WORKSPACE/e2b-video-template/render-test.mjs" .
+        node render-test.mjs
+        cp video.mp4 "$GITHUB_WORKSPACE/video.mp4"
+      env:
+        E2B_API_KEY: ${{ inputs.e2b_access_token || secrets.E2B_ACCESS_TOKEN }}
+
+    - name: Upload the rendered video
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-video
+        path: video.mp4
+        if-no-files-found: warn
