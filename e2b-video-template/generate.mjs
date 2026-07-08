@@ -196,7 +196,23 @@ async function waitForAppReady(page) {
   await page.waitForTimeout(700) // settle for fonts/layout/entry animations
 }
 
-async function screencastSeg(out, url, steps, maxDur = 20) {
+// Cursor-aware helpers handed to a raw `script` so agent-written Playwright routines
+// still produce the animated cursor + click ripples (they wrap the same runStep path),
+// while `page` stays available for anything the DSL can't express.
+function scriptHelpers(page, baseUrl) {
+  return {
+    page,
+    goto: (path) => runStep(page, { action: 'goto', path }, baseUrl),
+    click: (target) => runStep(page, { action: 'click', selector: target }, baseUrl),
+    type: (target, text, slowmo) => runStep(page, { action: 'type', selector: target, text, slowmo }, baseUrl),
+    hover: (target) => runStep(page, { action: 'hover', selector: target }, baseUrl),
+    scrollTo: (target) => runStep(page, { action: 'scrollTo', selector: target }, baseUrl),
+    press: (key) => page.keyboard.press(key).catch(() => {}),
+    wait: (ms) => page.waitForTimeout(Math.min(Number(ms) || 0, 8000)),
+    log: (m) => console.log(`      [script] ${String(m).slice(0, 200)}`),
+  }
+}
+async function screencastSeg(out, url, steps, maxDur = 20, script = null) {
   const vdir = fs.mkdtempSync(path.join(WORK, 'cast-'))
   try {
     const ctx = await (await getBrowser()).newContext({ viewport: { width: W, height: H }, recordVideo: { dir: vdir, size: { width: W, height: H } } })
@@ -210,9 +226,30 @@ async function screencastSeg(out, url, steps, maxDur = 20) {
     await installCursor(page)
     // Run the demo (or just dwell) for maxDur of VISIBLE-app time after it rendered.
     const deadline = Date.now() + maxDur * 1000
-    for (const st of steps || []) {
-      if (Date.now() > deadline) break
-      await runStep(page, st, url).catch(() => {})
+    if (script && typeof script === 'string') {
+      // Agent-authored Playwright routine — full control flow, run with cursor-aware
+      // helpers + raw `page`, capped to the scene duration so it can never hang a render.
+      const h = scriptHelpers(page, url)
+      const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor
+      let fn
+      try { fn = new AsyncFunction('page', 'goto', 'click', 'type', 'hover', 'scrollTo', 'press', 'wait', 'log', script) }
+      catch (e) { console.log(`      script compile error: ${e.message}`) }
+      if (fn) {
+        await Promise.race([
+          fn(h.page, h.goto, h.click, h.type, h.hover, h.scrollTo, h.press, h.wait, h.log).catch((e) => console.log(`      script error: ${e.message}`)),
+          new Promise((r) => setTimeout(r, maxDur * 1000)),
+        ])
+        console.log(`      script done (${url})`)
+      }
+    } else {
+      let ran = 0
+      const actionable = (steps || []).filter((st) => st.action !== 'wait')
+      for (const st of steps || []) {
+        if (Date.now() > deadline) break
+        const ok = await runStep(page, st, url).catch(() => false)
+        if (ok && st.action !== 'wait') ran++
+      }
+      if (actionable.length) console.log(`      steps: ${ran}/${actionable.length} matched (${url})`)
     }
     const remain = deadline - Date.now()
     if (remain > 300) await page.waitForTimeout(Math.min(remain, maxDur * 1000))
@@ -232,37 +269,68 @@ async function installCursor(page) {
     .__pprip{position:fixed;z-index:2147483646;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:var(--signal,#f59e0b);pointer-events:none;animation:__pprip .5s ease-out forwards}` }).catch(() => {})
   await page.evaluate(() => { const d = document.createElement('div'); d.id = '__ppcur'; document.body.appendChild(d) }).catch(() => {})
 }
-async function moveCursorTo(page, sel) {
-  const box = await page.locator(sel).first().boundingBox().catch(() => null)
+async function moveCursorTo(page, loc) {
+  const box = await loc.boundingBox().catch(() => null)
   if (!box) return null
   const x = Math.round(box.x + box.width / 2), y = Math.round(box.y + box.height / 2)
-  await page.evaluate(([x, y]) => { const c = document.getElementById('__ppcur'); if (c) { c.style.left = x + 'px'; c.style.top = y + 'px' } }, [x, y])
+  await page.evaluate(([x, y]) => { const c = document.getElementById('__ppcur'); if (c) { c.style.left = x + 'px'; c.style.top = y + 'px' } }, [x, y]).catch(() => {})
   await page.mouse.move(x, y)
   await page.waitForTimeout(550)
   return { x, y }
 }
+// Resolve a step's target FORGIVINGLY. The agent often can't see the live DOM, so a
+// `selector`/`ref` may be a CSS selector OR just a visible label. Try, in order: the
+// string as a selector, then text / button / link / placeholder / label matches — and
+// return the FIRST that actually exists. This is what makes agent-authored demos click.
+async function resolveLoc(page, st) {
+  const raw = (st.selector || st.ref || '').toString().trim()
+  if (!raw) return null
+  const label = raw.startsWith('text=') ? raw.slice(5).trim() : raw
+  const makers = []
+  if (raw.startsWith('text=')) {
+    makers.push(() => page.getByText(label, { exact: false }))
+  } else {
+    makers.push(() => page.locator(raw)) // treat as CSS/selector first
+  }
+  // Fuzzy fallbacks by visible label — order matters (most specific interactive first).
+  makers.push(
+    () => page.getByRole('button', { name: label, exact: false }),
+    () => page.getByRole('link', { name: label, exact: false }),
+    () => page.getByPlaceholder(label, { exact: false }),
+    () => page.getByRole('textbox', { name: label, exact: false }),
+    () => page.getByLabel(label, { exact: false }),
+    () => page.getByText(label, { exact: false }),
+  )
+  for (const mk of makers) {
+    try { const loc = mk().first(); if (await loc.count().catch(() => 0)) return loc } catch { /* invalid selector for this engine — try next */ }
+  }
+  return null
+}
 async function ripple(page, x, y) {
   await page.evaluate(([x, y]) => { const r = document.createElement('div'); r.className = '__pprip'; r.style.left = x + 'px'; r.style.top = y + 'px'; document.body.appendChild(r); setTimeout(() => r.remove(), 600) }, [x, y]).catch(() => {})
 }
-// Map a storyboard step → Playwright. `selector` is a CSS selector; `ref` is
-// accepted as a CSS selector fallback or a text= match (so the agent can pass
-// either a selector it read from the DOM or a visible label).
-function targetOf(st) { return st.selector || (st.ref?.startsWith('text=') ? st.ref : st.ref ? st.ref : null) }
+// Map a storyboard step → Playwright. Returns true if the step did something, false if
+// its target couldn't be found (so the caller can log a per-step outcome — silent misses
+// were exactly why agent-authored demos looked like they "did nothing").
 async function runStep(page, st, baseUrl) {
-  const sel = targetOf(st)
-  if (st.action === 'goto') { const u = new URL(st.path, baseUrl).href; await page.goto(u, { waitUntil: 'load', timeout: 30000 }).catch(() => {}); await waitForAppReady(page); await installCursor(page); return }
-  if (st.action === 'wait') { await page.waitForTimeout(Math.min(st.ms, 5000)); return }
-  if (st.action === 'press') { await page.keyboard.press(st.key); return }
-  if (!sel) return
-  const pos = await moveCursorTo(page, sel)
-  if (st.action === 'hover') { return }
-  if (st.action === 'scrollTo') { await page.locator(sel).first().scrollIntoViewIfNeeded().catch(() => {}); return }
-  if (st.action === 'click') { if (pos) await ripple(page, pos.x, pos.y); await page.locator(sel).first().click({ timeout: 4000 }).catch(() => {}); return }
+  const tgt = st.selector || st.ref || ''
+  if (st.action === 'goto') { const u = new URL(st.path, baseUrl).href; await page.goto(u, { waitUntil: 'load', timeout: 30000 }).catch(() => {}); await waitForAppReady(page); await installCursor(page); return true }
+  if (st.action === 'wait') { await page.waitForTimeout(Math.min(st.ms, 5000)); return true }
+  if (st.action === 'press') { await page.keyboard.press(st.key).catch(() => {}); return true }
+  const loc = await resolveLoc(page, st)
+  if (!loc) { console.log(`      ✗ ${st.action} "${tgt}" — no matching element`); return false }
+  await loc.scrollIntoViewIfNeeded().catch(() => {})
+  const pos = await moveCursorTo(page, loc)
+  if (st.action === 'hover') return true
+  if (st.action === 'scrollTo') return true
+  if (st.action === 'click') { if (pos) await ripple(page, pos.x, pos.y); await loc.click({ timeout: 4000 }).catch(() => {}); return true }
   if (st.action === 'type') {
     if (pos) await ripple(page, pos.x, pos.y)
-    await page.locator(sel).first().click({ timeout: 4000 }).catch(() => {})
+    await loc.click({ timeout: 4000 }).catch(() => {})
     for (const ch of String(st.text)) { await page.keyboard.type(ch); await page.waitForTimeout(st.slowmo || 45) }
+    return true
   }
+  return true
 }
 
 // ── HTML cards (themeable branding) ──────────────────────────────────────────
@@ -438,7 +506,7 @@ function capDraw(text, start, end) {
           kenBurnsSeg(out, photo.url, dur, s.forward !== false)
         }
       } else if (s.kind === 'screencast') {
-        await screencastSeg(out, s.url, s.steps, s.dur || 12)
+        await screencastSeg(out, s.url, s.steps, s.dur || 12, s.script)
       } else { // credits (only rendered when the storyboard explicitly includes a credits scene)
         await cardSeg(out, dur, creditsCard([...new Set([...credits, musicCredit].filter(Boolean))], s))
       }

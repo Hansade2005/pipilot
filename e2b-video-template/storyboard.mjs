@@ -33,7 +33,10 @@
 //   { kind:'video',     dur, q | prompt, pick?, start? }            // Pixabay b-roll; falls back to an a0 image (from `prompt`|`q`) with no key/match
 //   { kind:'image',     dur, prompt, forward? }                     // bespoke a0.dev-generated image (accurate to the scene; NO text in image — image models misspell)
 //   { kind:'still',     dur, prompt | keyword|topic|collection|id, pick?, color?, orientation?, forward? }  // a0 `prompt` OR Unsplash stock
-//   { kind:'screencast', dur?, url, steps:[Step] }                  // drive the live app
+//   { kind:'screencast', dur?, url, steps:[Step] | script:string }  // drive the live app —
+//        `steps` = the simple DSL (below), OR `script` = a raw async Playwright body run with
+//        (page, goto, click, type, hover, scrollTo, press, wait, log) helpers (cursor-aware),
+//        e.g. script: "await goto('/'); await click('Log in'); await type('Email','demo@x.com'); await click('Sign in'); await wait(1500)"
 //   { kind:'credits',   dur }                                       // auto-built attribution
 //
 // Screencast Step: { action, ... }
@@ -111,7 +114,9 @@ export function validateStoryboard(sb) {
       if (s.forward != null && typeof s.forward !== 'boolean') e.push(`${at}.forward must be a boolean`)
     } else if (s.kind === 'screencast') {
       if (!isStr(s.url)) e.push(`${at}.url (the running app URL) is required`)
-      if (!Array.isArray(s.steps) || s.steps.length === 0) e.push(`${at}.steps must be a non-empty array`)
+      // A screencast needs EITHER a raw `script` (agent-written Playwright) OR `steps`.
+      if (isStr(s.script)) { /* raw script — full control, validated at run time */ }
+      else if (!Array.isArray(s.steps) || s.steps.length === 0) e.push(`${at} needs a \`script\` (Playwright routine) or a non-empty \`steps\` array`)
       else s.steps.forEach((st, j) => {
         const sat = `${at}.steps[${j}]`
         if (!st || !STEP_ACTIONS[st.action]) { e.push(`${sat}.action must be one of ${Object.keys(STEP_ACTIONS).join(', ')}`); return }
