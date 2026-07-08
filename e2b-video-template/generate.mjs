@@ -136,24 +136,49 @@ async function cardSeg(out, dur, html) {
 
 // NEW: screencast — drive the user's LIVE app and record it as footage, with a
 // synthetic cursor overlay + click ripples so it reads as a produced demo.
+// Wait until the page has actually PAINTED something (not a blank white SPA that
+// hasn't hydrated yet — PiPilot's Drive-backed *.pipilot.dev hosting can be slow
+// to first paint). Best-effort: proceed after the timeout regardless.
+async function waitForAppReady(page) {
+  try { await page.waitForLoadState('networkidle', { timeout: 12000 }) } catch { /* keep going */ }
+  try {
+    await page.waitForFunction(() => {
+      const b = document.body
+      if (!b) return false
+      const txt = (b.innerText || '').trim()
+      return txt.length > 2 || !!b.querySelector('img,svg,canvas,button,a,input,h1,h2,[role],[class]')
+    }, { timeout: 20000, polling: 300 })
+  } catch { /* render check timed out — record whatever there is */ }
+  await page.waitForTimeout(700) // settle for fonts/layout/entry animations
+}
+
 async function screencastSeg(out, url, steps, maxDur = 20) {
   const vdir = fs.mkdtempSync(path.join(WORK, 'cast-'))
   try {
     const ctx = await (await getBrowser()).newContext({ viewport: { width: W, height: H }, recordVideo: { dir: vdir, size: { width: W, height: H } } })
     const page = await ctx.newPage()
-    await page.goto(url, { waitUntil: 'domcontentloaded' }).catch(() => {})
+    // Recording starts at page creation. Load + wait for the app to render, then
+    // measure how long that blank period was so we can TRIM it off the final clip.
+    const t0 = Date.now()
+    await page.goto(url, { waitUntil: 'load', timeout: 30000 }).catch(() => {})
+    await waitForAppReady(page)
+    const loadMs = Date.now() - t0
     await installCursor(page)
+    // Run the demo (or just dwell) for maxDur of VISIBLE-app time after it rendered.
     const deadline = Date.now() + maxDur * 1000
-    for (const st of steps) {
+    for (const st of steps || []) {
       if (Date.now() > deadline) break
       await runStep(page, st, url).catch(() => {})
     }
-    await page.waitForTimeout(500)
+    const remain = deadline - Date.now()
+    if (remain > 300) await page.waitForTimeout(Math.min(remain, maxDur * 1000))
+    await page.waitForTimeout(300)
     await page.close(); await ctx.close()
     const webm = fs.readdirSync(vdir).find((f) => f.endsWith('.webm'))
     if (!webm) throw new Error('no screencast recorded')
-    // Cap to maxDur; natural length otherwise (screencasts are action-length).
-    ff(['-t', `${maxDur}`, '-i', path.join(vdir, webm), '-an', '-vf', NORM, ...SEG, out])
+    // Trim the leading blank/load period (keep a 0.3s lead-in), then cap to maxDur.
+    const trim = Math.max(0, loadMs / 1000 - 0.3)
+    ff(['-ss', trim.toFixed(2), '-t', `${maxDur}`, '-i', path.join(vdir, webm), '-an', '-vf', NORM, ...SEG, out])
   } finally { fs.rmSync(vdir, { recursive: true, force: true }) }
 }
 // A CSS cursor dot + click ripple injected into the page so interactions are visible.
@@ -181,7 +206,7 @@ async function ripple(page, x, y) {
 function targetOf(st) { return st.selector || (st.ref?.startsWith('text=') ? st.ref : st.ref ? st.ref : null) }
 async function runStep(page, st, baseUrl) {
   const sel = targetOf(st)
-  if (st.action === 'goto') { const u = new URL(st.path, baseUrl).href; await page.goto(u, { waitUntil: 'domcontentloaded' }); await installCursor(page); return }
+  if (st.action === 'goto') { const u = new URL(st.path, baseUrl).href; await page.goto(u, { waitUntil: 'load', timeout: 30000 }).catch(() => {}); await waitForAppReady(page); await installCursor(page); return }
   if (st.action === 'wait') { await page.waitForTimeout(Math.min(st.ms, 5000)); return }
   if (st.action === 'press') { await page.keyboard.press(st.key); return }
   if (!sel) return
