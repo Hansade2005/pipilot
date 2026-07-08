@@ -235,6 +235,12 @@ function creditsCard(lines, scene) {
 
 // ── assemble ────────────────────────────────────────────────────────────────
 function xfadeConcat(out, segs, durs) {
+  // Single scene: nothing to crossfade — just normalize/encode the one segment
+  // (an empty xfade filter would make ffmpeg fail on a missing [v] output).
+  if (segs.length === 1) {
+    ff(['-i', segs[0], '-c:v', 'libx264', '-crf', '20', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', out])
+    return durs[0]
+  }
   const trans = ['fade', 'slideleft', 'fade', 'slideup', 'fade']
   let filter = '', prev = '[0:v]', acc = durs[0]
   for (let i = 1; i < segs.length; i++) {
