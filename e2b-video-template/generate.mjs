@@ -338,7 +338,9 @@ const finalPreset = (t) => (t <= 60 ? 'veryslow' : t <= 180 ? 'slow' : 'medium')
   const inputs = ['-i', silent]
   let idx = 1, musicIdx = -1, wmIdx = -1
   if (musicUrl) { const music = curl(musicUrl, path.join(CACHE, `music_${hash(musicUrl)}.mp3`)); inputs.push('-i', music); musicIdx = idx++ }
-  if (wmPath) { inputs.push('-loop', '1', '-i', wmPath); wmIdx = idx++ }
+  // NO -loop on the logo: a single-frame image + overlay's default eof_action=repeat
+  // persists it for the whole video. -loop 1 makes it infinite and hangs the encode.
+  if (wmPath) { inputs.push('-i', wmPath); wmIdx = idx++ }
   const vParts = []; let cur = '0:v'
   if (DRAFT) { vParts.push(`[${cur}]scale=640:-2[vs]`); cur = 'vs' }
   if (wmIdx >= 0) { const m = Math.round(H / 34); vParts.push(`[${cur}][${wmIdx}:v]overlay=W-w-${m}:H-h-${m}[vw]`); cur = 'vw' }
@@ -354,8 +356,9 @@ const finalPreset = (t) => (t <= 60 ? 'veryslow' : t <= 180 ? 'slow' : 'medium')
   if (musicIdx >= 0) args.push('-map', '[a]')
   args.push('-c:v', 'libx264', '-crf', crf, '-preset', preset, '-pix_fmt', 'yuv420p', '-movflags', '+faststart')
   if (musicIdx >= 0) args.push('-c:a', 'aac', '-b:a', '128k')
-  // A looped image or a music stream would never end on its own → bound the output.
-  if (wmIdx >= 0 || musicIdx >= 0) args.push('-shortest')
+  // Bound the output to the (finite) video/music when a music stream is present;
+  // the single-frame logo overlay follows the main video length on its own.
+  if (musicIdx >= 0) args.push('-shortest')
   args.push(finalOut)
   ff(args)
 
