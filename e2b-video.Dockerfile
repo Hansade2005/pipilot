@@ -71,7 +71,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /opt/pipilot-video
 RUN npm init -y && npm install playwright
 RUN PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright npx playwright install --with-deps chromium
-COPY e2b-video-template/generate.mjs e2b-video-template/stockdb.mjs e2b-video-template/storyboard.mjs ./
+COPY e2b-video-template/generate.mjs e2b-video-template/stockdb.mjs e2b-video-template/storyboard.mjs e2b-video-template/logo.svg ./
 
 # The zero-API stock corpus (music moods + unsplash photos/topics/collections).
 # stockdb.mjs defaults STOCKDB_DIR to /opt/stockdb.

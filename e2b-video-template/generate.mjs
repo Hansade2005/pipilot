@@ -33,6 +33,12 @@ if (!check.ok) { console.error('Invalid storyboard:\n' + check.errors.join('\n')
 const { width: W, height: H, fps: FPS } = resolveCanvas(SB)
 const XF = 0.6 // crossfade seconds
 const KEY = process.env.PIXABAY_KEY
+// DRAFT=1 → fast, low-res preview (ultrafast encode, downscaled, skip Google fonts).
+const DRAFT = process.env.DRAFT === '1' || process.env.DRAFT === 'true'
+// WATERMARK set (a label, or '1' for the default) → burn a corner watermark on the
+// final video (free tier). SERVER sets this from the user's plan; the engine just honors it.
+const WM = process.env.WATERMARK
+const WM_TEXT = WM && WM !== '1' && WM !== 'true' ? String(WM).slice(0, 40) : 'Made with PiPilot'
 const needsPixabay = SB.scenes.some((s) => s.kind === 'video')
 if (needsPixabay && !KEY) { console.error('This storyboard has `video` scenes — set PIXABAY_KEY (connect Pixabay).'); process.exit(2) }
 
@@ -89,6 +95,30 @@ function kenBurnsSeg(out, url, dur, forward = true) {
 // package resolves its browser registry — a static import would evaluate first.
 let _browser = null
 const getBrowser = async () => (_browser ??= await (await import('playwright')).chromium.launch())
+
+// Render the PiPilot logo (logo.svg) + wordmark to a transparent PNG watermark,
+// on a subtle dark pill so it reads on any footage. Cached; overlaid by ffmpeg.
+let _wmPath = null
+async function watermarkPng() {
+  if (_wmPath) return _wmPath
+  let svg = ''
+  try { svg = fs.readFileSync(path.join(import.meta.dirname, 'logo.svg'), 'utf8') } catch { svg = '' }
+  const h = Math.max(22, Math.round(H / 18)), pad = Math.round(h * 0.4), gap = Math.round(h * 0.34)
+  const html = `<style>html,body{margin:0;background:transparent}
+    .w{display:inline-flex;align-items:center;gap:${gap}px;background:rgba(10,12,18,.34);border-radius:${h}px;padding:${Math.round(pad * 0.7)}px ${pad}px}
+    .w svg{height:${h}px;width:auto;display:block}
+    .t{font-family:'Liberation Sans','DejaVu Sans',sans-serif;font-weight:700;color:#fff;font-size:${Math.round(h * 0.82)}px;letter-spacing:-.5px;opacity:.95}</style>
+    <div class="w">${svg}<span class="t">PiPilot</span></div>`
+  const ctx = await (await getBrowser()).newContext({ viewport: { width: W, height: H }, deviceScaleFactor: 2 })
+  try {
+    const page = await ctx.newPage()
+    await page.setContent(html, { waitUntil: 'load' })
+    const el = await page.$('.w')
+    _wmPath = path.join(WORK, 'wm.png')
+    await el.screenshot({ path: _wmPath, omitBackground: true })
+  } finally { await ctx.close() }
+  return _wmPath
+}
 
 async function cardSeg(out, dur, html) {
   const vdir = fs.mkdtempSync(path.join(WORK, 'card-'))
@@ -178,7 +208,8 @@ function resolveTheme(scene) {
 }
 function fontFor(font) {
   const keys = { sans: `'Liberation Sans','DejaVu Sans',Arial,sans-serif`, serif: `'Liberation Serif','Noto Serif',Georgia,serif`, mono: `'Liberation Mono','DejaVu Sans Mono',monospace` }
-  if (!font || keys[font]) return { face: keys[font] || keys.sans, link: '' }
+  // Draft previews skip the network Google-fonts fetch (the slowest card step).
+  if (!font || keys[font] || DRAFT) return { face: keys[font] || keys.sans, link: '' }
   const fam = String(font).trim().replace(/[^\w \-]/g, '')
   return { face: `'${fam}','Liberation Sans',Arial,sans-serif`, link: `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${fam.replace(/\s+/g, '+')}:wght@400;600;700;800&display=swap">` }
 }
@@ -256,7 +287,7 @@ const finalPreset = (t) => (t <= 60 ? 'veryslow' : t <= 180 ? 'slow' : 'medium')
 
 // ── run ─────────────────────────────────────────────────────────────────────
 ;(async () => {
-  console.log(`▶  ${W}x${H}@${FPS} · ${SB.scenes.length} scenes\n`)
+  console.log(`▶  ${W}x${H}@${FPS} · ${SB.scenes.length} scenes${DRAFT ? ' · DRAFT' : ''}${WM ? ' · watermark' : ''}\n`)
   const credits = [], segs = [], durs = []
   // Resolve music up front — the credits card needs its attribution string.
   let musicUrl = null, musicCredit = null
@@ -287,22 +318,46 @@ const finalPreset = (t) => (t <= 60 ? 'veryslow' : t <= 180 ? 'slow' : 'medium')
       segs.push(out); durs.push(dur)
       console.log(`  · seg ${i} (${s.kind}) — ${secs().toFixed(1)}s`)
     }
+    // Pre-render the watermark while the shared browser is still open (the finally
+    // below closes it before the final ffmpeg encode calls watermarkPng()).
+    if (WM) await watermarkPng().catch((e) => console.log(`   (watermark skipped: ${e.message})`))
   } finally { if (_browser) await _browser.close() }
 
   const silent = path.join(WORK, 'silent.mp4')
   const total = xfadeConcat(silent, segs, durs)
 
   const finalOut = path.join(OUT, 'video.mp4')
-  if (musicUrl) {
-    const music = curl(musicUrl, path.join(CACHE, `music_${hash(musicUrl)}.mp3`))
+  const crf = DRAFT ? '32' : '30'
+  const preset = DRAFT ? 'ultrafast' : finalPreset(total)
+  // Watermark = the real PiPilot logo (rendered from logo.svg → transparent PNG,
+  // on a subtle dark pill for contrast), overlaid bottom-right. Free tier only.
+  // Use the copy pre-rendered above (browser is closed now); null if it failed.
+  const wmPath = _wmPath
+  // Assemble a single ffmpeg call handling any combo of: draft downscale, logo
+  // overlay, and music. Inputs: silent [+ music] [+ looped logo png].
+  const inputs = ['-i', silent]
+  let idx = 1, musicIdx = -1, wmIdx = -1
+  if (musicUrl) { const music = curl(musicUrl, path.join(CACHE, `music_${hash(musicUrl)}.mp3`)); inputs.push('-i', music); musicIdx = idx++ }
+  if (wmPath) { inputs.push('-loop', '1', '-i', wmPath); wmIdx = idx++ }
+  const vParts = []; let cur = '0:v'
+  if (DRAFT) { vParts.push(`[${cur}]scale=640:-2[vs]`); cur = 'vs' }
+  if (wmIdx >= 0) { const m = Math.round(H / 34); vParts.push(`[${cur}][${wmIdx}:v]overlay=W-w-${m}:H-h-${m}[vw]`); cur = 'vw' }
+  const aParts = []
+  if (musicIdx >= 0) {
     const fIn = Math.min(1.5, total), fOutStart = Math.max(0, total - 2), fOutDur = Math.min(2, total - fOutStart)
-    ff(['-i', silent, '-i', music, '-filter_complex',
-        `[1:a]atrim=0:${total.toFixed(2)},afade=t=in:st=0:d=${fIn.toFixed(2)},afade=t=out:st=${fOutStart.toFixed(2)}:d=${fOutDur.toFixed(2)},volume=0.85[a]`,
-        '-map', '0:v', '-map', '[a]', '-c:v', 'libx264', '-crf', '30', '-preset', finalPreset(total),
-        '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-c:a', 'aac', '-b:a', '128k', '-shortest', finalOut])
-  } else {
-    ff(['-i', silent, '-c:v', 'libx264', '-crf', '30', '-preset', finalPreset(total), '-pix_fmt', 'yuv420p', '-movflags', '+faststart', finalOut])
+    aParts.push(`[${musicIdx}:a]atrim=0:${total.toFixed(2)},afade=t=in:st=0:d=${fIn.toFixed(2)},afade=t=out:st=${fOutStart.toFixed(2)}:d=${fOutDur.toFixed(2)},volume=0.85[a]`)
   }
+  const fc = [...vParts, ...aParts].join(';')
+  const args = [...inputs]
+  if (fc) args.push('-filter_complex', fc)
+  args.push('-map', vParts.length ? `[${cur}]` : '0:v')
+  if (musicIdx >= 0) args.push('-map', '[a]')
+  args.push('-c:v', 'libx264', '-crf', crf, '-preset', preset, '-pix_fmt', 'yuv420p', '-movflags', '+faststart')
+  if (musicIdx >= 0) args.push('-c:a', 'aac', '-b:a', '128k')
+  // A looped image or a music stream would never end on its own → bound the output.
+  if (wmIdx >= 0 || musicIdx >= 0) args.push('-shortest')
+  args.push(finalOut)
+  ff(args)
 
   // Thumbnail: grab a crisp frame from the opening (into the animated title card
   // if there is one → an on-brand poster). out/thumb.jpg, read back by the app.
