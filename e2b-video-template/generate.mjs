@@ -341,7 +341,10 @@ function xfadeConcat(out, segs, durs, transFor = []) {
       '-map', '[v]', '-c:v', 'libx264', '-crf', '20', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', out])
   return acc
 }
-const finalPreset = (t) => (t <= 60 ? 'veryslow' : t <= 180 ? 'slow' : 'medium')
+// Encode speed scales with length so long 1080p videos never approach the render
+// timeout (CRF governs quality; preset is mostly a size/speed trade — a faster
+// preset at the same CRF is only marginally larger).
+const finalPreset = (t) => (t <= 20 ? 'slow' : t <= 60 ? 'medium' : t <= 120 ? 'fast' : 'veryfast')
 const WMFONT = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
 // A burned-in caption (drawtext) shown only during [start,end] of the final timeline.
 function capDraw(text, start, end) {
