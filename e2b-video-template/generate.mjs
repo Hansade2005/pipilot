@@ -470,6 +470,7 @@ function capDraw(text, start, end) { return lineDrawtexts(wrapLines(_capText(tex
 // Returns one or more drawtext filters. For typewriter, reveal WORD-BY-WORD (cumulative, re-wrapped
 // each step) over the caption span — reads like typing and scales to full narration sentences
 // without the char-by-char filter bloat / 64-char cap the old version fell back to static on.
+const CAP_MAX_STEPS = 14 // cap reveal steps per caption so long videos don't build a giant filtergraph
 function capDraws(text, start, end, typewriter) {
   const t = _capText(text)
   const words = t.split(' ').filter(Boolean)
@@ -477,12 +478,16 @@ function capDraws(text, start, end, typewriter) {
   if (!typewriter || n <= 1) return capDraw(text, start, end)
   const span = Math.max(0.2, end - start)
   const typeDur = Math.min(span * 0.9, Math.max(0.6, n * 0.42)) // reveal pace ~2.4 words/s, within span
-  const dt = typeDur / n
+  // Reveal in at most CAP_MAX_STEPS chunks (word-by-word for short lines, word-groups for long ones)
+  // — keeps the typing feel while bounding drawtext count (a 70-scene video otherwise = thousands).
+  const steps = Math.min(n, CAP_MAX_STEPS)
+  const dt = typeDur / steps
   const out = []
-  for (let k = 1; k <= n; k++) {
-    const a = start + (k - 1) * dt
-    const b = k < n ? start + k * dt : end
-    lineDrawtexts(wrapLines(words.slice(0, k).join(' '), CAP_MAXLINE), a, b).forEach((d) => out.push(d))
+  for (let s = 1; s <= steps; s++) {
+    const wc = s === steps ? n : Math.max(1, Math.round((s * n) / steps))
+    const a = start + (s - 1) * dt
+    const b = s < steps ? start + s * dt : end
+    lineDrawtexts(wrapLines(words.slice(0, wc).join(' '), CAP_MAXLINE), a, b).forEach((d) => out.push(d))
   }
   return out
 }
@@ -632,7 +637,15 @@ function capDraws(text, start, end, typewriter) {
 
   const fc = [...vParts, ...aParts].join(';')
   const args = [...inputs]
-  if (fc) args.push('-filter_complex', fc)
+  // Pass the filtergraph via a FILE, not argv: a long narrated/captioned video builds thousands
+  // of drawtext filters, and a single `-filter_complex` argv string that exceeds Linux's 128KB
+  // per-argument limit (MAX_ARG_STRLEN) makes spawn fail with E2BIG. `-filter_complex_script`
+  // reads the identical graph from disk, so it scales to any length.
+  if (fc) {
+    const fcFile = path.join(WORK, 'filtergraph.txt')
+    fs.writeFileSync(fcFile, fc)
+    args.push('-filter_complex_script', fcFile)
+  }
   args.push('-map', vParts.length ? `[${cur}]` : '0:v')
   if (haveAudio) args.push('-map', '[a]')
   args.push('-c:v', 'libx264', '-crf', crf, '-preset', preset, '-pix_fmt', 'yuv420p', '-movflags', '+faststart')
