@@ -439,24 +439,51 @@ const finalPreset = (t) => (t <= 20 ? 'slow' : t <= 60 ? 'medium' : t <= 120 ? '
 const WMFONT = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
 // A burned-in caption (drawtext). ffmpeg text is STATIC, so a "typewriter" caption is
 // built as a CHAIN of reveals (cumulative substrings, each enabled for one time slice).
-const _capText = (text) => String(text).replace(/[\\':%]/g, '').replace(/\s+/g, ' ').slice(0, 140)
-function drawtextFor(text, start, end) {
-  const fsz = Math.round(H / 22)
-  return `drawtext=fontfile=${WMFONT}:text='${text}':fontcolor=white:fontsize=${fsz}:x=(w-tw)/2:y=h-th-${Math.round(H * 0.09)}:box=1:boxcolor=black@0.55:boxborderw=${Math.round(fsz * 0.5)}:enable='between(t,${start.toFixed(3)},${end.toFixed(3)})'`
+const _capText = (text) => String(text).replace(/[\\':%]/g, '').replace(/\s+/g, ' ').trim().slice(0, 200)
+// Caption sizing: font relative to height, and a per-line char budget derived from FRAME WIDTH so
+// text NEVER overflows the frame (the old single-line drawtext ran off both edges on long narration).
+const CAP_FSZ = Math.round(H / 27)
+const CAP_LH = Math.round(CAP_FSZ * 1.34)
+const CAP_MAXLINE = Math.max(24, Math.min(48, Math.floor((W * 0.84) / (CAP_FSZ * 0.52))))
+// Greedy word-wrap into lines that fit CAP_MAXLINE chars.
+function wrapLines(t, maxChars) {
+  const words = String(t).split(' ').filter(Boolean)
+  const lines = []
+  let cur = ''
+  for (const w of words) {
+    const next = cur ? cur + ' ' + w : w
+    if (next.length > maxChars && cur) { lines.push(cur); cur = w } else cur = next
+  }
+  if (cur) lines.push(cur)
+  return lines.length ? lines : ['']
 }
-function capDraw(text, start, end) { return drawtextFor(_capText(text), start, end) }
-// Returns ONE OR MORE drawtext filters. For typewriter, one per character reveal (each
-// active for a single slice) — capped to 64 chars (longer just burns static, since typing
-// a paragraph char-by-char reads poorly and bloats the filtergraph).
+// One drawtext per line, bottom-anchored as a block, each line centered on its own row.
+function lineDrawtexts(lines, start, end) {
+  const n = lines.length
+  const bottomPad = Math.round(H * 0.085)
+  return lines.map((ln, i) => {
+    const yFromBottom = bottomPad + (n - 1 - i) * CAP_LH
+    return `drawtext=fontfile=${WMFONT}:text='${ln}':fontcolor=white:fontsize=${CAP_FSZ}:x=(w-tw)/2:y=h-th-${yFromBottom}:box=1:boxcolor=black@0.55:boxborderw=${Math.round(CAP_FSZ * 0.42)}:enable='between(t,${start.toFixed(3)},${end.toFixed(3)})'`
+  })
+}
+function capDraw(text, start, end) { return lineDrawtexts(wrapLines(_capText(text), CAP_MAXLINE), start, end) }
+// Returns one or more drawtext filters. For typewriter, reveal WORD-BY-WORD (cumulative, re-wrapped
+// each step) over the caption span — reads like typing and scales to full narration sentences
+// without the char-by-char filter bloat / 64-char cap the old version fell back to static on.
 function capDraws(text, start, end, typewriter) {
   const t = _capText(text)
-  const n = t.length
-  if (!typewriter || n <= 1 || n > 64) return [capDraw(text, start, end)]
-  const span = Math.max(0.1, end - start)
-  const typeDur = Math.max(0.3, Math.min(span * 0.7, n * 0.05, 2.2)) // ~20 cps, capped 2.2s
+  const words = t.split(' ').filter(Boolean)
+  const n = words.length
+  if (!typewriter || n <= 1) return capDraw(text, start, end)
+  const span = Math.max(0.2, end - start)
+  const typeDur = Math.min(span * 0.9, Math.max(0.6, n * 0.42)) // reveal pace ~2.4 words/s, within span
   const dt = typeDur / n
   const out = []
-  for (let k = 1; k <= n; k++) out.push(drawtextFor(t.slice(0, k), start + (k - 1) * dt, k < n ? start + k * dt : end))
+  for (let k = 1; k <= n; k++) {
+    const a = start + (k - 1) * dt
+    const b = k < n ? start + k * dt : end
+    lineDrawtexts(wrapLines(words.slice(0, k).join(' '), CAP_MAXLINE), a, b).forEach((d) => out.push(d))
+  }
   return out
 }
 
@@ -572,7 +599,7 @@ function capDraws(text, start, end, typewriter) {
     if (s.caption) {
       const obj = typeof s.caption === 'string' ? { text: s.caption } : (s.caption || {})
       overlays.push({ text: obj.text || '', typewriter: obj.typewriter === true, start: starts[i], end: starts[i] + durs[i] })
-    } else if (CAPTIONS && s.say) { const n = narrByScene.get(i); overlays.push({ text: s.say, typewriter: false, start: starts[i], end: Math.min(starts[i] + durs[i], starts[i] + (n?.dur || durs[i]) + 0.4) }) }
+    } else if (CAPTIONS && s.say) { const n = narrByScene.get(i); overlays.push({ text: s.say, typewriter: true, start: starts[i], end: Math.min(starts[i] + durs[i], starts[i] + (n?.dur || durs[i]) + 0.4) }) }
   })
   overlays.forEach((o, k) => {
     if (!o.text) return
