@@ -34,6 +34,12 @@
 //   { kind:'video',     dur, src | keyword | q | prompt, pick?, start? }  // `src` = YOUR image/video URL; else Pixabay B-roll from the baked corpus (`keyword`|`q`); else a0 image (from `prompt`)
 //   { kind:'image',     dur, src | prompt, forward? }               // `src` = YOUR image URL (logo / company photo); else bespoke a0.dev image (NO text in image)
 //   { kind:'still',     dur, src | prompt | keyword|topic|collection|id, pick?, color?, orientation?, forward? }  // `src` = YOUR image URL; else a0 `prompt`; else Unsplash stock
+//   { kind:'canvas',    dur, html }   // a FULLY HANDCRAFTED scene — your own HTML/CSS body (rendered at
+//        full resolution, CSS animations captured over `dur`). Best for TEXT-HEAVY / custom scenes
+//        (comparison tables, bullet lists, animated stats, quotes, code blocks) with PERFECT text.
+//        Theme is exposed as CSS vars: var(--bg) var(--accent) var(--text) var(--sub) var(--font).
+//        Use relative units (vw/vh/%/em/flex/grid) so it fills any aspect. No external assets except
+//        https image URLs and the theme's Google font (already loaded).
 //   { kind:'screencast', dur?, url, steps:[Step] | script:string }  // drive the live app —
 //        `steps` = the simple DSL (below), OR `script` = a raw async Playwright body run with
 //        (page, goto, click, type, hover, scrollTo, press, wait, log) helpers (cursor-aware),
@@ -53,7 +59,7 @@
 // 1080-class canvases (was 720p) — noticeably sharper, and large outputs now go
 // to Drive rather than an inline cap, so the size bump is handled.
 const ASPECTS = { '16:9': [1920, 1080], '9:16': [1080, 1920], '1:1': [1080, 1080], '4:5': [1080, 1350] }
-const SCENE_KINDS = ['title', 'video', 'still', 'image', 'screencast', 'credits']
+const SCENE_KINDS = ['title', 'video', 'still', 'image', 'canvas', 'screencast', 'credits']
 const STILL_SOURCES = ['keyword', 'topic', 'collection', 'id']
 const STEP_ACTIONS = {
   goto: ['path'], click: [], type: ['text'], hover: [], scrollTo: [], press: ['key'], wait: ['ms'],
@@ -116,6 +122,9 @@ export function validateStoryboard(sb) {
       }
       if (s.orientation != null && !['horizontal', 'vertical'].includes(s.orientation)) e.push(`${at}.orientation must be horizontal|vertical`)
       if (s.forward != null && typeof s.forward !== 'boolean') e.push(`${at}.forward must be a boolean`)
+    } else if (s.kind === 'canvas') {
+      // A fully agent-authored HTML/CSS scene (perfect text, custom layout, CSS animation).
+      if (!isStr(s.html) && !isStr(s.canvas)) e.push(`${at} needs an \`html\` string (self-contained HTML/CSS for the scene body)`)
     } else if (s.kind === 'screencast') {
       if (!isStr(s.url)) e.push(`${at}.url (the running app URL) is required`)
       // A screencast needs EITHER a raw `script` (agent-written Playwright) OR `steps`.

@@ -65,16 +65,67 @@ const pickN = (arr, n, seed = 0) => {
 }
 
 // ── MUSIC ───────────────────────────────────────────────────────────────────
-// pickMusic({ mood, minDur, seed }) → one track. mood matches Jamendo's tag
-// vocabulary (happy, epic, corporate, advertising, documentary, inspiring,
-// uplifting, energetic, emotional, dark, film, calm, …). Falls back to
-// 'background' then any track so it NEVER returns null on a live corpus.
+// Map a caller's free-text mood onto the ACTUAL Jamendo tag vocabulary present in the corpus, so a
+// request like "upbeat corporate" or "chill" always resolves to well-matched tracks. Values are real
+// corpus tags (happy/film/energetic/relaxing/emotional/epic/inspiring/corporate/uplifting/… ).
+const MOOD_ALIASES = {
+  upbeat: ['upbeat', 'energetic', 'happy', 'positive', 'fun'],
+  energetic: ['energetic', 'upbeat', 'powerful', 'fast', 'action'],
+  happy: ['happy', 'positive', 'fun', 'uplifting', 'summer'],
+  corporate: ['corporate', 'advertising', 'motivational', 'commercial', 'inspiring'],
+  business: ['corporate', 'advertising', 'motivational', 'commercial'],
+  advertising: ['advertising', 'commercial', 'corporate', 'upbeat'],
+  inspiring: ['inspiring', 'uplifting', 'motivational', 'hopeful', 'positive'],
+  inspirational: ['inspiring', 'uplifting', 'motivational', 'hopeful'],
+  motivational: ['motivational', 'inspiring', 'uplifting', 'powerful'],
+  uplifting: ['uplifting', 'inspiring', 'positive', 'hopeful'],
+  calm: ['calm', 'relaxing', 'soft', 'ambiental', 'meditative'],
+  chill: ['relaxing', 'calm', 'mellow', 'soft', 'cool'],
+  relaxed: ['relaxing', 'calm', 'soft', 'mellow'],
+  relaxing: ['relaxing', 'calm', 'soft', 'ambiental'],
+  ambient: ['ambiental', 'soundscape', 'meditative', 'calm', 'space'],
+  peaceful: ['calm', 'relaxing', 'meditative', 'soft'],
+  epic: ['epic', 'dramatic', 'powerful', 'trailer', 'action'],
+  cinematic: ['film', 'movie', 'epic', 'dramatic', 'soundscape'],
+  dramatic: ['dramatic', 'drama', 'epic', 'emotional'],
+  trailer: ['trailer', 'epic', 'powerful', 'dramatic', 'action'],
+  powerful: ['powerful', 'epic', 'energetic', 'dramatic'],
+  action: ['action', 'energetic', 'powerful', 'fast', 'sport'],
+  emotional: ['emotional', 'sad', 'melancholic', 'romantic', 'ballad'],
+  sad: ['sad', 'melancholic', 'emotional', 'slow'],
+  romantic: ['romantic', 'love', 'emotional', 'soft'],
+  dark: ['dark', 'deep', 'horror', 'dramatic'],
+  tech: ['space', 'soundscape', 'energetic', 'corporate', 'ambiental'],
+  technology: ['space', 'soundscape', 'energetic', 'corporate'],
+  modern: ['energetic', 'corporate', 'upbeat', 'cool'],
+  fun: ['fun', 'happy', 'funny', 'party', 'groovy'],
+  documentary: ['documentary', 'film', 'inspiring', 'ambiental'],
+  background: ['background', 'ambiental', 'calm', 'soft'],
+}
+// pickMusic({ mood, minDur, seed }) → one track, SCORED by how many of a track's Jamendo mood tags
+// match the (alias-expanded, tokenized) request — so the closest-fitting track wins, not just a
+// first exact hit. Cascades to background → any dur-eligible → any, so it NEVER returns null.
 export function pickMusic({ mood = 'background', minDur = 0, seed = 0 } = {}) {
   const all = music()
-  const byMood = (m) => all.filter((t) => Array.isArray(t.moods) && t.moods.includes(m) && (t.duration_sec || 0) >= minDur)
-  let pool = byMood(mood)
-  if (!pool.length) pool = byMood('background')
-  if (!pool.length) pool = all.filter((t) => (t.duration_sec || 0) >= minDur)
+  const okDur = (t) => (t.duration_sec || 0) >= minDur
+  // Target tag set = the request's own words + their aliases (+ whole-string alias).
+  const raw = String(mood || '').toLowerCase().trim()
+  const targets = new Set()
+  for (const w of raw.split(/[^a-z]+/).filter(Boolean)) { targets.add(w); for (const a of MOOD_ALIASES[w] || []) targets.add(a) }
+  for (const a of MOOD_ALIASES[raw] || []) targets.add(a)
+  if (!targets.size) targets.add('background')
+  // Score every dur-eligible track by tag overlap; keep the best-scoring pool.
+  let best = [], bestScore = 0
+  for (const t of all) {
+    if (!okDur(t)) continue
+    let score = 0
+    for (const m of t.moods || []) if (targets.has(String(m).toLowerCase())) score++
+    if (score > bestScore) { bestScore = score; best = [t] }
+    else if (score === bestScore && score > 0) best.push(t)
+  }
+  let pool = best
+  if (!pool.length) pool = all.filter((t) => okDur(t) && Array.isArray(t.moods) && t.moods.includes('background'))
+  if (!pool.length) pool = all.filter(okDur)
   if (!pool.length) pool = all
   const t = pool[Math.floor(mulberry32(seed + pool.length)() * pool.length)]
   return {

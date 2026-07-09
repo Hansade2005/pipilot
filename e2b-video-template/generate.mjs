@@ -423,6 +423,29 @@ function titleCard(scene, typeDur = 0) {
   const tw = `<style>@keyframes blink{50%{opacity:0}}</style><script>(function(){var h=document.querySelector('h1');if(!h)return;var full=h.textContent;h.textContent='';h.style.opacity='1';h.style.transform='none';h.style.animation='none';var t=document.createElement('span');h.appendChild(t);var car=document.createElement('span');car.textContent='|';car.style.cssText='margin-left:3px;animation:blink 1s steps(1) infinite';h.appendChild(car);var sub=document.querySelector('p');if(sub){sub.style.opacity='0';sub.style.animation='none';}var n=full.length,ms=Math.min(70,Math.max(32,${Math.round(typeDur * 1000)}/Math.max(1,n))),i=0;var tm=setInterval(function(){i++;t.textContent=full.slice(0,i);if(i>=n){clearInterval(tm);setTimeout(function(){car.style.display='none';if(sub){sub.style.transition='opacity .5s';sub.style.opacity='1';}},250);}},ms);})();</script>`
   return base + tw
 }
+// Canvas — a FULLY AGENT-AUTHORED scene. The storyboard supplies a self-contained HTML/CSS body
+// which we render at full resolution and record for `dur`s (CSS animations/keyframes are captured).
+// This is how the agent HANDCRAFTS text-heavy or bespoke scenes (comparison tables, feature grids,
+// animated stat counters, quotes, code blocks, bullet reveals) with PERFECT text — no image model to
+// misspell. The video's theme is exposed as CSS custom properties + its Google font is pre-loaded, so
+// canvas scenes match the rest of the video. Body should use relative units so it fills any aspect.
+function canvasHtml(scene) {
+  const t = resolveTheme(scene)
+  const f = fontFor(t.font)
+  const solid = Array.isArray(t.bg) ? t.bg[0] : (typeof t.bg === 'string' && !/gradient\(/.test(t.bg) ? t.bg : '#0E1726')
+  const vars = `--bg:${esc(solid)};--bg2:${esc(t.bg2 || solid)};--accent:${esc(t.accent)};--text:${esc(t.text)};--sub:${esc(t.sub)};--font:${f.face}`
+  const body = String(scene.html || scene.canvas || '').trim()
+    || `<div style="position:fixed;inset:0;display:grid;place-items:center;color:var(--text);font-family:var(--font)">canvas</div>`
+  // Base font-size scales with canvas height so the agent can size with `em`. KF gives it the
+  // built-in g/r/f keyframes (bar-grow / rise-in / fade-in) to reuse alongside its own @keyframes.
+  return `${f.link}<style>
+    :root{${vars}}
+    *{box-sizing:border-box}
+    html,body{margin:0;width:100%;height:100%;overflow:hidden}
+    body{background:${bgFor(t)};color:var(--text);font-family:var(--font);font-size:${Math.round(H / 40)}px;line-height:1.4}
+    ${KF}
+  </style>${body}`
+}
 function creditsCard(lines, scene) {
   const t = resolveTheme(scene)
   const c = { ...t, ...fontFor(t.font), bgSolid: Array.isArray(t.bg) ? t.bg[0] : (typeof t.bg === 'string' && !/gradient\(/.test(t.bg) ? t.bg : '#0E1726') }
@@ -615,6 +638,9 @@ function capDraws(text, start, end, typewriter) {
           credits.push(photo.credit)
           kenBurnsSeg(out, photo.url, dur, s.forward !== false)
         }
+      } else if (s.kind === 'canvas') {
+        // Agent-handcrafted HTML scene (perfect text, custom layout, CSS animation).
+        await cardSeg(out, dur, canvasHtml(s))
       } else if (s.kind === 'screencast') {
         await screencastSeg(out, s.url, s.steps, s.dur || 12, s.script)
       } else { // credits (only rendered when the storyboard explicitly includes a credits scene)
