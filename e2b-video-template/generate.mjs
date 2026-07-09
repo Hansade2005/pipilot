@@ -527,21 +527,32 @@ function capDraws(text, start, end, typewriter) {
         // Typewriter cards sync their type duration to the narration when present.
         await cardSeg(out, dur, titleCard(s, s.typewriter ? (narrByScene.get(i)?.dur || dur * 0.7) : 0))
       } else if (s.kind === 'video') {
-        // Prefer Pixabay b-roll; fall back to an a0-generated image (Ken Burns) when
-        // there's no key or no match, so `video` scenes always resolve.
-        const hits = KEY ? pixabayVideo(s.q || s.prompt || '') : []
-        const h = hits[(s.pick || 0) % Math.max(1, hits.length)]
-        if (h) {
-          credits.push(`${h.user} / Pixabay`)
-          brollSeg(out, (h.videos.medium || h.videos.small || h.videos.tiny).url, dur, s.start || 0)
+        // A user-supplied asset URL (s.src / s.image_url) wins — their own footage/photo.
+        const userSrc = s.src || s.image_url || s.asset
+        if (userSrc) {
+          credits.push('provided')
+          kenBurnsSeg(out, userSrc, dur, s.forward !== false)
         } else {
-          credits.push('AI-generated (a0)')
-          kenBurnsSeg(out, a0ImageUrl(s.prompt || s.q || 'cinematic abstract background', i), dur, s.forward !== false)
+          // Prefer Pixabay b-roll; fall back to an a0-generated image (Ken Burns) when
+          // there's no key or no match, so `video` scenes always resolve.
+          const hits = KEY ? pixabayVideo(s.q || s.prompt || '') : []
+          const h = hits[(s.pick || 0) % Math.max(1, hits.length)]
+          if (h) {
+            credits.push(`${h.user} / Pixabay`)
+            brollSeg(out, (h.videos.medium || h.videos.small || h.videos.tiny).url, dur, s.start || 0)
+          } else {
+            credits.push('AI-generated (a0)')
+            kenBurnsSeg(out, a0ImageUrl(s.prompt || s.q || 'cinematic abstract background', i), dur, s.forward !== false)
+          }
         }
       } else if (s.kind === 'still' || s.kind === 'image') {
-        // A `prompt` → a bespoke a0-generated image (accurate to the scene). Otherwise
-        // fall back to the stock corpus by keyword/topic/collection/id.
-        if (s.prompt) {
+        // Resolution priority: a user-supplied asset URL (their logo / company photos) →
+        // a bespoke a0-generated image (from `prompt`) → the baked stock corpus.
+        const userSrc = s.src || s.image_url || s.asset
+        if (userSrc) {
+          credits.push('provided')
+          kenBurnsSeg(out, userSrc, dur, s.forward !== false)
+        } else if (s.prompt) {
           credits.push('AI-generated (a0)')
           kenBurnsSeg(out, a0ImageUrl(s.prompt, (s.pick || 0) + i), dur, s.forward !== false)
         } else {

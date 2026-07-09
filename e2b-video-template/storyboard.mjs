@@ -31,9 +31,9 @@
 //     overlay — a string, or { text, typewriter?:true } to TYPE it on-screen char-by-char),
 //     transition (the xfade INTO this scene).  A narrated scene AUTO-EXTENDS to fit its
 //     voiceover, so `say` never bleeds across the cut.  credits are OPTIONAL.
-//   { kind:'video',     dur, q | prompt, pick?, start? }            // Pixabay b-roll; falls back to an a0 image (from `prompt`|`q`) with no key/match
-//   { kind:'image',     dur, prompt, forward? }                     // bespoke a0.dev-generated image (accurate to the scene; NO text in image — image models misspell)
-//   { kind:'still',     dur, prompt | keyword|topic|collection|id, pick?, color?, orientation?, forward? }  // a0 `prompt` OR Unsplash stock
+//   { kind:'video',     dur, src | q | prompt, pick?, start? }      // `src` = YOUR image/video URL; else Pixabay b-roll; else a0 image (from `prompt`|`q`)
+//   { kind:'image',     dur, src | prompt, forward? }               // `src` = YOUR image URL (logo / company photo); else bespoke a0.dev image (NO text in image)
+//   { kind:'still',     dur, src | prompt | keyword|topic|collection|id, pick?, color?, orientation?, forward? }  // `src` = YOUR image URL; else a0 `prompt`; else Unsplash stock
 //   { kind:'screencast', dur?, url, steps:[Step] | script:string }  // drive the live app —
 //        `steps` = the simple DSL (below), OR `script` = a raw async Playwright body run with
 //        (page, goto, click, type, hover, scrollTo, press, wait, log) helpers (cursor-aware),
@@ -100,15 +100,17 @@ export function validateStoryboard(sb) {
       if (!isStr(s.title)) e.push(`${at}.title is required`)
       if (s.sub != null && typeof s.sub !== 'string') e.push(`${at}.sub must be a string`)
     } else if (s.kind === 'video') {
-      // Pixabay `q` (b-roll) OR `prompt` (a0 image fallback) — at least one.
-      if (!isStr(s.q) && !isStr(s.prompt)) e.push(`${at} needs a \`q\` (Pixabay search term) or \`prompt\` (a0 image)`)
+      // A user-supplied asset URL (`src`) OR Pixabay `q` (b-roll) OR `prompt` (a0 fallback).
+      const hasUserSrc = isStr(s.src) || isStr(s.image_url) || isStr(s.asset)
+      if (!hasUserSrc && !isStr(s.q) && !isStr(s.prompt)) e.push(`${at} needs a \`src\` (your image/video URL), \`q\` (Pixabay term) or \`prompt\` (a0 image)`)
       if (s.pick != null && !isNum(s.pick)) e.push(`${at}.pick must be a number`)
       if (s.start != null && !isNum(s.start)) e.push(`${at}.start must be a number (seconds)`)
     } else if (s.kind === 'still' || s.kind === 'image') {
-      // `prompt` → a bespoke a0-generated image; otherwise exactly one stock source.
-      if (!isStr(s.prompt)) {
+      // `src` (user asset URL — logo/company photo) → `prompt` (a0) → exactly one stock source.
+      const hasUserSrc = isStr(s.src) || isStr(s.image_url) || isStr(s.asset)
+      if (!hasUserSrc && !isStr(s.prompt)) {
         const srcs = STILL_SOURCES.filter((k) => s[k] != null)
-        if (srcs.length === 0) e.push(`${at} needs a \`prompt\` (a0 image) or one stock source: ${STILL_SOURCES.join(' | ')}`)
+        if (srcs.length === 0) e.push(`${at} needs a \`src\` (your image URL), \`prompt\` (a0 image) or one stock source: ${STILL_SOURCES.join(' | ')}`)
         if (srcs.length > 1) e.push(`${at} has multiple sources (${srcs.join(', ')}) — use exactly one`)
       }
       if (s.orientation != null && !['horizontal', 'vertical'].includes(s.orientation)) e.push(`${at}.orientation must be horizontal|vertical`)
