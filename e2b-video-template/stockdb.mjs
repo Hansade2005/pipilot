@@ -41,6 +41,10 @@ const collections = () => (_collections ??= readJsonl('unsplash_collections.json
 // (older templates without the harvested corpus): pickVideo() returns null then.
 const videos = () => (_videos ??= (fs.existsSync(path.join(DIR, 'pixabay_videos.jsonl')) ? readJsonl('pixabay_videos.jsonl') : []))
 
+// How many baked B-roll clips are available (0 = corpus absent). Lets the renderer log
+// accurately whether `video` scenes resolve from the corpus vs. fall back to a0 images.
+export const videoCorpusSize = () => videos().length
+
 // Deterministic PRNG so a given (seed) always yields the same pick — renders are
 // reproducible, and varying the seed per scene index avoids repeats without RNG.
 function mulberry32(seed) {

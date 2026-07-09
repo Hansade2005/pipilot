@@ -14,7 +14,7 @@
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { pickMusic, pickPhotos, pickVideo } from './stockdb.mjs'
+import { pickMusic, pickPhotos, pickVideo, videoCorpusSize } from './stockdb.mjs'
 import { validateStoryboard, resolveCanvas } from './storyboard.mjs'
 
 // Pin the baked Chromium location. E2B's SDK command execution doesn't reliably
@@ -63,7 +63,12 @@ const CAPTIONS = SB.captions === true || SB.captions === 'true'
 // `video` scenes prefer Pixabay b-roll, but fall back to an a0-generated image when
 // no key is connected — so a missing PIXABAY_KEY no longer fails the whole render.
 const needsPixabay = SB.scenes.some((s) => s.kind === 'video')
-if (needsPixabay && !KEY) console.log('   (no PIXABAY_KEY — `video` scenes fall back to a0-generated images)')
+if (needsPixabay) {
+  const corpus = videoCorpusSize()
+  if (corpus) console.log(`   video scenes → baked B-roll corpus (${corpus.toLocaleString()} clips, zero-API)`)
+  else if (KEY) console.log('   video scenes → live Pixabay (no baked corpus in this template)')
+  else console.log('   (no B-roll corpus and no PIXABAY_KEY — `video` scenes fall back to a0-generated images)')
+}
 
 const CACHE = path.join(import.meta.dirname, '.cache')
 const WORK = path.join(import.meta.dirname, '.work')
@@ -563,6 +568,7 @@ function capDraws(text, start, end, typewriter) {
       const s = SB.scenes[i]
       const out = path.join(WORK, `seg_${String(i).padStart(2, '0')}.mp4`)
       const dur = durs[i]
+      const cBefore = credits.length // to report each scene's resolved asset source in the log
       if (s.kind === 'title') {
         // Typewriter cards sync their type duration to the narration when present.
         await cardSeg(out, dur, titleCard(s, s.typewriter ? (narrByScene.get(i)?.dur || dur * 0.7) : 0))
@@ -615,7 +621,8 @@ function capDraws(text, start, end, typewriter) {
         await cardSeg(out, dur, creditsCard([...new Set([...credits, musicCredit].filter(Boolean))], s))
       }
       segs.push(out)
-      console.log(`  · seg ${i} (${s.kind}) — ${secs().toFixed(1)}s`)
+      const src = credits.length > cBefore ? ` [${credits[credits.length - 1]}]` : ''
+      console.log(`  · seg ${i} (${s.kind})${src} — ${secs().toFixed(1)}s`)
     }
     // Free tier → append an animated PiPilot end-screen (browser still open so cardSeg works).
     if (WM) {
