@@ -188,6 +188,50 @@ function outroCard() {
     <div class="wrap"><span class="logo">${svg}</span><span class="made">Made with</span><span class="brand">PiPilot</span></div>`
 }
 
+// UNIQUE COVER / POSTER — a bespoke thumbnail for the video (instead of a plain frame grab of the
+// opening title card). `SB.cover` = { prompt } (a0 generates a textless cinematic BACKGROUND, and we
+// overlay the video title in the theme font → a real poster) | { src } (your own image) | { html }
+// (a fully custom canvas cover) | a bare string (treated as a prompt). Returns true if it wrote thumbOut.
+async function makeCover(thumbOut) {
+  const cov = SB.cover && typeof SB.cover === 'object' ? SB.cover
+    : (typeof SB.cover === 'string' && SB.cover.trim() ? { prompt: SB.cover } : null)
+  if (!cov) return false
+  const t = resolveTheme(null)
+  const f = fontFor(t.font)
+  const firstTitle = SB.scenes.find((s) => s.kind === 'title')
+  const title = esc(cov.title || SB.title || firstTitle?.title || '')
+  const sub = esc(cov.subtitle || cov.sub || firstTitle?.sub || '')
+  let html, bgUrl = ''
+  if (cov.html) {
+    html = canvasHtml({ html: cov.html })
+  } else {
+    bgUrl = String(cov.src || cov.image_url || (cov.prompt ? a0ImageUrl(cov.prompt, 0xC0FFEE) : '')).replace(/'/g, '')
+    const bg = bgUrl ? `background:#0a0c12 url('${bgUrl}') center/cover no-repeat` : `background:${bgFor(t)}`
+    const accent = esc(t.accent)
+    html = `${f.link}<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;font-family:${f.face}}
+      .bg{position:fixed;inset:0;${bg}}
+      .scrim{position:fixed;inset:0;background:linear-gradient(180deg,rgba(8,10,16,.12) 0%,rgba(8,10,16,.38) 45%,rgba(8,10,16,.92) 100%)}
+      .txt{position:fixed;left:6%;right:6%;bottom:8%;color:#fff}
+      .bar{width:${Math.round(W * 0.06)}px;height:${Math.round(H * 0.013)}px;background:${accent};border-radius:99px;margin-bottom:${Math.round(H * 0.028)}px}
+      h1{margin:0;font-size:${Math.round(H * 0.11)}px;font-weight:800;letter-spacing:-2px;line-height:.98;text-shadow:0 6px 44px rgba(0,0,0,.55)}
+      p{margin:${Math.round(H * 0.02)}px 0 0;font-size:${Math.round(H * 0.036)}px;font-weight:500;color:#e2e9f2;text-shadow:0 2px 22px rgba(0,0,0,.55)}
+      .brand{position:fixed;top:5.5%;right:6%;color:#fff;font-weight:800;font-size:${Math.round(H * 0.03)}px;opacity:.9;letter-spacing:-.5px;text-shadow:0 2px 16px rgba(0,0,0,.5)}</style>
+      <div class="bg"></div><div class="scrim"></div>
+      <span class="brand">PiPilot</span>
+      <div class="txt"><div class="bar"></div><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ''}</div>`
+  }
+  const ctx = await (await getBrowser()).newContext({ viewport: { width: W, height: H } })
+  try {
+    const page = await ctx.newPage()
+    await page.setContent(html, { waitUntil: 'load' })
+    // Wait for the background image (a0/URL) to actually decode before capturing (CSS bg loads lazily).
+    if (bgUrl) await page.evaluate((u) => new Promise((r) => { const i = new Image(); i.onload = i.onerror = () => r(); i.src = u; setTimeout(r, 6000) }), bgUrl).catch(() => {})
+    else await page.waitForTimeout(cov.html ? 900 : 300)
+    await page.screenshot({ path: thumbOut, type: 'jpeg', quality: 90 })
+  } finally { await ctx.close() }
+  return true
+}
+
 async function cardSeg(out, dur, html) {
   const vdir = fs.mkdtempSync(path.join(WORK, 'card-'))
   try {
@@ -434,8 +478,23 @@ function canvasHtml(scene) {
   const f = fontFor(t.font)
   const solid = Array.isArray(t.bg) ? t.bg[0] : (typeof t.bg === 'string' && !/gradient\(/.test(t.bg) ? t.bg : '#0E1726')
   const vars = `--bg:${esc(solid)};--bg2:${esc(t.bg2 || solid)};--accent:${esc(t.accent)};--text:${esc(t.text)};--sub:${esc(t.sub)};--font:${f.face}`
-  const body = String(scene.html || scene.canvas || '').trim()
-    || `<div style="position:fixed;inset:0;display:grid;place-items:center;color:var(--text);font-family:var(--font)">canvas</div>`
+  // Optional `bg` = a TEXTLESS image behind the scene, so the agent overlays PERFECT HTML text on
+  // top of an AI-generated (or provided) picture — the right way to do "image with text".
+  //   bg: { prompt } (a0 textless image) | { src } (URL) | "prompt string" ; scrim:false to skip the scrim.
+  let bgLayer = ''
+  if (scene.bg) {
+    const b = scene.bg
+    const url = typeof b === 'string' ? a0ImageUrl(b, 0)
+      : String(b.src || b.image_url || (b.prompt ? a0ImageUrl(b.prompt, hash(String(b.prompt))) : '')).replace(/'/g, '')
+    if (url) {
+      bgLayer = `<div style="position:fixed;inset:0;z-index:0;background:#0a0c12 url('${url}') center/cover no-repeat"></div>`
+      if (scene.scrim !== false) bgLayer += `<div style="position:fixed;inset:0;z-index:0;background:linear-gradient(180deg,rgba(8,10,16,.18) 0%,rgba(8,10,16,.55) 100%)"></div>`
+    }
+  }
+  const body = (bgLayer ? `<div style="position:relative;z-index:1;width:100%;height:100%">` : '')
+    + (String(scene.html || scene.canvas || '').trim()
+      || `<div style="position:fixed;inset:0;display:grid;place-items:center;color:var(--text);font-family:var(--font)">canvas</div>`)
+    + (bgLayer ? '</div>' : '')
   // Base font-size scales with canvas height so the agent can size with `em`. KF gives it the
   // built-in g/r/f keyframes (bar-grow / rise-in / fade-in) to reuse alongside its own @keyframes.
   return `${f.link}<style>
@@ -444,7 +503,7 @@ function canvasHtml(scene) {
     html,body{margin:0;width:100%;height:100%;overflow:hidden}
     body{background:${bgFor(t)};color:var(--text);font-family:var(--font);font-size:${Math.round(H / 40)}px;line-height:1.4}
     ${KF}
-  </style>${body}`
+  </style>${bgLayer}${body}`
 }
 function creditsCard(lines, scene) {
   const t = resolveTheme(scene)
@@ -746,13 +805,17 @@ function capDraws(text, start, end, typewriter) {
   args.push(finalOut)
   ff(args)
 
-  // Thumbnail: grab a crisp frame from the opening (into the animated title card
-  // if there is one → an on-brand poster). out/thumb.jpg, read back by the app.
+  // Thumbnail: a UNIQUE cover/poster when the storyboard specifies `cover` (a bespoke a0 background +
+  // the title overlaid); otherwise fall back to a crisp frame from the opening title card.
   try {
     const thumbOut = path.join(OUT, 'thumb.jpg')
-    const at = Math.min(1.4, Math.max(0.3, total * 0.12))
-    ff(['-ss', at.toFixed(2), '-i', finalOut, '-frames:v', '1', '-q:v', '3', '-vf', `scale=${W}:${H}`, thumbOut])
-    if (fs.existsSync(thumbOut)) console.log(`   thumb: ${path.relative(process.cwd(), thumbOut)}`)
+    let made = false
+    try { made = await makeCover(thumbOut) } catch (e) { console.log(`   (cover render failed, using frame: ${e.message})`) }
+    if (!made) {
+      const at = Math.min(1.4, Math.max(0.3, total * 0.12))
+      ff(['-ss', at.toFixed(2), '-i', finalOut, '-frames:v', '1', '-q:v', '3', '-vf', `scale=${W}:${H}`, thumbOut])
+    }
+    if (fs.existsSync(thumbOut)) console.log(`   thumb: ${path.relative(process.cwd(), thumbOut)}${made ? ' (unique cover)' : ''}`)
   } catch (e) { console.log(`   (thumb skipped: ${e.message})`) }
 
   const mb = (fs.statSync(finalOut).size / 1048576).toFixed(2)

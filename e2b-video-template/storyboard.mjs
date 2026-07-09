@@ -16,6 +16,10 @@
 //   theme?:  { style?: 'spotlight'|'bold'|'gradient'|'minimal'|'editorial',
 //             bg?: hex | [hex,hex], bg2?: hex, accent?: hex, text?: hex, sub?: hex,
 //             font?: 'sans'|'serif'|'mono' | '<Google Fonts family>' },  // per-VIDEO card design
+//   cover?:  { prompt: string }   // a0 generates a TEXTLESS cinematic background; the video title is
+//          | { src: string }       //   overlaid in the theme font → a UNIQUE poster/thumbnail
+//          | { html: string }      // a fully custom cover (canvas HTML)
+//          | string,               // shorthand for { prompt }
 //   voice?:    string,          // default Piper TTS voice for scene `say` narration
 //   captions?: boolean,         // burn narration text as subtitles
 //   transition_duration?: number,  // crossfade seconds between scenes (default 0.6, max 2.5)
@@ -79,6 +83,13 @@ export function validateStoryboard(sb) {
   }
   if (sb.title != null && typeof sb.title !== 'string') e.push('title must be a string')
   if (sb.transition_duration != null && (!isNum(sb.transition_duration) || sb.transition_duration < 0)) e.push('transition_duration must be a non-negative number (seconds)')
+
+  // cover (optional) — a bespoke poster/thumbnail: { prompt } | { src } | { html } | string
+  if (sb.cover != null && typeof sb.cover !== 'object' && typeof sb.cover !== 'string') {
+    e.push('cover must be a string prompt or an object ({ prompt } | { src } | { html })')
+  } else if (sb.cover && typeof sb.cover === 'object' && !isStr(sb.cover.prompt) && !isStr(sb.cover.src) && !isStr(sb.cover.image_url) && !isStr(sb.cover.html)) {
+    e.push('cover object needs a `prompt` (a0 background), `src` (image URL) or `html` (custom cover)')
+  }
 
   // music (optional)
   if (sb.music != null) {
