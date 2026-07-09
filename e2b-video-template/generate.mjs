@@ -147,7 +147,7 @@ async function watermarkPng() {
   if (_wmPath) return _wmPath
   let svg = ''
   try { svg = fs.readFileSync(path.join(import.meta.dirname, 'logo.svg'), 'utf8') } catch { svg = '' }
-  const h = Math.max(22, Math.round(H / 18)), pad = Math.round(h * 0.4), gap = Math.round(h * 0.34)
+  const h = Math.max(18, Math.round(H / 24)), pad = Math.round(h * 0.4), gap = Math.round(h * 0.34)
   const html = `<style>html,body{margin:0;background:transparent}
     .w{display:inline-flex;align-items:center;gap:${gap}px;background:rgba(10,12,18,.34);border-radius:${h}px;padding:${Math.round(pad * 0.7)}px ${pad}px}
     .w svg{height:${h}px;width:auto;display:block}
@@ -162,6 +162,25 @@ async function watermarkPng() {
     await el.screenshot({ path: _wmPath, omitBackground: true })
   } finally { await ctx.close() }
   return _wmPath
+}
+
+// Free-tier animated END SCREEN — a short branded PiPilot outro (logo + "Made with PiPilot")
+// appended after the content so it's clear the video was created with PiPilot.
+function outroCard() {
+  let svg = ''
+  try { svg = fs.readFileSync(path.join(import.meta.dirname, 'logo.svg'), 'utf8') } catch { svg = '' }
+  const lh = Math.round(H / 7)
+  return `<style>html,body{margin:0;height:100%}
+    body{background:#0a0c12;display:flex;align-items:center;justify-content:center;overflow:hidden;font-family:'Liberation Sans','DejaVu Sans',sans-serif}
+    .pulse{position:absolute;width:${lh * 3}px;height:${lh * 3}px;border-radius:50%;background:radial-gradient(circle,rgba(120,140,255,.22),transparent 70%);animation:pulse 2.6s ease-in-out infinite}
+    .wrap{position:relative;display:flex;flex-direction:column;align-items:center;gap:${Math.round(H * 0.028)}px;opacity:0;transform:translateY(${Math.round(H * 0.02)}px) scale(.96);animation:in .9s cubic-bezier(.2,.7,.3,1) forwards}
+    .logo svg{height:${lh}px;width:auto;display:block;filter:drop-shadow(0 10px 34px rgba(120,140,255,.4))}
+    .made{color:#aeb6c8;font-size:${Math.round(H * 0.026)}px;letter-spacing:.5px;font-weight:600;opacity:0;animation:in .8s ease .35s forwards}
+    .brand{color:#fff;font-size:${Math.round(H * 0.06)}px;font-weight:800;letter-spacing:-1px;opacity:0;animation:in .8s ease .45s forwards}
+    @keyframes in{to{opacity:1;transform:none}}
+    @keyframes pulse{0%,100%{transform:scale(.9);opacity:.45}50%{transform:scale(1.12);opacity:.85}}</style>
+    <div class="pulse"></div>
+    <div class="wrap"><span class="logo">${svg}</span><span class="made">Made with</span><span class="brand">PiPilot</span></div>`
 }
 
 async function cardSeg(out, dur, html) {
@@ -497,10 +516,26 @@ function capDraws(text, start, end, typewriter) {
   const nSay = SB.scenes.filter((s) => s.say).length
   console.log(`▶  ${W}x${H}@${FPS} · ${SB.scenes.length} scenes${nSay ? ` · ${nSay} narrated${CAPTIONS ? '+captions' : ''}` : ''}${DRAFT ? ' · DRAFT' : ''}${WM ? ' · watermark' : ''}\n`)
   const credits = [], segs = []
+  let hasOutro = false
   // Resolve music up front — the credits card needs its attribution string.
-  let musicUrl = null, musicCredit = null
-  if (SB.music?.url) { musicUrl = SB.music.url; musicCredit = SB.music.credit || 'music' }
-  else if (SB.music?.mood) { const m = pickMusic({ mood: SB.music.mood }); musicUrl = m.url; musicCredit = m.credit }
+  // A scene may carry its OWN `music` ({mood}|{url}|null) to SWITCH the track; scenes without one
+  // inherit the top-level SB.music. Contiguous scenes sharing a track become ONE looped segment,
+  // and the track crossfades when a scene selects a different one. (One SB.music → one segment.)
+  const resolveTrack = (m) => {
+    if (!m) return null
+    if (m.url) return { url: m.url, credit: m.credit || 'music' }
+    if (m.mood) { try { const p = pickMusic({ mood: m.mood }); return { url: p.url, credit: p.credit } } catch { return null } }
+    return null
+  }
+  const _sceneMusic = SB.scenes.map((s) => resolveTrack(Object.prototype.hasOwnProperty.call(s, 'music') ? s.music : SB.music))
+  const musicSegments = [] // { url, credit, from, to } — scene index range
+  _sceneMusic.forEach((t, i) => {
+    if (!t) return
+    const last = musicSegments[musicSegments.length - 1]
+    if (last && last.url === t.url && last.to === i - 1) last.to = i
+    else musicSegments.push({ url: t.url, credit: t.credit, from: i, to: i })
+  })
+  const musicCredit = [...new Set(musicSegments.map((s) => s.credit).filter(Boolean))].join(' · ') || null
   // Durations + start offsets are deterministic from the storyboard, so compute them
   // UP FRONT — narration is synth'd before cards render so a typewriter card can time
   // its typing to the narration length (voice-synced typewriter).
@@ -575,6 +610,11 @@ function capDraws(text, start, end, typewriter) {
       segs.push(out)
       console.log(`  · seg ${i} (${s.kind}) — ${secs().toFixed(1)}s`)
     }
+    // Free tier → append an animated PiPilot end-screen (browser still open so cardSeg works).
+    if (WM) {
+      try { const oseg = path.join(WORK, 'seg_outro.mp4'); await cardSeg(oseg, 2.8, outroCard()); segs.push(oseg); durs.push(2.8); hasOutro = true }
+      catch (e) { console.log(`   (outro skipped: ${e.message})`) }
+    }
     // Pre-render the watermark while the shared browser is still open (the finally
     // below closes it before the final ffmpeg encode calls watermarkPng()).
     if (WM) await watermarkPng().catch((e) => console.log(`   (watermark skipped: ${e.message})`))
@@ -583,6 +623,7 @@ function capDraws(text, start, end, typewriter) {
   const silent = path.join(WORK, 'silent.mp4')
   // Per-boundary transitions: scene i may set `transition`; otherwise a varied default.
   const transFor = SB.scenes.map((s) => (s.transition && XF_TRANSITIONS.has(s.transition) ? s.transition : null))
+  if (hasOutro) transFor.push('fadeblack') // the outro's transition-in
   const total = xfadeConcat(silent, segs, durs, transFor)
 
   const finalOut = path.join(OUT, 'video.mp4')
@@ -596,8 +637,13 @@ function capDraws(text, start, end, typewriter) {
   // burned-in captions, ducked music, and narration. Inputs: silent [+ music]
   // [+ logo png] [+ one wav per narration line].
   const inputs = ['-i', silent]
-  let idx = 1, musicIdx = -1, wmIdx = -1
-  if (musicUrl) { const music = curl(musicUrl, path.join(CACHE, `music_${hash(musicUrl)}.mp3`)); inputs.push('-i', music); musicIdx = idx++ }
+  let idx = 1, wmIdx = -1
+  // One LOOPED input per music segment (-stream_loop -1 → the track repeats to fill long scenes).
+  const musicSegIdx = []
+  for (const seg of musicSegments) {
+    const music = curl(seg.url, path.join(CACHE, `music_${hash(seg.url)}.mp3`))
+    inputs.push('-stream_loop', '-1', '-i', music); musicSegIdx.push(idx++)
+  }
   // NO -loop on the logo: a single-frame image + overlay's default eof_action=repeat
   // persists it for the whole video. -loop 1 makes it infinite and hangs the encode.
   if (wmPath) { inputs.push('-i', wmPath); wmIdx = idx++ }
@@ -622,14 +668,18 @@ function capDraws(text, start, end, typewriter) {
     capDraws(o.text, o.start, o.end, o.typewriter).forEach((d, j) => { const oo = `cap${k}_${j}`; vParts.push(`[${cur}]${d}[${oo}]`); cur = oo })
   })
 
-  // ── audio: ducked music + narration (each placed at its scene offset) ──
+  // ── audio: ducked music (per segment, looped + crossfaded at switches) + narration ──
   const aParts = [], mixLabels = []
-  if (musicIdx >= 0) {
-    const fIn = Math.min(1.5, total), fOutStart = Math.max(0, total - 2), fOutDur = Math.min(2, total - fOutStart)
-    const vol = hasNarr ? 0.22 : 0.85 // duck music under narration
-    aParts.push(`[${musicIdx}:a]atrim=0:${total.toFixed(2)},afade=t=in:st=0:d=${fIn.toFixed(2)},afade=t=out:st=${fOutStart.toFixed(2)}:d=${fOutDur.toFixed(2)},volume=${vol}[amus]`)
-    mixLabels.push('[amus]')
-  }
+  const vol = hasNarr ? 0.22 : 0.85 // duck music under narration
+  musicSegments.forEach((seg, k) => {
+    const segStart = starts[seg.from] || 0
+    const segEnd = Math.min(total, (starts[seg.to] || 0) + (durs[seg.to] || 0))
+    const segDur = Math.max(0.5, segEnd - segStart)
+    const fIn = Math.min(1.2, segDur / 3), fOut = Math.min(1.5, segDur / 3)
+    const ms = Math.round(segStart * 1000)
+    aParts.push(`[${musicSegIdx[k]}:a]atrim=0:${segDur.toFixed(2)},afade=t=in:st=0:d=${fIn.toFixed(2)},afade=t=out:st=${(segDur - fOut).toFixed(2)}:d=${fOut.toFixed(2)},volume=${vol},adelay=${ms}|${ms}[amus${k}]`)
+    mixLabels.push(`[amus${k}]`)
+  })
   narr.forEach((n, k) => { const ms = Math.round(n.start * 1000); aParts.push(`[${narrIdx[k]}:a]adelay=${ms}|${ms},volume=1.35[nd${k}]`); mixLabels.push(`[nd${k}]`) })
   let haveAudio = false
   if (mixLabels.length === 1) { aParts.push(`${mixLabels[0]}anull[a]`); haveAudio = true }
@@ -650,8 +700,9 @@ function capDraws(text, start, end, typewriter) {
   if (haveAudio) args.push('-map', '[a]')
   args.push('-c:v', 'libx264', '-crf', crf, '-preset', preset, '-pix_fmt', 'yuv420p', '-movflags', '+faststart')
   if (haveAudio) args.push('-c:a', 'aac', '-b:a', '128k')
-  // Bound to the finite video when music is present (music is trimmed to `total`).
-  if (musicIdx >= 0) args.push('-shortest')
+  // Music segments are atrim-bounded (finite), so -shortest isn't needed to tame looping music.
+  // Skip it when there's an outro — the branded end-screen has no audio, so -shortest would clip it.
+  if (musicSegments.length && !hasOutro) args.push('-shortest')
   args.push(finalOut)
   ff(args)
 
