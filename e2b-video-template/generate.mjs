@@ -14,7 +14,7 @@
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { pickMusic, pickPhotos } from './stockdb.mjs'
+import { pickMusic, pickPhotos, pickVideo } from './stockdb.mjs'
 import { validateStoryboard, resolveCanvas } from './storyboard.mjs'
 
 // Pin the baked Chromium location. E2B's SDK command execution doesn't reliably
@@ -569,12 +569,19 @@ function capDraws(text, start, end, typewriter) {
       } else if (s.kind === 'video') {
         // A user-supplied asset URL (s.src / s.image_url) wins — their own footage/photo.
         const userSrc = s.src || s.image_url || s.asset
+        // ZERO-API baked corpus first — genre-appropriate Pixabay B-roll from
+        // pixabay_videos.jsonl (deterministic per scene index, no key needed).
+        // Returns null only when the corpus file is absent → fall through below.
+        const clip = userSrc ? null : pickVideo({ keyword: s.keyword || s.q || s.prompt || '', aspect: SB.aspect, minDur: s.dur, seed: i })
         if (userSrc) {
           credits.push('provided')
           kenBurnsSeg(out, userSrc, dur, s.forward !== false)
+        } else if (clip) {
+          credits.push(clip.credit)
+          brollSeg(out, clip.url_medium || clip.url, dur, s.start || 0)
         } else {
-          // Prefer Pixabay b-roll; fall back to an a0-generated image (Ken Burns) when
-          // there's no key or no match, so `video` scenes always resolve.
+          // Corpus absent → fall back: live Pixabay b-roll (if a key is present),
+          // else an a0-generated image (Ken Burns), so `video` scenes always resolve.
           const hits = KEY ? pixabayVideo(s.q || s.prompt || '') : []
           const h = hits[(s.pick || 0) % Math.max(1, hits.length)]
           if (h) {

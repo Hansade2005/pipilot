@@ -20,7 +20,7 @@ import path from 'node:path'
 const DIR = process.env.STOCKDB_DIR || '/opt/stockdb'
 
 // ── lazy, in-process caches (each file parsed at most once) ─────────────────
-let _music = null, _photos = null, _photoById = null, _topics = null, _collections = null
+let _music = null, _photos = null, _photoById = null, _topics = null, _collections = null, _videos = null
 
 function readJsonl(file) {
   const txt = fs.readFileSync(path.join(DIR, file), 'utf8')
@@ -37,6 +37,9 @@ const photos = () => (_photos ??= readJsonl('unsplash_photos.jsonl'))
 const photoById = () => (_photoById ??= new Map(photos().map((p) => [p.photo_id, p])))
 const topics = () => (_topics ??= readJsonl('unsplash_topics.jsonl'))
 const collections = () => (_collections ??= readJsonl('unsplash_collections.jsonl'))
+// pixabay_videos.jsonl is OPTIONAL — guard so renders don't break if it's absent
+// (older templates without the harvested corpus): pickVideo() returns null then.
+const videos = () => (_videos ??= (fs.existsSync(path.join(DIR, 'pixabay_videos.jsonl')) ? readJsonl('pixabay_videos.jsonl') : []))
 
 // Deterministic PRNG so a given (seed) always yields the same pick — renders are
 // reproducible, and varying the seed per scene index avoids repeats without RNG.
@@ -157,6 +160,51 @@ export function pickPhotos({ keyword, topic, collection, id, n = 1, color, orien
   return pickN(pool, n, seed).map(toPhoto)
 }
 
+// ── VIDEO (Pixabay B-roll) ────────────────────────────────────────────────────
+// pickVideo({ keyword, aspect, minDur, seed }) → one CDN mp4 clip from the baked
+// pixabay_videos.jsonl corpus (ZERO API calls at render time). Matches keyword as
+// a case-insensitive substring against each row's `keywords` + `tags`, with cascading
+// fallbacks (keyword → any tag/keyword token → any clip) so it NEVER dead-ends on a
+// live corpus. Deterministic pick via mulberry32(seed). Returns null ONLY when the
+// corpus file is absent (older templates) so existing renders don't break.
+export function pickVideo({ keyword, aspect, minDur = 0, seed = 0 } = {}) {
+  const all = videos()
+  if (!all.length) return null // corpus missing → let the caller fall back
+
+  const byAspect = (arr) => (aspect ? arr.filter((v) => v.aspect === aspect) : arr)
+  const byDur = (arr) => arr.filter((v) => (v.duration || 0) >= minDur)
+
+  const kw = String(keyword || '').toLowerCase().trim()
+  const toks = [...new Set(kw.split(/[^a-z0-9]+/).filter((t) => t.length > 1))]
+  const hay = (v) => `${(v.keywords || []).join(' ')} ${(v.tags || []).join(' ')}`.toLowerCase()
+  const matchesPhrase = (v) => kw && hay(v).includes(kw)
+  const matchesAnyTok = (v) => toks.some((t) => hay(v).includes(t))
+
+  // Cascade: exact phrase (+aspect+dur) → any-token (+aspect+dur) → phrase/token
+  // ignoring aspect → any clip (+dur) → any clip. Never returns null on a live corpus.
+  let pool = byDur(byAspect(all.filter(matchesPhrase)))
+  if (!pool.length) pool = byDur(byAspect(all.filter(matchesAnyTok)))
+  if (!pool.length) pool = byDur(all.filter(matchesPhrase))
+  if (!pool.length) pool = byDur(all.filter(matchesAnyTok))
+  if (!pool.length) pool = byDur(byAspect(all))
+  if (!pool.length) pool = byDur(all)
+  if (!pool.length) pool = all
+
+  const v = pool[Math.floor(mulberry32(seed + pool.length)() * pool.length)]
+  return {
+    id: v.id,
+    url: v.url, // primary (large); callers preferring a lighter render use url_medium
+    url_medium: v.url_medium || '',
+    url_small: v.url_small || '',
+    thumbnail: v.thumbnail || '',
+    duration: v.duration,
+    width: v.width,
+    height: v.height,
+    aspect: v.aspect,
+    credit: `Pixabay #${v.id} by ${v.user || 'Unknown'}`,
+  }
+}
+
 // ── tiny CLI for local testing ──────────────────────────────────────────────
 //   STOCKDB_DIR=... node stockdb.mjs moods
 //   STOCKDB_DIR=... node stockdb.mjs music corporate 60
@@ -167,5 +215,6 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
   if (cmd === 'moods') console.log(MOODS().slice(0, 40).map(([m, n]) => `${m} (${n})`).join(', '))
   else if (cmd === 'music') console.log(pickMusic({ mood: a || 'background', minDur: Number(b) || 0 }))
   else if (cmd === 'photo') console.log(JSON.stringify(pickPhotos({ [a]: b, n: Number(c) || 1 }), null, 2))
-  else console.log('usage: stockdb.mjs moods | music <mood> [minDur] | photo <keyword|topic|collection|id> <value> [n]')
+  else if (cmd === 'video') console.log(JSON.stringify(pickVideo({ keyword: a, aspect: b || undefined, minDur: Number(c) || 0 }), null, 2))
+  else console.log('usage: stockdb.mjs moods | music <mood> [minDur] | photo <keyword|topic|collection|id> <value> [n] | video <keyword> [aspect] [minDur]')
 }

@@ -31,7 +31,7 @@
 //     overlay — a string, or { text, typewriter?:true } to TYPE it on-screen char-by-char),
 //     transition (the xfade INTO this scene).  A narrated scene AUTO-EXTENDS to fit its
 //     voiceover, so `say` never bleeds across the cut.  credits are OPTIONAL.
-//   { kind:'video',     dur, src | q | prompt, pick?, start? }      // `src` = YOUR image/video URL; else Pixabay b-roll; else a0 image (from `prompt`|`q`)
+//   { kind:'video',     dur, src | keyword | q | prompt, pick?, start? }  // `src` = YOUR image/video URL; else Pixabay B-roll from the baked corpus (`keyword`|`q`); else a0 image (from `prompt`)
 //   { kind:'image',     dur, src | prompt, forward? }               // `src` = YOUR image URL (logo / company photo); else bespoke a0.dev image (NO text in image)
 //   { kind:'still',     dur, src | prompt | keyword|topic|collection|id, pick?, color?, orientation?, forward? }  // `src` = YOUR image URL; else a0 `prompt`; else Unsplash stock
 //   { kind:'screencast', dur?, url, steps:[Step] | script:string }  // drive the live app —
@@ -100,9 +100,10 @@ export function validateStoryboard(sb) {
       if (!isStr(s.title)) e.push(`${at}.title is required`)
       if (s.sub != null && typeof s.sub !== 'string') e.push(`${at}.sub must be a string`)
     } else if (s.kind === 'video') {
-      // A user-supplied asset URL (`src`) OR Pixabay `q` (b-roll) OR `prompt` (a0 fallback).
+      // A user-supplied asset URL (`src`) OR `keyword`/`q` (Pixabay B-roll from the
+      // baked corpus — `keyword` is preferred) OR `prompt` (a0 fallback).
       const hasUserSrc = isStr(s.src) || isStr(s.image_url) || isStr(s.asset)
-      if (!hasUserSrc && !isStr(s.q) && !isStr(s.prompt)) e.push(`${at} needs a \`src\` (your image/video URL), \`q\` (Pixabay term) or \`prompt\` (a0 image)`)
+      if (!hasUserSrc && !isStr(s.keyword) && !isStr(s.q) && !isStr(s.prompt)) e.push(`${at} needs a \`src\` (your image/video URL), \`keyword\`/\`q\` (Pixabay B-roll term) or \`prompt\` (a0 image)`)
       if (s.pick != null && !isNum(s.pick)) e.push(`${at}.pick must be a number`)
       if (s.start != null && !isNum(s.start)) e.push(`${at}.start must be a number (seconds)`)
     } else if (s.kind === 'still' || s.kind === 'image') {
