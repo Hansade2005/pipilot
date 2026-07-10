@@ -25,7 +25,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const OUT = path.join(__dirname, '..', 'stockdb', 'pixabay_videos.jsonl')
 
 const PER_PAGE = 150      // Pixabay video per_page max is 200
-const PAGES = 2           // up to 2 pages/keyword (~300 hits ceiling; ~500 accessible)
+const PAGES = 3           // up to 3 pages/keyword — pull deeper per keyword
 const THROTTLE_MS = 680   // ~88 req/min — safely under the 100/60s cap
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -64,6 +64,75 @@ const KEYWORDS = [
   'luxury', 'fashion', 'jewelry', 'cars', 'car driving', 'sports car', 'motorcycle',
   // gaming / creative
   'gaming', 'esports', 'music studio', 'art painting',
+
+  // ── expansion round: ~200 long-tail / genre terms not well covered above ──
+  // tech / data / dev (fine-grained)
+  'data center', 'server racks', 'circuit board macro', 'developer typing keyboard',
+  'coding screen', 'software development', 'cloud computing', 'cybersecurity', 'binary code',
+  'motherboard closeup', 'fiber optics', 'blockchain', 'cryptocurrency', 'bitcoin', 'stock chart',
+  'trading screen', 'graph chart animation', 'big data', 'machine learning', 'virtual reality',
+  'augmented reality', 'drone flying', 'satellite orbit', 'rocket launch', '3d printing',
+  'semiconductor', 'quantum computing', 'wifi signal', 'smartphone screen', 'laptop working',
+  // energy / green / infrastructure
+  'electric car charging', 'wind farm aerial', 'solar farm', 'power lines', 'nuclear plant',
+  'hydroelectric dam', 'oil refinery', 'battery technology', 'recycling', 'water treatment',
+  'geothermal', 'coal power plant', 'electric grid',
+  // city / urban / night
+  'city rain night', 'neon signs', 'times square', 'tokyo street', 'subway train', 'metro station',
+  'city crosswalk', 'skyscraper', 'urban timelapse', 'street food', 'graffiti wall', 'city fog',
+  'downtown night', 'crosswalk aerial', 'parking garage', 'urban decay',
+  // nature / weather (fine-grained)
+  'forest fog', 'snow falling', 'autumn leaves falling', 'cherry blossom', 'lavender field',
+  'wheat field', 'rice terraces', 'volcano eruption', 'iceberg', 'glacier', 'canyon',
+  'sand dunes', 'rainforest', 'bamboo forest', 'foggy mountains', 'moss forest', 'dew drops',
+  'thunderstorm', 'tornado', 'hail', 'frost', 'melting ice', 'waterfall closeup', 'mountain timelapse',
+  // ocean / water (fine-grained)
+  'ocean aerial', 'waves slow motion', 'surfing', 'scuba diving', 'jellyfish', 'dolphins',
+  'whale', 'sharks', 'sea turtle', 'tropical beach', 'boat sailing', 'harbor', 'lighthouse',
+  'fishing boat', 'kayaking', 'river rafting',
+  // food / drink (fine-grained)
+  'coffee pour', 'espresso machine', 'latte art', 'pizza baking', 'sushi', 'burger',
+  'pouring wine', 'cocktail', 'chocolate melting', 'ice cream', 'barista', 'farmers market',
+  'grilling bbq', 'salad fresh', 'bread baking', 'tea pouring', 'honey dripping', 'pancakes',
+  // people / work / lifestyle
+  'team meeting office', 'brainstorming', 'presentation', 'video call', 'remote work',
+  'coworking space', 'entrepreneur', 'designer working', 'architect blueprint', 'call center',
+  'nurse patient', 'doctor surgery', 'teacher classroom', 'student studying', 'graduation',
+  'yoga meditation', 'people commuting', 'shopping mall', 'grocery shopping', 'online shopping',
+  'delivery courier', 'warehouse logistics', 'forklift warehouse', 'assembly line',
+  // industry / build
+  'construction crane', 'welding sparks', 'robot arm factory', 'cnc machine', 'steel factory',
+  'car manufacturing', 'textile factory', 'mining', 'excavator', 'bulldozer', 'road construction',
+  'bricklaying', 'scaffolding', 'demolition',
+  // transport / travel
+  'airplane takeoff', 'airplane landing', 'jet engine', 'helicopter', 'cargo ship',
+  'container port', 'freight train', 'high speed train', 'truck highway', 'traffic timelapse',
+  'roundabout aerial', 'toll booth', 'gas station', 'road trip desert', 'mountain road',
+  // health / science / medical
+  'science lab microscope', 'test tubes', 'petri dish', 'dna helix', 'vaccine syringe',
+  'heartbeat monitor', 'x ray', 'mri scan', 'brain scan', 'pills medication', 'blood cells',
+  'surgery operating room', 'physical therapy', 'dentist',
+  // agriculture / farm
+  'farm tractor', 'harvesting crops', 'vineyard', 'greenhouse', 'cattle farm', 'sheep herd',
+  'chicken farm', 'corn field', 'orchard', 'irrigation', 'beekeeping', 'plowing field',
+  // nature / animals (fine-grained)
+  'lion', 'elephant', 'tiger', 'wolf', 'deer', 'eagle', 'owl', 'butterfly', 'bees flowers',
+  'penguins', 'polar bear', 'horses running', 'flock of birds', 'aquarium fish', 'monkey',
+  // celebration / emotion / fire
+  'campfire night', 'bonfire', 'fireplace', 'sparklers', 'wedding', 'birthday party',
+  'new year celebration', 'confetti', 'balloons', 'christmas lights', 'halloween', 'diwali',
+  'lantern festival', 'protest crowd', 'stadium crowd',
+  // abstract / motion / background
+  'ink in water', 'paint splash', 'liquid gold', 'bokeh lights', 'light streaks', 'glitch effect',
+  'geometric loop', 'plexus network', 'smoke abstract', 'kaleidoscope', 'fractal', 'wireframe globe',
+  'data stream', 'matrix code', 'gradient waves', 'dust particles',
+  // interior / architecture
+  'modern kitchen', 'living room interior', 'empty office', 'hotel lobby', 'staircase spiral',
+  'glass building', 'library interior', 'museum', 'church interior', 'warehouse interior',
+  'rain window', 'window curtains',
+  // lifestyle / fashion / beauty
+  'makeup application', 'perfume', 'hair salon', 'spa massage', 'manicure', 'runway fashion',
+  'jewelry closeup', 'watch closeup', 'shopping bags', 'luxury hotel', 'private jet interior',
 ]
 
 // ── derive aspect bucket from primary (large) width/height ──────────────────
@@ -108,6 +177,25 @@ async function fetchPage(q, page) {
 const byId = new Map()   // id → row (merged keyword tags across the run)
 let requests = 0
 const t0 = Date.now()
+
+// ── load the existing corpus first so this run MERGES, never overwrites ──────
+let seededCount = 0
+if (fs.existsSync(OUT)) {
+  const raw = fs.readFileSync(OUT, 'utf8')
+  for (const line of raw.split('\n')) {
+    const s = line.trim()
+    if (!s) continue
+    try {
+      const row = JSON.parse(s)
+      if (row && row.id != null) {
+        if (!Array.isArray(row.keywords)) row.keywords = row.keywords ? [row.keywords] : []
+        byId.set(row.id, row)
+      }
+    } catch { /* skip malformed line */ }
+  }
+  seededCount = byId.size
+  console.log(`Loaded ${seededCount} existing rows from ${path.basename(OUT)} — merging into this run.`)
+}
 
 function flush() {
   const lines = [...byId.values()].map((r) => JSON.stringify(r)).join('\n')
@@ -166,5 +254,5 @@ flush()
 const elapsed = ((Date.now() - t0) / 1000).toFixed(1)
 const bytes = fs.existsSync(OUT) ? fs.statSync(OUT).size : 0
 console.log('\n──────────────────────────────────────────────')
-console.log(`DONE. unique videos: ${byId.size} · requests: ${requests} · elapsed: ${elapsed}s`)
+console.log(`DONE. unique videos: ${byId.size} (seeded ${seededCount}, +${byId.size - seededCount} new) · keywords: ${KEYWORDS.length} · requests: ${requests} · elapsed: ${elapsed}s`)
 console.log(`file: ${OUT} (${(bytes / 1024 / 1024).toFixed(2)} MB)`)

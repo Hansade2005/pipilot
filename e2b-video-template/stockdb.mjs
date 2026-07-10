@@ -20,7 +20,7 @@ import path from 'node:path'
 const DIR = process.env.STOCKDB_DIR || '/opt/stockdb'
 
 // ── lazy, in-process caches (each file parsed at most once) ─────────────────
-let _music = null, _photos = null, _photoById = null, _topics = null, _collections = null, _videos = null
+let _music = null, _photos = null, _photoById = null, _topics = null, _collections = null, _videos = null, _pixPhotos = null, _pexVideos = null, _pexPhotos = null
 
 function readJsonl(file) {
   const txt = fs.readFileSync(path.join(DIR, file), 'utf8')
@@ -40,10 +40,22 @@ const collections = () => (_collections ??= readJsonl('unsplash_collections.json
 // pixabay_videos.jsonl is OPTIONAL — guard so renders don't break if it's absent
 // (older templates without the harvested corpus): pickVideo() returns null then.
 const videos = () => (_videos ??= (fs.existsSync(path.join(DIR, 'pixabay_videos.jsonl')) ? readJsonl('pixabay_videos.jsonl') : []))
+// pexels_videos.jsonl is OPTIONAL — a second, Pexels-sourced B-roll pool merged into the
+// video pool (same schema as Pixabay rows). Guarded so an absent file just means empty.
+const pexVideos = () => (_pexVideos ??= (fs.existsSync(path.join(DIR, 'pexels_videos.jsonl')) ? readJsonl('pexels_videos.jsonl') : []))
+// The full B-roll pool = Pixabay ∪ Pexels clips (both share the pickVideo row shape).
+const allVideos = () => [...videos(), ...pexVideos()]
+// pixabay_images.jsonl is OPTIONAL — a second, Pixabay-sourced photo pool searched
+// alongside Unsplash in pickPhotos' keyword branch. Guarded so renders never break
+// if the harvested corpus is absent (older templates): the pool is just empty then.
+const pixPhotos = () => (_pixPhotos ??= (fs.existsSync(path.join(DIR, 'pixabay_images.jsonl')) ? readJsonl('pixabay_images.jsonl') : []))
+// pexels_images.jsonl is OPTIONAL — a third photo pool (Pexels), searched alongside
+// Unsplash + Pixabay in pickPhotos' keyword branch. Guarded like the others.
+const pexPhotos = () => (_pexPhotos ??= (fs.existsSync(path.join(DIR, 'pexels_images.jsonl')) ? readJsonl('pexels_images.jsonl') : []))
 
 // How many baked B-roll clips are available (0 = corpus absent). Lets the renderer log
 // accurately whether `video` scenes resolve from the corpus vs. fall back to a0 images.
-export const videoCorpusSize = () => videos().length
+export const videoCorpusSize = () => allVideos().length
 
 // Deterministic PRNG so a given (seed) always yields the same pick — renders are
 // reproducible, and varying the seed per scene index avoids repeats without RNG.
@@ -152,7 +164,7 @@ function toPhoto(p) {
     width: p.width, height: p.height, aspect_ratio: p.aspect_ratio,
     color: p.dominant_color_hex, colorName: p.dominant_color_keyword,
     description: p.description || '',
-    credit: `${p.photographer || 'Unknown'} / Unsplash`,
+    credit: `${p.photographer || 'Unknown'} / ${p.source === 'pixabay' ? 'Pixabay' : p.source === 'pexels' ? 'Pexels' : 'Unsplash'}`,
   }
 }
 
@@ -177,6 +189,11 @@ export function pickPhotos({ keyword, topic, collection, id, n = 1, color, orien
     // and only backfill from keyword tags when descriptions can't fill `n`. A whole-phrase
     // query like "fine dining" won't appear verbatim, so also score per-token.
     keywordSearch = true
+    // Search BOTH the Unsplash corpus and the optional Pixabay pool. Pixabay rows
+    // already carry description/keywords/image_url/download_url_1920w/aspect_ratio/
+    // photographer, so they flow through rank()/toPhoto() identically. Absent file
+    // → empty pool → behaviour is unchanged from Unsplash-only.
+    const searchPool = [...photos(), ...pixPhotos(), ...pexPhotos()]
     const kw = String(keyword).toLowerCase().trim()
     const toks = [...new Set(kw.split(/[^a-z0-9]+/).filter((t) => t.length > 1))]
     const rank = (text) => {
@@ -187,7 +204,7 @@ export function pickPhotos({ keyword, topic, collection, id, n = 1, color, orien
     }
     const rankBy = (field) => {
       const scored = []
-      for (const p of photos()) { const s = rank(p[field]); if (s > 0) scored.push([p, s]) }
+      for (const p of searchPool) { const s = rank(p[field]); if (s > 0) scored.push([p, s]) }
       return scored.sort((a, b) => b[1] - a[1]).map(([p]) => p)
     }
     const descPool = rankBy('description')
@@ -196,7 +213,7 @@ export function pickPhotos({ keyword, topic, collection, id, n = 1, color, orien
       const seen = new Set(descPool.map((p) => p.photo_id))
       // keyword-tag matches (noisier) ranked by how many query words appear as tags
       const kwPool = []
-      for (const p of photos()) {
+      for (const p of searchPool) {
         if (seen.has(p.photo_id)) continue
         const h = (p.keywords || []).join(' ').toLowerCase()
         let s = kw && h.includes(kw) ? 1000 : 0
@@ -223,7 +240,7 @@ export function pickPhotos({ keyword, topic, collection, id, n = 1, color, orien
 // live corpus. Deterministic pick via mulberry32(seed). Returns null ONLY when the
 // corpus file is absent (older templates) so existing renders don't break.
 export function pickVideo({ keyword, aspect, minDur = 0, seed = 0 } = {}) {
-  const all = videos()
+  const all = allVideos() // Pixabay ∪ Pexels B-roll
   if (!all.length) return null // corpus missing → let the caller fall back
 
   const byAspect = (arr) => (aspect ? arr.filter((v) => v.aspect === aspect) : arr)
