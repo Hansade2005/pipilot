@@ -136,9 +136,26 @@ RUN mkdir -p checkpoints face_detection/detection/sfd temp \
     && curl -fSL https://huggingface.co/camenduru/Wav2Lip/resolve/main/face_detection/detection/sfd/s3fd.pth -o face_detection/detection/sfd/s3fd.pth
 WORKDIR /opt/pipilot-video
 
+# ── Background matting for transparent presenters (U^2-Net via onnxruntime) ───
+# Cuts the person out of the (opaque) Wav2Lip talking-head so it composites over the
+# scene background with NO white box. onnxruntime + Pillow only — NOT the rembg
+# package (its deps would upgrade numpy and break Wav2Lip's pinned 1.23.5). Because
+# Wav2Lip moves only the mouth, one mask (from a single frame) matts the whole clip.
+RUN pip3 install --no-cache-dir --break-system-packages onnxruntime==1.16.3 pillow
+ENV U2NET_HOME=/opt/u2net
+RUN mkdir -p /opt/u2net && curl -fSL https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx -o /opt/u2net/u2net.onnx
+COPY e2b-video-template/matte.py ./
+
+# Baked presenter CHARACTER library — a small curated set of frontal a0 portraits the
+# agent can pick by name (presenter:{character:"aria"}). Delivered as .webp; convert to
+# real JPEG at build time (cv2.imread in Wav2Lip is happiest with JPEG). Matting still
+# runs on these at render, so they composite transparently just like a generated face.
+COPY e2b-video-template/avatars /opt/avatars
+RUN for f in /opt/avatars/*.webp; do [ -e "$f" ] && ffmpeg -y -loglevel error -i "$f" "${f%.webp}.jpg" && rm -f "$f"; done; ls -la /opt/avatars
+
 # Let the runtime user read the engine/corpus and write render scratch
 # (.cache/.work/out under the engine dir). Wav2Lip writes temp/ under /opt/wav2lip.
-RUN chmod -R a+rwX /opt/pipilot-video /opt/stockdb /opt/ms-playwright /opt/piper /opt/wav2lip
+RUN chmod -R a+rwX /opt/pipilot-video /opt/stockdb /opt/ms-playwright /opt/piper /opt/wav2lip /opt/u2net /opt/avatars
 
 # E2B non-root runtime user.
 RUN useradd -m -s /bin/bash user

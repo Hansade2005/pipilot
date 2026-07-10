@@ -296,6 +296,8 @@ async function overlayLogo(seg, url, pos) {
 
 // ── Talking-avatar presenter (Wav2Lip lip-sync, CPU) ─────────────────────────
 const W2L_DIR = process.env.WAV2LIP_DIR || '/opt/wav2lip'
+const AVATARS_DIR = process.env.AVATARS_DIR || '/opt/avatars'   // baked presenter CHARACTER library
+const MATTE = path.join(import.meta.dirname, 'matte.py')         // U^2-Net background matting
 // Resolve the presenter portrait ONCE per render and cache it, so every {kind:"avatar"}
 // scene shows the SAME face. Priority: presenter.src (a LOCKED portrait URL — pixel-
 // identical across videos, for a persistent "channel avatar") → a0 from presenter.prompt
@@ -308,6 +310,8 @@ function presenterPortrait() {
   const p = SB.presenter && typeof SB.presenter === 'object' ? SB.presenter
     : (typeof SB.presenter === 'string' ? { prompt: SB.presenter } : {})
   try {
+    // A baked CHARACTER from the library (presenter:{character:"aria"}) — a curated frontal portrait.
+    if (p.character) { const f = path.join(AVATARS_DIR, `${String(p.character).toLowerCase().replace(/[^a-z0-9]+/g, '')}.jpg`); if (fs.existsSync(f)) { _presenter = f; return f } }
     if (p.src || p.image_url) { _presenter = curl(String(p.src || p.image_url), path.join(CACHE, 'presenter.jpg')); return _presenter }
     const persona = String(p.prompt || p.persona || 'a warm, professional television presenter with a friendly, approachable face')
     const framed = `${persona}. Photorealistic head-and-shoulders studio portrait, face centered and looking straight at the camera, neutral relaxed expression with the mouth gently closed, soft even studio lighting, clean plain background, sharp focus, high detail.`
@@ -338,7 +342,22 @@ async function avatarBg(out, dur, s) {
   const c2 = String(Array.isArray(th.bg) ? (th.bg[1] || th.accent) : (th.accent || '#1b2550')).replace(/'/g, '')
   await cardSeg(out, dur, `<style>html,body{margin:0;height:100%}body{background:radial-gradient(circle at 30% 25%, ${c2}, ${c1})}</style><body></body>`)
 }
-// avatar scene → a talking presenter, composited corner (over a background) or full-frame.
+// Cut the presenter OUT of the (opaque) talking clip → a grayscale alpha mask. The silhouette
+// is CONSTANT (Wav2Lip moves only the mouth), so one mask from frame 0 matts the whole clip.
+// Returns the mask path, or null (→ composite the opaque clip as a graceful fallback).
+function matteMask(talk) {
+  try {
+    const f0 = talk.replace(/\.mp4$/, '_f0.png'); ff(['-i', talk, '-frames:v', '1', f0])
+    const mask = talk.replace(/\.mp4$/, '_mask.png')
+    execFileSync('python3', [MATTE, f0, mask], { stdio: ['ignore', 'ignore', 'inherit'] })
+    return fs.existsSync(mask) ? mask : null
+  } catch (e) { console.log(`   (matte failed: ${e.message}) → opaque presenter`); return null }
+}
+
+// avatar scene → a talking presenter, MATTED (transparent cutout) and composited over a
+// background — corner cutaway (default) or full-frame — with subtle idle MOTION so the
+// mouth-only Wav2Lip clip reads as alive (gentle sway + micro head-bob; the bg's own Ken
+// Burns pan behind it adds parallax).
 async function avatarSeg(out, dur, s, wav) {
   const portrait = presenterPortrait()
   if (!portrait) { await avatarBg(out, dur, s); return }          // no face → just the background
@@ -346,16 +365,32 @@ async function avatarSeg(out, dur, s, wav) {
   const talk = path.join(WORK, `talk_${String(hash(out))}.mp4`)
   try { wav2lip(portrait, wav, talk) }
   catch (e) { console.log(`   (wav2lip failed: ${e.message}) → still portrait`); kenBurnsSeg(out, portrait, dur); return }
-  const pose = String(s.pose || s.position || 'corner').toLowerCase().replace(/\s+/g, '-')
-  if (pose === 'full') { ff(['-i', talk, '-t', `${dur}`, '-an', '-vf', `${NORM},tpad=stop_mode=clone:stop_duration=${dur}`, ...SEG, out]); return }
+  const mask = matteMask(talk)                                    // transparent cutout (null = opaque)
   const bg = path.join(WORK, `abg_${String(hash(out))}.mp4`)
-  await avatarBg(bg, dur, s)
-  const sz = Number(s.size); const frac = sz > 0.2 && sz < 0.9 ? sz : 0.44
-  const th = Math.round((H * frac) / 2) * 2
-  const pad = Math.round(W * 0.045)
-  const POS = { 'bottom-left': `${pad}:H-h-${pad}`, 'bottom-right': `W-w-${pad}:H-h-${pad}`, 'top-right': `W-w-${pad}:${pad}`, 'top-left': `${pad}:${pad}` }
-  const at = POS[pose] || POS['bottom-right']
-  ff(['-i', bg, '-i', talk, '-filter_complex', `[1:v]scale=-2:${th}[pv];[0:v][pv]overlay=${at}:eof_action=repeat[v]`, '-map', '[v]', '-t', `${dur}`, '-an', ...SEG, out])
+  await avatarBg(bg, dur, s)                                      // always over a background now
+  const pose = String(s.pose || s.position || 'corner').toLowerCase().replace(/\s+/g, '-')
+  // Subtle idle motion — a few px of sway + a phase-offset micro head-bob. Just enough life.
+  const swayX = Math.max(4, Math.round(W * 0.006)), bobY = Math.max(4, Math.round(H * 0.009))
+  let th, baseX, baseY
+  if (pose === 'full') {
+    th = Math.round((H * 0.98) / 2) * 2; baseX = '(W-w)/2'; baseY = '(H-h)/2'
+  } else {
+    const sz = Number(s.size); const frac = sz > 0.2 && sz < 0.9 ? sz : 0.46
+    th = Math.round((H * frac) / 2) * 2
+    const pad = Math.round(W * 0.045)
+    const CX = { 'bottom-left': `${pad}`, 'top-left': `${pad}`, 'bottom-right': `W-w-${pad}`, 'top-right': `W-w-${pad}` }
+    const CY = { 'bottom-left': `H-h-${pad}`, 'bottom-right': `H-h-${pad}`, 'top-left': `${pad}`, 'top-right': `${pad}` }
+    baseX = CX[pose] || `W-w-${pad}`; baseY = CY[pose] || `H-h-${pad}`
+  }
+  const x = `${baseX}+${swayX}*sin(2*PI*t/6)`, y = `${baseY}+${bobY}*sin(2*PI*t/4.4+1)`
+  const ov = `overlay=x=${x}:y=${y}:eof_action=repeat,fps=${FPS},format=yuv420p`
+  if (mask) {
+    ff(['-i', bg, '-i', talk, '-loop', '1', '-i', mask, '-filter_complex',
+      `[1:v]scale=-2:${th}[p];[2:v]scale=-2:${th},format=gray[m];[p][m]alphamerge[pa];[0:v][pa]${ov}[v]`,
+      '-map', '[v]', '-t', `${dur}`, '-an', ...SEG, out])
+  } else {
+    ff(['-i', bg, '-i', talk, '-filter_complex', `[1:v]scale=-2:${th}[p];[0:v][p]${ov}[v]`, '-map', '[v]', '-t', `${dur}`, '-an', ...SEG, out])
+  }
 }
 
 // NEW: screencast — drive the user's LIVE app and record it as footage, with a

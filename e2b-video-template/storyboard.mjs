@@ -21,8 +21,10 @@
 //          | { html: string }      // a fully custom cover (canvas HTML)
 //          | string,               // shorthand for { prompt }
 //   presenter?: { prompt: string, seed?: number }  // a talking-AVATAR face (a0-generated) reused across
-//             | { src: string }                      //   every {kind:'avatar'} scene; `seed` locks the same
-//             | string,                              //   face across renders; `src` = a locked portrait URL
+//             | { character: string }                //   every {kind:'avatar'} scene. `character` = a baked
+//             | { src: string }                      //   library face (aria|maya|zoe|noah|ethan|leo); `seed`
+//             | string,                              //   locks the a0 face across renders; `src` = locked URL.
+//             // The presenter is auto-MATTED (background removed) so it composites transparently.
 //   voice?:    string,          // default Piper TTS voice for scene `say` narration
 //   captions?: boolean,         // burn narration text as subtitles
 //   transition_duration?: number,  // crossfade seconds between scenes (default 0.6, max 2.5)
@@ -97,8 +99,8 @@ export function validateStoryboard(sb) {
   // { prompt } (a0 face) | { prompt, seed } (deterministic same face) | { src } (locked portrait URL).
   if (sb.presenter != null && typeof sb.presenter !== 'object' && typeof sb.presenter !== 'string') {
     e.push('presenter must be a string persona or an object ({ prompt, seed? } | { src })')
-  } else if (sb.presenter && typeof sb.presenter === 'object' && !isStr(sb.presenter.prompt) && !isStr(sb.presenter.persona) && !isStr(sb.presenter.src) && !isStr(sb.presenter.image_url)) {
-    e.push('presenter object needs a `prompt` (describe the face for a0) or a `src` (locked portrait URL)')
+  } else if (sb.presenter && typeof sb.presenter === 'object' && !isStr(sb.presenter.prompt) && !isStr(sb.presenter.persona) && !isStr(sb.presenter.src) && !isStr(sb.presenter.image_url) && !isStr(sb.presenter.character)) {
+    e.push('presenter object needs a `prompt` (describe the face for a0), a `character` (baked library name) or a `src` (locked portrait URL)')
   }
   if (sb.transition_duration != null && (!isNum(sb.transition_duration) || sb.transition_duration < 0)) e.push('transition_duration must be a non-negative number (seconds)')
 
