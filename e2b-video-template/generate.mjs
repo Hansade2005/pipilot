@@ -92,12 +92,38 @@ function voiceModel(name) {
   return null
 }
 const audioDur = (f) => { try { return parseFloat(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', f]).toString().trim()) || 0 } catch { return 0 } }
+
+// A tiny pronunciation dictionary for words Piper mangles. Keys are matched case-INSENSITIVELY on
+// whole words; the phonetic respelling is what Piper actually says. Extend as new mispronunciations
+// surface. (e.g. Piper reads "PiPilot" oddly and says "Lives" as "life-s".)
+const SAY_AS = [
+  [/\bPiPilot\b/gi, 'Pie Pilot'],
+  [/\bLives\b/g, 'Lyves'],   // the plural/verb "lives" (rhymes with "gives/hives"), not "life-s"
+]
+// Normalise a spoken line before Piper: strip LaTeX the model sometimes leaves in `say` (Piper reads
+// "$10^{15}$" literally) → plain spoken words, and apply the pronunciation dictionary.
+function speakable(text) {
+  let s = String(text || '')
+  // LaTeX / math notation → spoken words.
+  s = s.replace(/\$\s*([^$]*?)\s*\$/g, '$1')                 // drop $…$ delimiters
+  s = s.replace(/\\text\s*\{([^}]*)\}/g, '$1')               // \text{million} → million
+  s = s.replace(/\\(?:mathrm|mathbf|mathit|rm|bf|it)\s*\{([^}]*)\}/g, '$1')
+  s = s.replace(/([0-9A-Za-z])\s*\^\s*\{([^}]*)\}/g, '$1 to the power of $2')  // 10^{15} → 10 to the power of 15
+  s = s.replace(/([0-9A-Za-z])\s*\^\s*([0-9A-Za-z]+)/g, '$1 to the power of $2')  // 10^15
+  s = s.replace(/([0-9A-Za-z])\s*_\s*\{([^}]*)\}/g, '$1 $2')  // subscripts → spoken
+  s = s.replace(/\\times\b/g, ' times ').replace(/\\cdot\b/g, ' times ')
+  s = s.replace(/\\[a-zA-Z]+/g, ' ')                          // strip any remaining \commands
+  s = s.replace(/[{}]/g, ' ')                                 // stray braces
+  for (const [re, to] of SAY_AS) s = s.replace(re, to)
+  return s.replace(/\s{2,}/g, ' ').trim()
+}
+
 // Synthesize text → wav. Returns { wav, dur } or null if TTS is unavailable/fails.
 function tts(text, voice, outWav) {
   const model = voiceModel(voice)
   if (!model) return null
   try {
-    execFileSync(path.join(PIPER_DIR, 'piper'), ['--model', model, '--output_file', outWav], { input: String(text).slice(0, 1200), cwd: PIPER_DIR, stdio: ['pipe', 'ignore', 'ignore'] })
+    execFileSync(path.join(PIPER_DIR, 'piper'), ['--model', model, '--output_file', outWav], { input: speakable(text).slice(0, 1200), cwd: PIPER_DIR, stdio: ['pipe', 'ignore', 'ignore'] })
     if (!fs.existsSync(outWav)) return null
     return { wav: outWav, dur: audioDur(outWav) }
   } catch (e) { console.log(`   (tts failed for "${String(voice)}": ${e.message})`); return null }
