@@ -130,6 +130,9 @@ function tts(text, voice, outWav) {
   } catch (e) { console.log(`   (tts failed for "${String(voice)}": ${e.message})`); return null }
 }
 function curl(url, dest) {
+  // A LOCAL file path (baked presenter portraits, already-resolved assets) — use it directly;
+  // never shell out to curl, which rejects a non-URL path with "bad/illegal format".
+  if (typeof url === 'string' && !/^https?:\/\//i.test(url) && fs.existsSync(url)) return url
   if (fs.existsSync(dest) && fs.statSync(dest).size > 0) return dest
   try { execFileSync('curl', ['-f', '-sS', '-L', '--max-time', '120', '-o', dest, url], { stdio: ['ignore', 'ignore', 'inherit'] }) }
   catch (e) { try { fs.unlinkSync(dest) } catch {} throw e }
@@ -298,6 +301,7 @@ async function overlayLogo(seg, url, pos) {
 const W2L_DIR = process.env.WAV2LIP_DIR || '/opt/wav2lip'
 const AVATARS_DIR = process.env.AVATARS_DIR || '/opt/avatars'   // baked presenter CHARACTER library
 const MATTE = path.join(import.meta.dirname, 'matte.py')         // U^2-Net background matting
+const MATTE_PY = process.env.MATTE_PY || '/opt/matte-venv/bin/python'  // isolated venv (numpy 2.x, off Wav2Lip)
 // Resolve the presenter portrait ONCE per render and cache it, so every {kind:"avatar"}
 // scene shows the SAME face. Priority: presenter.src (a LOCKED portrait URL — pixel-
 // identical across videos, for a persistent "channel avatar") → a0 from presenter.prompt
@@ -349,7 +353,7 @@ function matteMask(talk) {
   try {
     const f0 = talk.replace(/\.mp4$/, '_f0.png'); ff(['-i', talk, '-frames:v', '1', f0])
     const mask = talk.replace(/\.mp4$/, '_mask.png')
-    execFileSync('python3', [MATTE, f0, mask], { stdio: ['ignore', 'ignore', 'inherit'] })
+    execFileSync(MATTE_PY, [MATTE, f0, mask], { stdio: ['ignore', 'ignore', 'inherit'] })
     return fs.existsSync(mask) ? mask : null
   } catch (e) { console.log(`   (matte failed: ${e.message}) → opaque presenter`); return null }
 }

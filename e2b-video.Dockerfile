@@ -138,11 +138,16 @@ WORKDIR /opt/pipilot-video
 
 # ── Background matting for transparent presenters (U^2-Net via onnxruntime) ───
 # Cuts the person out of the (opaque) Wav2Lip talking-head so it composites over the
-# scene background with NO white box. onnxruntime + Pillow only — NOT the rembg
-# package (its deps would upgrade numpy and break Wav2Lip's pinned 1.23.5). Because
-# Wav2Lip moves only the mouth, one mask (from a single frame) matts the whole clip.
-RUN pip3 install --no-cache-dir --break-system-packages onnxruntime==1.16.3 pillow
-ENV U2NET_HOME=/opt/u2net
+# scene background with NO white box. Because Wav2Lip moves only the mouth, one mask
+# (from a single frame) matts the whole clip. CRITICAL: onnxruntime pulls numpy 2.x,
+# which is ABI-incompatible with Wav2Lip's cv2/torch (built against numpy 1.23.5) —
+# installing it globally breaks Wav2Lip (numpy.core.multiarray import fails). So the
+# matting stack lives in its OWN venv (matte.py runs under /opt/matte-venv/bin/python)
+# and never touches the global numpy that Wav2Lip depends on.
+RUN apt-get update && apt-get install -y --no-install-recommends python3-venv \
+    && rm -rf /var/lib/apt/lists/* \
+    && python3 -m venv /opt/matte-venv \
+    && /opt/matte-venv/bin/pip install --no-cache-dir onnxruntime pillow numpy
 RUN mkdir -p /opt/u2net && curl -fSL https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx -o /opt/u2net/u2net.onnx
 COPY e2b-video-template/matte.py ./
 
@@ -155,7 +160,7 @@ RUN for f in /opt/avatars/*.webp; do [ -e "$f" ] && ffmpeg -y -loglevel error -i
 
 # Let the runtime user read the engine/corpus and write render scratch
 # (.cache/.work/out under the engine dir). Wav2Lip writes temp/ under /opt/wav2lip.
-RUN chmod -R a+rwX /opt/pipilot-video /opt/stockdb /opt/ms-playwright /opt/piper /opt/wav2lip /opt/u2net /opt/avatars
+RUN chmod -R a+rwX /opt/pipilot-video /opt/stockdb /opt/ms-playwright /opt/piper /opt/wav2lip /opt/u2net /opt/avatars /opt/matte-venv
 
 # E2B non-root runtime user.
 RUN useradd -m -s /bin/bash user
