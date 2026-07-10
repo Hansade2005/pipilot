@@ -272,6 +272,27 @@ async function cardSeg(out, dur, html) {
   } finally { fs.rmSync(vdir, { recursive: true, force: true }) }
 }
 
+// Overlay a resolved logo in a CORNER of an already-rendered (WxH, silent) segment — a brand tag
+// on any visual scene. pos ∈ bottom-right(default)|bottom-left|top-right|top-left. Best-effort:
+// leaves the segment untouched on any failure.
+async function overlayLogo(seg, url, pos) {
+  if (!url) return
+  let png
+  try { png = curl(url, path.join(CACHE, `logo_${hash(url)}.png`)) } catch { return }
+  if (!png || !fs.existsSync(png)) return
+  const lw = Math.round(W * 0.15), pad = Math.round(W * 0.035)
+  const POS = {
+    'bottom-right': `W-w-${pad}:H-h-${pad}`, 'bottom-left': `${pad}:H-h-${pad}`,
+    'top-right': `W-w-${pad}:${pad}`, 'top-left': `${pad}:${pad}`,
+  }
+  const at = POS[String(pos || '').toLowerCase().replace(/\s+/g, '-')] || POS['bottom-right']
+  const tmp = seg.replace(/\.mp4$/, '_lg.mp4')
+  try {
+    ff(['-i', seg, '-i', png, '-filter_complex', `[1:v]scale=${lw}:-1[lg];[0:v][lg]overlay=${at}[v]`, '-map', '[v]', ...SEG, tmp])
+    fs.renameSync(tmp, seg)
+  } catch { try { if (fs.existsSync(tmp)) fs.unlinkSync(tmp) } catch { /* noop */ } }
+}
+
 // NEW: screencast — drive the user's LIVE app and record it as footage, with a
 // synthetic cursor overlay + click ripples so it reads as a produced demo.
 // Wait until the page has actually PAINTED something (not a blank white SPA that
@@ -519,7 +540,11 @@ function canvasHtml(scene) {
   const t = resolveTheme(scene)
   const f = fontFor(t.font)
   const solid = Array.isArray(t.bg) ? t.bg[0] : (typeof t.bg === 'string' && !/gradient\(/.test(t.bg) ? t.bg : '#0E1726')
-  const vars = `--bg:${esc(solid)};--bg2:${esc(t.bg2 || solid)};--accent:${esc(t.accent)};--text:${esc(t.text)};--sub:${esc(t.sub)};--font:${f.face}`
+  // A brand/company logo the canvas HTML can place anywhere via var(--logo) (e.g.
+  // background:var(--logo) center/contain no-repeat, or <img src> can't read a var so use bg-image).
+  // scene.logo = an explicit URL; scene.brand = a brand name resolved to its official logo.
+  const logoUrl = scene.logo ? String(scene.logo).replace(/'/g, '') : (scene.brand ? brandLogo(scene.brand) : null)
+  const vars = `--bg:${esc(solid)};--bg2:${esc(t.bg2 || solid)};--accent:${esc(t.accent)};--text:${esc(t.text)};--sub:${esc(t.sub)};--font:${f.face}${logoUrl ? `;--logo:url('${logoUrl}')` : ''}`
   // Optional `bg` = a TEXTLESS image behind the scene, so the agent overlays PERFECT HTML text on
   // top of an AI-generated (or provided) picture — the right way to do "image with text".
   //   bg: { prompt } (a0 textless image) | { src } (URL) | "prompt string" ; scrim:false to skip the scrim.
@@ -759,6 +784,12 @@ function capDraws(text, start, end, typewriter) {
         await screencastSeg(out, s.url, s.steps, s.dur || 12, s.script)
       } else { // credits (only rendered when the storyboard explicitly includes a credits scene)
         await cardSeg(out, dur, creditsCard([...new Set([...credits, musicCredit].filter(Boolean))], s))
+      }
+      // Optional corner LOGO overlay (brand tag) on any visual scene — resolves a brand name to its
+      // official logo (or takes a direct URL). Not applied to cards/canvas (they compose logos themselves).
+      if (s.logo && (s.kind === 'video' || s.kind === 'still' || s.kind === 'image')) {
+        const lu = /^https?:\/\//i.test(s.logo) ? s.logo : brandLogo(s.logo)
+        if (lu) { await overlayLogo(out, lu, s.logoPos); if (/img\.logo\.dev/.test(lu)) credits.push('Logo.dev') }
       }
       segs.push(out)
       const src = credits.length > cBefore ? ` [${credits[credits.length - 1]}]` : ''

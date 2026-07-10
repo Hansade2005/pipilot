@@ -36,8 +36,8 @@
 //     transition (the xfade INTO this scene).  A narrated scene AUTO-EXTENDS to fit its
 //     voiceover, so `say` never bleeds across the cut.  credits are OPTIONAL.
 //   { kind:'video',     dur, src | keyword | q | prompt, pick?, start? }  // `src` = YOUR image/video URL; else Pixabay B-roll from the baked corpus (`keyword`|`q`); else a0 image (from `prompt`)
-//   { kind:'image',     dur, src | prompt, forward? }               // `src` = YOUR image URL (logo / company photo); else bespoke a0.dev image (NO text in image)
-//   { kind:'still',     dur, src | prompt | keyword|topic|collection|id, pick?, color?, orientation?, forward? }  // `src` = YOUR image URL; else a0 `prompt`; else Unsplash stock
+//   { kind:'image',     dur, brand | src | prompt, forward? }        // `brand` = official brand logo (e.g. "coca cola","pipilot") contained on a card; `src` = YOUR image URL; else bespoke a0.dev image (NO text in image)
+//   { kind:'still',     dur, brand | src | prompt | keyword|topic|collection|id, pick?, color?, orientation?, forward? }  // `brand` = brand logo; `src` = YOUR image URL; else a0 `prompt`; else stock (keyword searches Pixabay+Pexels+Unsplash — include the BRAND NAME in the keyword for brand product shots, e.g. "coca cola bottle ice")
 //   { kind:'canvas',    dur, html }   // a FULLY HANDCRAFTED scene — your own HTML/CSS body (rendered at
 //        full resolution, CSS animations captured over `dur`). Best for TEXT-HEAVY / custom scenes
 //        (comparison tables, bullet lists, animated stats, quotes, code blocks) with PERFECT text.
@@ -124,11 +124,11 @@ export function validateStoryboard(sb) {
       if (s.pick != null && !isNum(s.pick)) e.push(`${at}.pick must be a number`)
       if (s.start != null && !isNum(s.start)) e.push(`${at}.start must be a number (seconds)`)
     } else if (s.kind === 'still' || s.kind === 'image') {
-      // `src` (user asset URL — logo/company photo) → `prompt` (a0) → exactly one stock source.
+      // `brand` (official brand logo) → `src` (user asset URL) → `prompt` (a0) → one stock source.
       const hasUserSrc = isStr(s.src) || isStr(s.image_url) || isStr(s.asset)
-      if (!hasUserSrc && !isStr(s.prompt)) {
+      if (!isStr(s.brand) && !hasUserSrc && !isStr(s.prompt)) {
         const srcs = STILL_SOURCES.filter((k) => s[k] != null)
-        if (srcs.length === 0) e.push(`${at} needs a \`src\` (your image URL), \`prompt\` (a0 image) or one stock source: ${STILL_SOURCES.join(' | ')}`)
+        if (srcs.length === 0) e.push(`${at} needs a \`brand\` (brand logo), \`src\` (your image URL), \`prompt\` (a0 image) or one stock source: ${STILL_SOURCES.join(' | ')}`)
         if (srcs.length > 1) e.push(`${at} has multiple sources (${srcs.join(', ')}) — use exactly one`)
       }
       if (s.orientation != null && !['horizontal', 'vertical'].includes(s.orientation)) e.push(`${at}.orientation must be horizontal|vertical`)
