@@ -325,6 +325,16 @@ function presenterPortrait() {
   } catch (e) { console.log(`   (presenter portrait failed: ${e.message})`); _presenter = '' }
   return _presenter || null
 }
+// The narration voice that MATCHES the presenter, so a female avatar never speaks in a male
+// voice (and vice-versa). presenter.voice wins; else each baked character maps to a fitting
+// Piper voice. Returns null when there's no presenter / unknown custom face (→ use SB.voice).
+function presenterVoice() {
+  const p = SB.presenter && typeof SB.presenter === 'object' ? SB.presenter : {}
+  if (typeof p.voice === 'string' && p.voice) return p.voice
+  const CV = { aria: 'amy', maya: 'kristin', zoe: 'jenny', noah: 'joe', ethan: 'ryan', leo: 'alan' }
+  const c = typeof p.character === 'string' ? p.character.toLowerCase().replace(/[^a-z0-9]+/g, '') : ''
+  return CV[c] || null
+}
 // Wav2Lip: portrait + speech wav → lip-synced talking head (portrait-res, has audio).
 // --static detects the face ONCE on the still (vs every frame) → big CPU speedup. Throws.
 function wav2lip(portrait, wav, out) {
@@ -370,10 +380,26 @@ function matteMask(talk) {
   } catch (e) { console.log(`   (matte failed: ${e.message}) → opaque presenter`); return null }
 }
 
+// Corner placement + LIVELY motion for a presenter overlay. Bottom corners SIT FLUSH on the
+// bottom edge (y=H-h, no gap) and lift UPWARD only so the presenter stays GLUED to the edge —
+// never floating. Side edges are flush too, swaying INWARD so it never leaves frame. Plus a slow
+// sway and a subtle fast micro-shake for life. Returns {x,y} ffmpeg overlay expressions.
+function presenterMotion(pose) {
+  const p = String(pose || 'bottom-right').toLowerCase().replace(/\s+/g, '-')
+  const left = p.includes('left'), top = p.includes('top')
+  const swayX = Math.max(6, Math.round(W * 0.009))
+  const bobY = Math.max(8, Math.round(H * 0.016))
+  const jit = Math.max(2, Math.round(H * 0.0022))
+  const sway = `${swayX}*sin(2*PI*t/5)`
+  const shake = `${jit}*sin(2*PI*t*2.7)`             // subtle fast shake
+  const bob = `${bobY}*(0.5-0.5*cos(2*PI*t/3.2))`    // 0..bobY, smooth (lift up from the edge)
+  const x = left ? `abs(${sway})+(${shake})` : `W-w-abs(${sway})-(${shake})`
+  const y = top ? `abs(${bob})+(${shake})` : `H-h-(${bob})+(${shake})`
+  return { x, y }
+}
 // avatar scene → a talking presenter, MATTED (transparent cutout) and composited over a
-// background — corner cutaway (default) or full-frame — with subtle idle MOTION so the
-// mouth-only Wav2Lip clip reads as alive (gentle sway + micro head-bob; the bg's own Ken
-// Burns pan behind it adds parallax).
+// background — corner cutaway (default, sitting flush on the edge) or full-frame — with LIVELY
+// motion (sway + up-bob + micro-shake; the bg's own Ken Burns pan behind it adds parallax).
 async function avatarSeg(out, dur, s, wav) {
   const portrait = presenterPortrait()
   if (!portrait) { await avatarBg(out, dur, s); return }          // no face → just the background
@@ -385,20 +411,16 @@ async function avatarSeg(out, dur, s, wav) {
   const bg = path.join(WORK, `abg_${String(hash(out))}.mp4`)
   await avatarBg(bg, dur, s)                                      // always over a background now
   const pose = String(s.pose || s.position || 'corner').toLowerCase().replace(/\s+/g, '-')
-  // Subtle idle motion — a few px of sway + a phase-offset micro head-bob. Just enough life.
-  const swayX = Math.max(4, Math.round(W * 0.006)), bobY = Math.max(4, Math.round(H * 0.009))
-  let th, baseX, baseY
+  let th, x, y
   if (pose === 'full') {
-    th = Math.round((H * 0.98) / 2) * 2; baseX = '(W-w)/2'; baseY = '(H-h)/2'
+    th = Math.round((H * 0.98) / 2) * 2
+    const sx = Math.max(4, Math.round(W * 0.005)), sy = Math.max(4, Math.round(H * 0.008))
+    x = `(W-w)/2+${sx}*sin(2*PI*t/6)`; y = `(H-h)/2+${sy}*sin(2*PI*t/4.4)`
   } else {
     const sz = Number(s.size); const frac = sz > 0.2 && sz < 0.9 ? sz : 0.46
     th = Math.round((H * frac) / 2) * 2
-    const pad = Math.round(W * 0.045)
-    const CX = { 'bottom-left': `${pad}`, 'top-left': `${pad}`, 'bottom-right': `W-w-${pad}`, 'top-right': `W-w-${pad}` }
-    const CY = { 'bottom-left': `H-h-${pad}`, 'bottom-right': `H-h-${pad}`, 'top-left': `${pad}`, 'top-right': `${pad}` }
-    baseX = CX[pose] || `W-w-${pad}`; baseY = CY[pose] || `H-h-${pad}`
+    const m = presenterMotion(pose); x = m.x; y = m.y
   }
-  const x = `${baseX}+${swayX}*sin(2*PI*t/6)`, y = `${baseY}+${bobY}*sin(2*PI*t/4.4+1)`
   const ov = `overlay=x=${x}:y=${y}:eof_action=repeat,fps=${FPS},format=yuv420p`
   if (mask) {
     ff(['-i', bg, '-i', talk, '-loop', '1', '-i', mask, '-filter_complex',
@@ -432,13 +454,7 @@ async function overlayPresenterStill(seg, dur, pos, size) {
   const cut = presenterStill(); if (!cut) return
   const frac = Number(size) > 0.2 && Number(size) < 0.9 ? Number(size) : 0.4
   const th = Math.round((H * frac) / 2) * 2
-  const pad = Math.round(W * 0.045)
-  const p = String(pos || 'bottom-right').toLowerCase().replace(/\s+/g, '-')
-  const CX = { 'bottom-left': `${pad}`, 'top-left': `${pad}`, 'bottom-right': `W-w-${pad}`, 'top-right': `W-w-${pad}` }
-  const CY = { 'bottom-left': `H-h-${pad}`, 'bottom-right': `H-h-${pad}`, 'top-left': `${pad}`, 'top-right': `${pad}` }
-  const baseX = CX[p] || `W-w-${pad}`, baseY = CY[p] || `H-h-${pad}`
-  const swayX = Math.max(4, Math.round(W * 0.006)), bobY = Math.max(4, Math.round(H * 0.009))
-  const x = `${baseX}+${swayX}*sin(2*PI*t/6)`, y = `${baseY}+${bobY}*sin(2*PI*t/4.4+1)`
+  const { x, y } = presenterMotion(pos)   // flush to the edge, sway + up-bob + micro-shake
   const tmp = seg.replace(/\.mp4$/, '_pr.mp4')
   try {
     ff(['-i', seg, '-loop', '1', '-i', cut, '-filter_complex', `[1:v]scale=-2:${th}[p];[0:v][p]overlay=x=${x}:y=${y}:eof_action=repeat,format=yuv420p[v]`, '-map', '[v]', '-t', `${dur}`, ...SEG, tmp])
@@ -858,11 +874,14 @@ function capDraws(text, start, end, typewriter) {
   // Synthesize narration FIRST, then EXTEND each narrated scene so its voiceover fits
   // inside its own scene (+ a short tail). Otherwise a long `say` runs past the cut and
   // bleeds into the next scene. Offsets are computed AFTER, from the corrected durations.
+  // A defined presenter IS the narrator, so its matching voice becomes the video's default —
+  // overriding a mismatched top-level SB.voice (why a female avatar was speaking in a male voice).
+  const DEFAULT_NARR_VOICE = presenterVoice() || SB.voice
   const narrRaw = []
   for (let i = 0; i < SB.scenes.length; i++) {
     const s = SB.scenes[i]
     if (!s.say) { narrRaw.push(null); continue }
-    const v = s.voice || SB.voice
+    const v = s.voice || DEFAULT_NARR_VOICE
     const w = tts(s.say, v, path.join(WORK, `narr_${i}.wav`))
     narrRaw.push(w || null)
     if (w) { durs[i] = Math.max(durs[i], w.dur + 0.6); console.log(`   · narration ${i} (${v || DEFAULT_VOICE}) — ${w.dur.toFixed(1)}s`) }
