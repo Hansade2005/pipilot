@@ -14,7 +14,7 @@
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { pickMusic, pickPhotos, pickVideo, videoCorpusSize } from './stockdb.mjs'
+import { pickMusic, pickPhotos, pickVideo, videoCorpusSize, brandLogo } from './stockdb.mjs'
 import { validateStoryboard, resolveCanvas } from './storyboard.mjs'
 
 // Pin the baked Chromium location. E2B's SDK command execution doesn't reliably
@@ -499,6 +499,22 @@ function titleCard(scene, typeDur = 0) {
 // animated stat counters, quotes, code blocks, bullet reveals) with PERFECT text — no image model to
 // misspell. The video's theme is exposed as CSS custom properties + its Google font is pre-loaded, so
 // canvas scenes match the rest of the video. Body should use relative units so it fills any aspect.
+// A clean LOGO card — the brand logo centered + contained (never cropped) on the theme
+// background, with an optional caption. Used for {kind:"image"|"still", brand:"…"} scenes.
+function logoCard(scene, url) {
+  const t = resolveTheme(scene)
+  const f = fontFor(t.font)
+  const solid = Array.isArray(t.bg) ? t.bg[0] : (typeof t.bg === 'string' && !/gradient\(/.test(t.bg) ? t.bg : '#0E1726')
+  const bg = Array.isArray(t.bg) ? `linear-gradient(135deg,${t.bg[0]},${t.bg[1] || t.bg[0]})` : (t.bg || solid)
+  const cap = scene.title || scene.caption || scene.sub || ''
+  return `${f.link}<style>*{margin:0;box-sizing:border-box}html,body{width:100%;height:100%;overflow:hidden}</style>
+  <div style="width:100vw;height:100vh;display:flex;flex-direction:column;gap:4vh;align-items:center;justify-content:center;background:${esc(bg)};font-family:${f.face}">
+    <img src="${esc(url)}" crossorigin="anonymous" style="max-width:62%;max-height:${cap ? '52%' : '66%'};object-fit:contain;filter:drop-shadow(0 10px 34px rgba(0,0,0,.35));animation:lpop .8s ease both"/>
+    ${cap ? `<div style="color:${esc(t.text)};font-size:4.4vh;font-weight:800;letter-spacing:-.01em;text-align:center;animation:lrise .8s .15s ease both">${esc(String(cap))}</div>` : ''}
+  </div>
+  <style>@keyframes lpop{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:none}}@keyframes lrise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}</style>`
+}
+
 function canvasHtml(scene) {
   const t = resolveTheme(scene)
   const f = fontFor(t.font)
@@ -634,13 +650,20 @@ function capDraws(text, start, end, typewriter) {
   // A scene may carry its OWN `music` ({mood}|{url}|null) to SWITCH the track; scenes without one
   // inherit the top-level SB.music. Contiguous scenes sharing a track become ONE looped segment,
   // and the track crossfades when a scene selects a different one. (One SB.music → one segment.)
-  const resolveTrack = (m) => {
+  // A per-render seed so two videos with the SAME mood don't get the identical track every time
+  // (pickMusic is deterministic per seed; without a varied seed every "epic" video reused one clip).
+  const musicSeed = (Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0
+  const resolveTrack = (m, seed) => {
     if (!m) return null
     if (m.url) return { url: m.url, credit: m.credit || 'music' }
-    if (m.mood) { try { const p = pickMusic({ mood: m.mood }); return { url: p.url, credit: p.credit } } catch { return null } }
+    if (m.mood) { try { const p = pickMusic({ mood: m.mood, seed }); return { url: p.url, credit: p.credit } } catch { return null } }
     return null
   }
-  const _sceneMusic = SB.scenes.map((s) => resolveTrack(Object.prototype.hasOwnProperty.call(s, 'music') ? s.music : SB.music))
+  // Resolve the top-level track ONCE (shared seed) so every inheriting scene reuses the SAME clip
+  // and contiguous scenes still merge into one looped segment. Per-scene overrides get their own seed.
+  const _topTrack = resolveTrack(SB.music, musicSeed)
+  const _sceneMusic = SB.scenes.map((s, i) => (
+    Object.prototype.hasOwnProperty.call(s, 'music') ? resolveTrack(s.music, musicSeed + i + 1) : _topTrack))
   const musicSegments = [] // { url, credit, from, to } — scene index range
   _sceneMusic.forEach((t, i) => {
     if (!t) return
@@ -707,10 +730,16 @@ function capDraws(text, start, end, typewriter) {
           }
         }
       } else if (s.kind === 'still' || s.kind === 'image') {
-        // Resolution priority: a user-supplied asset URL (their logo / company photos) →
-        // a bespoke a0-generated image (from `prompt`) → the baked stock corpus.
+        // Resolution priority: a brand logo ({brand:"…"} → official logo, contained on a card) →
+        // a user-supplied asset URL (their logo / company photos) → a bespoke a0-generated image
+        // (from `prompt`) → the baked stock corpus.
         const userSrc = s.src || s.image_url || s.asset
-        if (userSrc) {
+        const brandUrl = s.brand ? brandLogo(s.brand) : null
+        if (brandUrl && !userSrc) {
+          // Attribute logo.dev when it served the logo (free-tier requirement); baked logos need none.
+          credits.push(/img\.logo\.dev/.test(brandUrl) ? 'Logo.dev' : 'brand logo')
+          await cardSeg(out, dur, logoCard(s, brandUrl))
+        } else if (userSrc) {
           credits.push('provided')
           kenBurnsSeg(out, userSrc, dur, s.forward !== false)
         } else if (s.prompt) {

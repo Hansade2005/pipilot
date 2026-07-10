@@ -19,6 +19,12 @@ import path from 'node:path'
 
 const DIR = process.env.STOCKDB_DIR || '/opt/stockdb'
 
+// Filler words that would match almost any caption/tag — dropped from query tokens so
+// relevance is driven by the meaningful words.
+const STOP = new Set(['a', 'an', 'the', 'of', 'and', 'or', 'in', 'on', 'at', 'to', 'with', 'for', 'by', 'from', 'as', 'is', 'it', 'this', 'that', 'up', 'out', 'over'])
+// Split a haystack into a set of whole words (for word-boundary matching, not substring).
+const wordSet = (h) => new Set(String(h || '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean))
+
 // ── lazy, in-process caches (each file parsed at most once) ─────────────────
 let _music = null, _photos = null, _photoById = null, _topics = null, _collections = null, _videos = null, _pixPhotos = null, _pexVideos = null, _pexPhotos = null
 
@@ -126,17 +132,27 @@ export function pickMusic({ mood = 'background', minDur = 0, seed = 0 } = {}) {
   for (const w of raw.split(/[^a-z]+/).filter(Boolean)) { targets.add(w); for (const a of MOOD_ALIASES[w] || []) targets.add(a) }
   for (const a of MOOD_ALIASES[raw] || []) targets.add(a)
   if (!targets.size) targets.add('background')
-  // Score every dur-eligible track by tag overlap; keep the best-scoring pool.
-  let best = [], bestScore = 0
+  // Score every dur-eligible track by tag overlap. Keep a BAND of the top scorers (not only the
+  // single max) so there's real variety — otherwise a mood whose top score is held by one track
+  // returns that SAME track on every video. Widen the band downward until the pool is healthy.
+  const scored = []
   for (const t of all) {
     if (!okDur(t)) continue
     let score = 0
     for (const m of t.moods || []) if (targets.has(String(m).toLowerCase())) score++
-    if (score > bestScore) { bestScore = score; best = [t] }
-    else if (score === bestScore && score > 0) best.push(t)
+    if (score > 0) scored.push([t, score])
   }
-  let pool = best
-  if (!pool.length) pool = all.filter((t) => okDur(t) && Array.isArray(t.moods) && t.moods.includes('background'))
+  let pool
+  if (scored.length) {
+    scored.sort((a, b) => b[1] - a[1])
+    const bestScore = scored[0][1]
+    let cut = bestScore
+    pool = scored.filter(([, s]) => s >= cut).map(([t]) => t)
+    // Include the next score tiers until we have enough candidates for genuine variety.
+    while (pool.length < 30 && cut > 1) { cut--; pool = scored.filter(([, s]) => s >= cut).map(([t]) => t) }
+  } else {
+    pool = all.filter((t) => okDur(t) && Array.isArray(t.moods) && t.moods.includes('background'))
+  }
   if (!pool.length) pool = all.filter(okDur)
   if (!pool.length) pool = all
   const t = pool[Math.floor(mulberry32(seed + pool.length)() * pool.length)]
@@ -147,6 +163,57 @@ export function pickMusic({ mood = 'background', minDur = 0, seed = 0 } = {}) {
     mood,
     credit: `Jamendo #${t.numeric_id}`,
   }
+}
+
+// ── BRAND LOGOS ───────────────────────────────────────────────────────────────
+// Resolve a brand name → an official logo URL. Baked overrides win (our own brands + any we
+// hardcode). Otherwise use logo.dev: it looks a company up by NAME directly (https://img.logo.dev/
+// name/<Company>) so almost anything resolves, and by DOMAIN when we know one (crisper). The token
+// is a PUBLISHABLE key (safe to ship); override via LOGO_DEV_TOKEN. Docs: logo.dev/docs/logo-images.
+// Free tier + commercial use requires a "Logo.dev" attribution — the render credits that logo.
+const LOGO_TOKEN = process.env.LOGO_DEV_TOKEN || 'pk_FECnJ8AdT2y2CwzgYtqX_g'
+const BRAND_LOGOS = {
+  'pipilot': 'https://pipilot.dev/logo.png',
+  'pixelways': 'https://www.pixelways.co/logo.png',
+  'pixelways solutions': 'https://www.pixelways.co/logo.png',
+  'pixelways solutions inc': 'https://www.pixelways.co/logo.png',
+}
+const BRAND_DOMAINS = {
+  'coca cola': 'coca-cola.com', 'coca-cola': 'coca-cola.com', 'coke': 'coca-cola.com',
+  'pepsi': 'pepsi.com', 'sprite': 'coca-cola.com', 'fanta': 'coca-cola.com', 'red bull': 'redbull.com', 'redbull': 'redbull.com',
+  'monster energy': 'monsterenergy.com', 'gatorade': 'gatorade.com', 'starbucks': 'starbucks.com', 'nescafe': 'nescafe.com',
+  'heineken': 'heineken.com', 'budweiser': 'budweiser.com', 'corona': 'coronaextra.com',
+  'apple': 'apple.com', 'iphone': 'apple.com', 'ipad': 'apple.com', 'macbook': 'apple.com', 'samsung': 'samsung.com',
+  'google': 'google.com', 'microsoft': 'microsoft.com', 'windows': 'microsoft.com', 'android': 'android.com',
+  'playstation': 'playstation.com', 'xbox': 'xbox.com', 'nintendo': 'nintendo.com', 'tesla': 'tesla.com',
+  'nvidia': 'nvidia.com', 'intel': 'intel.com', 'sony': 'sony.com', 'huawei': 'huawei.com', 'xiaomi': 'mi.com',
+  'dell': 'dell.com', 'hp': 'hp.com', 'lenovo': 'lenovo.com',
+  'facebook': 'facebook.com', 'instagram': 'instagram.com', 'twitter': 'x.com', 'x': 'x.com', 'tiktok': 'tiktok.com',
+  'youtube': 'youtube.com', 'netflix': 'netflix.com', 'spotify': 'spotify.com', 'whatsapp': 'whatsapp.com',
+  'snapchat': 'snapchat.com', 'linkedin': 'linkedin.com', 'amazon': 'amazon.com', 'ebay': 'ebay.com', 'paypal': 'paypal.com',
+  'nike': 'nike.com', 'adidas': 'adidas.com', 'puma': 'puma.com', 'gucci': 'gucci.com', 'louis vuitton': 'louisvuitton.com',
+  'chanel': 'chanel.com', 'rolex': 'rolex.com', 'levis': 'levi.com', 'zara': 'zara.com', 'under armour': 'underarmour.com',
+  'new balance': 'newbalance.com', 'vans': 'vans.com', 'converse': 'converse.com',
+  'bmw': 'bmw.com', 'mercedes': 'mercedes-benz.com', 'mercedes benz': 'mercedes-benz.com', 'audi': 'audi.com',
+  'toyota': 'toyota.com', 'honda': 'honda.com', 'ford': 'ford.com', 'ferrari': 'ferrari.com', 'lamborghini': 'lamborghini.com',
+  'porsche': 'porsche.com', 'volkswagen': 'vw.com', 'jeep': 'jeep.com', 'harley davidson': 'harley-davidson.com',
+  'mcdonalds': 'mcdonalds.com', "mcdonald's": 'mcdonalds.com', 'kfc': 'kfc.com', 'burger king': 'bk.com',
+  'subway': 'subway.com', 'pizza hut': 'pizzahut.com', 'dominos': 'dominos.com', 'dunkin': 'dunkindonuts.com',
+  'oreo': 'oreo.com', 'nutella': 'nutella.com', 'pringles': 'pringles.com', 'doritos': 'doritos.com', 'lays': 'lays.com',
+  'lego': 'lego.com', 'ikea': 'ikea.com', 'disney': 'disney.com', 'marvel': 'marvel.com', 'visa': 'visa.com',
+  'mastercard': 'mastercard.com', 'shell': 'shell.com', 'bp': 'bp.com', 'nescafé': 'nescafe.com',
+}
+export function brandLogo(name, { size = 512 } = {}) {
+  const raw = String(name || '').trim()
+  const k = raw.toLowerCase()
+  if (!k) return null
+  if (BRAND_LOGOS[k]) return BRAND_LOGOS[k] // our own / hardcoded full-res logos win
+  const q = `token=${LOGO_TOKEN}&size=${Math.min(size, 800)}&format=png&retina=true`
+  // Prefer a known DOMAIN (crispest), else a bare domain the caller passed, else look up by NAME.
+  const known = BRAND_DOMAINS[k.replace(/\s+(inc|llc|ltd|corp|co|company|solutions)\.?$/, '').trim()]
+  if (known) return `https://img.logo.dev/${known}?${q}`
+  if (/^[a-z0-9-]+\.[a-z]{2,}$/.test(k)) return `https://img.logo.dev/${k}?${q}`
+  return `https://img.logo.dev/name/${encodeURIComponent(raw)}?${q}`
 }
 
 export const MOODS = () => {
@@ -195,11 +262,16 @@ export function pickPhotos({ keyword, topic, collection, id, n = 1, color, orien
     // → empty pool → behaviour is unchanged from Unsplash-only.
     const searchPool = [...photos(), ...pixPhotos(), ...pexPhotos()]
     const kw = String(keyword).toLowerCase().trim()
-    const toks = [...new Set(kw.split(/[^a-z0-9]+/).filter((t) => t.length > 1))]
+    // Query tokens, minus filler words that would match everything.
+    const toks = [...new Set(kw.split(/[^a-z0-9]+/).filter((t) => t.length > 1 && !STOP.has(t)))]
+    // Score on WHOLE-WORD membership, not substring — otherwise "ice" matches "off-ice-",
+    // "can" matches "candle"/"canyon", wrecking relevance. Whole phrase present = big boost;
+    // otherwise count how many query words appear as their own word in the text.
     const rank = (text) => {
       const h = String(text || '').toLowerCase(); if (!h) return 0
       if (kw && h.includes(kw)) return 1000
-      let s = 0; for (const t of toks) if (h.includes(t)) s++
+      const words = wordSet(h)
+      let s = 0; for (const t of toks) if (words.has(t)) s++
       return s
     }
     const rankBy = (field) => {
@@ -211,13 +283,13 @@ export function pickPhotos({ keyword, topic, collection, id, n = 1, color, orien
     pool = descPool
     if (descPool.length < Math.max(n, 6)) {
       const seen = new Set(descPool.map((p) => p.photo_id))
-      // keyword-tag matches (noisier) ranked by how many query words appear as tags
+      // keyword-tag matches (noisier) ranked by how many query words appear as whole tags
       const kwPool = []
       for (const p of searchPool) {
         if (seen.has(p.photo_id)) continue
-        const h = (p.keywords || []).join(' ').toLowerCase()
-        let s = kw && h.includes(kw) ? 1000 : 0
-        if (!s) for (const t of toks) if (h.includes(t)) s++
+        const joined = (p.keywords || []).join(' ').toLowerCase()
+        let s = kw && joined.includes(kw) ? 1000 : 0
+        if (!s) { const words = wordSet(joined); for (const t of toks) if (words.has(t)) s++ }
         if (s > 0) kwPool.push([p, s])
       }
       kwPool.sort((a, b) => b[1] - a[1])
@@ -233,12 +305,11 @@ export function pickPhotos({ keyword, topic, collection, id, n = 1, color, orien
 }
 
 // ── VIDEO (Pixabay B-roll) ────────────────────────────────────────────────────
-// pickVideo({ keyword, aspect, minDur, seed }) → one CDN mp4 clip from the baked
-// pixabay_videos.jsonl corpus (ZERO API calls at render time). Matches keyword as
-// a case-insensitive substring against each row's `keywords` + `tags`, with cascading
-// fallbacks (keyword → any tag/keyword token → any clip) so it NEVER dead-ends on a
-// live corpus. Deterministic pick via mulberry32(seed). Returns null ONLY when the
-// corpus file is absent (older templates) so existing renders don't break.
+// pickVideo({ keyword, aspect, minDur, seed }) → one CDN mp4 clip from the baked Pixabay+Pexels
+// corpus (ZERO API calls at render time). Matches the keyword by WHOLE WORD against each row's
+// `keywords` + `tags` (phrase match preferred, else best token overlap), then refines by
+// aspect/duration. Returns NULL when nothing genuinely matches (or the corpus is absent) so the
+// render engine falls back to an on-topic a0-generated image instead of a random clip.
 export function pickVideo({ keyword, aspect, minDur = 0, seed = 0 } = {}) {
   const all = allVideos() // Pixabay ∪ Pexels B-roll
   if (!all.length) return null // corpus missing → let the caller fall back
@@ -247,20 +318,26 @@ export function pickVideo({ keyword, aspect, minDur = 0, seed = 0 } = {}) {
   const byDur = (arr) => arr.filter((v) => (v.duration || 0) >= minDur)
 
   const kw = String(keyword || '').toLowerCase().trim()
-  const toks = [...new Set(kw.split(/[^a-z0-9]+/).filter((t) => t.length > 1))]
+  const toks = [...new Set(kw.split(/[^a-z0-9]+/).filter((t) => t.length > 1 && !STOP.has(t)))]
   const hay = (v) => `${(v.keywords || []).join(' ')} ${(v.tags || []).join(' ')}`.toLowerCase()
-  const matchesPhrase = (v) => kw && hay(v).includes(kw)
-  const matchesAnyTok = (v) => toks.some((t) => hay(v).includes(t))
-
-  // Cascade: exact phrase (+aspect+dur) → any-token (+aspect+dur) → phrase/token
-  // ignoring aspect → any clip (+dur) → any clip. Never returns null on a live corpus.
-  let pool = byDur(byAspect(all.filter(matchesPhrase)))
-  if (!pool.length) pool = byDur(byAspect(all.filter(matchesAnyTok)))
-  if (!pool.length) pool = byDur(all.filter(matchesPhrase))
-  if (!pool.length) pool = byDur(all.filter(matchesAnyTok))
-  if (!pool.length) pool = byDur(byAspect(all))
-  if (!pool.length) pool = byDur(all)
-  if (!pool.length) pool = all
+  // Relevance score: whole phrase present = big; else count query words that appear as WHOLE
+  // words (word-boundary, so "cola" doesn't match "cho-cola-te", "can" doesn't match "candle").
+  const score = (v) => {
+    const h = hay(v)
+    if (kw && h.includes(kw)) return 100
+    const w = wordSet(h); let s = 0; for (const t of toks) if (w.has(t)) s++
+    return s
+  }
+  // GENUINE matches only. If nothing in the corpus actually matches the keyword, return null so the
+  // render engine falls back to an on-topic a0-generated image — MUCH better than a random clip.
+  let cands = all.map((v) => [v, score(v)]).filter(([, s]) => s > 0)
+  if (!cands.length) return null
+  const top = Math.max(...cands.map(([, s]) => s))
+  cands = cands.filter(([, s]) => s === top).map(([v]) => v) // best-scoring clips only
+  // Refine by aspect/duration, but never let a refinement empty an otherwise-good result set.
+  let pool = byDur(byAspect(cands))
+  if (!pool.length) pool = byDur(cands)
+  if (!pool.length) pool = cands
 
   const v = pool[Math.floor(mulberry32(seed + pool.length)() * pool.length)]
   return {
