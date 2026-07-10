@@ -40,8 +40,9 @@ const KEY = process.env.PIXABAY_KEY
 // that curl -L + ffmpeg consume directly. Image models misspell text, so we append
 // a strict no-text guard (use title/caption cards for any on-screen words).
 const A0_ASPECTS = new Set(['1:1', '16:9', '9:16', '4:5', '5:4', '4:3', '3:4', '2:3', '3:2'])
-function a0ImageUrl(prompt, seedBase = 0) {
-  const asp = A0_ASPECTS.has(SB.aspect) ? SB.aspect : (W >= H ? '16:9' : '9:16')
+function a0ImageUrl(prompt, seedBase = 0, aspectOverride) {
+  const asp = aspectOverride && A0_ASPECTS.has(aspectOverride) ? aspectOverride
+    : A0_ASPECTS.has(SB.aspect) ? SB.aspect : (W >= H ? '16:9' : '9:16')
   const p = String(prompt || '').trim()
   const guarded = /\bno\s+(text|words|lettering|type)\b/i.test(p)
     ? p
@@ -291,6 +292,70 @@ async function overlayLogo(seg, url, pos) {
     ff(['-i', seg, '-i', png, '-filter_complex', `[1:v]scale=${lw}:-1[lg];[0:v][lg]overlay=${at}[v]`, '-map', '[v]', ...SEG, tmp])
     fs.renameSync(tmp, seg)
   } catch { try { if (fs.existsSync(tmp)) fs.unlinkSync(tmp) } catch { /* noop */ } }
+}
+
+// ── Talking-avatar presenter (Wav2Lip lip-sync, CPU) ─────────────────────────
+const W2L_DIR = process.env.WAV2LIP_DIR || '/opt/wav2lip'
+// Resolve the presenter portrait ONCE per render and cache it, so every {kind:"avatar"}
+// scene shows the SAME face. Priority: presenter.src (a LOCKED portrait URL — pixel-
+// identical across videos, for a persistent "channel avatar") → a0 from presenter.prompt
+// with a FIXED seed (deterministic — a0 returns the same face on every render) → a
+// default persona. Framing is tuned for face detection (frontal, centered, plain bg,
+// mouth closed). Returns a local path, or null if it can't be resolved.
+let _presenter // undefined until resolved; '' = resolution failed
+function presenterPortrait() {
+  if (_presenter !== undefined) return _presenter || null
+  const p = SB.presenter && typeof SB.presenter === 'object' ? SB.presenter
+    : (typeof SB.presenter === 'string' ? { prompt: SB.presenter } : {})
+  try {
+    if (p.src || p.image_url) { _presenter = curl(String(p.src || p.image_url), path.join(CACHE, 'presenter.jpg')); return _presenter }
+    const persona = String(p.prompt || p.persona || 'a warm, professional television presenter with a friendly, approachable face')
+    const framed = `${persona}. Photorealistic head-and-shoulders studio portrait, face centered and looking straight at the camera, neutral relaxed expression with the mouth gently closed, soft even studio lighting, clean plain background, sharp focus, high detail.`
+    const seed = Number.isFinite(Number(p.seed)) ? Number(p.seed) : 7
+    _presenter = curl(a0ImageUrl(framed, seed, '3:4'), path.join(CACHE, 'presenter.jpg'))
+  } catch (e) { console.log(`   (presenter portrait failed: ${e.message})`); _presenter = '' }
+  return _presenter || null
+}
+// Wav2Lip: portrait + speech wav → lip-synced talking head (portrait-res, has audio).
+// --static detects the face ONCE on the still (vs every frame) → big CPU speedup. Throws.
+function wav2lip(portrait, wav, out) {
+  execFileSync('python3', ['inference.py',
+    '--checkpoint_path', path.join(W2L_DIR, 'checkpoints', 'wav2lip_gan.pth'),
+    '--face', portrait, '--audio', wav, '--outfile', out,
+    '--static', 'True', '--nosmooth', '--pads', '0', '10', '0', '0', '--resize_factor', '1'],
+  { cwd: W2L_DIR, stdio: ['ignore', 'ignore', 'inherit'], env: { ...process.env, OMP_NUM_THREADS: '8' } })
+  if (!fs.existsSync(out)) throw new Error('wav2lip produced no output')
+  return out
+}
+// Background behind a corner presenter (full-frame WxH, silent, `dur`s): scene bg/prompt →
+// a0 image (Ken Burns), else a keyword stock still, else a themed radial gradient card.
+async function avatarBg(out, dur, s) {
+  if (s.bg && (s.bg.prompt || s.bg.src)) { kenBurnsSeg(out, s.bg.src || a0ImageUrl(s.bg.prompt, hash(String(s.bg.prompt))), dur); return }
+  if (s.prompt) { kenBurnsSeg(out, a0ImageUrl(s.prompt, hash(String(s.prompt))), dur); return }
+  if (s.keyword) { try { const [ph] = pickPhotos({ keyword: s.keyword, n: 1, seed: 0 }); if (ph?.url) { kenBurnsSeg(out, ph.url, dur); return } } catch { /* fall through */ } }
+  const th = SB.theme || {}
+  const c1 = String(Array.isArray(th.bg) ? th.bg[0] : (th.bg || '#0b1020')).replace(/'/g, '')
+  const c2 = String(Array.isArray(th.bg) ? (th.bg[1] || th.accent) : (th.accent || '#1b2550')).replace(/'/g, '')
+  await cardSeg(out, dur, `<style>html,body{margin:0;height:100%}body{background:radial-gradient(circle at 30% 25%, ${c2}, ${c1})}</style><body></body>`)
+}
+// avatar scene → a talking presenter, composited corner (over a background) or full-frame.
+async function avatarSeg(out, dur, s, wav) {
+  const portrait = presenterPortrait()
+  if (!portrait) { await avatarBg(out, dur, s); return }          // no face → just the background
+  if (!wav) { kenBurnsSeg(out, portrait, dur); return }           // no narration → a still portrait
+  const talk = path.join(WORK, `talk_${String(hash(out))}.mp4`)
+  try { wav2lip(portrait, wav, talk) }
+  catch (e) { console.log(`   (wav2lip failed: ${e.message}) → still portrait`); kenBurnsSeg(out, portrait, dur); return }
+  const pose = String(s.pose || s.position || 'corner').toLowerCase().replace(/\s+/g, '-')
+  if (pose === 'full') { ff(['-i', talk, '-t', `${dur}`, '-an', '-vf', `${NORM},tpad=stop_mode=clone:stop_duration=${dur}`, ...SEG, out]); return }
+  const bg = path.join(WORK, `abg_${String(hash(out))}.mp4`)
+  await avatarBg(bg, dur, s)
+  const sz = Number(s.size); const frac = sz > 0.2 && sz < 0.9 ? sz : 0.44
+  const th = Math.round((H * frac) / 2) * 2
+  const pad = Math.round(W * 0.045)
+  const POS = { 'bottom-left': `${pad}:H-h-${pad}`, 'bottom-right': `W-w-${pad}:H-h-${pad}`, 'top-right': `W-w-${pad}:${pad}`, 'top-left': `${pad}:${pad}` }
+  const at = POS[pose] || POS['bottom-right']
+  ff(['-i', bg, '-i', talk, '-filter_complex', `[1:v]scale=-2:${th}[pv];[0:v][pv]overlay=${at}:eof_action=repeat[v]`, '-map', '[v]', '-t', `${dur}`, '-an', ...SEG, out])
 }
 
 // NEW: screencast — drive the user's LIVE app and record it as footage, with a
@@ -782,6 +847,11 @@ function capDraws(text, start, end, typewriter) {
         await cardSeg(out, dur, canvasHtml(s))
       } else if (s.kind === 'screencast') {
         await screencastSeg(out, s.url, s.steps, s.dur || 12, s.script)
+      } else if (s.kind === 'avatar') {
+        // A lip-synced talking PRESENTER (a0 portrait + this scene's Piper narration via Wav2Lip),
+        // composited as a corner cutaway over a background, or full-frame (pose:"full").
+        await avatarSeg(out, dur, s, narrByScene.get(i)?.wav)
+        credits.push(SB.presenter && (SB.presenter.src || SB.presenter.image_url) ? 'presenter' : 'AI-generated (a0)')
       } else { // credits (only rendered when the storyboard explicitly includes a credits scene)
         await cardSeg(out, dur, creditsCard([...new Set([...credits, musicCredit].filter(Boolean))], s))
       }

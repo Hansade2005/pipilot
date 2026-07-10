@@ -20,6 +20,9 @@
 //          | { src: string }       //   overlaid in the theme font → a UNIQUE poster/thumbnail
 //          | { html: string }      // a fully custom cover (canvas HTML)
 //          | string,               // shorthand for { prompt }
+//   presenter?: { prompt: string, seed?: number }  // a talking-AVATAR face (a0-generated) reused across
+//             | { src: string }                      //   every {kind:'avatar'} scene; `seed` locks the same
+//             | string,                              //   face across renders; `src` = a locked portrait URL
 //   voice?:    string,          // default Piper TTS voice for scene `say` narration
 //   captions?: boolean,         // burn narration text as subtitles
 //   transition_duration?: number,  // crossfade seconds between scenes (default 0.6, max 2.5)
@@ -48,6 +51,12 @@
 //        `steps` = the simple DSL (below), OR `script` = a raw async Playwright body run with
 //        (page, goto, click, type, hover, scrollTo, press, wait, log) helpers (cursor-aware),
 //        e.g. script: "await goto('/'); await click('Log in'); await type('Email','demo@x.com'); await click('Sign in'); await wait(1500)"
+//   { kind:'avatar',    dur, say, pose?, size?, bg? }  // a lip-synced talking PRESENTER (the top-level
+//        `presenter` face, lip-synced to this scene's `say` via Wav2Lip). pose: 'corner' (default — a
+//        cutaway over a background) | 'full' (fills the frame) | a corner edge (bottom-left/right,
+//        top-left/right). size: 0.2-0.9 of frame height for the corner presenter. bg: {prompt|src} |
+//        prompt | keyword → the background behind a corner presenter. Best for the HOOK, section
+//        intros and the OUTRO call-to-action — not the whole video (b-roll/canvas carry the body).
 //   { kind:'credits',   dur }                                       // auto-built attribution
 //
 // Screencast Step: { action, ... }
@@ -63,7 +72,8 @@
 // 1080-class canvases (was 720p) — noticeably sharper, and large outputs now go
 // to Drive rather than an inline cap, so the size bump is handled.
 const ASPECTS = { '16:9': [1920, 1080], '9:16': [1080, 1920], '1:1': [1080, 1080], '4:5': [1080, 1350] }
-const SCENE_KINDS = ['title', 'video', 'still', 'image', 'canvas', 'screencast', 'credits']
+const SCENE_KINDS = ['title', 'video', 'still', 'image', 'canvas', 'screencast', 'avatar', 'credits']
+const AVATAR_POSES = ['corner', 'full', 'bottom-left', 'bottom-right', 'top-left', 'top-right']
 const STILL_SOURCES = ['keyword', 'topic', 'collection', 'id']
 const STEP_ACTIONS = {
   goto: ['path'], click: [], type: ['text'], hover: [], scrollTo: [], press: ['key'], wait: ['ms'],
@@ -82,6 +92,14 @@ export function validateStoryboard(sb) {
     if (sb[k] != null && (!isNum(sb[k]) || sb[k] <= 0)) e.push(`${k} must be a positive number`)
   }
   if (sb.title != null && typeof sb.title !== 'string') e.push('title must be a string')
+
+  // presenter (optional) — the talking-avatar face reused across ALL {kind:'avatar'} scenes.
+  // { prompt } (a0 face) | { prompt, seed } (deterministic same face) | { src } (locked portrait URL).
+  if (sb.presenter != null && typeof sb.presenter !== 'object' && typeof sb.presenter !== 'string') {
+    e.push('presenter must be a string persona or an object ({ prompt, seed? } | { src })')
+  } else if (sb.presenter && typeof sb.presenter === 'object' && !isStr(sb.presenter.prompt) && !isStr(sb.presenter.persona) && !isStr(sb.presenter.src) && !isStr(sb.presenter.image_url)) {
+    e.push('presenter object needs a `prompt` (describe the face for a0) or a `src` (locked portrait URL)')
+  }
   if (sb.transition_duration != null && (!isNum(sb.transition_duration) || sb.transition_duration < 0)) e.push('transition_duration must be a non-negative number (seconds)')
 
   // cover (optional) — a bespoke poster/thumbnail: { prompt } | { src } | { html } | string
@@ -136,6 +154,13 @@ export function validateStoryboard(sb) {
     } else if (s.kind === 'canvas') {
       // A fully agent-authored HTML/CSS scene (perfect text, custom layout, CSS animation).
       if (!isStr(s.html) && !isStr(s.canvas)) e.push(`${at} needs an \`html\` string (self-contained HTML/CSS for the scene body)`)
+    } else if (s.kind === 'avatar') {
+      // A lip-synced talking presenter (uses the top-level `presenter` face + this scene's `say`).
+      // Optional: pose (corner default | full | a corner edge), size (0.2-0.9 of height for corner),
+      // and a background (bg:{prompt|src} | prompt | keyword) shown behind a corner presenter.
+      if (s.say != null && typeof s.say !== 'string') e.push(`${at}.say must be a string (the presenter's spoken line)`)
+      if (s.pose != null && !AVATAR_POSES.includes(String(s.pose).toLowerCase().replace(/\s+/g, '-'))) e.push(`${at}.pose must be one of ${AVATAR_POSES.join(', ')}`)
+      if (s.size != null && !isNum(s.size)) e.push(`${at}.size must be a number (0.2-0.9 of frame height)`)
     } else if (s.kind === 'screencast') {
       if (!isStr(s.url)) e.push(`${at}.url (the running app URL) is required`)
       // A screencast needs EITHER a raw `script` (agent-written Playwright) OR `steps`.

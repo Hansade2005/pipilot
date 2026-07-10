@@ -114,9 +114,31 @@ thorsten_de:de/de_DE/thorsten/medium/de_DE-thorsten-medium
 davefx_es:es/es_ES/davefx/medium/es_ES-davefx-medium
 VOICES
 
+# ── Wav2Lip (talking-avatar lip-sync, CPU) ───────────────────────────────────
+# Original Rudrabha/Wav2Lip on torch-CPU — every dependency is a prebuilt manylinux
+# wheel (ZERO source compilation), and the S3FD detector + checkpoints come from the
+# camenduru HuggingFace MIRROR (no Google Drive → no 404 risk in a headless build).
+# The engine feeds it an a0-generated presenter portrait + the scene's Piper narration
+# wav → a lip-synced talking head for {kind:"avatar"} scenes. librosa is pinned to
+# 0.9.2 because 0.10+ makes librosa.filters.mel's args keyword-only and hard-breaks
+# Wav2Lip's audio.py; numba/llvmlite/numpy are the co-installable wheel set.
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-pip git \
+    && rm -rf /var/lib/apt/lists/*
+RUN git clone --depth 1 https://github.com/Rudrabha/Wav2Lip.git /opt/wav2lip
+WORKDIR /opt/wav2lip
+RUN pip3 install --no-cache-dir --break-system-packages \
+      --extra-index-url https://download.pytorch.org/whl/cpu \
+      torch==2.0.1 torchvision==0.15.2 \
+      numpy==1.23.5 opencv-python-headless==4.9.0.80 \
+      librosa==0.9.2 numba==0.58.1 llvmlite==0.41.1 scipy==1.11.4 tqdm
+RUN mkdir -p checkpoints face_detection/detection/sfd temp \
+    && curl -fSL https://huggingface.co/camenduru/Wav2Lip/resolve/main/checkpoints/wav2lip_gan.pth -o checkpoints/wav2lip_gan.pth \
+    && curl -fSL https://huggingface.co/camenduru/Wav2Lip/resolve/main/face_detection/detection/sfd/s3fd.pth -o face_detection/detection/sfd/s3fd.pth
+WORKDIR /opt/pipilot-video
+
 # Let the runtime user read the engine/corpus and write render scratch
-# (.cache/.work/out under the engine dir).
-RUN chmod -R a+rwX /opt/pipilot-video /opt/stockdb /opt/ms-playwright /opt/piper
+# (.cache/.work/out under the engine dir). Wav2Lip writes temp/ under /opt/wav2lip.
+RUN chmod -R a+rwX /opt/pipilot-video /opt/stockdb /opt/ms-playwright /opt/piper /opt/wav2lip
 
 # E2B non-root runtime user.
 RUN useradd -m -s /bin/bash user
