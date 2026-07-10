@@ -409,6 +409,43 @@ async function avatarSeg(out, dur, s, wav) {
   }
 }
 
+// A STATIC matted cutout of the presenter (portrait matted ONCE → RGBA png), for a persistent
+// host presence on NON-avatar scenes — the presenter is "there" the whole video without paying
+// Wav2Lip per scene. Cached. Returns the cutout png path or null.
+let _presenterStill // undefined until resolved; '' = failed
+function presenterStill() {
+  if (_presenterStill !== undefined) return _presenterStill || null
+  const portrait = presenterPortrait()
+  if (!portrait) { _presenterStill = ''; return null }
+  try {
+    const mask = path.join(WORK, 'presenter_still_mask.png')
+    execFileSync(MATTE_PY, [MATTE, portrait, mask], { stdio: ['ignore', 'ignore', 'inherit'] })
+    const rgba = path.join(WORK, 'presenter_still.png')
+    ff(['-i', portrait, '-i', mask, '-filter_complex', '[0:v][1:v]alphamerge[o]', '-map', '[o]', rgba])
+    _presenterStill = fs.existsSync(rgba) ? rgba : ''
+  } catch (e) { console.log(`   (presenter still failed: ${e.message})`); _presenterStill = '' }
+  return _presenterStill || null
+}
+// Overlay the static presenter cutout onto an already-built (WxH, silent) segment, corner-placed
+// with the same gentle sway/bob as the talking version so it reads as a live host, not a sticker.
+async function overlayPresenterStill(seg, dur, pos, size) {
+  const cut = presenterStill(); if (!cut) return
+  const frac = Number(size) > 0.2 && Number(size) < 0.9 ? Number(size) : 0.4
+  const th = Math.round((H * frac) / 2) * 2
+  const pad = Math.round(W * 0.045)
+  const p = String(pos || 'bottom-right').toLowerCase().replace(/\s+/g, '-')
+  const CX = { 'bottom-left': `${pad}`, 'top-left': `${pad}`, 'bottom-right': `W-w-${pad}`, 'top-right': `W-w-${pad}` }
+  const CY = { 'bottom-left': `H-h-${pad}`, 'bottom-right': `H-h-${pad}`, 'top-left': `${pad}`, 'top-right': `${pad}` }
+  const baseX = CX[p] || `W-w-${pad}`, baseY = CY[p] || `H-h-${pad}`
+  const swayX = Math.max(4, Math.round(W * 0.006)), bobY = Math.max(4, Math.round(H * 0.009))
+  const x = `${baseX}+${swayX}*sin(2*PI*t/6)`, y = `${baseY}+${bobY}*sin(2*PI*t/4.4+1)`
+  const tmp = seg.replace(/\.mp4$/, '_pr.mp4')
+  try {
+    ff(['-i', seg, '-loop', '1', '-i', cut, '-filter_complex', `[1:v]scale=-2:${th}[p];[0:v][p]overlay=x=${x}:y=${y}:eof_action=repeat,format=yuv420p[v]`, '-map', '[v]', '-t', `${dur}`, ...SEG, tmp])
+    fs.renameSync(tmp, seg)
+  } catch (e) { console.log(`   (presenter overlay skipped: ${e.message})`); try { if (fs.existsSync(tmp)) fs.unlinkSync(tmp) } catch { /* noop */ } }
+}
+
 // NEW: screencast — drive the user's LIVE app and record it as footage, with a
 // synthetic cursor overlay + click ripples so it reads as a produced demo.
 // Wait until the page has actually PAINTED something (not a blank white SPA that
@@ -918,6 +955,13 @@ function capDraws(text, start, end, typewriter) {
       if (s.logo && (s.kind === 'video' || s.kind === 'still' || s.kind === 'image')) {
         const lu = /^https?:\/\//i.test(s.logo) ? s.logo : brandLogo(s.logo)
         if (lu) { await overlayLogo(out, lu, s.logoPos); if (/img\.logo\.dev/.test(lu)) credits.push('Logo.dev') }
+      }
+      // Persistent HOST: with presenter.persist set, overlay the STATIC matted presenter (no Wav2Lip)
+      // as a corner bug on non-avatar visual scenes, so the host is present the WHOLE video cheaply.
+      // Per-scene opt-out with `presenter:false` on the scene.
+      if (SB.presenter && SB.presenter.persist === true && s.presenter !== false &&
+          (s.kind === 'video' || s.kind === 'still' || s.kind === 'image' || s.kind === 'canvas')) {
+        await overlayPresenterStill(out, dur, s.presenterPos || SB.presenter.corner, s.presenterSize || SB.presenter.size)
       }
       segs.push(out)
       const src = credits.length > cBefore ? ` [${credits[credits.length - 1]}]` : ''
