@@ -134,7 +134,8 @@ function curl(url, dest) {
   // never shell out to curl, which rejects a non-URL path with "bad/illegal format".
   if (typeof url === 'string' && !/^https?:\/\//i.test(url) && fs.existsSync(url)) return url
   if (fs.existsSync(dest) && fs.statSync(dest).size > 0) return dest
-  try { execFileSync('curl', ['-f', '-sS', '-L', '--max-time', '120', '-o', dest, url], { stdio: ['ignore', 'ignore', 'inherit'] }) }
+  // --retry-all-errors so a TRANSIENT a0.dev 500 (its image API overloads) is retried, not fatal.
+  try { execFileSync('curl', ['-f', '-sS', '-L', '--retry', '3', '--retry-delay', '1', '--retry-all-errors', '--max-time', '90', '-o', dest, url], { stdio: ['ignore', 'ignore', 'inherit'] }) }
   catch (e) { try { fs.unlinkSync(dest) } catch {} throw e }
   return dest
 }
@@ -337,14 +338,25 @@ function wav2lip(portrait, wav, out) {
 }
 // Background behind a corner presenter (full-frame WxH, silent, `dur`s): scene bg/prompt →
 // a0 image (Ken Burns), else a keyword stock still, else a themed radial gradient card.
+// A themed radial-gradient card (browser-only, NO network) — the universal safe fallback.
+function themedGradient() {
+  const th = SB.theme || {}
+  const c1 = String(Array.isArray(th.bg) ? th.bg[0] : (th.bg || '#0b1020')).replace(/'/g, '')
+  const c2 = String(Array.isArray(th.bg) ? (th.bg[1] || th.accent) : (th.accent || '#1b2550')).replace(/'/g, '')
+  return `<style>html,body{margin:0;height:100%}body{background:radial-gradient(circle at 30% 25%, ${c2}, ${c1})}</style><body></body>`
+}
 async function avatarBg(out, dur, s) {
   if (s.bg && (s.bg.prompt || s.bg.src)) { kenBurnsSeg(out, s.bg.src || a0ImageUrl(s.bg.prompt, hash(String(s.bg.prompt))), dur); return }
   if (s.prompt) { kenBurnsSeg(out, a0ImageUrl(s.prompt, hash(String(s.prompt))), dur); return }
   if (s.keyword) { try { const [ph] = pickPhotos({ keyword: s.keyword, n: 1, seed: 0 }); if (ph?.url) { kenBurnsSeg(out, ph.url, dur); return } } catch { /* fall through */ } }
-  const th = SB.theme || {}
-  const c1 = String(Array.isArray(th.bg) ? th.bg[0] : (th.bg || '#0b1020')).replace(/'/g, '')
-  const c2 = String(Array.isArray(th.bg) ? (th.bg[1] || th.accent) : (th.accent || '#1b2550')).replace(/'/g, '')
-  await cardSeg(out, dur, `<style>html,body{margin:0;height:100%}body{background:radial-gradient(circle at 30% 25%, ${c2}, ${c1})}</style><body></body>`)
+  await cardSeg(out, dur, themedGradient())
+}
+// A scene failed to resolve its asset (e.g. a0 500, dead URL) — render SOMETHING rather than
+// crash the whole video: a stock photo if a keyword exists, else the themed gradient card.
+async function fallbackSeg(out, dur, s) {
+  try { const kw = s.keyword || s.q; if (kw) { const [ph] = pickPhotos({ keyword: kw, n: 1, seed: 0 }); if (ph?.url) { kenBurnsSeg(out, ph.url, dur); return 'stock-fallback' } } } catch { /* fall through */ }
+  await cardSeg(out, dur, themedGradient())
+  return 'gradient-fallback'
 }
 // Cut the presenter OUT of the (opaque) talking clip → a grayscale alpha mask. The silhouette
 // is CONSTANT (Wav2Lip moves only the mouth), so one mask from frame 0 matts the whole clip.
@@ -829,6 +841,7 @@ function capDraws(text, start, end, typewriter) {
       const out = path.join(WORK, `seg_${String(i).padStart(2, '0')}.mp4`)
       const dur = durs[i]
       const cBefore = credits.length // to report each scene's resolved asset source in the log
+      try {
       if (s.kind === 'title') {
         // Typewriter cards sync their type duration to the narration when present.
         await cardSeg(out, dur, titleCard(s, s.typewriter ? (narrByScene.get(i)?.dur || dur * 0.7) : 0))
@@ -893,6 +906,12 @@ function capDraws(text, start, end, typewriter) {
         credits.push(SB.presenter && (SB.presenter.src || SB.presenter.image_url) ? 'presenter' : 'AI-generated (a0)')
       } else { // credits (only rendered when the storyboard explicitly includes a credits scene)
         await cardSeg(out, dur, creditsCard([...new Set([...credits, musicCredit].filter(Boolean))], s))
+      }
+      } catch (err) {
+        // One scene's asset failed (a0 500, dead URL, bad keyword…) — NEVER let it crash the whole
+        // render. Log it and drop in a graceful fallback so the video still completes.
+        console.log(`   (seg ${i} [${s.kind}] failed: ${err?.message ?? err}) → fallback`)
+        await fallbackSeg(out, dur, s)
       }
       // Optional corner LOGO overlay (brand tag) on any visual scene — resolves a brand name to its
       // official logo (or takes a direct URL). Not applied to cards/canvas (they compose logos themselves).
