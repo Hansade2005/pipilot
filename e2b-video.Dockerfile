@@ -77,42 +77,16 @@ COPY e2b-video-template/generate.mjs e2b-video-template/stockdb.mjs e2b-video-te
 # stockdb.mjs defaults STOCKDB_DIR to /opt/stockdb.
 COPY e2b-video-template/stockdb /opt/stockdb
 
-# ── Piper TTS (narration voices) ─────────────────────────────────────────────
-# The Piper binary (self-contained: bundles espeak-ng-data + libs) → /opt/piper.
-RUN mkdir -p /opt/piper && cd /opt/piper \
-    && curl -fsSL https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_x86_64.tar.gz -o piper.tgz \
-    && tar xzf piper.tgz --strip-components=1 && rm piper.tgz && chmod +x piper
-# ~20 curated voices from rhasspy/piper-voices (HF). Tolerant: a voice that 404s
-# is skipped (the engine falls back to a default), so a bad URL never fails the build.
-# Saved as /opt/piper/voices/<friendly>.onnx (+ .onnx.json).
-RUN mkdir -p /opt/piper/voices && cd /opt/piper/voices \
-    && base="https://huggingface.co/rhasspy/piper-voices/resolve/main" \
-    && while IFS=: read -r name p; do \
-         [ -z "$name" ] && continue; \
-         ( curl -fsSL "$base/$p.onnx" -o "$name.onnx" && curl -fsSL "$base/$p.onnx.json" -o "$name.onnx.json" ) || { echo "skip voice $name"; rm -f "$name.onnx" "$name.onnx.json"; }; \
-       done <<'VOICES'
-amy:en/en_US/amy/medium/en_US-amy-medium
-lessac:en/en_US/lessac/medium/en_US-lessac-medium
-ryan:en/en_US/ryan/high/en_US-ryan-high
-joe:en/en_US/joe/medium/en_US-joe-medium
-kusal:en/en_US/kusal/medium/en_US-kusal-medium
-kristin:en/en_US/kristin/medium/en_US-kristin-medium
-hfc_female:en/en_US/hfc_female/medium/en_US-hfc_female-medium
-hfc_male:en/en_US/hfc_male/medium/en_US-hfc_male-medium
-john:en/en_US/john/medium/en_US-john-medium
-norman:en/en_US/norman/medium/en_US-norman-medium
-bryce:en/en_US/bryce/medium/en_US-bryce-medium
-danny:en/en_US/danny/low/en_US-danny-low
-kathleen:en/en_US/kathleen/low/en_US-kathleen-low
-alan:en/en_GB/alan/medium/en_GB-alan-medium
-alba:en/en_GB/alba/medium/en_GB-alba-medium
-cori:en/en_GB/cori/high/en_GB-cori-high
-jenny:en/en_GB/jenny_dioco/medium/en_GB-jenny_dioco-medium
-northern:en/en_GB/northern_english_male/medium/en_GB-northern_english_male-medium
-siwis_fr:fr/fr_FR/siwis/medium/fr_FR-siwis-medium
-thorsten_de:de/de_DE/thorsten/medium/de_DE-thorsten-medium
-davefx_es:es/es_ES/davefx/medium/es_ES-davefx-medium
-VOICES
+# ── Kokoro-ONNX TTS (narration) ──────────────────────────────────────────────
+# Kokoro replaces Piper (whose espeak-ng data caused garbled/inconsistent narration).
+# Installed in its OWN venv so its numpy/onnxruntime never conflict with Wav2Lip's
+# pinned numpy (same isolation pattern as /opt/matte-venv). Model + voices → /opt/kokoro.
+RUN python3 -m venv /opt/kokoro-venv \
+    && /opt/kokoro-venv/bin/pip install --no-cache-dir --upgrade pip \
+    && /opt/kokoro-venv/bin/pip install --no-cache-dir kokoro-onnx soundfile
+RUN mkdir -p /opt/kokoro \
+    && curl -fsSL "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx" -o /opt/kokoro/kokoro-v1.0.onnx \
+    && curl -fsSL "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin" -o /opt/kokoro/voices-v1.0.bin
 
 # ── Wav2Lip (talking-avatar lip-sync, CPU) ───────────────────────────────────
 # Original Rudrabha/Wav2Lip on torch-CPU — every dependency is a prebuilt manylinux
@@ -160,7 +134,7 @@ RUN for f in /opt/avatars/*.webp; do [ -e "$f" ] && ffmpeg -y -loglevel error -i
 
 # Let the runtime user read the engine/corpus and write render scratch
 # (.cache/.work/out under the engine dir). Wav2Lip writes temp/ under /opt/wav2lip.
-RUN chmod -R a+rwX /opt/pipilot-video /opt/stockdb /opt/ms-playwright /opt/piper /opt/wav2lip /opt/u2net /opt/avatars /opt/matte-venv
+RUN chmod -R a+rwX /opt/pipilot-video /opt/stockdb /opt/ms-playwright /opt/kokoro /opt/kokoro-venv /opt/wav2lip /opt/u2net /opt/avatars /opt/matte-venv
 
 # E2B non-root runtime user.
 RUN useradd -m -s /bin/bash user
@@ -172,7 +146,9 @@ WORKDIR /home/user
 ENV NODE_ENV=development
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 ENV STOCKDB_DIR=/opt/stockdb
-ENV LD_LIBRARY_PATH=/opt/piper
-ENV PIPER_DIR=/opt/piper
+ENV KOKORO_PY=/opt/kokoro-venv/bin/python
+ENV KOKORO_MODEL=/opt/kokoro/kokoro-v1.0.onnx
+ENV KOKORO_VOICES=/opt/kokoro/voices-v1.0.bin
+ENV KOKORO_VOICE=am_fenrir
 
 CMD ["/bin/bash"]

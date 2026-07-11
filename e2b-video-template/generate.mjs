@@ -58,8 +58,11 @@ const DRAFT = process.env.DRAFT === '1' || process.env.DRAFT === 'true'
 // final video (free tier). SERVER sets this from the user's plan; the engine just honors it.
 const WM = process.env.WATERMARK
 const WM_TEXT = WM && WM !== '1' && WM !== 'true' ? String(WM).slice(0, 40) : 'Made with PiPilot'
-const PIPER_DIR = process.env.PIPER_DIR || '/opt/piper'
-const DEFAULT_VOICE = 'amy'
+// Kokoro-ONNX TTS — replaces Piper (whose espeak-ng data caused garbled/inconsistent output).
+const KOKORO_MODEL = process.env.KOKORO_MODEL || '/opt/kokoro/kokoro-v1.0.onnx'
+const KOKORO_VOICES = process.env.KOKORO_VOICES || '/opt/kokoro/voices-v1.0.bin'
+const KOKORO_PY = process.env.KOKORO_PY || '/opt/kokoro-venv/bin/python'  // isolated venv (off Wav2Lip's numpy)
+const DEFAULT_VOICE = process.env.KOKORO_VOICE || 'am_fenrir'  // bold US male; see kokoro voice table
 const CAPTIONS = SB.captions === true || SB.captions === 'true'
 // `video` scenes prefer Pixabay b-roll, but fall back to an a0-generated image when
 // no key is connected — so a missing PIXABAY_KEY no longer fails the whole render.
@@ -82,24 +85,17 @@ const hash = (s) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 
 
 // ── ffmpeg + curl helpers ───────────────────────────────────────────────────
 const ff = (a) => execFileSync('ffmpeg', ['-y', '-loglevel', 'error', ...a], { stdio: ['ignore', 'ignore', 'inherit'] })
-// ── Piper TTS (narration) ────────────────────────────────────────────────────
-// Resolve a voice name → the baked .onnx model, falling back to the default (or
-// any available voice) so a bad/unknown name never breaks the render.
-function voiceModel(name) {
-  const dir = path.join(PIPER_DIR, 'voices')
-  const tryNames = [name, DEFAULT_VOICE].filter(Boolean)
-  for (const n of tryNames) { const f = path.join(dir, `${n}.onnx`); if (fs.existsSync(f)) return f }
-  try { const any = fs.readdirSync(dir).find((f) => f.endsWith('.onnx')); if (any) return path.join(dir, any) } catch { /* no voices */ }
-  return null
-}
+// ── Kokoro-ONNX TTS (narration) ──────────────────────────────────────────────
+// Kokoro replaces Piper: one ONNX model + a voices bin, zero espeak dependency, and
+// consistent natural voices (Piper's per-subprocess espeak re-init varied the voice
+// and mangled words). Voice IDs are Kokoro names (am_*/af_*/bm_*/bf_*), validated in
+// Python so an unknown name never crashes the render.
 const audioDur = (f) => { try { return parseFloat(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', f]).toString().trim()) || 0 } catch { return 0 } }
 
-// A tiny pronunciation dictionary for words Piper mangles. Keys are matched case-INSENSITIVELY on
-// whole words; the phonetic respelling is what Piper actually says. Extend as new mispronunciations
-// surface. (e.g. Piper reads "PiPilot" oddly and says "Lives" as "life-s".)
+// A tiny pronunciation dictionary. Kokoro pronounces almost everything naturally (no espeak),
+// so we only override the brand name. Add entries here ONLY if you hear a specific word mangled.
 const SAY_AS = [
   [/\bPiPilot\b/gi, 'Pie Pilot'],
-  [/\bLives\b/g, 'Lyves'],   // the plural/verb "lives" (rhymes with "gives/hives"), not "life-s"
 ]
 // Normalise a spoken line before Piper: strip LaTeX the model sometimes leaves in `say` (Piper reads
 // "$10^{15}$" literally) → plain spoken words, and apply the pronunciation dictionary.
@@ -119,15 +115,56 @@ function speakable(text) {
   return s.replace(/\s{2,}/g, ' ').trim()
 }
 
+// Kokoro synthesis via a tiny Python shim. The model is loaded ONCE per Python process
+// (cached on the interpreter via a module attribute); each scene is one execFileSync call.
+// An unknown voice ID falls back to DEFAULT_VOICE inside Python (validated against the
+// loaded voice list) so a bad name in a storyboard never breaks the render.
+// The shim script is written once and reused. Returns { wav, dur } or null on failure.
+const TTS_SHIM = path.join(WORK, '_kokoro_tts.py')
+let _ttsShimWritten = false
+function writeTtsShim() {
+  if (_ttsShimWritten) return
+  fs.writeFileSync(TTS_SHIM, [
+    'import sys, soundfile as sf',
+    'from kokoro_onnx import Kokoro',
+    'model_path, voices_path, text, voice, out = sys.argv[1:6]',
+    'speed = float(sys.argv[6]) if len(sys.argv) > 6 else 1.0',
+    '# Load once per process (cached on the module) so multi-call renders stay fast-ish.',
+    'k = getattr(Kokoro, "_pp_instance", None)',
+    'if k is None:',
+    '    k = Kokoro(model_path, voices_path); Kokoro._pp_instance = k',
+    'try:',
+    '    voices = set(k.get_voices())',
+    'except Exception:',
+    '    voices = set()',
+    'if voices and voice not in voices:',
+    `    voice = ${JSON.stringify(DEFAULT_VOICE)}`,
+    'try:',
+    '    samples, sr = k.create(text, voice=voice, speed=speed, lang="en-us")',
+    '    sf.write(out, samples, sr)',
+    '    print("OK:%.3f" % (len(samples) / sr))',
+    'except Exception as e:',
+    '    print("ERR:%s" % e, file=sys.stderr); sys.exit(1)',
+    '',
+  ].join('\n'))
+  _ttsShimWritten = true
+}
+
 // Synthesize text → wav. Returns { wav, dur } or null if TTS is unavailable/fails.
 function tts(text, voice, outWav) {
-  const model = voiceModel(voice)
-  if (!model) return null
+  const v = voice && String(voice).trim() ? String(voice).trim() : DEFAULT_VOICE
+  const speak = speakable(text)
+  if (!speak) return null
   try {
-    execFileSync(path.join(PIPER_DIR, 'piper'), ['--model', model, '--output_file', outWav], { input: speakable(text).slice(0, 1200), cwd: PIPER_DIR, stdio: ['pipe', 'ignore', 'ignore'] })
-    if (!fs.existsSync(outWav)) return null
-    return { wav: outWav, dur: audioDur(outWav) }
-  } catch (e) { console.log(`   (tts failed for "${String(voice)}": ${e.message})`); return null }
+    writeTtsShim()
+    const res = execFileSync(KOKORO_PY, [TTS_SHIM, KOKORO_MODEL, KOKORO_VOICES, speak.slice(0, 1200), v, outWav, '1.0'], {
+      stdio: ['ignore', 'pipe', 'pipe'], timeout: 120_000,
+    }).toString().trim()
+    if (!res.startsWith('OK:')) return null
+    const dur = parseFloat(res.slice(3))
+    if (!fs.existsSync(outWav) || !(dur > 0)) return null
+    return { wav: outWav, dur }
+  } catch (e) { console.log(`   (kokoro tts failed for voice "${v}": ${e.message})`); return null }
 }
 function curl(url, dest) {
   // A LOCAL file path (baked presenter portraits, already-resolved assets) — use it directly;
@@ -327,11 +364,15 @@ function presenterPortrait() {
 }
 // The narration voice that MATCHES the presenter, so a female avatar never speaks in a male
 // voice (and vice-versa). presenter.voice wins; else each baked character maps to a fitting
-// Piper voice. Returns null when there's no presenter / unknown custom face (→ use SB.voice).
+// Kokoro voice (am_=US male, af_=US female, bm_/bf_=British). Returns null when there's no
+// presenter / unknown custom face (→ use SB.voice).
 function presenterVoice() {
   const p = SB.presenter && typeof SB.presenter === 'object' ? SB.presenter : {}
   if (typeof p.voice === 'string' && p.voice) return p.voice
-  const CV = { aria: 'amy', maya: 'kristin', zoe: 'jenny', noah: 'joe', ethan: 'ryan', leo: 'alan' }
+  const CV = {
+    aria: 'af_heart', maya: 'af_jessica', zoe: 'af_sky', lily: 'bf_lily', nova: 'af_nova',
+    noah: 'am_fenrir', ethan: 'am_eric', kai: 'am_liam', leo: 'bm_fable', ryan: 'bm_lewis',
+  }
   const c = typeof p.character === 'string' ? p.character.toLowerCase().replace(/[^a-z0-9]+/g, '') : ''
   return CV[c] || null
 }
@@ -361,10 +402,30 @@ async function avatarBg(out, dur, s) {
   if (s.keyword) { try { const [ph] = pickPhotos({ keyword: s.keyword, n: 1, seed: 0 }); if (ph?.url) { kenBurnsSeg(out, ph.url, dur); return } } catch { /* fall through */ } }
   await cardSeg(out, dur, themedGradient())
 }
-// A scene failed to resolve its asset (e.g. a0 500, dead URL) — render SOMETHING rather than
-// crash the whole video: a stock photo if a keyword exists, else the themed gradient card.
+// A scene failed to resolve its asset (e.g. a0 500, dead URL, keyword matched no stock,
+// no b-roll corpus) — render SOMETHING meaningful rather than crash OR flash a blank color.
+// Cascade: (1) a real stock photo if a keyword exists → (2) a THEMED TEXT CARD built from
+// whatever the scene says (title/heading/narration) so the viewer always sees legible content,
+// not a bare gradient → (3) an empty themed gradient only when the scene truly has NO text.
+function fallbackTitle(s) {
+  const firstSentence = (txt) => {
+    const m = String(txt || '').trim().split(/(?<=[.!?])\s+/)[0] || ''
+    return m.length > 90 ? m.slice(0, 88).trim() + '…' : m
+  }
+  return String(s.title || s.heading || s.headline || s.text || s.label || s.caption || firstSentence(s.say) || SB.title || '').trim()
+}
 async function fallbackSeg(out, dur, s) {
+  // 1) Real stock photo when the scene named a keyword (pickPhotos never dead-ends).
   try { const kw = s.keyword || s.q; if (kw) { const [ph] = pickPhotos({ keyword: kw, n: 1, seed: 0 }); if (ph?.url) { kenBurnsSeg(out, ph.url, dur); return 'stock-fallback' } } } catch { /* fall through */ }
+  // 2) Graceful TEXT CARD — reuse the themed title-card renderer with the scene's own words,
+  //    so a failed asset lookup degrades to a designed card, never a plain color.
+  const title = fallbackTitle(s)
+  if (title) {
+    const sub = String(s.sub || s.subtitle || (s.title ? s.caption : '') || '').trim() || undefined
+    try { await cardSeg(out, dur, titleCard({ ...s, title, sub }, 0)); return 'text-card-fallback' }
+    catch { /* fall through to gradient */ }
+  }
+  // 3) Last resort: themed gradient (only when the scene carries no text at all).
   await cardSeg(out, dur, themedGradient())
   return 'gradient-fallback'
 }

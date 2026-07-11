@@ -27,7 +27,7 @@
 //             // The presenter is auto-MATTED (background removed) so it composites transparently.
 //             // Add persist:true (+ corner?:'bottom-right'|…, size?) to also show the STATIC presenter
 //             // (no lip-sync) as a corner bug on every non-avatar visual scene → a host present all video.
-//   voice?:    string,          // default Piper TTS voice for scene `say` narration
+//   voice?:    string,          // default Kokoro TTS voice id (am_*/af_*/bm_*/bf_*) for `say` narration
 //   captions?: boolean,         // burn narration text as subtitles
 //   transition_duration?: number,  // crossfade seconds between scenes (default 0.6, max 2.5)
 //   music?:  { mood: string, minDur?: number }   // resolved via stockdb (Jamendo)
