@@ -81,9 +81,11 @@ COPY e2b-video-template/stockdb /opt/stockdb
 # Kokoro replaces Piper (whose espeak-ng data caused garbled/inconsistent narration).
 # Installed in its OWN venv so its numpy/onnxruntime never conflict with Wav2Lip's
 # pinned numpy (same isolation pattern as /opt/matte-venv). Model + voices → /opt/kokoro.
-RUN python3 -m venv /opt/kokoro-venv \
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-venv python3-pip \
+    && python3 -m venv /opt/kokoro-venv \
     && /opt/kokoro-venv/bin/pip install --no-cache-dir --upgrade pip \
-    && /opt/kokoro-venv/bin/pip install --no-cache-dir kokoro-onnx soundfile
+    && /opt/kokoro-venv/bin/pip install --no-cache-dir kokoro-onnx soundfile \
+    && rm -rf /var/lib/apt/lists/*
 RUN mkdir -p /opt/kokoro \
     && curl -fsSL "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx" -o /opt/kokoro/kokoro-v1.0.onnx \
     && curl -fsSL "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin" -o /opt/kokoro/voices-v1.0.bin
