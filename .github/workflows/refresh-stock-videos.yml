@@ -1,0 +1,70 @@
+name: Refresh Stock Video Corpus
+
+# Background loop that keeps the baked B-roll corpus fresh: re-runs the Pixabay +
+# Pexels VIDEO harvesters (both merge-safe — they load existing rows and dedupe, so
+# each run only APPENDS new clips), commits the grown stockdb, and rebuilds the
+# pipilot-video template so renders pick up the new footage. Runs weekly + on demand.
+on:
+  schedule:
+    - cron: '0 6 * * 1'   # every Monday 06:00 UTC
+  workflow_dispatch:
+    inputs:
+      rebuild_template:
+        description: 'Rebuild the pipilot-video template after harvesting'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Harvest fresh Pixabay + Pexels videos (merge-safe append)
+        working-directory: e2b-video-template
+        env:
+          PIXABAY_KEY: ${{ secrets.PIXABAY_KEY }}
+          PEXELS_KEY: ${{ secrets.PEXELS_KEY }}
+        run: |
+          echo "== rows BEFORE =="
+          wc -l stockdb/pixabay_videos.jsonl stockdb/pexels_videos.jsonl || true
+          node scripts/harvest-pixabay-videos.mjs || echo "pixabay harvest had issues (non-fatal)"
+          node scripts/harvest-pexels-videos.mjs || echo "pexels harvest had issues (non-fatal)"
+          echo "== rows AFTER =="
+          wc -l stockdb/pixabay_videos.jsonl stockdb/pexels_videos.jsonl || true
+
+      - name: Commit corpus if it grew
+        id: commit
+        run: |
+          git config user.name "Hans Ade"
+          git config user.email "hans@pipilot.dev"
+          git add e2b-video-template/stockdb/pixabay_videos.jsonl e2b-video-template/stockdb/pexels_videos.jsonl
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No new clips — nothing to commit."
+          else
+            git commit -m "stock: refresh B-roll video corpus (weekly harvest)"
+            git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Rebuild pipilot-video template with the fresh corpus
+        if: steps.commit.outputs.changed == 'true' && (github.event_name == 'schedule' || inputs.rebuild_template)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run deploy-video-template.yml -R ${{ github.repository }} \
+            -f template_name=pipilot-video -f cpu_count=8 -f memory_mb=8192 \
+            && echo "Template rebuild dispatched." \
+            || echo "Rebuild dispatch failed (run deploy-video-template manually)."
