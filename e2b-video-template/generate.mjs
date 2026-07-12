@@ -292,6 +292,9 @@ async function makeCover(thumbOut) {
   try {
     const page = await ctx.newPage()
     await page.setContent(html, { waitUntil: 'load' })
+    // Wait for the theme web font to load before capturing — otherwise the poster shows the generic
+    // fallback font (same display=swap issue as the animated cards).
+    await page.evaluate(() => Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 3000))])).catch(() => {})
     // Wait for the background image (a0/URL) to actually decode before capturing (CSS bg loads lazily).
     if (bgUrl) await page.evaluate((u) => new Promise((r) => { const i = new Image(); i.onload = i.onerror = () => r(); i.src = u; setTimeout(r, 6000) }), bgUrl).catch(() => {})
     else await page.waitForTimeout(cov.html ? 900 : 300)
@@ -304,13 +307,24 @@ async function cardSeg(out, dur, html) {
   const vdir = fs.mkdtempSync(path.join(WORK, 'card-'))
   try {
     const ctx = await (await getBrowser()).newContext({ viewport: { width: W, height: H }, recordVideo: { dir: vdir, size: { width: W, height: H } } })
+    const tStart = process.hrtime.bigint()
     const page = await ctx.newPage()
+    // First paint downloads the theme web font.
     await page.setContent(html, { waitUntil: 'load' })
-    await page.waitForTimeout(Math.round(dur * 1000))
+    // Wait for the font to ACTUALLY load (bounded) before we keep the take — otherwise `display=swap`
+    // renders the generic fallback font for the opening frames and every card looks plain/off-brand.
+    await page.evaluate(() => Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 3000))])).catch(() => {})
+    // Re-render so the CSS entrance animations restart from t=0 — the font is now cached in this
+    // context, so it paints correctly from the very first frame of THIS pass (no swap flash).
+    await page.setContent(html, { waitUntil: 'load' })
+    const skip = Number(process.hrtime.bigint() - tStart) / 1e9  // pre-roll (font-load + warm-up) to trim off
+    await page.waitForTimeout(Math.round(dur * 1000) + 150)
     await page.close(); await ctx.close()
     const webm = fs.readdirSync(vdir).find((f) => f.endsWith('.webm'))
     if (!webm) throw new Error('no .webm recorded')
-    ff(['-t', `${dur}`, '-i', path.join(vdir, webm), '-an', '-vf', NORM, ...SEG, out])
+    // OUTPUT seek (`-ss` after `-i`) = frame-accurate: drop the pre-roll, keep `dur`s of the clean,
+    // correctly-fonted pass with its entrance animations intact.
+    ff(['-i', path.join(vdir, webm), '-ss', skip.toFixed(3), '-t', `${dur}`, '-an', '-vf', NORM, ...SEG, out])
   } finally { fs.rmSync(vdir, { recursive: true, force: true }) }
 }
 
