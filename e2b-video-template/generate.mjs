@@ -1028,27 +1028,24 @@ function capDraws(text, start, end, typewriter) {
       } else if (s.kind === 'video') {
         // A user-supplied asset URL (s.src / s.image_url) wins — their own footage/photo.
         const userSrc = s.src || s.image_url || s.asset
-        // ZERO-API baked corpus first — genre-appropriate Pixabay B-roll from
-        // pixabay_videos.jsonl (deterministic per scene index, no key needed).
-        // Returns null only when the corpus file is absent → fall through below.
-        const clip = userSrc ? null : pickVideo({ keyword: s.keyword || s.q || s.prompt || '', aspect: SB.aspect, minDur: s.dur, seed: i })
+        const vkw = s.keyword || s.q || s.prompt || ''
+        // Resolution order (accuracy-first): user src → LIVE Pixabay/Pexels (on-topic footage
+        // for ANY subject via platform keys) → baked corpus B-roll → a0 image. Live goes BEFORE
+        // the generic baked corpus so topical videos get media that actually matches the subject.
+        const live = userSrc ? null : liveVideo(vkw)
+        const clip = (userSrc || live) ? null : pickVideo({ keyword: vkw, aspect: SB.aspect, minDur: s.dur, seed: i })
         if (userSrc) {
           credits.push('provided')
           kenBurnsSeg(out, userSrc, dur, s.forward !== false)
+        } else if (live) {
+          credits.push(live.credit)
+          brollSeg(out, live.url, dur, s.start || 0)
         } else if (clip) {
           credits.push(clip.credit)
           brollSeg(out, clip.url_medium || clip.url, dur, s.start || 0)
         } else {
-          // Baked corpus had no match → LIVE stock (Pixabay+Pexels, platform keys) for real
-          // motion footage on ANY topic; else an a0 image (Ken Burns), so it always resolves.
-          const live = liveVideo(s.keyword || s.q || s.prompt || '')
-          if (live) {
-            credits.push(live.credit)
-            brollSeg(out, live.url, dur, s.start || 0)
-          } else {
-            credits.push('AI-generated (a0)')
-            kenBurnsSeg(out, a0ImageUrl(s.prompt || s.q || 'cinematic abstract background', i), dur, s.forward !== false)
-          }
+          credits.push('AI-generated (a0)')
+          kenBurnsSeg(out, a0ImageUrl(s.prompt || s.q || 'cinematic abstract background', i), dur, s.forward !== false)
         }
       } else if (s.kind === 'still' || s.kind === 'image') {
         // Resolution priority: a brand logo ({brand:"…"} → official logo, contained on a card) →
@@ -1067,16 +1064,26 @@ function capDraws(text, start, end, typewriter) {
           credits.push('AI-generated (a0)')
           kenBurnsSeg(out, a0ImageUrl(s.prompt, (s.pick || 0) + i), dur, s.forward !== false)
         } else {
-          const src = s.id ? { id: s.id } : s.topic ? { topic: s.topic } : s.collection ? { collection: s.collection } : { keyword: s.keyword }
-          const [photo] = pickPhotos({ ...src, color: s.color, orientation: s.orientation, n: 1, seed: (s.pick || 0) + i })
-          if (photo?.url) {
-            credits.push(photo.credit)
-            kenBurnsSeg(out, photo.url, dur, s.forward !== false)
-          } else {
-            // Baked corpus had no match → LIVE stock photo (Pixabay+Pexels), else a0-generated.
-            const live = livePhoto(s.keyword || s.topic || s.q || '')
+          // Accuracy-first for a plain keyword: try LIVE Pixabay/Pexels BEFORE the generic baked
+          // corpus so the photo actually matches the subject. Unsplash SELECTORS (id/topic/
+          // collection) are corpus-specific, so those resolve from the baked pool first.
+          const hasSelector = s.id || s.topic || s.collection
+          const kw = s.keyword || s.topic || s.q || ''
+          let resolved = false
+          if (!hasSelector) {
+            const live = livePhoto(kw)
+            if (live) { credits.push(live.credit); kenBurnsSeg(out, live.url, dur, s.forward !== false); resolved = true }
+          }
+          if (!resolved) {
+            const src = s.id ? { id: s.id } : s.topic ? { topic: s.topic } : s.collection ? { collection: s.collection } : { keyword: s.keyword }
+            const [photo] = pickPhotos({ ...src, color: s.color, orientation: s.orientation, n: 1, seed: (s.pick || 0) + i })
+            if (photo?.url) { credits.push(photo.credit); kenBurnsSeg(out, photo.url, dur, s.forward !== false); resolved = true }
+          }
+          if (!resolved) {
+            // Selector missed (or no live match) → live keyword search, else a0-generated.
+            const live = hasSelector ? livePhoto(kw) : null
             if (live) { credits.push(live.credit); kenBurnsSeg(out, live.url, dur, s.forward !== false) }
-            else { credits.push('AI-generated (a0)'); kenBurnsSeg(out, a0ImageUrl(s.keyword || s.topic || 'cinematic abstract background', (s.pick || 0) + i), dur, s.forward !== false) }
+            else { credits.push('AI-generated (a0)'); kenBurnsSeg(out, a0ImageUrl(kw || 'cinematic abstract background', (s.pick || 0) + i), dur, s.forward !== false) }
           }
         }
       } else if (s.kind === 'card') {
