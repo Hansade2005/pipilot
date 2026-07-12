@@ -35,7 +35,14 @@ const { width: W, height: H, fps: FPS } = resolveCanvas(SB)
 // Crossfade seconds — the agent can tune the transition length per storyboard
 // (`transition_duration`). Clamped so it can't swallow a whole scene.
 const XF = Math.max(0, Math.min(2.5, Number(SB.transition_duration ?? SB.transitionDuration ?? 0.6) || 0.6))
-const KEY = process.env.PIXABAY_KEY
+// Live-stock API keys. The render server injects the PLATFORM keys
+// (PIXABAY_KEY_VIDEOS/_IMAGES, PEXELS_KEY_VIDEOS/_IMAGES) so live lookup works for EVERY
+// render with zero user setup; a user-connected PIXABAY_KEY still works as a fallback alias.
+const PIXABAY_VIDEO_KEY = process.env.PIXABAY_KEY_VIDEOS || process.env.PIXABAY_KEY || ''
+const PIXABAY_IMAGE_KEY = process.env.PIXABAY_KEY_IMAGES || process.env.PIXABAY_KEY || ''
+const PEXELS_VIDEO_KEY = process.env.PEXELS_KEY_VIDEOS || process.env.PEXELS_KEY || ''
+const PEXELS_IMAGE_KEY = process.env.PEXELS_KEY_IMAGES || process.env.PEXELS_KEY || ''
+const KEY = PIXABAY_VIDEO_KEY // legacy alias (needsPixabay logging + video fallback path)
 // a0.dev keyless image generation — resolves a scene's `prompt` to a bespoke image
 // at render time (accurate, unlike stock keyword guessing). Returns a 302→webp URL
 // that curl -L + ffmpeg consume directly. Image models misspell text, so we append
@@ -178,17 +185,58 @@ function curl(url, dest) {
   return dest
 }
 
-// Pixabay `video` b-roll (live API — the ONE thing that needs the user's key).
-function pixabayVideo(q) {
-  const cf = path.join(CACHE, `pxv_${hash(q)}.json`)
-  if (!fs.existsSync(cf)) {
-    const p = new URLSearchParams({ key: KEY, q, safesearch: 'true', per_page: '30', order: 'popular' })
-    curl(`https://pixabay.com/api/videos/?${p}`, cf)
-  }
-  const hits = JSON.parse(fs.readFileSync(cf, 'utf8')).hits || []
-  if (!hits.length) throw new Error(`No Pixabay video for "${q}"`)
-  return hits
+// ── LIVE stock search (platform keys) ────────────────────────────────────────
+// Accurate media for ANY topic when the baked corpus has no match: photos + videos,
+// Pixabay + Pexels, tried in order. Each returns a normalized {url, credit} or null.
+// Responses are cached to disk per query so repeat keywords cost nothing.
+function fetchJson(url, dest, headers = []) {
+  try {
+    if (fs.existsSync(dest) && fs.statSync(dest).size > 0) return JSON.parse(fs.readFileSync(dest, 'utf8'))
+    const args = ['-f', '-sS', '-L', '--retry', '2', '--retry-delay', '1', '--max-time', '30']
+    for (const h of headers) args.push('-H', h)
+    args.push('-o', dest, url)
+    execFileSync('curl', args, { stdio: ['ignore', 'ignore', 'inherit'] })
+    return JSON.parse(fs.readFileSync(dest, 'utf8'))
+  } catch { try { fs.unlinkSync(dest) } catch {} return null }
 }
+function livePixabayVideo(q) {
+  if (!PIXABAY_VIDEO_KEY || !q) return null
+  const p = new URLSearchParams({ key: PIXABAY_VIDEO_KEY, q, safesearch: 'true', per_page: '30', order: 'popular' })
+  const j = fetchJson(`https://pixabay.com/api/videos/?${p}`, path.join(CACHE, `lpxv_${hash(q)}.json`))
+  for (const h of (j?.hits || [])) {
+    const u = (h.videos?.large || h.videos?.medium || h.videos?.small || h.videos?.tiny)?.url
+    if (u) return { url: u, credit: `${h.user || 'Pixabay'} / Pixabay` }
+  }
+  return null
+}
+function livePexelsVideo(q) {
+  if (!PEXELS_VIDEO_KEY || !q) return null
+  const p = new URLSearchParams({ query: q, per_page: '30', orientation: H >= W ? 'portrait' : 'landscape' })
+  const j = fetchJson(`https://api.pexels.com/videos/search?${p}`, path.join(CACHE, `lpev_${hash(q)}.json`), [`Authorization: ${PEXELS_VIDEO_KEY}`])
+  for (const v of (j?.videos || [])) {
+    const files = (v.video_files || []).filter((f) => f.file_type === 'video/mp4').sort((a, b) => (b.width || 0) - (a.width || 0))
+    const f = files.find((x) => (x.width || 0) <= 1920) || files[0]
+    if (f?.link) return { url: f.link, credit: `${v.user?.name || 'Pexels'} / Pexels` }
+  }
+  return null
+}
+function livePixabayPhoto(q) {
+  if (!PIXABAY_IMAGE_KEY || !q) return null
+  const p = new URLSearchParams({ key: PIXABAY_IMAGE_KEY, q, image_type: 'photo', safesearch: 'true', per_page: '30', order: 'popular' })
+  const j = fetchJson(`https://pixabay.com/api/?${p}`, path.join(CACHE, `lpxi_${hash(q)}.json`))
+  for (const h of (j?.hits || [])) { const u = h.largeImageURL || h.webformatURL; if (u) return { url: u, credit: `${h.user || 'Pixabay'} / Pixabay` } }
+  return null
+}
+function livePexelsPhoto(q) {
+  if (!PEXELS_IMAGE_KEY || !q) return null
+  const p = new URLSearchParams({ query: q, per_page: '30', orientation: H >= W ? 'portrait' : 'landscape' })
+  const j = fetchJson(`https://api.pexels.com/v1/search?${p}`, path.join(CACHE, `lpei_${hash(q)}.json`), [`Authorization: ${PEXELS_IMAGE_KEY}`])
+  for (const ph of (j?.photos || [])) { const u = ph.src?.large2x || ph.src?.large || ph.src?.original; if (u) return { url: u, credit: `${ph.photographer || 'Pexels'} / Pexels` } }
+  return null
+}
+// Try Pixabay then Pexels for a live motion clip / photo matching the keyword.
+function liveVideo(q) { try { return livePixabayVideo(q) || livePexelsVideo(q) } catch { return null } }
+function livePhoto(q) { try { return livePixabayPhoto(q) || livePexelsPhoto(q) } catch { return null } }
 
 // ── segment builders — every segment exits in the SAME format (critical) ─────
 const NORM = `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},fps=${FPS},setsar=1,format=yuv420p`
@@ -991,13 +1039,12 @@ function capDraws(text, start, end, typewriter) {
           credits.push(clip.credit)
           brollSeg(out, clip.url_medium || clip.url, dur, s.start || 0)
         } else {
-          // Corpus absent → fall back: live Pixabay b-roll (if a key is present),
-          // else an a0-generated image (Ken Burns), so `video` scenes always resolve.
-          const hits = KEY ? pixabayVideo(s.q || s.prompt || '') : []
-          const h = hits[(s.pick || 0) % Math.max(1, hits.length)]
-          if (h) {
-            credits.push(`${h.user} / Pixabay`)
-            brollSeg(out, (h.videos.medium || h.videos.small || h.videos.tiny).url, dur, s.start || 0)
+          // Baked corpus had no match → LIVE stock (Pixabay+Pexels, platform keys) for real
+          // motion footage on ANY topic; else an a0 image (Ken Burns), so it always resolves.
+          const live = liveVideo(s.keyword || s.q || s.prompt || '')
+          if (live) {
+            credits.push(live.credit)
+            brollSeg(out, live.url, dur, s.start || 0)
           } else {
             credits.push('AI-generated (a0)')
             kenBurnsSeg(out, a0ImageUrl(s.prompt || s.q || 'cinematic abstract background', i), dur, s.forward !== false)
@@ -1022,9 +1069,15 @@ function capDraws(text, start, end, typewriter) {
         } else {
           const src = s.id ? { id: s.id } : s.topic ? { topic: s.topic } : s.collection ? { collection: s.collection } : { keyword: s.keyword }
           const [photo] = pickPhotos({ ...src, color: s.color, orientation: s.orientation, n: 1, seed: (s.pick || 0) + i })
-          if (!photo?.url) throw new Error(`no photo resolved for scene ${i}`)
-          credits.push(photo.credit)
-          kenBurnsSeg(out, photo.url, dur, s.forward !== false)
+          if (photo?.url) {
+            credits.push(photo.credit)
+            kenBurnsSeg(out, photo.url, dur, s.forward !== false)
+          } else {
+            // Baked corpus had no match → LIVE stock photo (Pixabay+Pexels), else a0-generated.
+            const live = livePhoto(s.keyword || s.topic || s.q || '')
+            if (live) { credits.push(live.credit); kenBurnsSeg(out, live.url, dur, s.forward !== false) }
+            else { credits.push('AI-generated (a0)'); kenBurnsSeg(out, a0ImageUrl(s.keyword || s.topic || 'cinematic abstract background', (s.pick || 0) + i), dur, s.forward !== false) }
+          }
         }
       } else if (s.kind === 'card') {
         // Pre-designed template card — agent passes {template, data}; the engine renders a
