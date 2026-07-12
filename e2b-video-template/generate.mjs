@@ -16,6 +16,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { pickMusic, pickPhotos, pickVideo, videoCorpusSize, brandLogo } from './stockdb.mjs'
 import { validateStoryboard, resolveCanvas } from './storyboard.mjs'
+import { cardHtml, CARD_TEMPLATES } from './cards.mjs'
 
 // Pin the baked Chromium location. E2B's SDK command execution doesn't reliably
 // inherit the image's Docker ENV, so relying on PLAYWRIGHT_BROWSERS_PATH being
@@ -1025,6 +1026,10 @@ function capDraws(text, start, end, typewriter) {
           credits.push(photo.credit)
           kenBurnsSeg(out, photo.url, dur, s.forward !== false)
         }
+      } else if (s.kind === 'card') {
+        // Pre-designed template card — agent passes {template, data}; the engine renders a
+        // professionally-typeset, animated card (distinct display font per template, theme-aware).
+        await cardSeg(out, dur, cardHtml(s, resolveTheme(s), { W, H }))
       } else if (s.kind === 'canvas') {
         // Agent-handcrafted HTML scene (perfect text, custom layout, CSS animation).
         await cardSeg(out, dur, canvasHtml(s))

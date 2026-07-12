@@ -45,6 +45,19 @@
 //   { kind:'video',     dur, src | keyword | q | prompt, pick?, start? }  // `src` = YOUR image/video URL; else Pixabay B-roll from the baked corpus (`keyword`|`q`); else a0 image (from `prompt`)
 //   { kind:'image',     dur, brand | src | prompt, forward? }        // `brand` = official brand logo (e.g. "coca cola","pipilot") contained on a card; `src` = YOUR image URL; else bespoke a0.dev image (NO text in image)
 //   { kind:'still',     dur, brand | src | prompt | keyword|topic|collection|id, pick?, color?, orientation?, forward? }  // `brand` = brand logo; `src` = YOUR image URL; else a0 `prompt`; else stock (keyword searches Pixabay+Pexels+Unsplash — include the BRAND NAME in the keyword for brand product shots, e.g. "coca cola bottle ice")
+//   { kind:'card',      dur, template, data }   // a PRE-DESIGNED animated card — zero HTML. Pick a
+//        `template` and pass its `data` fields; the engine typesets it in a distinct display font with a
+//        signature entrance animation, in your theme colors. Prefer this over `canvas` for standard
+//        info scenes (a stat, a comparison, bullets, a quote, steps, a KPI grid, a big statement, a CTA).
+//        Templates + their data shape:
+//          stat      { value, unit?, label?, delta?, deltaDir?:'up'|'down' }        — one hero metric
+//          compare   { left:{title?,value,note?}, right:{…}, winner?:'left'|'right' } — A vs B
+//          bullets   { heading?, eyebrow?, points:[string,…] }                      — up to 6 points
+//          quote     { quote, name?, role? }                                        — pull-quote
+//          steps     { heading?, steps:[string | {title,sub?}, …] }                — numbered process (≤4)
+//          kpiGrid   { heading?, items:[{value,label},…] }                          — metric tiles
+//          statement { text, eyebrow?, accentWord? }                                — big bold line
+//          cta       { headline, sub?, action?, url? }                              — call to action
 //   { kind:'canvas',    dur, html }   // a FULLY HANDCRAFTED scene — your own HTML/CSS body (rendered at
 //        full resolution, CSS animations captured over `dur`). Best for TEXT-HEAVY / custom scenes
 //        (comparison tables, bullet lists, animated stats, quotes, code blocks) with PERFECT text.
@@ -75,8 +88,9 @@
 
 // 1080-class canvases (was 720p) — noticeably sharper, and large outputs now go
 // to Drive rather than an inline cap, so the size bump is handled.
+import { CARD_TEMPLATES } from './cards.mjs'
 const ASPECTS = { '16:9': [1920, 1080], '9:16': [1080, 1920], '1:1': [1080, 1080], '4:5': [1080, 1350] }
-const SCENE_KINDS = ['title', 'video', 'still', 'image', 'canvas', 'screencast', 'avatar', 'credits']
+const SCENE_KINDS = ['title', 'video', 'still', 'image', 'card', 'canvas', 'screencast', 'avatar', 'credits']
 const AVATAR_POSES = ['corner', 'full', 'bottom-left', 'bottom-right', 'top-left', 'top-right']
 const STILL_SOURCES = ['keyword', 'topic', 'collection', 'id']
 const STEP_ACTIONS = {
@@ -155,6 +169,12 @@ export function validateStoryboard(sb) {
       }
       if (s.orientation != null && !['horizontal', 'vertical'].includes(s.orientation)) e.push(`${at}.orientation must be horizontal|vertical`)
       if (s.forward != null && typeof s.forward !== 'boolean') e.push(`${at}.forward must be a boolean`)
+    } else if (s.kind === 'card') {
+      // A pre-designed template card — agent passes {template, data}; the engine renders it
+      // with a distinct display font + signature animation, theme-aware. No HTML authoring needed.
+      if (!isStr(s.template)) e.push(`${at}.template is required — one of ${CARD_TEMPLATES.join(', ')}`)
+      else if (!CARD_TEMPLATES.includes(s.template)) e.push(`${at}.template must be one of ${CARD_TEMPLATES.join(', ')}`)
+      if (s.data != null && typeof s.data !== 'object') e.push(`${at}.data must be an object of the card's content fields`)
     } else if (s.kind === 'canvas') {
       // A fully agent-authored HTML/CSS scene (perfect text, custom layout, CSS animation).
       if (!isStr(s.html) && !isStr(s.canvas)) e.push(`${at} needs an \`html\` string (self-contained HTML/CSS for the scene body)`)
