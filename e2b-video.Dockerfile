@@ -127,6 +127,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3-venv \
 RUN mkdir -p /opt/u2net && curl -fSL https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx -o /opt/u2net/u2net.onnx
 COPY e2b-video-template/matte.py ./
 
+# YouTube ingest stack — yt-dlp (download/clip) + youtube-transcript-api (timestamped transcript),
+# in their OWN venv so they never touch the kokoro/matte numpy. ffmpeg (already baked) does the
+# precise -c copy cuts. Powers the agent's youtube_transcript / youtube_clip repurposing tools.
+RUN python3 -m venv /opt/yt-venv \
+    && /opt/yt-venv/bin/pip install --no-cache-dir --upgrade pip \
+    && /opt/yt-venv/bin/pip install --no-cache-dir yt-dlp youtube-transcript-api
+
 # Baked presenter CHARACTER library — a small curated set of frontal a0 portraits the
 # agent can pick by name (presenter:{character:"aria"}). Delivered as .webp; convert to
 # real JPEG at build time (cv2.imread in Wav2Lip is happiest with JPEG). Matting still
@@ -136,7 +143,7 @@ RUN for f in /opt/avatars/*.webp; do [ -e "$f" ] && ffmpeg -y -loglevel error -i
 
 # Let the runtime user read the engine/corpus and write render scratch
 # (.cache/.work/out under the engine dir). Wav2Lip writes temp/ under /opt/wav2lip.
-RUN chmod -R a+rwX /opt/pipilot-video /opt/stockdb /opt/ms-playwright /opt/kokoro /opt/kokoro-venv /opt/wav2lip /opt/u2net /opt/avatars /opt/matte-venv
+RUN chmod -R a+rwX /opt/pipilot-video /opt/stockdb /opt/ms-playwright /opt/kokoro /opt/kokoro-venv /opt/wav2lip /opt/u2net /opt/avatars /opt/matte-venv /opt/yt-venv
 
 # E2B non-root runtime user.
 RUN useradd -m -s /bin/bash user
@@ -150,6 +157,8 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 ENV STOCKDB_DIR=/opt/stockdb
 ENV KOKORO_PY=/opt/kokoro-venv/bin/python
 ENV KOKORO_MODEL=/opt/kokoro/kokoro-v1.0.onnx
+ENV YT_DLP=/opt/yt-venv/bin/yt-dlp
+ENV YT_PY=/opt/yt-venv/bin/python
 ENV KOKORO_VOICES=/opt/kokoro/voices-v1.0.bin
 ENV KOKORO_VOICE=am_fenrir
 
