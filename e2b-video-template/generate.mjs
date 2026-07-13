@@ -1039,13 +1039,28 @@ function capDraws(text, start, end, typewriter) {
     const v = s.voice || DEFAULT_NARR_VOICE
     const w = tts(s.say, v, path.join(WORK, `narr_${i}.wav`))
     narrRaw.push(w || null)
-    if (w) { durs[i] = Math.max(durs[i], w.dur + 0.6); console.log(`   · narration ${i} (${v || DEFAULT_VOICE}) — ${w.dur.toFixed(1)}s`) }
+    // keepAudio scenes hold their EXACT clip length (the transcript range) — the `say` is only a
+    // short VO patch over part of it, so DON'T stretch the scene to fit the narration.
+    if (w) { if (!s.keepAudio) durs[i] = Math.max(durs[i], w.dur + 0.6); console.log(`   · narration ${i} (${v || DEFAULT_VOICE}) — ${w.dur.toFixed(1)}s${s.keepAudio ? ' [patch over kept audio]' : ''}`) }
   }
   const starts = []; { let a = 0; for (let i = 0; i < durs.length; i++) { starts.push(a); a += durs[i] - (i < durs.length - 1 ? XF : 0) } }
   const narr = []
-  for (let i = 0; i < narrRaw.length; i++) { const w = narrRaw[i]; if (w) narr.push({ i, start: starts[i], dur: w.dur, wav: w.wav, text: SB.scenes[i].say, end: starts[i] + durs[i] }) }
+  for (let i = 0; i < narrRaw.length; i++) {
+    const w = narrRaw[i]; if (!w) continue
+    const s = SB.scenes[i]
+    // VO patch position: default at the scene start; `sayAt:"end"` places it at the tail so the
+    // original clip audio leads and the narrator closes the beat. Only meaningful with keepAudio.
+    const winMax = Math.max(0.1, durs[i] - 0.2)
+    const voLen = Math.min(w.dur, winMax)
+    const atEnd = s.keepAudio && (s.sayAt === 'end' || s.sayAt === 'outro')
+    const rel = atEnd ? Math.max(0, durs[i] - voLen - 0.3) : 0
+    narr.push({ i, start: starts[i] + rel, rel, dur: w.dur, voLen, wav: w.wav, text: s.say, end: starts[i] + durs[i] })
+  }
   const narrByScene = new Map(narr.map((n) => [n.i, n]))
   const hasNarr = narr.length > 0
+  // Per-scene ORIGINAL clip audio (only for keepAudio scenes) → { wav } keyed by scene index.
+  // Mixed into the final track at the scene's offset, ducked under any VO patch on that scene.
+  const clipAudio = new Map()
   try {
     for (let i = 0; i < SB.scenes.length; i++) {
       const s = SB.scenes[i]
@@ -1068,13 +1083,27 @@ function capDraws(text, start, end, typewriter) {
           // Retry with a FRESH tunnel URL each attempt: cobalt occasionally hands back a partial/
           // still-transcoding file (curl gets 200 but the mp4 has no moov atom → ffmpeg errors), and
           // a re-mint almost always fixes it. brollSeg downloads + trims (-ss/-t) + loop-fills.
+          let usedUrl = null
           for (let attempt = 0; attempt < 3 && !done; attempt++) {
             const clipUrl = resolveYtClip(clipId, s.quality || 480)
             if (!clipUrl) { console.log(`   (ytClip ${clipId} resolve miss, attempt ${attempt + 1})`); continue }
-            try { brollSeg(out, clipUrl, dur, s.start || 0); credits.push('YouTube clip'); done = true }
+            try { brollSeg(out, clipUrl, dur, s.start || 0); credits.push('YouTube clip'); done = true; usedUrl = clipUrl }
             catch (e) { console.log(`   (ytClip ${clipId} attempt ${attempt + 1} failed: ${e.message})`) }
           }
           if (!done) console.log(`   (ytClip ${clipId} → fallback after retries)`)
+          // keepAudio → extract the clip's ORIGINAL audio (same trim/loop as the video) so it can play
+          // under/after any VO patch. Reuses brollSeg's already-downloaded mp4; skipped if the clip
+          // has no audio track. Failure is non-fatal (scene just stays silent b-roll).
+          if (done && usedUrl && s.keepAudio) {
+            try {
+              const src = path.join(CACHE, `vid_${hash(usedUrl)}.mp4`)
+              const aout = path.join(WORK, `clipaud_${i}.wav`)
+              const pre = (s.start || 0) > 0 ? ['-ss', `${s.start}`] : []
+              execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-stream_loop', '-1', ...pre, '-i', src, '-t', `${dur}`, '-vn', '-ac', '2', '-ar', '44100', aout], { stdio: ['ignore', 'ignore', 'inherit'] })
+              if (fs.existsSync(aout) && fs.statSync(aout).size > 2000) { clipAudio.set(i, { wav: aout }); console.log(`   · kept original audio for scene ${i}`) }
+              else console.log(`   (scene ${i} keepAudio: clip had no usable audio track)`)
+            } catch (e) { console.log(`   (scene ${i} keepAudio extract failed: ${e.message})`) }
+          }
         }
         if (!done && userSrc) { credits.push('provided'); kenBurnsSeg(out, userSrc, dur, s.forward !== false); done = true }
         if (!done) { const live = liveVideo(vkw); if (live) { credits.push(live.credit); brollSeg(out, live.url, dur, s.start || 0); done = true } }
@@ -1198,6 +1227,10 @@ function capDraws(text, start, end, typewriter) {
   if (wmPath) { inputs.push('-i', wmPath); wmIdx = idx++ }
   const narrIdx = []
   for (const n of narr) { inputs.push('-i', n.wav); narrIdx.push(idx++) }
+  // Original clip audio inputs (keepAudio scenes), in scene order.
+  const clipAud = [...clipAudio.entries()].map(([i, a]) => ({ i, wav: a.wav }))
+  const clipAudIdx = []
+  for (const c of clipAud) { inputs.push('-i', c.wav); clipAudIdx.push(idx++) }
 
   // ── video filter chain ──
   const vParts = []; let cur = '0:v'
@@ -1210,7 +1243,7 @@ function capDraws(text, start, end, typewriter) {
     if (s.caption) {
       const obj = typeof s.caption === 'string' ? { text: s.caption } : (s.caption || {})
       overlays.push({ text: obj.text || '', typewriter: obj.typewriter === true, start: starts[i], end: starts[i] + durs[i] })
-    } else if (CAPTIONS && s.say) { const n = narrByScene.get(i); overlays.push({ text: s.say, typewriter: true, start: starts[i], end: Math.min(starts[i] + durs[i], starts[i] + (n?.dur || durs[i]) + 0.4) }) }
+    } else if (CAPTIONS && s.say) { const n = narrByScene.get(i); const cs = n?.start ?? starts[i]; overlays.push({ text: s.say, typewriter: true, start: cs, end: Math.min(starts[i] + durs[i], cs + (n?.dur || durs[i]) + 0.4) }) }
   })
   overlays.forEach((o, k) => {
     if (!o.text) return
@@ -1229,7 +1262,40 @@ function capDraws(text, start, end, typewriter) {
     aParts.push(`[${musicSegIdx[k]}:a]atrim=0:${segDur.toFixed(2)},afade=t=in:st=0:d=${fIn.toFixed(2)},afade=t=out:st=${(segDur - fOut).toFixed(2)}:d=${fOut.toFixed(2)},volume=${vol},adelay=${ms}|${ms}[amus${k}]`)
     mixLabels.push(`[amus${k}]`)
   })
-  narr.forEach((n, k) => { const ms = Math.round(n.start * 1000); aParts.push(`[${narrIdx[k]}:a]adelay=${ms}|${ms},volume=1.35[nd${k}]`); mixLabels.push(`[nd${k}]`) })
+  narr.forEach((n, k) => {
+    const ms = Math.round(n.start * 1000)
+    // On keepAudio scenes the VO is a PATCH — cap it to its window so it can't bleed past the clip.
+    const trim = clipAudio.has(n.i) ? `atrim=0:${Math.max(0.1, n.voLen).toFixed(2)},asetpts=PTS-STARTPTS,` : ''
+    aParts.push(`[${narrIdx[k]}:a]${trim}adelay=${ms}|${ms},volume=1.35[nd${k}]`)
+    mixLabels.push(`[nd${k}]`)
+  })
+  // Original clip audio (keepAudio) — full level, DUCKED only under this scene's VO patch window, so
+  // the narrator leads for a few seconds then RELEASES to the real audio (or plays untouched if no
+  // say). Built by splitting into [duck window] + [full window] and concatenating, then delayed to
+  // the scene offset. `clipVol` (default 1.0) and `duckVol` (default 0.14) are per-scene knobs.
+  clipAud.forEach((c, k) => {
+    const s = SB.scenes[c.i]
+    const inLbl = `${clipAudIdx[k]}:a`
+    const base = Math.max(0, Math.min(1.5, s.clipVol == null ? 1.0 : Number(s.clipVol)))
+    const duck = Math.max(0, Math.min(1, s.duckVol == null ? 0.14 : Number(s.duckVol)))
+    const ms = Math.round((starts[c.i] || 0) * 1000)
+    const n = narrByScene.get(c.i)
+    let chain
+    if (n && n.voLen > 0.1) {
+      const rel = Math.max(0, n.rel || 0)           // VO offset within the scene
+      const vEnd = Math.min(durs[c.i], rel + n.voLen + 0.3)
+      // window A = [0,rel) full · window B = [rel,vEnd) ducked · window C = [vEnd,dur) full — split the
+      // input into the present windows, gain each, then concat back in order.
+      const bounds = [[0, rel, base], [rel, vEnd, duck * base], [vEnd, durs[c.i], base]].filter(([a, b]) => b - a >= 0.05)
+      const labs = []
+      aParts.push(`[${inLbl}]asplit=${bounds.length}${bounds.map((_, j) => `[cas${k}_${j}]`).join('')}`)
+      bounds.forEach(([a, b, g], j) => { const l = `ca${k}_${j}`; aParts.push(`[cas${k}_${j}]atrim=${a.toFixed(2)}:${b.toFixed(2)},asetpts=PTS-STARTPTS,volume=${g.toFixed(2)}[${l}]`); labs.push(`[${l}]`) })
+      aParts.push(`${labs.join('')}concat=n=${labs.length}:v=0:a=1,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${ms}|${ms}[cad${k}]`)
+    } else {
+      aParts.push(`[${inLbl}]volume=${base.toFixed(2)},aformat=sample_rates=44100:channel_layouts=stereo,adelay=${ms}|${ms}[cad${k}]`)
+    }
+    mixLabels.push(`[cad${k}]`)
+  })
   let haveAudio = false
   if (mixLabels.length === 1) { aParts.push(`${mixLabels[0]}anull[a]`); haveAudio = true }
   else if (mixLabels.length > 1) { aParts.push(`${mixLabels.join('')}amix=inputs=${mixLabels.length}:normalize=0:duration=longest[a]`); haveAudio = true }
