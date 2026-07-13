@@ -1065,12 +1065,16 @@ function capDraws(text, start, end, typewriter) {
         const vkw = s.keyword || s.q || s.prompt || ''
         let done = false
         if (clipId) {
-          const clipUrl = resolveYtClip(clipId, s.quality || 480)
-          if (clipUrl) {
-            // brollSeg downloads + trims (-ss start / -t dur) + loop-fills to the scene length.
+          // Retry with a FRESH tunnel URL each attempt: cobalt occasionally hands back a partial/
+          // still-transcoding file (curl gets 200 but the mp4 has no moov atom → ffmpeg errors), and
+          // a re-mint almost always fixes it. brollSeg downloads + trims (-ss/-t) + loop-fills.
+          for (let attempt = 0; attempt < 3 && !done; attempt++) {
+            const clipUrl = resolveYtClip(clipId, s.quality || 480)
+            if (!clipUrl) { console.log(`   (ytClip ${clipId} resolve miss, attempt ${attempt + 1})`); continue }
             try { brollSeg(out, clipUrl, dur, s.start || 0); credits.push('YouTube clip'); done = true }
-            catch (e) { console.log(`   (ytClip ${clipId} download failed: ${e.message}) → fallback`) }
-          } else console.log(`   (ytClip ${clipId} could not resolve) → fallback`)
+            catch (e) { console.log(`   (ytClip ${clipId} attempt ${attempt + 1} failed: ${e.message})`) }
+          }
+          if (!done) console.log(`   (ytClip ${clipId} → fallback after retries)`)
         }
         if (!done && userSrc) { credits.push('provided'); kenBurnsSeg(out, userSrc, dur, s.forward !== false); done = true }
         if (!done) { const live = liveVideo(vkw); if (live) { credits.push(live.credit); brollSeg(out, live.url, dur, s.start || 0); done = true } }
