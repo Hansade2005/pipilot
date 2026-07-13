@@ -244,7 +244,13 @@ const SEG = ['-c:v', 'libx264', '-crf', '20', '-preset', 'veryfast']
 
 function brollSeg(out, url, dur, start = 0) {
   const src = curl(url, path.join(CACHE, `vid_${hash(url)}.mp4`))
-  ff(['-ss', `${start}`, '-t', `${dur}`, '-i', src, '-an', '-vf', NORM, ...SEG, out])
+  // LOOP the source so the segment ALWAYS fills the full scene `dur`. Otherwise a clip shorter
+  // than the scene — common when the scene was auto-extended to fit a longer `say` voiceover —
+  // ends early and leaves a BLACK tail under the continuing narration. `-stream_loop -1` replays
+  // the input; `-t dur` as an OUTPUT option caps it to exactly `dur`; `-ss` seeks first for range
+  // clips (a long source just reads its slice and never actually loops).
+  const pre = start > 0 ? ['-ss', `${start}`] : []
+  ff(['-stream_loop', '-1', ...pre, '-i', src, '-t', `${dur}`, '-an', '-vf', NORM, ...SEG, out])
 }
 function kenBurnsSeg(out, url, dur, forward = true) {
   const src = curl(url, path.join(CACHE, `img_${hash(url)}.jpg`))
