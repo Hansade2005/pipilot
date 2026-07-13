@@ -156,7 +156,10 @@ export function validateStoryboard(sb) {
       // A user-supplied asset URL (`src`) OR `keyword`/`q` (Pixabay B-roll from the
       // baked corpus — `keyword` is preferred) OR `prompt` (a0 fallback).
       const hasUserSrc = isStr(s.src) || isStr(s.image_url) || isStr(s.asset)
-      if (!hasUserSrc && !isStr(s.keyword) && !isStr(s.q) && !isStr(s.prompt)) e.push(`${at} needs a \`src\` (your image/video URL), \`keyword\`/\`q\` (Pixabay B-roll term) or \`prompt\` (a0 image)`)
+      // `ytClip` = an 11-char YouTube id → the engine resolves the real footage in-sandbox at render
+      // time (fresh, same IP) and trims it to start/dur. It's a valid standalone source.
+      const hasYtClip = isStr(s.ytClip)
+      if (!hasUserSrc && !hasYtClip && !isStr(s.keyword) && !isStr(s.q) && !isStr(s.prompt)) e.push(`${at} needs a \`src\` (your image/video URL), \`ytClip\` (YouTube id), \`keyword\`/\`q\` (Pixabay B-roll term) or \`prompt\` (a0 image)`)
       if (s.pick != null && !isNum(s.pick)) e.push(`${at}.pick must be a number`)
       if (s.start != null && !isNum(s.start)) e.push(`${at}.start must be a number (seconds)`)
     } else if (s.kind === 'still' || s.kind === 'image') {

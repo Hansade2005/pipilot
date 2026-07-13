@@ -42,6 +42,11 @@ const PIXABAY_VIDEO_KEY = process.env.PIXABAY_KEY_VIDEOS || process.env.PIXABAY_
 const PIXABAY_IMAGE_KEY = process.env.PIXABAY_KEY_IMAGES || process.env.PIXABAY_KEY || ''
 const PEXELS_VIDEO_KEY = process.env.PEXELS_KEY_VIDEOS || process.env.PEXELS_KEY || ''
 const PEXELS_IMAGE_KEY = process.env.PEXELS_KEY_IMAGES || process.env.PEXELS_KEY || ''
+// Cobalt (YouTube → playable mp4) — resolves `ytClip` scenes IN-SANDBOX at download time, so the
+// single-use, short-lived tunnel URL is minted and fetched from the SAME IP within seconds (the
+// reason resolving on Vercel ahead of the render 404'd). Public default; overridable for self-host.
+const COBALT_API_URL = (process.env.COBALT_API_URL || 'https://cnv.cx').replace(/\/+$/, '')
+const COBALT_ORIGIN = process.env.COBALT_ORIGIN || 'https://frame.y2meta-uk.com'
 const KEY = PIXABAY_VIDEO_KEY // legacy alias (needsPixabay logging + video fallback path)
 // a0.dev keyless image generation — resolves a scene's `prompt` to a bespoke image
 // at render time (accurate, unlike stock keyword guessing). Returns a 302→webp URL
@@ -241,6 +246,26 @@ function livePhoto(q) { try { return livePixabayPhoto(q) || livePexelsPhoto(q) }
 // ── segment builders — every segment exits in the SAME format (critical) ─────
 const NORM = `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},fps=${FPS},setsar=1,format=yuv420p`
 const SEG = ['-c:v', 'libx264', '-crf', '20', '-preset', 'veryfast']
+
+// Resolve a YouTube id → a fresh, playable mp4 URL via cobalt (2 calls: session key, then convert).
+// Runs HERE in the sandbox so the resulting single-use tunnel is downloaded (by brollSeg) from the
+// same IP, seconds later. Returns a URL or null (caller falls back to stock). No caching — the key
+// and tunnel are both single-use/short-lived, so a cached response would be stale.
+function resolveYtClip(vid, quality = 480) {
+  const H = ['-H', `origin: ${COBALT_ORIGIN}`, '-H', `referer: ${COBALT_ORIGIN}/`, '-H', 'user-agent: Mozilla/5.0', '-H', 'accept: */*']
+  const kd = path.join(CACHE, `cobkey_${hash(vid + Date.now())}.json`)
+  const rd = path.join(CACHE, `cobres_${hash(vid + quality + Date.now())}.json`)
+  try {
+    execFileSync('curl', ['-sS', '-L', '--max-time', '25', '-o', kd, '-H', 'content-type: application/json', ...H, `${COBALT_API_URL}/v2/sanity/key`], { stdio: ['ignore', 'ignore', 'inherit'] })
+    const key = JSON.parse(fs.readFileSync(kd, 'utf8'))?.key
+    if (!key) return null
+    const body = `link=${encodeURIComponent('https://youtu.be/' + vid)}&format=mp4&audioBitrate=128&videoQuality=${quality}&filenameStyle=pretty&vCodec=h264`
+    execFileSync('curl', ['-sS', '-L', '--max-time', '45', '-X', 'POST', '-o', rd, '-H', 'content-type: application/x-www-form-urlencoded', '-H', `key: ${key}`, ...H, '--data', body, `${COBALT_API_URL}/v2/converter`], { stdio: ['ignore', 'ignore', 'inherit'] })
+    const cj = JSON.parse(fs.readFileSync(rd, 'utf8'))
+    return cj?.url || (Array.isArray(cj?.picker) && cj.picker[0]?.url) || null
+  } catch { return null }
+  finally { try { fs.unlinkSync(kd) } catch {} try { fs.unlinkSync(rd) } catch {} }
+}
 
 function brollSeg(out, url, dur, start = 0) {
   const src = curl(url, path.join(CACHE, `vid_${hash(url)}.mp4`))
@@ -1032,27 +1057,25 @@ function capDraws(text, start, end, typewriter) {
         // Typewriter cards sync their type duration to the narration when present.
         await cardSeg(out, dur, titleCard(s, s.typewriter ? (narrByScene.get(i)?.dur || dur * 0.7) : 0))
       } else if (s.kind === 'video') {
-        // A user-supplied asset URL (s.src / s.image_url) wins — their own footage/photo.
+        // Resolution order: ytClip (real YouTube footage, resolved in-sandbox + trimmed to start/dur)
+        // → user src → LIVE Pixabay/Pexels (on-topic) → baked corpus B-roll → a0 image. Each step
+        // falls through to the next on failure so a scene NEVER renders black.
+        const clipId = typeof s.ytClip === 'string' && /^[A-Za-z0-9_-]{11}$/.test(s.ytClip) ? s.ytClip : null
         const userSrc = s.src || s.image_url || s.asset
         const vkw = s.keyword || s.q || s.prompt || ''
-        // Resolution order (accuracy-first): user src → LIVE Pixabay/Pexels (on-topic footage
-        // for ANY subject via platform keys) → baked corpus B-roll → a0 image. Live goes BEFORE
-        // the generic baked corpus so topical videos get media that actually matches the subject.
-        const live = userSrc ? null : liveVideo(vkw)
-        const clip = (userSrc || live) ? null : pickVideo({ keyword: vkw, aspect: SB.aspect, minDur: s.dur, seed: i })
-        if (userSrc) {
-          credits.push('provided')
-          kenBurnsSeg(out, userSrc, dur, s.forward !== false)
-        } else if (live) {
-          credits.push(live.credit)
-          brollSeg(out, live.url, dur, s.start || 0)
-        } else if (clip) {
-          credits.push(clip.credit)
-          brollSeg(out, clip.url_medium || clip.url, dur, s.start || 0)
-        } else {
-          credits.push('AI-generated (a0)')
-          kenBurnsSeg(out, a0ImageUrl(s.prompt || s.q || 'cinematic abstract background', i), dur, s.forward !== false)
+        let done = false
+        if (clipId) {
+          const clipUrl = resolveYtClip(clipId, s.quality || 480)
+          if (clipUrl) {
+            // brollSeg downloads + trims (-ss start / -t dur) + loop-fills to the scene length.
+            try { brollSeg(out, clipUrl, dur, s.start || 0); credits.push('YouTube clip'); done = true }
+            catch (e) { console.log(`   (ytClip ${clipId} download failed: ${e.message}) → fallback`) }
+          } else console.log(`   (ytClip ${clipId} could not resolve) → fallback`)
         }
+        if (!done && userSrc) { credits.push('provided'); kenBurnsSeg(out, userSrc, dur, s.forward !== false); done = true }
+        if (!done) { const live = liveVideo(vkw); if (live) { credits.push(live.credit); brollSeg(out, live.url, dur, s.start || 0); done = true } }
+        if (!done) { const clip = pickVideo({ keyword: vkw, aspect: SB.aspect, minDur: s.dur, seed: i }); if (clip) { credits.push(clip.credit); brollSeg(out, clip.url_medium || clip.url, dur, s.start || 0); done = true } }
+        if (!done) { credits.push('AI-generated (a0)'); kenBurnsSeg(out, a0ImageUrl(s.prompt || s.q || 'cinematic abstract background', i), dur, s.forward !== false) }
       } else if (s.kind === 'still' || s.kind === 'image') {
         // Resolution priority: a brand logo ({brand:"…"} → official logo, contained on a card) →
         // a user-supplied asset URL (their logo / company photos) → a bespoke a0-generated image
