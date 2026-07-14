@@ -357,7 +357,7 @@ if(renderer){
   const scene=new THREE.Scene();
   try{ scene.background=new THREE.Color('${bg}'); }catch(e){}
   const camera=new THREE.PerspectiveCamera(50,W/H,0.1,1000); camera.position.set(0,0,6);
-  window.update=null;
+  window.__renderer=renderer; window.update=null;
   try{
 ${code}
   }catch(e){ document.title='SCENE3D_ERR:'+(e&&e.message||e); }
@@ -366,24 +366,41 @@ ${code}
   function loop(){ const t=(performance.now()-t0)/1000; try{ if(window.update)window.update(t); }catch(e){} try{ renderer.render(scene,camera); }catch(e){} requestAnimationFrame(loop); }
   renderer.render(scene,camera);
   requestAnimationFrame(loop);
+  // Free the WebGL context when this page closes so it can't accumulate/leak.
+  window.addEventListener('pagehide', ()=>{ try{ renderer.forceContextLoss(); renderer.dispose(); }catch(e){} });
 }
 </script></body></html>`
 }
-// Preflight the WebGL context + scene code (cheap, one page) so a broken 3D scene throws → the main
-// loop's fallbackSeg kicks in, rather than silently shipping a black clip. Then record via cardSeg.
+// A 3D scene records in its OWN throwaway browser (launched with SwiftShader flags), fully ISOLATED
+// from the shared card/canvas browser — so a WebGL/GPU-process crash can never black-out the other
+// scenes, and every 3D scene starts from a clean GL state (no context-pool exhaustion). One setContent
+// pass (a WebGL page has no web font to double-load for), a readiness gate that throws → fallbackSeg
+// rather than shipping black, then the GL context is explicitly freed before the browser closes.
 async function scene3dSeg(out, scene, dur) {
   if (!THREE_JS) throw new Error('three.min.js not bundled')
   const html = three3dHtml(scene)
-  const ctx = await (await getBrowser()).newContext({ viewport: { width: W, height: H } })
+  const vdir = fs.mkdtempSync(path.join(WORK, 's3d-'))
+  const browser = await (await import('playwright')).chromium.launch({
+    args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'],
+  })
   try {
+    const ctx = await browser.newContext({ viewport: { width: W, height: H }, recordVideo: { dir: vdir, size: { width: W, height: H } } })
     const page = await ctx.newPage()
+    const tStart = process.hrtime.bigint()
     await page.setContent(html, { waitUntil: 'load' })
-    await page.waitForTimeout(400)
+    // Gate on the WebGL context actually coming up BEFORE spending `dur` — a failure throws so the
+    // main loop's fallbackSeg runs (never a black clip).
+    await page.waitForTimeout(350)
     const st = await page.evaluate(() => ({ title: document.title, ok: !!window.__ok }))
-    await page.close()
     if (/SCENE3D_ERR|no-webgl/.test(st.title || '') || !st.ok) throw new Error(`scene3d failed: ${st.title || 'no WebGL context'}`)
-  } finally { await ctx.close() }
-  await cardSeg(out, dur, html)
+    const skip = Number(process.hrtime.bigint() - tStart) / 1e9
+    await page.waitForTimeout(Math.round(dur * 1000) + 150)
+    await page.evaluate(() => { try { window.__renderer && window.__renderer.forceContextLoss() } catch (e) {} }).catch(() => {})
+    await page.close(); await ctx.close()
+    const webm = fs.readdirSync(vdir).find((f) => f.endsWith('.webm'))
+    if (!webm) throw new Error('no .webm recorded')
+    ff(['-i', path.join(vdir, webm), '-ss', skip.toFixed(3), '-t', `${dur}`, '-an', '-vf', NORM, ...SEG, out])
+  } finally { await browser.close().catch(() => {}); fs.rmSync(vdir, { recursive: true, force: true }) }
 }
 
 // One shared browser for ALL cards + screencasts (launching per item costs ~4.5s).
@@ -391,12 +408,10 @@ async function scene3dSeg(out, scene, dur) {
 // PLAYWRIGHT_BROWSERS_PATH override set at module top is in effect before the
 // package resolves its browser registry — a static import would evaluate first.
 let _browser = null
-// SwiftShader flags force SOFTWARE WebGL — the E2B container has NO GPU, so {kind:'scene3d'}
-// Three.js scenes need ANGLE→SwiftShader to get a real WebGL context headlessly (harmless for the
-// card/screencast pages that don't use WebGL). Without these, WebGL context creation fails → black.
-const getBrowser = async () => (_browser ??= await (await import('playwright')).chromium.launch({
-  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'],
-}))
+// The SHARED browser stays plain (no GPU flags) — cards/canvas/screencast are 2D and a WebGL page's
+// GPU-process crash under SwiftShader would POISON this long-lived browser (every later scene goes
+// black). So {kind:'scene3d'} gets its OWN throwaway browser instead (see scene3dSeg).
+const getBrowser = async () => (_browser ??= await (await import('playwright')).chromium.launch())
 
 // Render the PiPilot logo (logo.svg) + wordmark to a transparent PNG watermark,
 // on a subtle dark pill so it reads on any footage. Cached; overlaid by ffmpeg.
