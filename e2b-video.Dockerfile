@@ -127,6 +127,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3-venv \
 RUN mkdir -p /opt/u2net && curl -fSL https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx -o /opt/u2net/u2net.onnx
 COPY e2b-video-template/matte.py ./
 
+# Level-1 CODE-COMPOSED DESIGN engine (the `Design` API: gradients, mesh, glow, shapes, chrome
+# type, 13 bundled OFL fonts — MIT, see design/NOTICE). Renders {kind:'design'} scenes to crisp
+# PNGs (agent writes the composition Python; generate.mjs runs it under the matte venv, which
+# already has pillow+numpy, then Ken-Burns the PNG). Just static assets → a plain COPY.
+COPY e2b-video-template/design /opt/pipilot-video/design
+
 # YouTube ingest stack — yt-dlp (download/clip) + youtube-transcript-api (timestamped transcript),
 # in their OWN venv so they never touch the kokoro/matte numpy. ffmpeg (already baked) does the
 # precise -c copy cuts. Powers the agent's youtube_transcript / youtube_clip repurposing tools.

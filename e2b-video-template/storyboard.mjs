@@ -64,6 +64,13 @@
 //        Theme is exposed as CSS vars: var(--bg) var(--accent) var(--text) var(--sub) var(--font).
 //        Use relative units (vw/vh/%/em/flex/grid) so it fills any aspect. No external assets except
 //        https image URLs and the theme's Google font (already loaded).
+//   { kind:'design',    dur, code, forward? }   // a CODE-COMPOSED graphic — the agent writes PYTHON
+//        against the `Design` API (gradients, mesh, glow, shapes, chrome type, bundled fonts) which
+//        renders to a CRISP supersampled PNG that is then Ken-Burned. Best for typographic / geometric /
+//        gradient / soft-minimal / poster graphics (perfect text, no browser, deterministic — unlike
+//        an a0 image which misspells text, and cheaper than a `canvas` browser scene). The engine
+//        pre-defines `d = Design(SIZE)` at the frame aspect + `OUT`; the code composes on `d` and may
+//        `d.save(OUT, grain=..)`. Consult `design_docs` for the API + reference builds. (MIT: design/NOTICE.)
 //   { kind:'screencast', dur?, url, steps:[Step] | script:string }  // drive the live app —
 //        `steps` = the simple DSL (below), OR `script` = a raw async Playwright body run with
 //        (page, goto, click, type, hover, scrollTo, press, wait, log) helpers (cursor-aware),
@@ -90,7 +97,10 @@
 // to Drive rather than an inline cap, so the size bump is handled.
 import { CARD_TEMPLATES } from './cards.mjs'
 const ASPECTS = { '16:9': [1920, 1080], '9:16': [1080, 1920], '1:1': [1080, 1080], '4:5': [1080, 1350] }
-const SCENE_KINDS = ['title', 'video', 'still', 'image', 'card', 'canvas', 'screencast', 'avatar', 'credits']
+// NOTE: 'avatar' is TEMPORARILY DISABLED (removed from the advertised kinds) until the talking-
+// presenter/Wav2Lip pipeline is improved — avatarSeg + presenter plumbing stay in generate.mjs so
+// re-enabling is just adding 'avatar' back here. The agent prompt no longer offers avatar scenes.
+const SCENE_KINDS = ['title', 'video', 'still', 'image', 'card', 'canvas', 'design', 'screencast', 'credits']
 const AVATAR_POSES = ['corner', 'full', 'bottom-left', 'bottom-right', 'top-left', 'top-right']
 const STILL_SOURCES = ['keyword', 'topic', 'collection', 'id']
 const STEP_ACTIONS = {
@@ -194,6 +204,10 @@ export function validateStoryboard(sb) {
     } else if (s.kind === 'canvas') {
       // A fully agent-authored HTML/CSS scene (perfect text, custom layout, CSS animation).
       if (!isStr(s.html) && !isStr(s.canvas)) e.push(`${at} needs an \`html\` string (self-contained HTML/CSS for the scene body)`)
+    } else if (s.kind === 'design') {
+      // A fully agent-authored PYTHON design scene (the Design API → crisp PNG, Ken-Burned).
+      if (!isStr(s.code) && !isStr(s.design)) e.push(`${at} needs a \`code\` string (Python composing on the provided \`d = Design(SIZE)\` and saving to OUT — see design_docs)`)
+      if (s.forward != null && typeof s.forward !== 'boolean') e.push(`${at}.forward must be a boolean`)
     } else if (s.kind === 'avatar') {
       // A lip-synced talking presenter (uses the top-level `presenter` face + this scene's `say`).
       // Optional: pose (corner default | full | a corner edge), size (0.2-0.9 of height for corner),

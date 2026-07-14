@@ -1,0 +1,8 @@
+The code-composed design engine (lib/render.py, lib/fonts.py, reference/*.py) is
+vendored from the "claude-image-generation" project by Hasan Aboul Hasan,
+level-1-image-generator skill (MIT License, Copyright (c) 2026 Hasan Aboul Hasan):
+https://github.com/hassancs91/claude-image-generation
+
+Bundled fonts in fonts/ are licensed under the SIL Open Font License (OFL); each
+family's *-OFL.txt ships alongside its .ttf. PiPilot uses this engine to render
+{kind:"design"} video scenes (agent-authored composition code -> PNG -> Ken-Burns).

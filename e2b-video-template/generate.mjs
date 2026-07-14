@@ -286,6 +286,46 @@ function kenBurnsSeg(out, url, dur, forward = true) {
   ff(['-loop', '1', '-t', `${dur}`, '-i', src, '-an', '-vf', vf, ...SEG, out])
 }
 
+// ── LEVEL-1 CODE-COMPOSED DESIGN SCENE ──────────────────────────────────────
+// A {kind:'design'} scene: the agent writes ONLY Python composition code against the
+// vendored `Design` API (gradients, mesh, shapes, chrome type, bundled fonts — MIT, see
+// design/NOTICE). We run it in the matte venv (Pillow+numpy already baked there) → a crisp
+// supersampled PNG → then Ken-Burns it like any still. No browser, perfect text, deterministic.
+// The engine injects: `SIZE` (the frame's ken-burns crop size), a ready `d = Design(SIZE)`, and
+// `OUT`. The scene code composes on `d` and may call `d.save(OUT, grain=..)`; if it doesn't, we
+// auto-save `d`. Everything the reference/ scripts do is available.
+const DESIGN_DIR = process.env.DESIGN_DIR || path.join(import.meta.dirname, 'design')
+const DESIGN_PY = process.env.DESIGN_PY || process.env.MATTE_PY || '/opt/matte-venv/bin/python'
+function designSeg(out, code, dur, forward = true) {
+  const cw = Math.round((W * 1.2) / 2) * 2, ch = Math.round((H * 1.2) / 2) * 2
+  const tag = hash(String(code)).slice(0, 10)
+  const png = path.join(WORK, `design_${tag}.png`)
+  const shim = [
+    'import sys, os',
+    `sys.path.insert(0, ${JSON.stringify(path.join(DESIGN_DIR, 'lib'))})`,
+    'from render import *',
+    `OUT = ${JSON.stringify(png)}`,
+    `SIZE = (${cw}, ${ch})`,
+    'd = Design(SIZE)',
+    '',
+    String(code || ''),
+    '',
+    '# Auto-save if the scene code did not save itself (references whatever `d` is bound to).',
+    'try: _ok = os.path.exists(OUT) and os.path.getsize(OUT) > 1000',
+    'except Exception: _ok = False',
+    'if not _ok: d.save(OUT, grain=3)',
+  ].join('\n')
+  const pyf = path.join(WORK, `design_${tag}.py`)
+  fs.writeFileSync(pyf, shim)
+  execFileSync(DESIGN_PY, [pyf], { stdio: ['ignore', 'ignore', 'inherit'], timeout: 120_000 })
+  if (!fs.existsSync(png) || fs.statSync(png).size < 1000) throw new Error('design scene produced no image')
+  // Ken-Burns the crisp PNG (source is already at the crop size → no upscaling of the type).
+  const p = forward ? `(t/${dur})` : `(1-(t/${dur}))`
+  const vf = `scale=${cw}:${ch}:force_original_aspect_ratio=increase,crop=${cw}:${ch},` +
+    `crop=${W}:${H}:x='(in_w-out_w)*${p}':y='(in_h-out_h)*${p}',fps=${FPS},setsar=1,format=yuv420p`
+  ff(['-loop', '1', '-t', `${dur}`, '-i', png, '-an', '-vf', vf, ...SEG, out])
+}
+
 // One shared browser for ALL cards + screencasts (launching per item costs ~4.5s).
 // Playwright is imported dynamically (not a hoisted static import) so the
 // PLAYWRIGHT_BROWSERS_PATH override set at module top is in effect before the
@@ -1242,6 +1282,11 @@ function capDraws(text, start, end, typewriter) {
       } else if (s.kind === 'canvas') {
         // Agent-handcrafted HTML scene (perfect text, custom layout, CSS animation).
         await cardSeg(out, dur, canvasHtml(s))
+      } else if (s.kind === 'design') {
+        // Agent-handcrafted PYTHON design (the Design API → crisp PNG, then Ken-Burns). Best for
+        // typographic/geometric/gradient/soft-minimal/poster graphics — perfect text, no browser.
+        designSeg(out, s.code || s.design || '', dur, s.forward !== false)
+        credits.push('code-composed design')
       } else if (s.kind === 'screencast') {
         await screencastSeg(out, s.url, s.steps, s.dur || 12, s.script)
       } else if (s.kind === 'avatar') {
