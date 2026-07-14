@@ -71,6 +71,11 @@
 //        an a0 image which misspells text, and cheaper than a `canvas` browser scene). The engine
 //        pre-defines `d = Design(SIZE)` at the frame aspect + `OUT`; the code composes on `d` and may
 //        `d.save(OUT, grain=..)`. Consult `design_docs` for the API + reference builds. (MIT: design/NOTICE.)
+//   { kind:'scene3d',   dur, code, seed?, exposure? }   // a real-time 3D scene — the agent writes
+//        THREE.js against a pre-built `scene`/`camera`/`renderer` (WebGL via Chromium/SwiftShader) and
+//        the engine RECORDS it for `dur` (so it can ANIMATE — set window.update=(t)=>{…}). Injected:
+//        THREE, scene, camera (z=6), renderer, W, H, seeded rng(). Best for 3D product shots, abstract/
+//        geometric 3D, studio scenes. Consult `scene3d_docs`. (Three.js r152, MIT.)
 //   { kind:'screencast', dur?, url, steps:[Step] | script:string }  // drive the live app —
 //        `steps` = the simple DSL (below), OR `script` = a raw async Playwright body run with
 //        (page, goto, click, type, hover, scrollTo, press, wait, log) helpers (cursor-aware),
@@ -100,7 +105,7 @@ const ASPECTS = { '16:9': [1920, 1080], '9:16': [1080, 1920], '1:1': [1080, 1080
 // NOTE: 'avatar' is TEMPORARILY DISABLED (removed from the advertised kinds) until the talking-
 // presenter/Wav2Lip pipeline is improved — avatarSeg + presenter plumbing stay in generate.mjs so
 // re-enabling is just adding 'avatar' back here. The agent prompt no longer offers avatar scenes.
-const SCENE_KINDS = ['title', 'video', 'still', 'image', 'card', 'canvas', 'design', 'screencast', 'credits']
+const SCENE_KINDS = ['title', 'video', 'still', 'image', 'card', 'canvas', 'design', 'scene3d', 'screencast', 'credits']
 const AVATAR_POSES = ['corner', 'full', 'bottom-left', 'bottom-right', 'top-left', 'top-right']
 const STILL_SOURCES = ['keyword', 'topic', 'collection', 'id']
 const STEP_ACTIONS = {
@@ -208,6 +213,11 @@ export function validateStoryboard(sb) {
       // A fully agent-authored PYTHON design scene (the Design API → crisp PNG, Ken-Burned).
       if (!isStr(s.code) && !isStr(s.design)) e.push(`${at} needs a \`code\` string (Python composing on the provided \`d = Design(SIZE)\` and saving to OUT — see design_docs)`)
       if (s.forward != null && typeof s.forward !== 'boolean') e.push(`${at}.forward must be a boolean`)
+    } else if (s.kind === 'scene3d') {
+      // A fully agent-authored Three.js 3D scene (WebGL via Chromium, recorded for dur).
+      if (!isStr(s.code) && !isStr(s.three) && !isStr(s.scene3d)) e.push(`${at} needs a \`code\` string (Three.js building on the provided \`scene\`/\`camera\`/\`renderer\`; optionally set window.update — see scene3d_docs)`)
+      if (s.seed != null && !isNum(s.seed)) e.push(`${at}.seed must be a number`)
+      if (s.exposure != null && !isNum(s.exposure)) e.push(`${at}.exposure must be a number`)
     } else if (s.kind === 'avatar') {
       // A lip-synced talking presenter (uses the top-level `presenter` face + this scene's `say`).
       // Optional: pose (corner default | full | a corner edge), size (0.2-0.9 of height for corner),

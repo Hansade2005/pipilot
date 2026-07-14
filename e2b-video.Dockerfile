@@ -133,6 +133,11 @@ COPY e2b-video-template/matte.py ./
 # already has pillow+numpy, then Ken-Burns the PNG). Just static assets → a plain COPY.
 COPY e2b-video-template/design /opt/pipilot-video/design
 
+# Level-2 3D engine: Three.js (r152 UMD, MIT) bundled for {kind:'scene3d'} scenes. The agent's
+# Three.js code renders via the ALREADY-baked Chromium's WebGL (SwiftShader — no GPU, no headless-gl,
+# no xvfb/Mesa needed) and is recorded through the same browser path as canvas. Just a static asset.
+COPY e2b-video-template/lib3d /opt/pipilot-video/lib3d
+
 # YouTube ingest stack — yt-dlp (download/clip) + youtube-transcript-api (timestamped transcript),
 # in their OWN venv so they never touch the kokoro/matte numpy. ffmpeg (already baked) does the
 # precise -c copy cuts. Powers the agent's youtube_transcript / youtube_clip repurposing tools.

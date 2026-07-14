@@ -326,12 +326,77 @@ function designSeg(out, code, dur, forward = true) {
   ff(['-loop', '1', '-t', `${dur}`, '-i', png, '-an', '-vf', vf, ...SEG, out])
 }
 
+// ── LEVEL-2 3D SCENE (Three.js in our OWN Chromium — no headless-gl/xvfb/Mesa) ──────────────
+// A {kind:'scene3d'} scene: the agent writes Three.js code against a pre-built scene/camera/renderer
+// (WebGL via Chromium's SwiftShader), and the engine RECORDS it for `dur` through the SAME browser
+// path as canvas — so unlike a single captured frame, a scene3d can ANIMATE (assign window.update).
+// The engine injects: THREE, `scene`, `camera` (PerspectiveCamera at z=6), `renderer`, W, H, and a
+// seeded `rng()` (deterministic). The code adds meshes/lights, positions the camera, and may set
+// `window.update = (t)=>{ ... }` to animate over the scene's seconds.
+const LIB3D = process.env.LIB3D || path.join(import.meta.dirname, 'lib3d')
+const THREE_JS = (() => { try { return fs.readFileSync(path.join(LIB3D, 'three.min.js'), 'utf8') } catch { return '' } })()
+function three3dHtml(scene) {
+  const code = String(scene.code || scene.three || scene.scene3d || '')
+  const seed = Number.isFinite(+scene.seed) ? (+scene.seed >>> 0) : (hash(code) >>> 0)
+  const exposure = Number.isFinite(+scene.exposure) ? +scene.exposure : 1.1
+  const bg = typeof scene.bg === 'string' && /^#|rgb/.test(scene.bg) ? scene.bg : '#07030f'
+  return `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;overflow:hidden;background:${bg}}#c{display:block;width:${W}px;height:${H}px}</style></head>
+<body><canvas id="c" width="${W}" height="${H}"></canvas>
+<script>${THREE_JS}</script>
+<script>
+const W=${W},H=${H};
+let _s=${seed}>>>0; function rng(){_s=(_s*1664525+1013904223)>>>0;return _s/4294967296;}
+const canvas=document.getElementById('c');
+let renderer;
+try{ renderer=new THREE.WebGLRenderer({canvas,antialias:true,preserveDrawingBuffer:true}); }
+catch(e){ document.title='SCENE3D_ERR:no-webgl:'+(e&&e.message||e); }
+if(renderer){
+  renderer.setSize(W,H,false); renderer.setPixelRatio(1);
+  try{ renderer.outputColorSpace=THREE.SRGBColorSpace; }catch(e){}
+  try{ renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=${exposure}; }catch(e){}
+  const scene=new THREE.Scene();
+  try{ scene.background=new THREE.Color('${bg}'); }catch(e){}
+  const camera=new THREE.PerspectiveCamera(50,W/H,0.1,1000); camera.position.set(0,0,6);
+  window.update=null;
+  try{
+${code}
+  }catch(e){ document.title='SCENE3D_ERR:'+(e&&e.message||e); }
+  window.__ok=true;
+  let t0=performance.now();
+  function loop(){ const t=(performance.now()-t0)/1000; try{ if(window.update)window.update(t); }catch(e){} try{ renderer.render(scene,camera); }catch(e){} requestAnimationFrame(loop); }
+  renderer.render(scene,camera);
+  requestAnimationFrame(loop);
+}
+</script></body></html>`
+}
+// Preflight the WebGL context + scene code (cheap, one page) so a broken 3D scene throws → the main
+// loop's fallbackSeg kicks in, rather than silently shipping a black clip. Then record via cardSeg.
+async function scene3dSeg(out, scene, dur) {
+  if (!THREE_JS) throw new Error('three.min.js not bundled')
+  const html = three3dHtml(scene)
+  const ctx = await (await getBrowser()).newContext({ viewport: { width: W, height: H } })
+  try {
+    const page = await ctx.newPage()
+    await page.setContent(html, { waitUntil: 'load' })
+    await page.waitForTimeout(400)
+    const st = await page.evaluate(() => ({ title: document.title, ok: !!window.__ok }))
+    await page.close()
+    if (/SCENE3D_ERR|no-webgl/.test(st.title || '') || !st.ok) throw new Error(`scene3d failed: ${st.title || 'no WebGL context'}`)
+  } finally { await ctx.close() }
+  await cardSeg(out, dur, html)
+}
+
 // One shared browser for ALL cards + screencasts (launching per item costs ~4.5s).
 // Playwright is imported dynamically (not a hoisted static import) so the
 // PLAYWRIGHT_BROWSERS_PATH override set at module top is in effect before the
 // package resolves its browser registry — a static import would evaluate first.
 let _browser = null
-const getBrowser = async () => (_browser ??= await (await import('playwright')).chromium.launch())
+// SwiftShader flags force SOFTWARE WebGL — the E2B container has NO GPU, so {kind:'scene3d'}
+// Three.js scenes need ANGLE→SwiftShader to get a real WebGL context headlessly (harmless for the
+// card/screencast pages that don't use WebGL). Without these, WebGL context creation fails → black.
+const getBrowser = async () => (_browser ??= await (await import('playwright')).chromium.launch({
+  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'],
+}))
 
 // Render the PiPilot logo (logo.svg) + wordmark to a transparent PNG watermark,
 // on a subtle dark pill so it reads on any footage. Cached; overlaid by ffmpeg.
@@ -1287,6 +1352,11 @@ function capDraws(text, start, end, typewriter) {
         // typographic/geometric/gradient/soft-minimal/poster graphics — perfect text, no browser.
         designSeg(out, s.code || s.design || '', dur, s.forward !== false)
         credits.push('code-composed design')
+      } else if (s.kind === 'scene3d') {
+        // Agent-handcrafted Three.js 3D scene (real WebGL via Chromium/SwiftShader, RECORDED for dur
+        // so it can animate). Perfect for 3D product shots, abstract/geometric 3D, studio scenes.
+        await scene3dSeg(out, s, dur)
+        credits.push('3D render (Three.js)')
       } else if (s.kind === 'screencast') {
         await screencastSeg(out, s.url, s.steps, s.dur || 12, s.script)
       } else if (s.kind === 'avatar') {
