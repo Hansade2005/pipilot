@@ -1,0 +1,203 @@
+Loaded 24545 existing rows from pixabay_videos.jsonl — merging into this run.
+[1/394] "nature" +26 new · unique so far: 24571
+[2/394] "forest" +45 new · unique so far: 24616
+[3/394] "mountains" +90 new · unique so far: 24706
+[4/394] "waterfall" +107 new · unique so far: 24813
+[5/394] "river" +68 new · unique so far: 24881
+[6/394] "sunset" +68 new · unique so far: 24949
+[7/394] "sunrise" +95 new · unique so far: 25044
+[8/394] "autumn" +89 new · unique so far: 25133
+[9/394] "winter snow" +102 new · unique so far: 25235
+[10/394] "spring flowers" +120 new · unique so far: 25355
+[11/394] "summer" +90 new · unique so far: 25445
+[12/394] "desert" +140 new · unique so far: 25585
+[13/394] "jungle" +148 new · unique so far: 25733
+[14/394] "meadow" +104 new · unique so far: 25837
+[15/394] "northern lights" +46 new · unique so far: 25883
+[16/394] "ocean" +77 new · unique so far: 25960
+[17/394] "ocean waves" +73 new · unique so far: 26033
+[18/394] "beach" +57 new · unique so far: 26090
+[19/394] "underwater" +89 new · unique so far: 26179
+[20/394] "coral reef" +109 new · unique so far: 26288
+[21/394] "rain" +56 new · unique so far: 26344
+[22/394] "water drop" +108 new · unique so far: 26452
+[23/394] "lake" +85 new · unique so far: 26537
+[24/394] "clouds" +61 new · unique so far: 26598
+[25/394] "timelapse clouds" +0 new · unique so far: 26598
+[26/394] "stars" +60 new · unique so far: 26658
+[27/394] "space" +59 new · unique so far: 26717
+[28/394] "galaxy" +30 new · unique so far: 26747
+[29/394] "milky way" +66 new · unique so far: 26813
+[30/394] "storm" +102 new · unique so far: 26915
+[31/394] "lightning" +143 new · unique so far: 27058
+[32/394] "city" +44 new · unique so far: 27102
+[33/394] "city night" +122 new · unique so far: 27224
+[34/394] "city timelapse" +3 new · unique so far: 27227
+[35/394] "traffic" +62 new · unique so far: 27289
+[36/394] "skyline" +107 new · unique so far: 27396
+[37/394] "aerial drone" +107 new · unique so far: 27503
+[38/394] "drone landscape" +56 new · unique so far: 27559
+[39/394] "travel" +75 new · unique so far: 27634
+[40/394] "road trip" +59 new · unique so far: 27693
+[41/394] "highway" +73 new · unique so far: 27766
+[42/394] "bridge" +80 new · unique so far: 27846
+[43/394] "airport" +0 new · unique so far: 27846
+[44/394] "train" +130 new · unique so far: 27976
+[45/394] "business" +18 new · unique so far: 27994
+[46/394] "office" +157 new · unique so far: 28151
+[47/394] "meeting" +0 new · unique so far: 28151
+[48/394] "handshake" +0 new · unique so far: 28151
+[49/394] "startup" +0 new · unique so far: 28151
+[50/394] "coworking" +0 new · unique so far: 28151
+[51/394] "finance" +87 new · unique so far: 28238
+[52/394] "stock market" +115 new · unique so far: 28353
+[53/394] "money" +29 new · unique so far: 28382
+[54/394] "success" +67 new · unique so far: 28449
+[55/394] "teamwork" +0 new · unique so far: 28449
+[56/394] "technology" +29 new · unique so far: 28478
+[57/394] "artificial intelligence" +84 new · unique so far: 28562
+[58/394] "data" +82 new · unique so far: 28644
+[59/394] "network" +48 new · unique so far: 28692
+[60/394] "code programming" +53 new · unique so far: 28745
+[61/394] "server room" +113 new · unique so far: 28858
+[62/394] "robot" +116 new · unique so far: 28974
+[63/394] "circuit" +0 new · unique so far: 28974
+[64/394] "abstract" +43 new · unique so far: 29017
+[65/394] "abstract background" +85 new · unique so far: 29102
+[66/394] "particles" +74 new · unique so far: 29176
+[67/394] "digital" +64 new · unique so far: 29240
+[68/394] "hologram" +0 new · unique so far: 29240
+[69/394] "neon" +115 new · unique so far: 29355
+[70/394] "people" +46 new · unique so far: 29401
+[71/394] "crowd" +0 new · unique so far: 29401
+[72/394] "walking" +86 new · unique so far: 29487
+[73/394] "friends" +6 new · unique so far: 29493
+[74/394] "family" +132 new · unique so far: 29625
+[75/394] "children playing" +73 new · unique so far: 29698
+[76/394] "portrait" +105 new · unique so far: 29803
+[77/394] "happy people" +12 new · unique so far: 29815
+[78/394] "food" +65 new · unique so far: 29880
+[79/394] "cooking" +110 new · unique so far: 29990
+[80/394] "coffee" +104 new · unique so far: 30094
+[81/394] "restaurant" +107 new · unique so far: 30201
+[82/394] "fruit" +127 new · unique so far: 30328
+[83/394] "baking" +0 new · unique so far: 30328
+[84/394] "fitness" +64 new · unique so far: 30392
+[85/394] "gym workout" +6 new · unique so far: 30398
+[86/394] "running" +119 new · unique so far: 30517
+[87/394] "yoga" +132 new · unique so far: 30649
+[88/394] "sports" +54 new · unique so far: 30703
+[89/394] "soccer" +21 new · unique so far: 30724
+[90/394] "cycling" +56 new · unique so far: 30780
+[91/394] "swimming" +94 new · unique so far: 30874
+[92/394] "animals" +78 new · unique so far: 30952
+[93/394] "wildlife" +87 new · unique so far: 31039
+[94/394] "birds" +92 new · unique so far: 31131
+[95/394] "dog" +90 new · unique so far: 31221
+[96/394] "cat" +107 new · unique so far: 31328
+[97/394] "science" +19 new · unique so far: 31347
+[98/394] "laboratory" +0 new · unique so far: 31347
+[99/394] "medical" +74 new · unique so far: 31421
+[100/394] "dna" +0 new · unique so far: 31421
+[101/394] "hospital" +0 new · unique so far: 31421
+[102/394] "industry" +103 new · unique so far: 31524
+[103/394] "factory" +0 new · unique so far: 31524
+[104/394] "construction" +117 new · unique so far: 31641
+[105/394] "energy" +51 new · unique so far: 31692
+[106/394] "solar panels" +123 new · unique so far: 31815
+[107/394] "wind turbine" +68 new · unique so far: 31883
+[108/394] "agriculture" +95 new · unique so far: 31978
+[109/394] "farming" +64 new · unique so far: 32042
+[110/394] "oil rig" +149 new · unique so far: 32191
+[111/394] "celebration" +53 new · unique so far: 32244
+[112/394] "fireworks" +106 new · unique so far: 32350
+[113/394] "party" +81 new · unique so far: 32431
+[114/394] "concert" +0 new · unique so far: 32431
+[115/394] "night lights" +28 new · unique so far: 32459
+[116/394] "fire" +41 new · unique so far: 32500
+[117/394] "smoke" +110 new · unique so far: 32610
+[118/394] "candle" +98 new · unique so far: 32708
+[119/394] "luxury" +126 new · unique so far: 32834
+[120/394] "fashion" +134 new · unique so far: 32968
+[121/394] "jewelry" +0 new · unique so far: 32968
+[122/394] "cars" +34 new · unique so far: 33002
+[123/394] "car driving" +23 new · unique so far: 33025
+[124/394] "sports car" +0 new · unique so far: 33025
+[125/394] "motorcycle" +0 new · unique so far: 33025
+[126/394] "gaming" +85 new · unique so far: 33110
+[127/394] "esports" +0 new · unique so far: 33110
+[128/394] "music studio" +55 new · unique so far: 33165
+[129/394] "art painting" +48 new · unique so far: 33213
+[130/394] "data center" +61 new · unique so far: 33274
+[131/394] "server racks" +13 new · unique so far: 33287
+[132/394] "circuit board macro" +258 new · unique so far: 33545
+[133/394] "developer typing keyboard" +163 new · unique so far: 33708
+[134/394] "coding screen" +199 new · unique so far: 33907
+[135/394] "software development" +40 new · unique so far: 33947
+[136/394] "cloud computing" +4 new · unique so far: 33951
+[137/394] "cybersecurity" +1 new · unique so far: 33952
+[138/394] "binary code" +23 new · unique so far: 33975
+[139/394] "motherboard closeup" +282 new · unique so far: 34257
+[140/394] "fiber optics" +296 new · unique so far: 34553
+[141/394] "blockchain" +26 new · unique so far: 34579
+[142/394] "cryptocurrency" +23 new · unique so far: 34602
+[143/394] "bitcoin" +8 new · unique so far: 34610
+[144/394] "stock chart" +127 new · unique so far: 34737
+[145/394] "trading screen" +51 new · unique so far: 34788
+[146/394] "graph chart animation" +197 new · unique so far: 34985
+[147/394] "big data" +66 new · unique so far: 35051
+[148/394] "machine learning" +136 new · unique so far: 35187
+[149/394] "virtual reality" +67 new · unique so far: 35254
+[150/394] "augmented reality" +1 new · unique so far: 35255
+[151/394] "drone flying" +253 new · unique so far: 35508
+[152/394] "satellite orbit" +273 new · unique so far: 35781
+[153/394] "rocket launch" +112 new · unique so far: 35893
+[154/394] "3d printing" +163 new · unique so far: 36056
+[155/394] "semiconductor" +0 new · unique so far: 36056
+[156/394] "quantum computing" +56 new · unique so far: 36112
+[157/394] "wifi signal" +69 new · unique so far: 36181
+[158/394] "smartphone screen" +69 new · unique so far: 36250
+[159/394] "laptop working" +68 new · unique so far: 36318
+[160/394] "electric car charging" +12 new · unique so far: 36330
+[161/394] "wind farm aerial" +17 new · unique so far: 36347
+[162/394] "solar farm" +1 new · unique so far: 36348
+[163/394] "power lines" +84 new · unique so far: 36432
+[164/394] "nuclear plant" +211 new · unique so far: 36643
+[165/394] "hydroelectric dam" +198 new · unique so far: 36841
+[166/394] "oil refinery" +1 new · unique so far: 36842
+[167/394] "battery technology" +9 new · unique so far: 36851
+[168/394] "recycling" +46 new · unique so far: 36897
+[169/394] "water treatment" +97 new · unique so far: 36994
+[170/394] "geothermal" +30 new · unique so far: 37024
+[171/394] "coal power plant" +6 new · unique so far: 37030
+[172/394] "electric grid" +100 new · unique so far: 37130
+[173/394] "city rain night" +50 new · unique so far: 37180
+[174/394] "neon signs" +174 new · unique so far: 37354
+[175/394] "times square" +120 new · unique so far: 37474
+[176/394] "tokyo street" +92 new · unique so far: 37566
+[177/394] "subway train" +38 new · unique so far: 37604
+[178/394] "metro station" +163 new · unique so far: 37767
+[179/394] "city crosswalk" +3 new · unique so far: 37770
+[180/394] "skyscraper" +143 new · unique so far: 37913
+   ! "urban timelapse" page 2 failed: HTTP 500 — skipping
+[181/394] "urban timelapse" +5 new · unique so far: 37918
+[182/394] "street food" +16 new · unique so far: 37934
+[183/394] "graffiti wall" +323 new · unique so far: 38257
+[184/394] "city fog" +152 new · unique so far: 38409
+[185/394] "downtown night" +74 new · unique so far: 38483
+[186/394] "crosswalk aerial" +26 new · unique so far: 38509
+[187/394] "parking garage" +200 new · unique so far: 38709
+[188/394] "urban decay" +55 new · unique so far: 38764
+[189/394] "forest fog" +243 new · unique so far: 39007
+[190/394] "snow falling" +126 new · unique so far: 39133
+[191/394] "autumn leaves falling" +135 new · unique so far: 39268
+[192/394] "cherry blossom" +298 new · unique so far: 39566
+[193/394] "lavender field" +127 new · unique so far: 39693
+[194/394] "wheat field" +158 new · unique so far: 39851
+[195/394] "rice terraces" +293 new · unique so far: 40144
+[196/394] "volcano eruption" +295 new · unique so far: 40439
+[197/394] "iceberg" +81 new · unique so far: 40520
+[198/394] "glacier" +111 new · unique so far: 40631
+[199/394] "canyon" +174 new · unique so far: 40805
+[200/394] "sand dunes" +169 new · unique so far: 40974
+[201/394] "rainforest" +87 new · unique so far: 41061

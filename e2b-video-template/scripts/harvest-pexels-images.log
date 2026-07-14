@@ -1,0 +1,160 @@
+Test fetch: query="nature" per_page=80 …
+AUTH OK. sample hit: {
+  "photo_id": "12377231",
+  "source": "pexels",
+  "page_url": "https://www.pexels.com/photo/a-green-trees-in-the-forest-12377231/",
+  "image_url": "https://images.pexels.com/photos/12377231/pexels-photo-12377231.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+  "width": 1965,
+  "height": 3488,
+  "aspect_ratio": 0.5633600917431193,
+  "description": "Dense greenery in a tranquil forest setting with tall trees and natural light.",
+  "photographer": "Danil Lysov",
+  "keywords": [
+    "nature",
+    "dense",
+    "greenery",
+    "tranquil",
+    "forest",
+    "setting",
+    "tall",
+    "trees",
+    "natural",
+    "light"
+  ],
+  "download_url_1920w": "https://images.pexels.com/photos/12377231/pexels-photo-12377231.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+  "aspect": "9:16"
+}
+quota after test: remaining=24995 reset=1783040841
+[seed] "nature" · unique so far: 80
+[2/129] "landscape" +80 · unique: 160 · quota rem=6663
+[3/129] "forest" +80 · unique: 240 · quota rem=18086
+[4/129] "mountains" +80 · unique: 320 · quota rem=24865
+[5/129] "waterfall" +79 · unique: 399 · quota rem=24999
+[6/129] "river" +80 · unique: 479 · quota rem=-1
+[7/129] "sunset" +80 · unique: 559 · quota rem=24964
+[8/129] "sunrise" +71 · unique: 630 · quota rem=19904
+[9/129] "autumn" +80 · unique: 710 · quota rem=-1
+[10/129] "winter" +80 · unique: 790 · quota rem=15541
+[11/129] "flowers" +80 · unique: 870 · quota rem=-1
+[12/129] "desert" +78 · unique: 948 · quota rem=24780
+[13/129] "meadow" +80 · unique: 1028 · quota rem=24998
+[14/129] "tree" +74 · unique: 1102 · quota rem=24999
+[15/129] "ocean" +80 · unique: 1182 · quota rem=24881
+[16/129] "beach" +80 · unique: 1262 · quota rem=-1
+[17/129] "underwater" +80 · unique: 1342 · quota rem=24997
+[18/129] "rain" +80 · unique: 1422 · quota rem=24983
+[19/129] "lake" +78 · unique: 1500 · quota rem=-1
+[20/129] "clouds" +80 · unique: 1580 · quota rem=24996
+[21/129] "sky" +73 · unique: 1653 · quota rem=14182
+[22/129] "stars" +80 · unique: 1733 · quota rem=24874
+[23/129] "space" +79 · unique: 1812 · quota rem=-1
+[24/129] "galaxy" +69 · unique: 1881 · quota rem=-1
+[25/129] "city" +80 · unique: 1961 · quota rem=24993
+[26/129] "skyline" +76 · unique: 2037 · quota rem=24995
+[27/129] "traffic" +80 · unique: 2117 · quota rem=24994
+[28/129] "travel" +80 · unique: 2197 · quota rem=-1
+[29/129] "road" +79 · unique: 2276 · quota rem=-1
+[30/129] "bridge" +80 · unique: 2356 · quota rem=24993
+[31/129] "train" +76 · unique: 2432 · quota rem=-1
+[32/129] "architecture" +80 · unique: 2512 · quota rem=24974
+[33/129] "building" +80 · unique: 2592 · quota rem=-1
+[34/129] "street" +68 · unique: 2660 · quota rem=19877
+[35/129] "interior" +80 · unique: 2740 · quota rem=24884
+[36/129] "home" +80 · unique: 2820 · quota rem=-1
+[37/129] "business" +80 · unique: 2900 · quota rem=24994
+[38/129] "office" +80 · unique: 2980 · quota rem=-1
+[39/129] "meeting" +80 · unique: 3060 · quota rem=23702
+[40/129] "handshake" +79 · unique: 3139 · quota rem=-1
+[41/129] "startup" +80 · unique: 3219 · quota rem=24992
+[42/129] "finance" +80 · unique: 3299 · quota rem=24991
+[43/129] "money" +80 · unique: 3379 · quota rem=16151
+[44/129] "teamwork" +77 · unique: 3456 · quota rem=24990
+[45/129] "presentation" +77 · unique: 3533 · quota rem=18760
+[46/129] "laptop" +80 · unique: 3613 · quota rem=24899
+[47/129] "technology" +80 · unique: 3693 · quota rem=24058
+[48/129] "data" +77 · unique: 3770 · quota rem=24989
+[49/129] "network" +76 · unique: 3846 · quota rem=24988
+[50/129] "coding" +79 · unique: 3925 · quota rem=24987
+[51/129] "robot" +75 · unique: 4000 · quota rem=24999
+[52/129] "abstract" +80 · unique: 4080 · quota rem=-1
+[53/129] "digital" +72 · unique: 4152 · quota rem=24986
+[54/129] "neon" +80 · unique: 4232 · quota rem=24985
+[55/129] "gradient" +80 · unique: 4312 · quota rem=24984
+[56/129] "texture" +80 · unique: 4392 · quota rem=-1
+[57/129] "pattern" +80 · unique: 4472 · quota rem=-1
+[58/129] "people" +80 · unique: 4552 · quota rem=-1
+[59/129] "crowd" +80 · unique: 4632 · quota rem=24983
+[60/129] "friends" +80 · unique: 4712 · quota rem=24981
+[61/129] "family" +80 · unique: 4792 · quota rem=24997
+[62/129] "children" +80 · unique: 4872 · quota rem=24903
+[63/129] "portrait" +80 · unique: 4952 · quota rem=24677
+[64/129] "woman" +80 · unique: 5032 · quota rem=24749
+[65/129] "man" +80 · unique: 5112 · quota rem=-1
+[66/129] "student" +80 · unique: 5192 · quota rem=24982
+[67/129] "smile" +77 · unique: 5269 · quota rem=24680
+[68/129] "food" +80 · unique: 5349 · quota rem=-1
+[69/129] "cooking" +80 · unique: 5429 · quota rem=18997
+[70/129] "coffee" +80 · unique: 5509 · quota rem=24981
+[71/129] "restaurant" +78 · unique: 5587 · quota rem=24980
+[72/129] "fruit" +79 · unique: 5666 · quota rem=24982
+[73/129] "breakfast" +80 · unique: 5746 · quota rem=-1
+[74/129] "vegetables" +80 · unique: 5826 · quota rem=24979
+[75/129] "wine" +80 · unique: 5906 · quota rem=24978
+[76/129] "fitness" +80 · unique: 5986 · quota rem=24977
+[77/129] "gym" +74 · unique: 6060 · quota rem=-1
+[78/129] "running" +80 · unique: 6140 · quota rem=24976
+[79/129] "yoga" +80 · unique: 6220 · quota rem=24975
+[80/129] "sports" +79 · unique: 6299 · quota rem=-1
+[81/129] "soccer" +79 · unique: 6378 · quota rem=-1
+[82/129] "cycling" +80 · unique: 6458 · quota rem=24974
+[83/129] "hiking" +80 · unique: 6538 · quota rem=24973
+[84/129] "animals" +80 · unique: 6618 · quota rem=-1
+[85/129] "wildlife" +79 · unique: 6697 · quota rem=24975
+[86/129] "birds" +80 · unique: 6777 · quota rem=24999
+[87/129] "dog" +79 · unique: 6856 · quota rem=-1
+[88/129] "cat" +80 · unique: 6936 · quota rem=-1
+[89/129] "horse" +80 · unique: 7016 · quota rem=24972
+[90/129] "science" +80 · unique: 7096 · quota rem=24766
+[91/129] "laboratory" +79 · unique: 7175 · quota rem=24971
+[92/129] "medical" +80 · unique: 7255 · quota rem=24970
+[93/129] "health" +79 · unique: 7334 · quota rem=24856
+[94/129] "industry" +80 · unique: 7414 · quota rem=24969
+[95/129] "factory" +68 · unique: 7482 · quota rem=24968
+[96/129] "construction" +79 · unique: 7561 · quota rem=24967
+[97/129] "energy" +80 · unique: 7641 · quota rem=24966
+[98/129] "solar" +80 · unique: 7721 · quota rem=24965
+[99/129] "agriculture" +80 · unique: 7801 · quota rem=24701
+[100/129] "farming" +65 · unique: 7866 · quota rem=24191
+[101/129] "logistics" +79 · unique: 7945 · quota rem=24964
+[102/129] "celebration" +80 · unique: 8025 · quota rem=24963
+[103/129] "fireworks" +75 · unique: 8100 · quota rem=-1
+[104/129] "party" +78 · unique: 8178 · quota rem=-1
+[105/129] "concert" +67 · unique: 8245 · quota rem=24962
+[106/129] "fire" +80 · unique: 8325 · quota rem=-1
+[107/129] "smoke" +79 · unique: 8404 · quota rem=-1
+[108/129] "christmas" +80 · unique: 8484 · quota rem=-1
+[109/129] "wedding" +80 · unique: 8564 · quota rem=24961
+[110/129] "luxury" +80 · unique: 8644 · quota rem=24960
+[111/129] "fashion" +80 · unique: 8724 · quota rem=-1
+[112/129] "jewelry" +80 · unique: 8804 · quota rem=24959
+[113/129] "car" +80 · unique: 8884 · quota rem=18053
+[114/129] "motorcycle" +80 · unique: 8964 · quota rem=-1
+[115/129] "shoes" +80 · unique: 9044 · quota rem=-1
+[116/129] "gaming" +80 · unique: 9124 · quota rem=-1
+[117/129] "music" +80 · unique: 9204 · quota rem=-1
+[118/129] "art" +80 · unique: 9284 · quota rem=-1
+[119/129] "books" +80 · unique: 9364 · quota rem=-1
+[120/129] "education" +80 · unique: 9444 · quota rem=24699
+[121/129] "guitar" +80 · unique: 9524 · quota rem=-1
+[122/129] "camera" +79 · unique: 9603 · quota rem=-1
+[123/129] "minimal" +80 · unique: 9683 · quota rem=24958
+[124/129] "vintage" +78 · unique: 9761 · quota rem=24957
+[125/129] "bokeh" +80 · unique: 9841 · quota rem=24956
+[126/129] "macro" +78 · unique: 9919 · quota rem=19316
+[127/129] "silhouette" +79 · unique: 9998 · quota rem=24955
+[128/129] "plant" +80 · unique: 10078 · quota rem=24397
+[129/129] "sunlight" +74 · unique: 10152 · quota rem=24954
+
+──────────────────────────────────────────────
+DONE. unique images: 10152 · requests: 129 · elapsed: 330.9s
+file: C:\tmp\pipilot-repo\e2b-video-template\stockdb\pexels_images.jsonl (6.85 MB)

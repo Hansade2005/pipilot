@@ -65,6 +65,30 @@ function a0ImageUrl(prompt, seedBase = 0, aspectOverride) {
   const seed = Math.abs(sd) % 1_000_000_000
   return `https://api.a0.dev/assets/image?text=${encodeURIComponent(guarded)}&aspect=${encodeURIComponent(asp)}&seed=${seed}`
 }
+// Pixel dims per aspect for Pollinations (it takes width/height, not a ratio string).
+const POLL_DIMS = { '1:1': [1024, 1024], '16:9': [1280, 720], '9:16': [720, 1280], '4:5': [896, 1120], '5:4': [1120, 896], '4:3': [1024, 768], '3:4': [768, 1024], '2:3': [832, 1216], '3:2': [1216, 832] }
+// Pollinations (grok-imagine-pro) — free, keyless, and RENDERS TEXT CORRECTLY (headlines, wordmarks,
+// poster titles). No no-text guard: the prompt (incl. any quoted words) goes through verbatim. Slower
+// than a0 (~8–20s), so we only lead with it when the scene actually wants baked text.
+function pollImageUrl(prompt, seedBase = 0, aspectOverride) {
+  const asp = aspectOverride && A0_ASPECTS.has(aspectOverride) ? aspectOverride
+    : A0_ASPECTS.has(SB.aspect) ? SB.aspect : (W >= H ? '16:9' : '9:16')
+  const [w, h] = POLL_DIMS[asp] || POLL_DIMS['16:9']
+  const p = String(prompt || '').trim()
+  const key = p + ':' + seedBase
+  let sd = 0; for (let i = 0; i < key.length; i++) sd = (sd * 31 + key.charCodeAt(i)) | 0
+  const seed = Math.abs(sd) % 1_000_000_000
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(p)}?model=grok-imagine-pro&seed=${seed}&width=${w}&height=${h}&nologo=true&referrer=pipilot.dev`
+}
+// A still/image whose PROMPT wants text (explicit `text:true`, or quoted words in the prompt) leads
+// with Pollinations (text-capable) and falls back to a0 (textless-guarded) on any failure. Otherwise
+// it's the fast reliable a0 path unchanged. Returns a URL or a [primary, fallback] list for curl().
+function genImageUrls(prompt, seedBase = 0, aspectOverride, wantText = false) {
+  const p = String(prompt || '').trim()
+  const hasQuoted = /["'][^"']{1,48}["']/.test(p) // "Sale 50% Off", 'The King' → bake it
+  if (wantText || hasQuoted) return [pollImageUrl(p, seedBase, aspectOverride), a0ImageUrl(p, seedBase, aspectOverride)]
+  return a0ImageUrl(p, seedBase, aspectOverride)
+}
 // DRAFT=1 → fast, low-res preview (ultrafast encode, downscaled, skip Google fonts).
 const DRAFT = process.env.DRAFT === '1' || process.env.DRAFT === 'true'
 // WATERMARK set (a label, or '1' for the default) → burn a corner watermark on the
@@ -180,6 +204,13 @@ function tts(text, voice, outWav) {
   } catch (e) { console.log(`   (kokoro tts failed for voice "${v}": ${e.message})`); return null }
 }
 function curl(url, dest) {
+  // Accept a FALLBACK LIST: [primary, fallback, …] — try each until one downloads. Lets a slower
+  // text-capable provider (Pollinations) lead with a reliable a0 fallback on failure/timeout.
+  if (Array.isArray(url)) {
+    let lastErr
+    for (const u of url) { try { return curl(u, dest) } catch (e) { lastErr = e } }
+    throw lastErr || new Error('all image sources failed')
+  }
   // A LOCAL file path (baked presenter portraits, already-resolved assets) — use it directly;
   // never shell out to curl, which rejects a non-URL path with "bad/illegal format".
   if (typeof url === 'string' && !/^https?:\/\//i.test(url) && fs.existsSync(url)) return url
@@ -278,7 +309,7 @@ function brollSeg(out, url, dur, start = 0) {
   ff(['-stream_loop', '-1', ...pre, '-i', src, '-t', `${dur}`, '-an', '-vf', NORM, ...SEG, out])
 }
 function kenBurnsSeg(out, url, dur, forward = true) {
-  const src = curl(url, path.join(CACHE, `img_${hash(url)}.jpg`))
+  const src = curl(url, path.join(CACHE, `img_${hash(Array.isArray(url) ? url[0] : url)}.jpg`))
   const cw = Math.round((W * 1.2) / 2) * 2, ch = Math.round((H * 1.2) / 2) * 2
   const p = forward ? `(t/${dur})` : `(1-(t/${dur}))`
   const vf = `scale=${cw}:${ch}:force_original_aspect_ratio=increase,crop=${cw}:${ch},` +
@@ -472,6 +503,14 @@ async function makeCover(thumbOut) {
   let html, bgUrl = ''
   if (cov.html) {
     html = canvasHtml({ html: cov.html })
+  } else if (cov.baked && cov.prompt) {
+    // Fully baked poster: Pollinations (grok) renders the cinematic art AND the title text together.
+    // We compose a poster prompt from the art + the real title/subtitle and show it full-bleed (no
+    // HTML overlay). Falls back to a0 (textless) if Pollinations fails.
+    const posterPrompt = `${cov.prompt}. Cinematic movie-poster composition with the bold title text "${cov.title || SB.title || firstTitle?.title || ''}"${sub ? ` and smaller subtitle "${sub}"` : ''} elegantly integrated, professional typography, high contrast, dramatic lighting`
+    bgUrl = String(pollImageUrl(posterPrompt, 0xC0FFEE)).replace(/'/g, '')
+    html = `<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0a0c12}
+      .bg{position:fixed;inset:0;background:#0a0c12 url('${bgUrl}') center/cover no-repeat}</style><div class="bg"></div>`
   } else {
     bgUrl = String(cov.src || cov.image_url || (cov.prompt ? a0ImageUrl(cov.prompt, 0xC0FFEE) : '')).replace(/'/g, '')
     const bg = bgUrl ? `background:#0a0c12 url('${bgUrl}') center/cover no-repeat` : `background:${bgFor(t)}`
@@ -1330,8 +1369,9 @@ function capDraws(text, start, end, typewriter) {
           credits.push('provided')
           kenBurnsSeg(out, userSrc, dur, s.forward !== false)
         } else if (s.prompt) {
-          credits.push('AI-generated (a0)')
-          kenBurnsSeg(out, a0ImageUrl(s.prompt, (s.pick || 0) + i), dur, s.forward !== false)
+          const wantText = s.text === true || s.baked === true
+          credits.push(wantText ? 'AI-generated (grok)' : 'AI-generated (a0)')
+          kenBurnsSeg(out, genImageUrls(s.prompt, (s.pick || 0) + i, s.aspect, wantText), dur, s.forward !== false)
         } else {
           // Accuracy-first for a plain keyword: try LIVE Pixabay/Pexels BEFORE the generic baked
           // corpus so the photo actually matches the subject. Unsplash SELECTORS (id/topic/

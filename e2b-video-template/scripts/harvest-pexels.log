@@ -1,0 +1,32 @@
+Test fetch: "nature" (orientation=landscape)…
+  OK — total_results=8000, got 80 videos.
+  X-Ratelimit-Remaining=19464  X-Ratelimit-Reset=1783858265
+  Sample hit: {"id":11700405,"duration":56,"w":1920,"h":1080,"url":"https://videos.pexels.com/video-files/11700405/11700405-hd_1920_1080_30fps.mp4","user":"Justin Stretch"}
+  Auth confirmed. unique so far: 80
+
+[1/178] "nature" (landscape) +0 · unique: 80 · remaining: 19464 · reqs: 2
+[2/178] "forest" (landscape) +71 · unique: 151 · remaining: 24998 · reqs: 3
+[3/178] "mountains" (landscape) +80 · unique: 231 · remaining: 24973 · reqs: 4
+[4/178] "waterfall" (landscape) +80 · unique: 311 · remaining: 17457 · reqs: 5
+[5/178] "river" (landscape) +79 · unique: 390 · remaining: 24997 · reqs: 6
+[6/178] "sunset" (landscape) +78 · unique: 468 · remaining: 24996 · reqs: 7
+[7/178] "sunrise" (landscape) +74 · unique: 542 · remaining: 24995 · reqs: 8
+[8/178] "autumn" (landscape) +80 · unique: 622 · remaining: 24577 · reqs: 9
+[9/178] "winter snow" (landscape) +80 · unique: 702 · remaining: 24994 · reqs: 10
+[10/178] "spring flowers" (landscape) +80 · unique: 782 · remaining: 24993 · reqs: 11
+[11/178] "desert" (landscape) +80 · unique: 862 · remaining: 24992 · reqs: 12
+[12/178] "jungle" (landscape) +78 · unique: 940 · remaining: 24991 · reqs: 13
+[13/178] "northern lights" (landscape) +80 · unique: 1020 · remaining: 24990 · reqs: 14
+[14/178] "ocean waves" (landscape) +80 · unique: 1100 · remaining: 24989 · reqs: 15
+[15/178] "beach" (landscape) +78 · unique: 1178 · remaining: 24988 · reqs: 16
+[16/178] "underwater" (landscape) +80 · unique: 1258 · remaining: 24987 · reqs: 17
+[17/178] "coral reef" (landscape) +79 · unique: 1337 · remaining: 24986 · reqs: 18
+[18/178] "rain" (landscape) +80 · unique: 1417 · remaining: 24984 · reqs: 19
+[19/178] "lake" (landscape) +78 · unique: 1495 · remaining: 24985 · reqs: 20
+[20/178] "clouds" (landscape) +79 · unique: 1574 · remaining: -1 · reqs: 21
+   X-Ratelimit-Remaining hit 0 — flushing + stopping gracefully.
+
+──────────────────────────────────────────────
+DONE (stopped early — partial). unique videos: 1574 (seeded 0, +1574 new)
+requests used: 21 / ~200-hr budget · elapsed: 90.7s
+file: C:\tmp\pipilot-repo\e2b-video-template\stockdb\pexels_videos.jsonl (0.83 MB)

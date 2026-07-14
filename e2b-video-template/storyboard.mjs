@@ -43,8 +43,8 @@
 //     transition (the xfade INTO this scene).  A narrated scene AUTO-EXTENDS to fit its
 //     voiceover, so `say` never bleeds across the cut.  credits are OPTIONAL.
 //   { kind:'video',     dur, src | keyword | q | prompt, pick?, start? }  // `src` = YOUR image/video URL; else Pixabay B-roll from the baked corpus (`keyword`|`q`); else a0 image (from `prompt`)
-//   { kind:'image',     dur, brand | src | prompt, forward? }        // `brand` = official brand logo (e.g. "coca cola","pipilot") contained on a card; `src` = YOUR image URL; else bespoke a0.dev image (NO text in image)
-//   { kind:'still',     dur, brand | src | prompt | keyword|topic|collection|id, pick?, color?, orientation?, forward? }  // `brand` = brand logo; `src` = YOUR image URL; else a0 `prompt`; else stock (keyword searches Pixabay+Pexels+Unsplash — include the BRAND NAME in the keyword for brand product shots, e.g. "coca cola bottle ice")
+//   { kind:'image',     dur, brand | src | prompt, text?, forward? }        // `brand` = official brand logo (e.g. "coca cola","pipilot") contained on a card; `src` = YOUR image URL; else bespoke AI image (from `prompt`). Set text:true (or put words in "quotes" in the prompt) to BAKE headline/poster text INTO the image via grok-imagine-pro (spells correctly) — else a0 textless.
+//   { kind:'still',     dur, brand | src | prompt | keyword|topic|collection|id, text?, pick?, color?, orientation?, forward? }  // `brand` = brand logo; `src` = YOUR image URL; else AI `prompt` (text:true / "quoted" words → grok bakes real text in; else a0 textless); else stock (keyword searches Pixabay+Pexels+Unsplash — include the BRAND NAME in the keyword for brand product shots, e.g. "coca cola bottle ice")
 //   { kind:'card',      dur, template, data }   // a PRE-DESIGNED animated card — zero HTML. Pick a
 //        `template` and pass its `data` fields; the engine typesets it in a distinct display font with a
 //        signature entrance animation, in your theme colors. Prefer this over `canvas` for standard
