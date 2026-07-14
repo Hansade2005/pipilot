@@ -111,6 +111,19 @@ export function validateStoryboard(sb) {
   }
   if (sb.title != null && typeof sb.title !== 'string') e.push('title must be a string')
 
+  // audio-only PODCAST — a multi-voice voiceover with NO scenes. Validate the spoken
+  // turns and return early (the whole visual schema below doesn't apply).
+  if (sb.audioOnly === true || sb.kind === 'podcast') {
+    const turns = Array.isArray(sb.turns) ? sb.turns
+      : Array.isArray(sb.dialogue) ? sb.dialogue
+      : Array.isArray(sb.scenes) ? sb.scenes : null
+    if (!turns || turns.length === 0) e.push('podcast needs a non-empty `turns` array ([{ speaker, text, voice? }])')
+    else if (!turns.some((t) => t && isStr(t.text || t.say))) e.push('podcast turns need `text` (the spoken line)')
+    if (sb.music != null && typeof sb.music === 'object' && !isStr(sb.music.mood) && !isStr(sb.music.url)) e.push('podcast music needs a `mood` or `url`')
+    if (sb.voices != null && (typeof sb.voices !== 'object' || Array.isArray(sb.voices))) e.push('voices must be an object mapping speaker → voice id')
+    return { ok: e.length === 0, errors: e }
+  }
+
   // presenter (optional) — the talking-avatar face reused across ALL {kind:'avatar'} scenes.
   // { prompt } (a0 face) | { prompt, seed } (deterministic same face) | { src } (locked portrait URL).
   if (sb.presenter != null && typeof sb.presenter !== 'object' && typeof sb.presenter !== 'string') {

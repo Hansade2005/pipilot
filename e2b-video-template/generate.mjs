@@ -991,6 +991,93 @@ function capDraws(text, start, end, typewriter) {
 
 // ── run ─────────────────────────────────────────────────────────────────────
 ;(async () => {
+  // ── AUDIO-ONLY PODCAST ──────────────────────────────────────────────────────
+  // A multi-voice podcast / voiceover: each `turn` is a spoken line
+  // ({ speaker, text, voice? }), synthesized in its own Kokoro voice and sequenced
+  // back-to-back with a natural gap, over an OPTIONAL music bed that swells at the
+  // open/close and DUCKS under the dialogue (per-frame volume expression). No video
+  // is rendered and the browser never opens — output is out/podcast.mp3 (+ a cover).
+  // Shape: { audioOnly:true | kind:'podcast', title?, music?, voices?:{Name:voiceId},
+  //          gap?, introLead?, outroTail?, musicVolume?, turns:[{speaker,text,voice?,gap?}] }
+  if (SB.audioOnly === true || SB.kind === 'podcast') {
+    const voiceMap = (SB.voices && typeof SB.voices === 'object') ? SB.voices : {}
+    const rawTurns = Array.isArray(SB.turns) ? SB.turns
+      : Array.isArray(SB.dialogue) ? SB.dialogue
+      : Array.isArray(SB.scenes) ? SB.scenes.map((s) => ({ speaker: s.speaker, text: s.say || s.text, voice: s.voice, gap: s.gap }))
+      : []
+    const turns = rawTurns
+      .map((t) => ({ speaker: t.speaker || '', text: String(t.text || t.say || '').trim(),
+        voice: t.voice || voiceMap[t.speaker] || SB.voice, gap: (t.gap != null && isFinite(+t.gap)) ? +t.gap : null }))
+      .filter((t) => t.text)
+    if (!turns.length) { console.error('podcast: no spoken turns'); process.exit(2) }
+    console.log(`▶  podcast · ${turns.length} turns · voices: ${[...new Set(turns.map((t) => t.voice || DEFAULT_VOICE))].join(', ')}\n`)
+
+    const GAP = Math.max(0, Math.min(3, Number(SB.gap ?? 0.35) || 0.35))
+    const hasMusic = !!(SB.music && (SB.music.url || SB.music.mood))
+    const LEAD = Math.max(0, Math.min(8, Number(SB.introLead ?? (hasMusic ? 2.2 : 0))))
+    const TAIL = Math.max(0, Math.min(8, Number(SB.outroTail ?? (hasMusic ? 2.5 : 0.4))))
+    const lines = []
+    let cursor = LEAD
+    for (let i = 0; i < turns.length; i++) {
+      const t = turns[i]
+      const wav = tts(t.text, t.voice, path.join(WORK, `pod_${i}.wav`))
+      if (!wav) { console.log(`   (turn ${i} tts failed — skipped)`); continue }
+      const gap = t.gap == null ? GAP : Math.max(0, Math.min(3, t.gap))
+      lines.push({ start: cursor, dur: wav.dur, wav: wav.wav })
+      console.log(`   · ${t.speaker || 'voice'} (${t.voice || DEFAULT_VOICE}) — ${wav.dur.toFixed(1)}s @ ${cursor.toFixed(1)}s`)
+      cursor += wav.dur + gap
+    }
+    if (!lines.length) { console.error('podcast: all turns failed to synthesize'); process.exit(2) }
+    const dialogueEnd = cursor - GAP
+    const total = dialogueEnd + TAIL
+
+    // Resolve an optional music bed (inline — resolveTrack lives later in this IIFE).
+    let track = null
+    if (SB.music) {
+      if (SB.music.url) track = { url: SB.music.url }
+      else if (SB.music.mood) { try { const p = pickMusic({ mood: SB.music.mood, seed: (Date.now() >>> 0) }); track = { url: p.url } } catch { track = null } }
+    }
+    const inputs = [], aParts = [], mixLabels = []
+    let idx = 0
+    if (track) {
+      const music = curl(track.url, path.join(CACHE, `music_${hash(track.url)}.mp3`))
+      inputs.push('-stream_loop', '-1', '-i', music); const mi = idx++
+      const full = Math.max(0, Math.min(1, Number(SB.musicIntroVolume ?? 0.8)))
+      const duck = Math.max(0, Math.min(1, Number(SB.musicVolume ?? 0.12)))
+      const fOut = Math.min(2.0, TAIL || 1.2)
+      // Music plays clear during the intro lead + outro tail, ducks under [LEAD, dialogueEnd].
+      aParts.push(`[${mi}:a]atrim=0:${total.toFixed(2)},afade=t=in:st=0:d=${Math.min(1.5, LEAD || 1).toFixed(2)},afade=t=out:st=${(total - fOut).toFixed(2)}:d=${fOut.toFixed(2)},volume=eval=frame:volume='if(between(t,${LEAD.toFixed(2)},${dialogueEnd.toFixed(2)}),${duck},${full})'[bed]`)
+      mixLabels.push('[bed]')
+    }
+    const lineIdx = []
+    for (const l of lines) { inputs.push('-i', l.wav); lineIdx.push(idx++) }
+    lines.forEach((l, k) => {
+      const ms = Math.round(l.start * 1000)
+      aParts.push(`[${lineIdx[k]}:a]adelay=${ms}|${ms},volume=1.35[v${k}]`)
+      mixLabels.push(`[v${k}]`)
+    })
+    aParts.push(mixLabels.length === 1 ? `${mixLabels[0]}anull[a]`
+      : `${mixLabels.join('')}amix=inputs=${mixLabels.length}:normalize=0:duration=longest[a]`)
+
+    const outPod = path.join(OUT, 'podcast.mp3')
+    const fcFile = path.join(WORK, 'podgraph.txt'); fs.writeFileSync(fcFile, aParts.join(';'))
+    ff([...inputs, '-filter_complex_script', fcFile, '-map', '[a]', '-c:a', 'libmp3lame', '-q:a', '3', '-t', total.toFixed(2), outPod])
+
+    // Cover art so the hub/playground has a poster (a0 background, else a default studio prompt).
+    try {
+      const cp = (SB.cover && (SB.cover.prompt || (typeof SB.cover === 'string' ? SB.cover : SB.cover.src)))
+        || `podcast cover art, ${SB.title || 'audio episode'}, moody studio microphone, cinematic lighting, no text`
+      const cov = /^https?:\/\//.test(cp) ? curl(cp, path.join(WORK, 'cover.jpg')) : curl(a0ImageUrl(cp, 7), path.join(WORK, 'cover.jpg'))
+      if (cov && fs.existsSync(cov)) { fs.copyFileSync(cov, path.join(OUT, 'thumb.jpg')); console.log('   cover: out/thumb.jpg') }
+    } catch (e) { console.log(`   (cover skipped: ${e.message})`) }
+
+    const mb = (fs.statSync(outPod).size / 1048576).toFixed(2)
+    console.log(`\n✅ out/podcast.mp3 · ${total.toFixed(1)}s · ${mb} MB`)
+    console.log(`⏱  ${secs().toFixed(1)}s`)
+    return
+  }
+  // ── end podcast ──────────────────────────────────────────────────────────────
+
   const nSay = SB.scenes.filter((s) => s.say).length
   console.log(`▶  ${W}x${H}@${FPS} · ${SB.scenes.length} scenes${nSay ? ` · ${nSay} narrated${CAPTIONS ? '+captions' : ''}` : ''}${DRAFT ? ' · DRAFT' : ''}${WM ? ' · watermark' : ''}\n`)
   const credits = [], segs = []
