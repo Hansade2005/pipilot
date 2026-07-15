@@ -103,7 +103,9 @@ const DEFAULT_VOICE = process.env.KOKORO_VOICE || 'am_fenrir'  // bold US male; 
 const CAPTIONS = SB.captions === true || SB.captions === 'true'
 // `video` scenes prefer Pixabay b-roll, but fall back to an a0-generated image when
 // no key is connected — so a missing PIXABAY_KEY no longer fails the whole render.
-const needsPixabay = SB.scenes.some((s) => s.kind === 'video')
+// Guard: podcast/audio-only storyboards carry `turns`, not `scenes` — this top-level line runs
+// before the podcast branch, so an unguarded .some() crashed every podcast render.
+const needsPixabay = Array.isArray(SB.scenes) && SB.scenes.some((s) => s.kind === 'video')
 if (needsPixabay) {
   const corpus = videoCorpusSize()
   if (corpus) console.log(`   video scenes → baked B-roll corpus (${corpus.toLocaleString()} clips, zero-API)`)
