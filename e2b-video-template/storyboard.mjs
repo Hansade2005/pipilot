@@ -101,7 +101,7 @@
 // 1080-class canvases (was 720p) — noticeably sharper, and large outputs now go
 // to Drive rather than an inline cap, so the size bump is handled.
 import { CARD_TEMPLATES } from './cards.mjs'
-const ASPECTS = { '16:9': [1920, 1080], '9:16': [1080, 1920], '1:1': [1080, 1080], '4:5': [1080, 1350] }
+const ASPECTS = { '16:9': [1920, 1080], '9:16': [1080, 1920], '1:1': [1080, 1080], '4:5': [1080, 1350], '5:4': [1350, 1080], '4:3': [1440, 1080], '3:4': [1080, 1440], '3:2': [1620, 1080], '2:3': [1080, 1620], '21:9': [2560, 1080], '9:21': [1080, 2560] }
 // NOTE: 'avatar' is TEMPORARILY DISABLED (removed from the advertised kinds) until the talking-
 // presenter/Wav2Lip pipeline is improved — avatarSeg + presenter plumbing stay in generate.mjs so
 // re-enabling is just adding 'avatar' back here. The agent prompt no longer offers avatar scenes.
@@ -124,6 +124,7 @@ export function validateStoryboard(sb) {
   for (const k of ['width', 'height', 'fps']) {
     if (sb[k] != null && (!isNum(sb[k]) || sb[k] <= 0)) e.push(`${k} must be a positive number`)
   }
+  if (sb.scale != null && (!isNum(sb.scale) || sb.scale <= 0 || sb.scale > 1)) e.push('scale must be a number in (0, 1]')
   if (sb.title != null && typeof sb.title !== 'string') e.push('title must be a string')
 
   // audio-only PODCAST — a multi-voice voiceover with NO scenes. Validate the spoken
@@ -245,9 +246,14 @@ export function validateStoryboard(sb) {
 
 // Normalize an aspect/defaults into concrete {width,height,fps}. Call after validation.
 export function resolveCanvas(sb) {
-  let [width, height] = sb.aspect ? ASPECTS[sb.aspect] : [sb.width || 1280, sb.height || 720]
+  // Guard: an unknown aspect must NOT throw on destructure — fall back to 16:9.
+  let [width, height] = sb.aspect ? (ASPECTS[sb.aspect] || [1280, 720]) : [sb.width || 1280, sb.height || 720]
   if (sb.width) width = sb.width
   if (sb.height) height = sb.height
+  // Optional resolution scaling: sb.scale in (0,1] downscales the 1080-class base
+  // (e.g. 0.667=720p, 0.444=480p, 0.333=360p). Keep dims even for ffmpeg.
+  const scale = Math.max(0.25, Math.min(1, Number(sb.scale) || 1))
+  if (scale !== 1) { width = Math.round((width * scale) / 2) * 2; height = Math.round((height * scale) / 2) * 2 }
   return { width, height, fps: sb.fps || 30 }
 }
 
