@@ -205,6 +205,37 @@ function tts(text, voice, outWav) {
     return { wav: outWav, dur }
   } catch (e) { console.log(`   (kokoro tts failed for voice "${v}": ${e.message})`); return null }
 }
+// In-scene MULTI-VOICE dialogue: synthesize each turn ({speaker,text,voice?,gap?}) in its own
+// Kokoro voice and concatenate them (with short gaps) into ONE wav. Returns { wav, dur } exactly
+// like tts(), so a scene carrying `turns` flows through the narration/extension/mixing path
+// unchanged — one held visual can hold a whole back-and-forth conversation.
+function ttsDialog(turns, defaultVoice, outWav) {
+  const list = (Array.isArray(turns) ? turns : [])
+    .map((t) => ({ text: String((t && (t.text ?? t.say)) || "").trim(), voice: (t && t.voice) || defaultVoice, gap: t && t.gap }))
+    .filter((t) => t.text)
+  if (!list.length) return null
+  const base = path.basename(outWav, ".wav")
+  const parts = []
+  for (let i = 0; i < list.length; i++) {
+    const w = tts(list[i].text, list[i].voice, path.join(WORK, `${base}_t${i}.wav`))
+    if (!w) { console.log(`   (dialogue turn ${i} tts failed — skipped)`); continue }
+    const g = list[i].gap == null ? 0.32 : Math.max(0, Math.min(3, Number(list[i].gap) || 0))
+    parts.push({ wav: w.wav, dur: w.dur, gap: i < list.length - 1 ? g : 0 })
+  }
+  if (!parts.length) return null
+  if (parts.length === 1) { fs.copyFileSync(parts[0].wav, outWav); return { wav: outWav, dur: parts[0].dur } }
+  const inputs = [], seg = []
+  let total = 0
+  parts.forEach((prt, k) => {
+    inputs.push("-i", prt.wav)
+    seg.push(`[${k}:a]aformat=sample_rates=24000:channel_layouts=mono,apad=pad_dur=${prt.gap.toFixed(3)}[s${k}]`)
+    total += prt.dur + prt.gap
+  })
+  const cat = parts.map((_, k) => `[s${k}]`).join("") + `concat=n=${parts.length}:v=0:a=1[a]`
+  const fc = path.join(WORK, `${base}_dialog.txt`); fs.writeFileSync(fc, [...seg, cat].join(";"))
+  try { ff([...inputs, "-filter_complex_script", fc, "-map", "[a]", outWav]) } catch (e) { console.log(`   (dialogue concat failed: ${e.message})`); return null }
+  return fs.existsSync(outWav) ? { wav: outWav, dur: total } : null
+}
 function curl(url, dest) {
   // Accept a FALLBACK LIST: [primary, fallback, …] — try each until one downloads. Lets a slower
   // text-capable provider (Pollinations) lead with a reliable a0 fallback on failure/timeout.
@@ -1283,9 +1314,12 @@ function capDraws(text, start, end, typewriter) {
   const narrRaw = []
   for (let i = 0; i < SB.scenes.length; i++) {
     const s = SB.scenes[i]
-    if (!s.say) { narrRaw.push(null); continue }
+    const hasTurns = Array.isArray(s.turns) && s.turns.some((t) => t && (t.text || t.say))
+    if (!s.say && !hasTurns) { narrRaw.push(null); continue }
     const v = s.voice || DEFAULT_NARR_VOICE
-    const w = tts(s.say, v, path.join(WORK, `narr_${i}.wav`))
+    const w = hasTurns
+      ? ttsDialog(s.turns, v, path.join(WORK, `narr_${i}.wav`))
+      : tts(s.say, v, path.join(WORK, `narr_${i}.wav`))
     narrRaw.push(w || null)
     // keepAudio scenes hold their EXACT clip length (the transcript range) — the `say` is only a
     // short VO patch over part of it, so DON'T stretch the scene to fit the narration.
@@ -1302,7 +1336,7 @@ function capDraws(text, start, end, typewriter) {
     const voLen = Math.min(w.dur, winMax)
     const atEnd = s.keepAudio && (s.sayAt === 'end' || s.sayAt === 'outro')
     const rel = atEnd ? Math.max(0, durs[i] - voLen - 0.3) : 0
-    narr.push({ i, start: starts[i] + rel, rel, dur: w.dur, voLen, wav: w.wav, text: s.say, end: starts[i] + durs[i] })
+    narr.push({ i, start: starts[i] + rel, rel, dur: w.dur, voLen, wav: w.wav, text: s.say || "", end: starts[i] + durs[i] })
   }
   const narrByScene = new Map(narr.map((n) => [n.i, n]))
   const hasNarr = narr.length > 0
