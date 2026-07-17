@@ -71,6 +71,16 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /opt/pipilot-video
 RUN npm init -y && npm install playwright
 RUN PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright npx playwright install --with-deps chromium
+
+# ── VideoFlow experimental render path (admin-only "VideoFlow mode") ────────
+# Real Google Chrome (WebCodecs H.264 — open-source Chromium lacks the proprietary
+# encoder VideoFlow needs) + the VideoFlow packages, baked at /opt/videoflow so an
+# experimental render needs ZERO install at runtime. The render_videoflow E2B action
+# writes the agent-authored builder script here and runs it against these deps.
+WORKDIR /opt/videoflow
+RUN npm init -y >/dev/null 2>&1 && npm install @videoflow/core @videoflow/renderer-server @videoflow/renderer-browser @videoflow/renderer-dom
+RUN npx playwright install --with-deps chrome
+WORKDIR /opt/pipilot-video
 COPY e2b-video-template/generate.mjs e2b-video-template/stockdb.mjs e2b-video-template/storyboard.mjs e2b-video-template/cards.mjs e2b-video-template/logo.svg ./
 
 # The zero-API stock corpus (music moods + unsplash photos/topics/collections).
