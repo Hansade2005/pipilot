@@ -219,22 +219,49 @@ function ttsDialog(turns, defaultVoice, outWav) {
   for (let i = 0; i < list.length; i++) {
     const w = tts(list[i].text, list[i].voice, path.join(WORK, `${base}_t${i}.wav`))
     if (!w) { console.log(`   (dialogue turn ${i} tts failed — skipped)`); continue }
-    const g = list[i].gap == null ? 0.32 : Math.max(0, Math.min(3, Number(list[i].gap) || 0))
+    // `gap` = the pause BEFORE the next turn. NEGATIVE = the next speaker cuts in early
+    // (interruption / overlapping argument) — clamp to [-0.7s overlap, 3s pause]. Default
+    // 0.28s = a snappy human back-and-forth (was 0.32s). Same-speaker consecutive turns keep
+    // a natural breath (never overlap themselves).
+    let g = list[i].gap == null ? 0.28 : Math.max(-0.7, Math.min(3, Number(list[i].gap) || 0))
+    if (g < 0 && i < list.length - 1 && list[i + 1].voice === list[i].voice) g = 0.1
     parts.push({ wav: w.wav, dur: w.dur, gap: i < list.length - 1 ? g : 0 })
   }
   if (!parts.length) return null
   if (parts.length === 1) { fs.copyFileSync(parts[0].wav, outWav); return { wav: outWav, dur: parts[0].dur } }
+  const overlap = parts.some((p) => p.gap < 0)
   const inputs = [], seg = []
-  let total = 0
+  if (!overlap) {
+    // Fast path — pure sequential turn-taking. apad each with its trailing gap, then concat.
+    let total = 0
+    parts.forEach((prt, k) => {
+      inputs.push("-i", prt.wav)
+      seg.push(`[${k}:a]aformat=sample_rates=24000:channel_layouts=mono,apad=pad_dur=${prt.gap.toFixed(3)}[s${k}]`)
+      total += prt.dur + prt.gap
+    })
+    const cat = parts.map((_, k) => `[s${k}]`).join("") + `concat=n=${parts.length}:v=0:a=1[a]`
+    const fc = path.join(WORK, `${base}_dialog.txt`); fs.writeFileSync(fc, [...seg, cat].join(";"))
+    try { ff([...inputs, "-filter_complex_script", fc, "-map", "[a]", outWav]) } catch (e) { console.log(`   (dialogue concat failed: ${e.message})`); return null }
+    return fs.existsSync(outWav) ? { wav: outWav, dur: total } : null
+  }
+  // Overlap path — place each turn on a shared timeline so an interruption's audio actually
+  // rides over the tail of the previous line, the way people talk over each other in a heated
+  // exchange. adelay shifts each clip to its start time; micro fade-in/out kills join clicks;
+  // amix sums them; alimiter tames the brief moments where two voices coincide.
+  let cursor = 0, end = 0
   parts.forEach((prt, k) => {
+    const start = Math.max(0, cursor)
+    const ms = Math.round(start * 1000)
+    const fd = Math.min(0.02, prt.dur / 4)
     inputs.push("-i", prt.wav)
-    seg.push(`[${k}:a]aformat=sample_rates=24000:channel_layouts=mono,apad=pad_dur=${prt.gap.toFixed(3)}[s${k}]`)
-    total += prt.dur + prt.gap
+    seg.push(`[${k}:a]aformat=sample_rates=24000:channel_layouts=mono,afade=t=in:st=0:d=${fd.toFixed(3)},afade=t=out:st=${Math.max(0, prt.dur - fd).toFixed(3)}:d=${fd.toFixed(3)},adelay=delays=${ms}:all=1[m${k}]`)
+    end = Math.max(end, start + prt.dur)
+    cursor = start + prt.dur + prt.gap
   })
-  const cat = parts.map((_, k) => `[s${k}]`).join("") + `concat=n=${parts.length}:v=0:a=1[a]`
-  const fc = path.join(WORK, `${base}_dialog.txt`); fs.writeFileSync(fc, [...seg, cat].join(";"))
-  try { ff([...inputs, "-filter_complex_script", fc, "-map", "[a]", outWav]) } catch (e) { console.log(`   (dialogue concat failed: ${e.message})`); return null }
-  return fs.existsSync(outWav) ? { wav: outWav, dur: total } : null
+  const mix = parts.map((_, k) => `[m${k}]`).join("") + `amix=inputs=${parts.length}:normalize=0:dropout_transition=0[mx];[mx]alimiter=limit=0.95[a]`
+  const fc = path.join(WORK, `${base}_dialog.txt`); fs.writeFileSync(fc, [...seg, mix].join(";"))
+  try { ff([...inputs, "-filter_complex_script", fc, "-map", "[a]", outWav]) } catch (e) { console.log(`   (dialogue mix failed: ${e.message})`); return null }
+  return fs.existsSync(outWav) ? { wav: outWav, dur: end } : null
 }
 function curl(url, dest) {
   // Accept a FALLBACK LIST: [primary, fallback, …] — try each until one downloads. Lets a slower
