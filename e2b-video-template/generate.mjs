@@ -1545,7 +1545,9 @@ function capDraws(text, start, end, typewriter) {
 
   // ── audio: ducked music (per segment, looped + crossfaded at switches) + narration ──
   const aParts = [], mixLabels = []
-  const vol = hasNarr ? 0.22 : 0.85 // duck music under narration
+  // Duck music well under the voiceover so narration always sits on top (0.22 was too hot and
+  // fought the VO). 0.13 matches the podcast bed for clean speech; overridable via SB.musicVolume.
+  const vol = hasNarr ? Math.max(0, Math.min(0.6, Number(SB.musicVolume ?? 0.13))) : Math.max(0, Math.min(1, Number(SB.musicIntroVolume ?? 0.85)))
   musicSegments.forEach((seg, k) => {
     const segStart = starts[seg.from] || 0
     const segEnd = Math.min(total, (starts[seg.to] || 0) + (durs[seg.to] || 0))
