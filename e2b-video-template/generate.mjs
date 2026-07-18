@@ -275,10 +275,22 @@ function curl(url, dest) {
   // never shell out to curl, which rejects a non-URL path with "bad/illegal format".
   if (typeof url === 'string' && !/^https?:\/\//i.test(url) && fs.existsSync(url)) return url
   if (fs.existsSync(dest) && fs.statSync(dest).size > 0) return dest
+  // Browser-like headers so CDNs that reject a bare/header-less curl (fbcdn, some signed S3/GCS,
+  // Cloudflare) still serve the file — "works in my browser, 403 in curl" is almost always a
+  // missing User-Agent/Accept. The URL is passed VERBATIM (query string preserved — for signed
+  // links the ?…&oh=…&oe=… params ARE the auth, so never strip them).
+  const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36'
   // --retry-all-errors so a TRANSIENT a0.dev 500 (its image API overloads) is retried, not fatal.
-  try { execFileSync('curl', ['-f', '-sS', '-L', '--retry', '3', '--retry-delay', '1', '--retry-all-errors', '--max-time', '90', '-o', dest, url], { stdio: ['ignore', 'ignore', 'inherit'] }) }
+  try { execFileSync('curl', ['-f', '-sS', '-L', '--retry', '3', '--retry-delay', '1', '--retry-all-errors', '--max-time', '90', '-H', `user-agent: ${UA}`, '-H', 'accept: */*', '-H', 'accept-language: en-US,en;q=0.9', '-o', dest, url], { stdio: ['ignore', 'ignore', 'inherit'] }) }
   catch (e) { try { fs.unlinkSync(dest) } catch {} throw e }
   return dest
+}
+// A provided src that points at actual VIDEO (by extension OR a known video CDN) must be used as
+// VIDEO (brollSeg), not fed to the still-image ken-burns path which would download it to a .jpg and
+// pan a single frame. Query strings are tolerated (…/clip.mp4?sig=…).
+function isVideoUrl(u) {
+  const s = Array.isArray(u) ? u[0] : u
+  return typeof s === 'string' && (/\.(mp4|webm|mov|m4v|mkv)(\?|#|$)/i.test(s) || /fbcdn\.net|\bvideo-[a-z0-9]+-\d+\.xx\.|\.mp4\?/i.test(s))
 }
 
 // ── LIVE stock search (platform keys) ────────────────────────────────────────
@@ -1414,7 +1426,16 @@ function capDraws(text, start, end, typewriter) {
             } catch (e) { console.log(`   (scene ${i} keepAudio extract failed: ${e.message})`) }
           }
         }
-        if (!done && userSrc) { credits.push('provided'); kenBurnsSeg(out, userSrc, dur, s.forward !== false); done = true }
+        if (!done && userSrc) {
+          // A provided VIDEO url → use it as real video (brollSeg); a provided IMAGE → ken-burns pan.
+          // Wrap in try/catch so an expired/blocked signed URL (fbcdn links are short-lived + IP-bound)
+          // falls through to live stock / the baked corpus instead of killing the whole render.
+          try {
+            if (isVideoUrl(userSrc)) brollSeg(out, userSrc, dur, s.start || 0)
+            else kenBurnsSeg(out, userSrc, dur, s.forward !== false)
+            credits.push('provided'); done = true
+          } catch (e) { console.log(`   (provided src failed: ${String(e && e.message || e).slice(0, 160)} — falling back to stock)`) }
+        }
         if (!done) { const live = liveVideo(vkw); if (live) { credits.push(live.credit); brollSeg(out, live.url, dur, s.start || 0); done = true } }
         if (!done) { const clip = pickVideo({ keyword: vkw, aspect: SB.aspect, minDur: s.dur, seed: i }); if (clip) { credits.push(clip.credit); brollSeg(out, clip.url_medium || clip.url, dur, s.start || 0); done = true } }
         if (!done) { credits.push('AI-generated (a0)'); kenBurnsSeg(out, a0ImageUrl(s.prompt || s.q || 'cinematic abstract background', i), dur, s.forward !== false) }
