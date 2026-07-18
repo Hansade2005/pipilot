@@ -1160,6 +1160,107 @@ function xfadeConcat(out, segs, durs, transFor = []) {
       '-map', '[v]', '-c:v', 'libx264', '-crf', '20', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', out])
   return acc
 }
+// ── VISUAL FX + COLOR GRADE (opt-in per scene) ───────────────────────────────
+// A cheap ffmpeg-native effects layer applied to a finished scene segment. Set `fx`
+// (a name or array of names) and/or `grade` (a preset name or an {…} object) on any
+// scene — or SB.fx / SB.grade for the whole video. Nothing runs unless one is set, so
+// there is ZERO cost by default. Fluid GPU-shader effects (glass, ripple, heat-haze,
+// per-element enter presets) are intentionally NOT here — those belong to canvas/
+// scene3d/VideoFlow. FX intensity scales with SB.fxIntensity (default 1).
+const FXI = Math.max(0.2, Math.min(2.5, Number(SB.fxIntensity ?? 1) || 1))
+const _n = (x) => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+// Each effect is either { lin } (a filter appended to a linear chain) or { blend } (a
+// self-contained split→process→blend subgraph, given unique labels per stage k).
+const FX = {
+  gaussianblur: { lin: `gblur=sigma=${(8 * FXI).toFixed(1)}` },
+  blur:         { lin: `gblur=sigma=${(8 * FXI).toFixed(1)}` },
+  frostedglass: { lin: `gblur=sigma=${(14 * FXI).toFixed(1)},eq=saturation=0.92` },
+  motionblur:   { lin: `tmix=frames=3:weights='1 1 1'` },
+  sharpen:      { lin: `unsharp=5:5:${(1.0 * FXI).toFixed(2)}` },
+  vignette:     { lin: `vignette=a=${(0.6 * Math.min(2, FXI)).toFixed(3)}` },
+  filmgrain:    { lin: `noise=alls=${Math.round(16 * FXI)}:allf=t+u` },
+  grain:        { lin: `noise=alls=${Math.round(16 * FXI)}:allf=t+u` },
+  invert:       { lin: `negate` },
+  pixelate:     { lin: `pixelize=w=${Math.max(2, Math.round(8 * FXI))}:h=${Math.max(2, Math.round(8 * FXI))}` },
+  chromaticaberration: { lin: `rgbashift=rh=${Math.round(4 * FXI)}:bh=${-Math.round(4 * FXI)}` },
+  rgbsplit:     { lin: `rgbashift=rh=${Math.round(5 * FXI)}:bh=${-Math.round(5 * FXI)}` },
+  lensdistortion: { lin: `lenscorrection=k1=${(0.15 * FXI).toFixed(2)}:k2=${(0.05 * FXI).toFixed(2)}` },
+  fisheye:      { lin: `lenscorrection=k1=${(0.3 * FXI).toFixed(2)}:k2=${(0.1 * FXI).toFixed(2)}` },
+  vhsdistortion:{ lin: `rgbashift=rh=3:bh=-3,noise=alls=${Math.round(12 * FXI)}:allf=t,eq=saturation=1.15` },
+  vhs:          { lin: `rgbashift=rh=3:bh=-3,noise=alls=${Math.round(12 * FXI)}:allf=t,eq=saturation=1.15` },
+  crtscanlines: { lin: `drawgrid=w=iw:h=4:t=1:c=black@${(0.3 * Math.min(1.5, FXI)).toFixed(2)}` },
+  scanlines:    { lin: `drawgrid=w=iw:h=4:t=1:c=black@${(0.3 * Math.min(1.5, FXI)).toFixed(2)}` },
+  duotone:      { lin: `hue=s=0,colorbalance=rs=0.25:bs=-0.25:rh=0.25:bh=-0.15` },
+  glow:  { blend: (i, o, k) => `[${i}]split[g${k}a][g${k}b];[g${k}b]gblur=sigma=${Math.round(18 * FXI)},eq=brightness=${(0.06 * FXI).toFixed(2)}[g${k}c];[g${k}a][g${k}c]blend=all_mode=screen:all_opacity=${Math.min(1, 0.7 * FXI).toFixed(2)}[${o}]` },
+  bloom: { blend: (i, o, k) => `[${i}]split[g${k}a][g${k}b];[g${k}b]gblur=sigma=${Math.round(24 * FXI)},eq=brightness=${(0.08 * FXI).toFixed(2)}[g${k}c];[g${k}a][g${k}c]blend=all_mode=screen:all_opacity=${Math.min(1, 0.8 * FXI).toFixed(2)}[${o}]` },
+  edgeglow: { blend: (i, o, k) => `[${i}]split[g${k}a][g${k}b];[g${k}b]gblur=sigma=${Math.round(14 * FXI)},eq=brightness=0.05[g${k}c];[g${k}a][g${k}c]blend=all_mode=screen:all_opacity=0.6[${o}]` },
+  lightleak: { blend: (i, o, k) => `[${i}]split[l${k}a][l${k}b];[l${k}b]gblur=sigma=30,colorbalance=rh=0.4:gh=0.1:bh=-0.3,eq=brightness=0.1[l${k}c];[l${k}a][l${k}c]blend=all_mode=screen:all_opacity=0.32[${o}]` },
+}
+// Named color-grade presets (linear), or an object {brightness,contrast,saturation,gamma,warm}.
+const GRADE = {
+  cinematic: 'colorbalance=rs=-0.1:bs=0.1:rh=0.1:bh=-0.1,eq=contrast=1.08:saturation=1.05',
+  tealorange: 'colorbalance=rs=-0.12:bs=0.12:rh=0.12:bh=-0.12,eq=contrast=1.1:saturation=1.08',
+  noir: 'hue=s=0,eq=contrast=1.18:brightness=-0.02',
+  bw: 'hue=s=0,eq=contrast=1.15',
+  warm: 'colorbalance=rm=0.12:bm=-0.1,eq=saturation=1.05',
+  cold: 'colorbalance=rm=-0.1:bm=0.12',
+  cool: 'colorbalance=rm=-0.1:bm=0.12',
+  vibrant: 'eq=saturation=1.35:contrast=1.05',
+  vivid: 'eq=saturation=1.5:contrast=1.08',
+  muted: 'eq=saturation=0.72',
+  moody: 'eq=brightness=-0.05:contrast=1.12:saturation=0.9',
+  vintage: `curves=r='0/0.05 1/0.9':b='0/0.1 1/0.85',eq=saturation=0.78:contrast=0.95`,
+  sepia: 'colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131',
+  dreamy: 'eq=brightness=0.04:saturation=1.1:contrast=0.98',
+}
+function gradeToFilter(g) {
+  if (!g) return ''
+  if (typeof g === 'string') return GRADE[_n(g)] || ''
+  if (typeof g === 'object') {
+    const eq = []
+    if (g.brightness != null) eq.push(`brightness=${Number(g.brightness)}`)
+    if (g.contrast != null) eq.push(`contrast=${Number(g.contrast)}`)
+    if (g.saturation != null) eq.push(`saturation=${Number(g.saturation)}`)
+    if (g.gamma != null) eq.push(`gamma=${Number(g.gamma)}`)
+    const parts = []
+    if (eq.length) parts.push(`eq=${eq.join(':')}`)
+    if (g.warm != null) { const w = Number(g.warm); parts.push(`colorbalance=rm=${(0.12 * w).toFixed(3)}:bm=${(-0.12 * w).toFixed(3)}`) }
+    return parts.join(',')
+  }
+  return ''
+}
+function buildFxGraph(fxRaw, gradeRaw) {
+  const fx = (Array.isArray(fxRaw) ? fxRaw : (fxRaw ? [fxRaw] : [])).map((x) => _n(x)).filter(Boolean)
+  const gradeStr = gradeToFilter(gradeRaw)
+  const stages = []
+  let lin = []
+  const flush = () => { if (lin.length) { const a = lin.slice(); stages.push((i, o) => `[${i}]${a.join(',')}[${o}]`); lin = [] } }
+  for (const name of fx) {
+    const eff = FX[name]
+    if (!eff) continue
+    if (eff.lin) lin.push(eff.lin)
+    else if (eff.blend) { flush(); stages.push(eff.blend) }
+  }
+  if (gradeStr) lin.push(gradeStr)
+  flush()
+  if (!stages.length) return null
+  let cur = '0:v'
+  const parts = []
+  stages.forEach((st, k) => { const o = k === stages.length - 1 ? 'v' : `fs${k}`; parts.push(st(cur, o, k)); cur = o })
+  return parts.join(';')
+}
+// Re-encode a finished (silent) scene segment through its fx/grade graph, in place.
+function applyFx(seg, fxRaw, gradeRaw) {
+  const graph = buildFxGraph(fxRaw, gradeRaw)
+  if (!graph) return
+  const tmp = seg.replace(/\.mp4$/, '_fx.mp4')
+  try {
+    ff(['-i', seg, '-filter_complex', graph, '-map', '[v]', '-c:v', 'libx264', '-crf', '20', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', tmp])
+    fs.renameSync(tmp, seg)
+  } catch (e) { console.log(`   (fx skipped on ${path.basename(seg)}: ${String(e && e.message || e).slice(0, 120)})`); try { fs.unlinkSync(tmp) } catch {} }
+}
+// Friendly transition aliases → the real xfade names the engine supports.
+const XF_ALIAS = { zoom: 'zoomin', radialzoom: 'zoomin', wipereveal: 'wipeleft', scanreveal: 'hlslice', sliceassemble: 'vuslice', radialreveal: 'radial', noisedissolve: 'dissolve', lightsweepreveal: 'horzopen', lenssnap: 'circleopen', slideup: 'slideup', slidedown: 'slidedown', slideleft: 'slideleft', slideright: 'slideright' }
 // Encode speed scales with length so long 1080p videos never approach the render
 // timeout (CRF governs quality; preset is mostly a size/speed trade — a faster
 // preset at the same CRF is only marginally larger).
@@ -1561,6 +1662,8 @@ function capSequence(text, start, end) {
           (s.kind === 'video' || s.kind === 'still' || s.kind === 'image' || s.kind === 'canvas')) {
         await overlayPresenterStill(out, dur, s.presenterPos || SB.presenter.corner, s.presenterSize || SB.presenter.size)
       }
+      // Opt-in visual FX + color grade (per-scene `fx`/`grade`, or video-wide SB.fx/SB.grade).
+      applyFx(out, s.fx ?? SB.fx, s.grade ?? SB.grade)
       segs.push(out)
       const src = credits.length > cBefore ? ` [${credits[credits.length - 1]}]` : ''
       console.log(`  · seg ${i} (${s.kind})${src} — ${secs().toFixed(1)}s`)
@@ -1577,7 +1680,7 @@ function capSequence(text, start, end) {
 
   const silent = path.join(WORK, 'silent.mp4')
   // Per-boundary transitions: scene i may set `transition`; otherwise a varied default.
-  const transFor = SB.scenes.map((s) => (s.transition && XF_TRANSITIONS.has(s.transition) ? s.transition : null))
+  const transFor = SB.scenes.map((s) => { const t = _n(s.transition); const norm = XF_ALIAS[t] || t; return norm && XF_TRANSITIONS.has(norm) ? norm : null })
   if (hasOutro) transFor.push('fadeblack') // the outro's transition-in
   const total = xfadeConcat(silent, segs, durs, transFor)
 
