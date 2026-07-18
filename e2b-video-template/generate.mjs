@@ -1219,6 +1219,42 @@ function capDraws(text, start, end, typewriter) {
   }
   return out
 }
+// SEQUENTIAL captions (TikTok/Reels style): split the narration into SHORT phrases and show ONE at a
+// time — each phrase REPLACES the previous so the screen never stacks into a wall of text; on-screen
+// caption stays a single short line (max two) that swaps in sync with the speech. Phrases break at
+// punctuation/clause boundaries, timed by char-weight across the real narration window.
+const CAP_CHUNK_WORDS = 6
+const CAP_CHUNK_CHARS = Math.min(CAP_MAXLINE, 30)
+function chunkCaption(t, maxWords, maxChars) {
+  const words = String(t).split(' ').filter(Boolean)
+  const chunks = []
+  let cur = []
+  for (const w of words) {
+    cur.push(w)
+    const joined = cur.join(' ')
+    const endsClause = /[.,!?;:]$/.test(w)
+    if (joined.length >= maxChars || cur.length >= maxWords || (endsClause && cur.length >= 3)) { chunks.push(joined); cur = [] }
+  }
+  if (cur.length) chunks.push(cur.join(' '))
+  return chunks.length ? chunks : ['']
+}
+const CAP_MAX_CHUNKS = 60 // bound drawtext count on very long narration
+function capSequence(text, start, end) {
+  const t = _capText(text)
+  let chunks = chunkCaption(t, CAP_CHUNK_WORDS, CAP_CHUNK_CHARS)
+  if (chunks.length <= 1) return capDraw(text, start, end)
+  if (chunks.length > CAP_MAX_CHUNKS) chunks = chunks.slice(0, CAP_MAX_CHUNKS)
+  const span = Math.max(0.3, end - start)
+  const totalChars = chunks.reduce((n, c) => n + c.length, 0) || 1
+  const out = []
+  let a = start
+  chunks.forEach((c, idx) => {
+    const b = idx === chunks.length - 1 ? end : Math.min(end, a + span * (c.length / totalChars))
+    lineDrawtexts(wrapLines(c, CAP_MAXLINE), a, b).forEach((d) => out.push(d))
+    a = b
+  })
+  return out
+}
 
 // ── run ─────────────────────────────────────────────────────────────────────
 ;(async () => {
@@ -1583,12 +1619,19 @@ function capDraws(text, start, end, typewriter) {
   SB.scenes.forEach((s, i) => {
     if (s.caption) {
       const obj = typeof s.caption === 'string' ? { text: s.caption } : (s.caption || {})
-      overlays.push({ text: obj.text || '', typewriter: obj.typewriter === true, start: starts[i], end: starts[i] + durs[i] })
-    } else if (CAPTIONS && s.say) { const n = narrByScene.get(i); const cs = n?.start ?? starts[i]; overlays.push({ text: s.say, typewriter: true, start: cs, end: Math.min(starts[i] + durs[i], cs + (n?.dur || durs[i]) + 0.4) }) }
+      overlays.push({ text: obj.text || '', typewriter: obj.typewriter === true, sequence: obj.sequence === true, start: starts[i], end: starts[i] + durs[i] })
+    } else if (CAPTIONS && s.say) {
+      // Narration captions default to SEQUENTIAL one-line-at-a-time (each phrase replaces the last),
+      // NOT the old cumulative word-pile that grew into a multi-line wall. Opt back into the stacked
+      // reveal per scene with { captionStack:true }.
+      const n = narrByScene.get(i); const cs = n?.start ?? starts[i]
+      overlays.push({ text: s.say, sequence: s.captionStack !== true, typewriter: s.captionStack === true, start: cs, end: Math.min(starts[i] + durs[i], cs + (n?.dur || durs[i]) + 0.4) })
+    }
   })
   overlays.forEach((o, k) => {
     if (!o.text) return
-    capDraws(o.text, o.start, o.end, o.typewriter).forEach((d, j) => { const oo = `cap${k}_${j}`; vParts.push(`[${cur}]${d}[${oo}]`); cur = oo })
+    const draws = o.sequence ? capSequence(o.text, o.start, o.end) : capDraws(o.text, o.start, o.end, o.typewriter)
+    draws.forEach((d, j) => { const oo = `cap${k}_${j}`; vParts.push(`[${cur}]${d}[${oo}]`); cur = oo })
   })
 
   // ── audio: ducked music (per segment, looped + crossfaded at switches) + narration ──
