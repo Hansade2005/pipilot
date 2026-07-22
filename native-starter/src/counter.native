@@ -1,0 +1,8 @@
+<column background="background" grow="1" gap="16" padding="24" cross="center">
+  <text>{countLabel}</text>
+  <row gap="8" cross="center">
+    <button variant="secondary" on-press="dec">-</button>
+    <button variant="primary" on-press="inc">+</button>
+    <button size="sm" on-press="reset">Reset</button>
+  </row>
+</column>
