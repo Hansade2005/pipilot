@@ -46,9 +46,15 @@ USER user
 WORKDIR /home/user/project
 
 # Warm the Zig 0.16 toolchain + SDK cache by building the counter starter once.
-# `|| true` so a transient warm-build hiccup never fails the whole image build.
+# `--yes` is MANDATORY: without it `native build` REFUSES to download/use its managed
+# Zig 0.16 toolchain non-interactively and aborts ("zig 0.16.0 ... not found on PATH,
+# re-run with --yes") — so the toolchain would NEVER bake and every runtime sandbox
+# would re-download ~50MB on first build. Runs as `user`, so Zig lands in the runtime
+# user's ~/.native and is reused. `|| true` so a transient hiccup never fails the image;
+# the final ls prints to the build log whether Zig actually baked.
 COPY --chown=user:user native-starter/ /home/user/project/
-RUN native validate app.zon || true \
- && native build || true
+RUN native validate app.zon || true
+RUN native build --yes || true
+RUN ls -la /home/user/.native/toolchains/ 2>/dev/null && echo "ZIG TOOLCHAIN BAKED ✓" || echo "WARN: zig toolchain NOT baked — runtime will re-download"
 
 CMD ["/bin/bash"]
