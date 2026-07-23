@@ -57,6 +57,11 @@ WORKDIR /home/user/app
 # the default build (native dev), and the automation build (native_screenshot). Builds are
 # headless (no display needed at image-build time; only RUNNING the app needs Xvfb).
 RUN sh -c 'native validate app.zon || true'
+# Warm BOTH optimize modes' SDK caches: `native dev` (Live preview) compiles DEBUG, while
+# `native build`/screenshots use ReleaseFast — they key separate objects in the global zig
+# cache (/home/user/.cache/zig). Baking both means the runtime only recompiles the user's
+# (small) app code, not the whole SDK, so the preview window appears in seconds.
+RUN sh -c 'native build --yes -Doptimize=Debug || true'
 RUN sh -c 'native build --yes || true'
 RUN sh -c 'native build --yes -Dautomation=true || true'
 RUN ls -la /home/user/.native/toolchains/ 2>/dev/null && echo "ZIG TOOLCHAIN BAKED ✓" || echo "WARN: zig toolchain NOT baked — preview will re-download"
