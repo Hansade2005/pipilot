@@ -50,7 +50,11 @@ RUN useradd -m -s /bin/bash user \
 COPY --chown=user:user native-starter/ /home/user/app/
 USER user
 WORKDIR /home/user/app
-RUN sh -c 'native validate app.zon || true; native build || true'
+# `--yes` is MANDATORY — without it `native build` refuses to fetch/use its managed Zig
+# 0.16 toolchain non-interactively, so nothing bakes and every preview re-downloads ~50MB.
+# Runs as `user` → Zig lands in the runtime user's ~/.native and is reused by `native dev`.
+RUN sh -c 'native validate app.zon || true; native build --yes || true'
+RUN ls -la /home/user/.native/toolchains/ 2>/dev/null && echo "ZIG TOOLCHAIN BAKED ✓" || echo "WARN: zig toolchain NOT baked — preview will re-download"
 USER root
 
 CMD ["/bin/bash"]
