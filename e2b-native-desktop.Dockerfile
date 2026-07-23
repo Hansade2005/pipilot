@@ -53,7 +53,12 @@ WORKDIR /home/user/app
 # `--yes` is MANDATORY — without it `native build` refuses to fetch/use its managed Zig
 # 0.16 toolchain non-interactively, so nothing bakes and every preview re-downloads ~50MB.
 # Runs as `user` → Zig lands in the runtime user's ~/.native and is reused by `native dev`.
-RUN sh -c 'native validate app.zon || true; native build --yes || true'
+# Bake ALL of it at once so the Live-native preview + screenshots start cold-free: Zig 0.16,
+# the default build (native dev), and the automation build (native_screenshot). Builds are
+# headless (no display needed at image-build time; only RUNNING the app needs Xvfb).
+RUN sh -c 'native validate app.zon || true'
+RUN sh -c 'native build --yes || true'
+RUN sh -c 'native build --yes -Dautomation=true || true'
 RUN ls -la /home/user/.native/toolchains/ 2>/dev/null && echo "ZIG TOOLCHAIN BAKED ✓" || echo "WARN: zig toolchain NOT baked — preview will re-download"
 USER root
 
