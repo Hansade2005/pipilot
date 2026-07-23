@@ -20,7 +20,7 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       xserver-xorg xorg x11-xserver-utils xvfb x11-utils xauth \
       xfce4 xfce4-goodies util-linux sudo curl git wget python3 ca-certificates \
-      xdotool scrot x11vnc dbus-x11 net-tools \
+      xdotool scrot x11vnc dbus-x11 net-tools imagemagick \
  && rm -rf /var/lib/apt/lists/*
 
 # noVNC (E2B fork) + websockify for the browser-facing VNC bridge on :6080.
