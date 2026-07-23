@@ -45,8 +45,17 @@ jobs:
         NAME="${{ inputs.template_name }}"; NAME="${NAME:-pipilot-native-desktop}"
         CPU="$(printf '%s' "${{ inputs.cpu_count }}" | tr -cd '0-9')"; CPU="${CPU:-2}"
         MEM="$(printf '%s' "${{ inputs.memory_mb }}" | tr -cd '0-9')"; MEM="${MEM:-4096}"
-        echo "Removing existing '$NAME' template (if any)..."
+        echo "=== Existing templates (diagnostic — ownership under THIS token) ==="
+        e2b template list || true
+        echo "==================================================================="
+        echo "Removing existing '$NAME' template by alias (if owned by this token)..."
         e2b template delete "$NAME" -y || true
+        # Fallback: alias-delete 404s when the CLI can't map alias->id, yet the alias stays
+        # reserved and the build then 403s "already used". Resolve id(s) from the listing and
+        # delete by id too. The diagnostic list above shows the real format if this misses.
+        for ID in $(e2b template list 2>/dev/null | grep -w "$NAME" | grep -oE '[A-Za-z0-9]{16,}' || true); do
+          echo "Deleting by resolved id: $ID"; e2b template delete "$ID" -y || true
+        done
         echo "Building '$NAME' with ${CPU} vCPU / ${MEM} MB"
         e2b template build \
           --name "$NAME" \
