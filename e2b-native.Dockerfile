@@ -54,7 +54,15 @@ WORKDIR /home/user/project
 # the final ls prints to the build log whether Zig actually baked.
 COPY --chown=user:user native-starter/ /home/user/project/
 RUN native validate app.zon || true
+# Bake the FULL toolchain + every build cache the runtime touches, so a fresh sandbox
+# NEVER downloads or compiles cold: Zig 0.16 (via --yes), the strict-check tooling, the
+# default build (native_check + native dev), AND the automation build (native_screenshot
+# uses `native build -Dautomation=true`). All run as `user`, so everything caches in the
+# runtime user's ~/.native + the project .zig-cache. First `--yes` fetches the toolchain;
+# the rest reuse it (fast). Builds are headless — no display needed at image-build time.
 RUN native build --yes || true
+RUN native check --strict || true
+RUN native build --yes -Dautomation=true || true
 RUN ls -la /home/user/.native/toolchains/ 2>/dev/null && echo "ZIG TOOLCHAIN BAKED ✓" || echo "WARN: zig toolchain NOT baked — runtime will re-download"
 
 CMD ["/bin/bash"]
