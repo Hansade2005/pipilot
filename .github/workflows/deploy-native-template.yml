@@ -53,11 +53,11 @@ jobs:
         echo "Removing existing '$NAME' template by alias (if owned by this token)..."
         e2b template delete "$NAME" -y || true
         # Fallback: alias-delete 404s when the CLI can't map alias->id, yet the alias stays
-        # reserved and the build then 403s "already used". Resolve id(s) from the listing and
-        # delete by id too. The diagnostic list above shows the real format if this misses.
-        for ID in $(e2b template list 2>/dev/null | grep -w "$NAME" | grep -oE '[A-Za-z0-9]{16,}' || true); do
-          echo "Deleting by resolved id: $ID"; e2b template delete "$ID" -y || true
-        done
+        # reserved and the build then 403s "already used". Resolve the REAL Template ID from the
+        # listing (STRIP ANSI colour codes first — else the id gets a "37m" escape prefix and its
+        # own delete 404s) matching the EXACT name column, and delete by id.
+        ID=$(e2b template list 2>/dev/null | perl -pe 's/\e\[[0-9;]*[A-Za-z]//g' | awk -v n="$NAME" '$3==n {print $2; exit}')
+        if [ -n "$ID" ]; then echo "Deleting by resolved id: $ID"; e2b template delete "$ID" -y || true; else echo "No owned template id resolved for alias $NAME"; fi
         echo "Building '$NAME' with ${CPU} vCPU / ${MEM} MB"
         e2b template build \
           --name "$NAME" \
