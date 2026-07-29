@@ -12,17 +12,16 @@ async function getSupabase() {
   return createClient(supabaseUrl, supabaseServiceKey)
 }
 
-// Tavily config for web search/extract tools
+// Tavily config for web search/extract tools — keys must come from environment
 const tavilyConfig = {
-  apiKeys: [
-    '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',
-    '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',
-    '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'
-  ],
+  apiKeys: (process.env.TAVILY_API_KEYS || '').split(',').filter(Boolean),
   currentKeyIndex: 0
 }
 
 function getNextTavilyKey(): string {
+  if (tavilyConfig.apiKeys.length === 0) {
+    throw new Error('TAVILY_API_KEYS environment variable is not set')
+  }
   const key = tavilyConfig.apiKeys[tavilyConfig.currentKeyIndex]
   tavilyConfig.currentKeyIndex = (tavilyConfig.currentKeyIndex + 1) % tavilyConfig.apiKeys.length
   return key
@@ -30,7 +29,7 @@ function getNextTavilyKey(): string {
 
 // AI model for task execution (fast, cheap, good for research)
 const mistralProvider = createMistral({
-  apiKey: process.env.MISTRAL_API_KEY || 'W8txIqwcJnyHBTthSlouN2w3mQciqAUr',
+  apiKey: process.env.MISTRAL_API_KEY || '',
 })
 
 // ─── Web search via Tavily ───────────────────────────────────────────────────

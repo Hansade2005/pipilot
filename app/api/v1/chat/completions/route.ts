@@ -353,7 +353,7 @@ async function searchWebTool(query: string): Promise<any> {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer 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`
+                'Authorization': `Bearer ${process.env.TAVILY_API_KEY || ''}`
             },
             body: JSON.stringify({
                 query: query,
@@ -943,9 +943,8 @@ function hasVisionContent(messages: OpenAIMessage[]): boolean {
 // --- Mistral / Codestral / Pixtral Integration ---
 
 async function callMistralVision(messages: any[], temperature?: number): Promise<any> {
-    const mistralApiKey = process.env.MISTRAL_API_KEY || 'W8txIqwcJnyHBTthSlouN2w3mQciqAUr';
+    const mistralApiKey = process.env.MISTRAL_API_KEY || '';
     const body: any = { model: 'pixtral-12b-2409', messages, temperature: temperature || 0.7 };
-    console.log('📤 Request body to Mistral Vision (pixtral-12b-2409):', JSON.stringify(body, null, 2));
 
     const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
         method: 'POST',
@@ -962,9 +961,8 @@ async function callMistralVision(messages: any[], temperature?: number): Promise
 }
 
 async function* streamMistralVision(messages: any[], temperature?: number): AsyncGenerator<string> {
-    const mistralApiKey = process.env.MISTRAL_API_KEY || 'W8txIqwcJnyHBTthSlouN2w3mQciqAUr';
+    const mistralApiKey = process.env.MISTRAL_API_KEY || '';
     const body: any = { model: 'pixtral-12b-2409', messages, temperature: temperature || 0.7, stream: true };
-    console.log('📤 Request body to Mistral Vision Streaming (pixtral-12b-2409):', JSON.stringify(body, null, 2));
 
     const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
         method: 'POST',
@@ -1005,9 +1003,8 @@ async function* streamMistralVision(messages: any[], temperature?: number): Asyn
 }
 
 async function callCodestral(messages: any[], temperature?: number): Promise<any> {
-    const codestralApiKey = process.env.CODESTRAL_API_KEY || 'DXfXAjwNIZcAv1ESKtoDwWZZF98lJxho';
+    const codestralApiKey = process.env.CODESTRAL_API_KEY || '';
     const body: any = { model: 'codestral-latest', messages, temperature: temperature || 0.3 };
-    console.log('📤 Request body to Codestral (codestral-latest):', JSON.stringify(body, null, 2));
 
     const response = await fetch('https://codestral.mistral.ai/v1/chat/completions', {
         method: 'POST',
@@ -1024,9 +1021,8 @@ async function callCodestral(messages: any[], temperature?: number): Promise<any
 }
 
 async function* streamCodestral(messages: any[], temperature?: number): AsyncGenerator<string> {
-    const codestralApiKey = process.env.CODESTRAL_API_KEY || 'DXfXAjwNIZcAv1ESKtoDwWZZF98lJxho';
+    const codestralApiKey = process.env.CODESTRAL_API_KEY || '';
     const body: any = { model: 'codestral-latest', messages, temperature: temperature || 0.3, stream: true };
-    console.log('📤 Request body to Codestral Streaming (codestral-latest):', JSON.stringify(body, null, 2));
 
     const response = await fetch('https://codestral.mistral.ai/v1/chat/completions', {
         method: 'POST',
