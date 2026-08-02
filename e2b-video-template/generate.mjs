@@ -1108,6 +1108,13 @@ function canvasHtml(scene) {
     *{box-sizing:border-box}
     html,body{margin:0;width:100%;height:100%;overflow:hidden}
     body{background:${bgFor(t)};color:var(--text);font-family:var(--font);font-size:${Math.round(H / 40)}px;line-height:1.4}
+    /* A canvas's CSS box defaults to its width/height ATTRIBUTES (agents often hardcode
+       1920x1080 regardless of the actual render resolution, which varies with storyboard
+       scale). Force every canvas to visually fill its container -- the browser then scales
+       the drawing buffer to fit, so authored artwork is never cropped to a corner or blown
+       out of frame. The canvas's own JS still draws using its internal (attribute) width/
+       height, so coordinate math in agent-authored scripts is unaffected. */
+    canvas{width:100% !important;height:100% !important;display:block}
     ${KF}
   </style>${bgLayer}${body}`
 }
