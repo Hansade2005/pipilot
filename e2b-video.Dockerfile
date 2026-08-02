@@ -87,18 +87,10 @@ COPY e2b-video-template/generate.mjs e2b-video-template/stockdb.mjs e2b-video-te
 # stockdb.mjs defaults STOCKDB_DIR to /opt/stockdb.
 COPY e2b-video-template/stockdb /opt/stockdb
 
-# ── Kokoro-ONNX TTS (narration) ──────────────────────────────────────────────
-# Kokoro replaces Piper (whose espeak-ng data caused garbled/inconsistent narration).
-# Installed in its OWN venv so its numpy/onnxruntime never conflict with Wav2Lip's
-# pinned numpy (same isolation pattern as /opt/matte-venv). Model + voices → /opt/kokoro.
-RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-venv python3-pip \
-    && python3 -m venv /opt/kokoro-venv \
-    && /opt/kokoro-venv/bin/pip install --no-cache-dir --upgrade pip \
-    && /opt/kokoro-venv/bin/pip install --no-cache-dir kokoro-onnx soundfile \
-    && rm -rf /var/lib/apt/lists/*
-RUN mkdir -p /opt/kokoro \
-    && curl -fsSL "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx" -o /opt/kokoro/kokoro-v1.0.onnx \
-    && curl -fsSL "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin" -o /opt/kokoro/voices-v1.0.bin
+# Kokoro narration TTS is now the FREE HOSTED API (tts.voice-generator.com/tts — same
+# hexgrad/Kokoro-82M model), called over plain HTTP from generate.mjs. No local
+# kokoro-onnx/onnxruntime venv or ~350MB of baked model/voices files anymore — one less
+# heavy install (faster template build) and no per-process model-load cost at render time.
 
 # ── Wav2Lip (talking-avatar lip-sync, CPU) ───────────────────────────────────
 # Original Rudrabha/Wav2Lip on torch-CPU — every dependency is a prebuilt manylinux
@@ -149,7 +141,7 @@ COPY e2b-video-template/design /opt/pipilot-video/design
 COPY e2b-video-template/lib3d /opt/pipilot-video/lib3d
 
 # YouTube ingest stack — yt-dlp (download/clip) + youtube-transcript-api (timestamped transcript),
-# in their OWN venv so they never touch the kokoro/matte numpy. ffmpeg (already baked) does the
+# in their OWN venv so they never touch the matte venv's numpy. ffmpeg (already baked) does the
 # precise -c copy cuts. Powers the agent's youtube_transcript / youtube_clip repurposing tools.
 RUN python3 -m venv /opt/yt-venv \
     && /opt/yt-venv/bin/pip install --no-cache-dir --upgrade pip \
@@ -164,7 +156,7 @@ RUN for f in /opt/avatars/*.webp; do [ -e "$f" ] && ffmpeg -y -loglevel error -i
 
 # Let the runtime user read the engine/corpus and write render scratch
 # (.cache/.work/out under the engine dir). Wav2Lip writes temp/ under /opt/wav2lip.
-RUN chmod -R a+rwX /opt/pipilot-video /opt/stockdb /opt/ms-playwright /opt/kokoro /opt/kokoro-venv /opt/wav2lip /opt/u2net /opt/avatars /opt/matte-venv /opt/yt-venv
+RUN chmod -R a+rwX /opt/pipilot-video /opt/stockdb /opt/ms-playwright /opt/wav2lip /opt/u2net /opt/avatars /opt/matte-venv /opt/yt-venv
 
 # E2B non-root runtime user.
 RUN useradd -m -s /bin/bash user
@@ -176,11 +168,8 @@ WORKDIR /home/user
 ENV NODE_ENV=development
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 ENV STOCKDB_DIR=/opt/stockdb
-ENV KOKORO_PY=/opt/kokoro-venv/bin/python
-ENV KOKORO_MODEL=/opt/kokoro/kokoro-v1.0.onnx
 ENV YT_DLP=/opt/yt-venv/bin/yt-dlp
 ENV YT_PY=/opt/yt-venv/bin/python
-ENV KOKORO_VOICES=/opt/kokoro/voices-v1.0.bin
 ENV KOKORO_VOICE=am_fenrir
 
 CMD ["/bin/bash"]

@@ -95,10 +95,11 @@ const DRAFT = process.env.DRAFT === '1' || process.env.DRAFT === 'true'
 // final video (free tier). SERVER sets this from the user's plan; the engine just honors it.
 const WM = process.env.WATERMARK
 const WM_TEXT = WM && WM !== '1' && WM !== 'true' ? String(WM).slice(0, 40) : 'Made with PiPilot'
-// Kokoro-ONNX TTS — replaces Piper (whose espeak-ng data caused garbled/inconsistent output).
-const KOKORO_MODEL = process.env.KOKORO_MODEL || '/opt/kokoro/kokoro-v1.0.onnx'
-const KOKORO_VOICES = process.env.KOKORO_VOICES || '/opt/kokoro/voices-v1.0.bin'
-const KOKORO_PY = process.env.KOKORO_PY || '/opt/kokoro-venv/bin/python'  // isolated venv (off Wav2Lip's numpy)
+// Kokoro TTS — via the free hosted tts.voice-generator.com API (same hexgrad/Kokoro-82M model
+// that used to run locally through kokoro_onnx). No more onnxruntime/kokoro_onnx/venv baked into
+// this image — one HTTP call per line, which is both far faster (no ~1s+ per-process model load)
+// and drops a heavy chunk of the template's install size/build time.
+const KOKORO_API = process.env.KOKORO_API_URL || 'https://tts.voice-generator.com/tts'
 const DEFAULT_VOICE = process.env.KOKORO_VOICE || 'am_fenrir'  // bold US male; see kokoro voice table
 const CAPTIONS = SB.captions === true || SB.captions === 'true'
 // `video` scenes prefer Pixabay b-roll, but fall back to an a0-generated image when
@@ -154,56 +155,39 @@ function speakable(text) {
   return s.replace(/\s{2,}/g, ' ').trim()
 }
 
-// Kokoro synthesis via a tiny Python shim. The model is loaded ONCE per Python process
-// (cached on the interpreter via a module attribute); each scene is one execFileSync call.
-// An unknown voice ID falls back to DEFAULT_VOICE inside Python (validated against the
-// loaded voice list) so a bad name in a storyboard never breaks the render.
-// The shim script is written once and reused. Returns { wav, dur } or null on failure.
-const TTS_SHIM = path.join(WORK, '_kokoro_tts.py')
-let _ttsShimWritten = false
-function writeTtsShim() {
-  if (_ttsShimWritten) return
-  fs.writeFileSync(TTS_SHIM, [
-    'import sys, soundfile as sf',
-    'from kokoro_onnx import Kokoro',
-    'model_path, voices_path, text, voice, out = sys.argv[1:6]',
-    'speed = float(sys.argv[6]) if len(sys.argv) > 6 else 1.0',
-    '# Load once per process (cached on the module) so multi-call renders stay fast-ish.',
-    'k = getattr(Kokoro, "_pp_instance", None)',
-    'if k is None:',
-    '    k = Kokoro(model_path, voices_path); Kokoro._pp_instance = k',
-    'try:',
-    '    voices = set(k.get_voices())',
-    'except Exception:',
-    '    voices = set()',
-    'if voices and voice not in voices:',
-    `    voice = ${JSON.stringify(DEFAULT_VOICE)}`,
-    'try:',
-    '    samples, sr = k.create(text, voice=voice, speed=speed, lang="en-us")',
-    '    sf.write(out, samples, sr)',
-    '    print("OK:%.3f" % (len(samples) / sr))',
-    'except Exception as e:',
-    '    print("ERR:%s" % e, file=sys.stderr); sys.exit(1)',
-    '',
-  ].join('\n'))
-  _ttsShimWritten = true
+// One synth attempt against the hosted Kokoro API. Voice ID's first letter IS its lang code
+// (am_fenrir → lang=a, bm_george → lang=b) — mismatching still returns audio but mispronounces.
+// The endpoint returns HTTP 200 + JSON {"detail":...} on failure (bad voice, etc.), NOT an error
+// status — so success is gated on the response's content-type, never on curl's own exit code.
+function synthOnce(text, voice, speed, outMp3) {
+  const url = `${KOKORO_API}?${new URLSearchParams({ text, voice, lang: voice[0] || 'a', format: 'mp3', speed: String(speed) })}`
+  const hdr = outMp3 + '.hdr'
+  try {
+    execFileSync('curl', ['-sS', '-L', '--retry', '2', '--retry-delay', '1', '--max-time', '25', '-D', hdr, '-o', outMp3, url], { stdio: ['ignore', 'ignore', 'inherit'] })
+    const headers = fs.existsSync(hdr) ? fs.readFileSync(hdr, 'utf8') : ''
+    if (!/content-type:\s*audio/i.test(headers) || !fs.existsSync(outMp3) || fs.statSync(outMp3).size === 0) return false
+    return true
+  } catch { return false }
+  finally { try { fs.unlinkSync(hdr) } catch {} }
 }
 
-// Synthesize text → wav. Returns { wav, dur } or null if TTS is unavailable/fails.
+// Synthesize text → wav. Returns { wav, dur } or null if TTS is unavailable/fails. One retry
+// against DEFAULT_VOICE if the requested voice ID is bad/unrecognized by the API.
 function tts(text, voice, outWav) {
   const v = voice && String(voice).trim() ? String(voice).trim() : DEFAULT_VOICE
   const speak = speakable(text)
   if (!speak) return null
+  const mp3 = outWav.replace(/\.wav$/i, '.mp3')
   try {
-    writeTtsShim()
-    const res = execFileSync(KOKORO_PY, [TTS_SHIM, KOKORO_MODEL, KOKORO_VOICES, speak.slice(0, 1200), v, outWav, '1.0'], {
-      stdio: ['ignore', 'pipe', 'pipe'], timeout: 120_000,
-    }).toString().trim()
-    if (!res.startsWith('OK:')) return null
-    const dur = parseFloat(res.slice(3))
+    let ok = synthOnce(speak.slice(0, 1200), v, 1.0, mp3)
+    if (!ok && v !== DEFAULT_VOICE) ok = synthOnce(speak.slice(0, 1200), DEFAULT_VOICE, 1.0, mp3)
+    if (!ok) return null
+    ff(['-i', mp3, outWav]) // mp3 → wav, matching what every downstream ffmpeg step already expects
+    const dur = audioDur(outWav)
     if (!fs.existsSync(outWav) || !(dur > 0)) return null
     return { wav: outWav, dur }
   } catch (e) { console.log(`   (kokoro tts failed for voice "${v}": ${e.message})`); return null }
+  finally { try { fs.unlinkSync(mp3) } catch {} }
 }
 // In-scene MULTI-VOICE dialogue: synthesize each turn ({speaker,text,voice?,gap?}) in its own
 // Kokoro voice and concatenate them (with short gaps) into ONE wav. Returns { wav, dur } exactly
