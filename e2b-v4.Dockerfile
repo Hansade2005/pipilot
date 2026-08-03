@@ -72,7 +72,10 @@ RUN python3 -m venv /opt/py-venv \
       python-pptx defusedxml lxml "markitdown[pptx]"
 
 # Non-root user + pre-created CLI config dirs (avoid first-write failures).
-RUN useradd -m -s /bin/bash user \
+# Idempotent: the E2B v2 build backend can pre-provision a 'user' account itself
+# before our Dockerfile RUNs — a bare `useradd` then fails with "already exists"
+# (exit 9). Only create it if missing; -m/mkdir -p/chown are already idempotent.
+RUN (id -u user >/dev/null 2>&1 || useradd -m -s /bin/bash user) \
  && mkdir -p /home/user/project \
       /home/user/.npm /home/user/.cache /home/user/.config/configstore \
       /home/user/.wrangler /home/user/.vercel /home/user/.netlify /home/user/.config/neonctl \
