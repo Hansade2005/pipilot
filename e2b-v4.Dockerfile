@@ -65,11 +65,23 @@ RUN npm install -g npm@latest pnpm@9.15.0 \
 # pptx-documents) — pre-warmed at BUILD time so no sandbox ever pays the pip-install
 # cost or hits the missing-pip/no-sudo wall. `--system-site-packages` off (default):
 # fully isolated, no PEP 668 externally-managed-environment friction.
+#
+# Symlink into /usr/local/bin (NOT just an ENV PATH prepend): run_command always
+# invokes `bash -lc` (a LOGIN shell) — see builder-src/api/e2b.mjs — which sources
+# /etc/profile and on Debian that UNCONDITIONALLY resets PATH to
+# "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", wiping any Docker
+# ENV PATH before the shell even runs the command. /usr/local/bin IS in that base
+# list (it's exactly why the npm -g CLIs below still resolve after the reset), so
+# symlinking there is what actually survives — an ENV PATH edit alone does not.
 RUN python3 -m venv /opt/py-venv \
  && /opt/py-venv/bin/pip install --no-cache-dir --upgrade pip \
  && /opt/py-venv/bin/pip install --no-cache-dir \
       pillow pypdf pdfplumber pypdfium2 reportlab pandas openpyxl \
-      python-pptx defusedxml lxml "markitdown[pptx]"
+      python-pptx defusedxml lxml "markitdown[pptx]" \
+ && ln -sf /opt/py-venv/bin/python3 /usr/local/bin/python3 \
+ && ln -sf /opt/py-venv/bin/python3 /usr/local/bin/python \
+ && ln -sf /opt/py-venv/bin/pip /usr/local/bin/pip \
+ && ln -sf /opt/py-venv/bin/pip3 /usr/local/bin/pip3
 
 # Non-root user + pre-created CLI config dirs (avoid first-write failures).
 # Idempotent: the E2B v2 build backend can pre-provision a 'user' account itself
