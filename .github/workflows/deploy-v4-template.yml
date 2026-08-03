@@ -53,14 +53,26 @@ jobs:
         MEM="$(printf '%s' "${{ inputs.memory_mb }}" | tr -cd '0-9')"; MEM="${MEM:-4096}"
         # Idempotent: drop any existing alias first so a re-build never 403s with
         # "alias already used". e2b.mjs creates by NAME, so a fresh id is fine.
+        # The delete can take a moment to propagate server-side, so retry the BUILD
+        # once (with one more delete + a short wait) if it still sees the old alias.
         echo "Removing existing '$NAME' template (if any)..."
         e2b template delete "$NAME" -y || true
+        sleep 5
         echo "Building '$NAME' with ${CPU} vCPU / ${MEM} MB"
-        e2b template build \
+        if ! e2b template build \
           --name "$NAME" \
           --dockerfile e2b-v4.Dockerfile \
           --cpu-count "$CPU" \
-          --memory-mb "$MEM"
+          --memory-mb "$MEM"; then
+          echo "Build failed — retrying once after another delete + wait (stale-alias propagation)..."
+          e2b template delete "$NAME" -y || true
+          sleep 10
+          e2b template build \
+            --name "$NAME" \
+            --dockerfile e2b-v4.Dockerfile \
+            --cpu-count "$CPU" \
+            --memory-mb "$MEM"
+        fi
       env:
         E2B_API_KEY: ${{ inputs.e2b_api_key || secrets.E2B_API_KEY }}
 
