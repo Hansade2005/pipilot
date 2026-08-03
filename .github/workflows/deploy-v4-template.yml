@@ -40,10 +40,12 @@ jobs:
       # Global + isolated: `pnpm add` at repo root pulls in the whole Next.js
       # project and pnpm v10 then exits non-zero on ignored build scripts
       # (sharp/oxide). npm -g sidesteps the project entirely.
-      # Pinned to 2.2.4: newer CLIs hard-fail the v1 `template build --name
-      # --dockerfile` flags (deprecated for the v2 build system). 2.2.4 still
-      # runs v1 (warns but succeeds).
-      run: npm install -g @e2b/cli@2.2.4
+      # @latest (was pinned to 2.2.4's deprecated v1 `template build --name
+      # --dockerfile`): E2B retired the v1 auth/build path server-side (ACCESS_TOKEN
+      # now hard-rejected, and 2.2.4's `build` subcommand doesn't even read
+      # E2B_API_KEY) — the v2 CLI's `template create` is the only surface that
+      # still works, and it reads E2B_API_KEY directly from the environment.
+      run: npm install -g @e2b/cli@latest
 
     - name: Build and deploy PiPilot v4 E2B template
       run: |
@@ -51,24 +53,22 @@ jobs:
         NAME="${{ inputs.template_name }}"; NAME="${NAME:-pipilot-v4}"
         CPU="$(printf '%s' "${{ inputs.cpu_count }}" | tr -cd '0-9')"; CPU="${CPU:-2}"
         MEM="$(printf '%s' "${{ inputs.memory_mb }}" | tr -cd '0-9')"; MEM="${MEM:-4096}"
-        # Idempotent: drop any existing alias first so a re-build never 403s with
-        # "alias already used". e2b.mjs creates by NAME, so a fresh id is fine.
-        # The delete can take a moment to propagate server-side, so retry the BUILD
-        # once (with one more delete + a short wait) if it still sees the old alias.
+        # Idempotent: drop any existing alias first so a re-create never 403s with
+        # "alias already used". The delete can take a moment to propagate
+        # server-side, so retry once (with one more delete + a short wait) if the
+        # create still sees the old alias.
         echo "Removing existing '$NAME' template (if any)..."
         e2b template delete "$NAME" -y || true
         sleep 5
         echo "Building '$NAME' with ${CPU} vCPU / ${MEM} MB"
-        if ! e2b template build \
-          --name "$NAME" \
+        if ! e2b template create "$NAME" \
           --dockerfile e2b-v4.Dockerfile \
           --cpu-count "$CPU" \
           --memory-mb "$MEM"; then
           echo "Build failed — retrying once after another delete + wait (stale-alias propagation)..."
           e2b template delete "$NAME" -y || true
           sleep 10
-          e2b template build \
-            --name "$NAME" \
+          e2b template create "$NAME" \
             --dockerfile e2b-v4.Dockerfile \
             --cpu-count "$CPU" \
             --memory-mb "$MEM"
