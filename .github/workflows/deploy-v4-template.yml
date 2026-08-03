@@ -3,8 +3,8 @@ name: Deploy PiPilot v4 E2B Template
 on:
   workflow_dispatch:
     inputs:
-      e2b_access_token:
-        description: 'E2B Access Token (leave blank to use the repo E2B_ACCESS_TOKEN secret)'
+      e2b_api_key:
+        description: 'E2B API Key (leave blank to use the repo E2B_API_KEY secret) — E2B_ACCESS_TOKEN is deprecated, the CLI now requires E2B_API_KEY'
         required: false
         type: string
       template_name:
@@ -62,7 +62,7 @@ jobs:
           --cpu-count "$CPU" \
           --memory-mb "$MEM"
       env:
-        E2B_ACCESS_TOKEN: ${{ inputs.e2b_access_token || secrets.E2B_ACCESS_TOKEN }}
+        E2B_API_KEY: ${{ inputs.e2b_api_key || secrets.E2B_API_KEY }}
 
     - name: Display template info
       run: |
