@@ -11,6 +11,14 @@
 #     vercel, netlify, neonctl (npm global) + gh, stripe (apt) + supabase (.deb)
 #   - A pre-installed React 18 + Vite 5 + Tailwind v4 starter in /home/user/project
 #     so the dev server boots fast (node_modules + warm pnpm store).
+#   - A pre-baked Python venv at /opt/py-venv (PATH-first, so bare `python3`/`pip`
+#     just work) with the doc/canvas-generation skills' packages pre-installed —
+#     the base image ships only bare python3 (no pip/ensurepip/venv, no sudo for
+#     the non-root `user`), which otherwise strands every Python-based skill
+#     (canvas-design, pdf-documents, pptx-documents) with "No module named pip"
+#     and no way to self-heal at runtime. See poppler-utils below for pdftoppm/
+#     pdftotext; LibreOffice is deliberately NOT baked in (too heavy) — the pptx
+#     skill degrades gracefully (markitdown + validate.py) when soffice is absent.
 #
 # The dev server + Host-rewriting proxy (:8080 -> Vite :5173) are started at
 # runtime by builder-src/api/e2b.mjs. This image only provides the environment.
@@ -21,9 +29,11 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV DEBCONF_NONINTERACTIVE_SEEN=true
 ENV NODE_ENV=development
 
-# System deps + third-party apt repos (GitHub CLI, Stripe CLI).
+# System deps + third-party apt repos (GitHub CLI, Stripe CLI). python3-venv (pip lives
+# inside the venv we create below, not system-wide) + poppler-utils (pdftoppm/pdftotext/
+# pdfimages — used by the pdf-documents/pptx-documents skills' QA + extraction steps).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates curl wget git gnupg python3 make g++ \
+      ca-certificates curl wget git gnupg python3 python3-venv make g++ poppler-utils \
  && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
       | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
@@ -51,12 +61,22 @@ RUN npm install -g npm@latest pnpm@9.15.0 \
       @anthropic-ai/claude-code@latest \
  && npm cache clean --force
 
+# Python venv for the doc/canvas-generation skills (canvas-design, pdf-documents,
+# pptx-documents) — pre-warmed at BUILD time so no sandbox ever pays the pip-install
+# cost or hits the missing-pip/no-sudo wall. `--system-site-packages` off (default):
+# fully isolated, no PEP 668 externally-managed-environment friction.
+RUN python3 -m venv /opt/py-venv \
+ && /opt/py-venv/bin/pip install --no-cache-dir --upgrade pip \
+ && /opt/py-venv/bin/pip install --no-cache-dir \
+      pillow pypdf pdfplumber pypdfium2 reportlab pandas openpyxl \
+      python-pptx defusedxml lxml "markitdown[pptx]"
+
 # Non-root user + pre-created CLI config dirs (avoid first-write failures).
 RUN useradd -m -s /bin/bash user \
  && mkdir -p /home/user/project \
       /home/user/.npm /home/user/.cache /home/user/.config/configstore \
       /home/user/.wrangler /home/user/.vercel /home/user/.netlify /home/user/.config/neonctl \
- && chown -R user:user /home/user
+ && chown -R user:user /home/user /opt/py-venv
 
 USER user
 WORKDIR /home/user/project
@@ -67,6 +87,6 @@ WORKDIR /home/user/project
 COPY --chown=user:user e2b-v4-template/package.json /home/user/project/package.json
 RUN pnpm install
 
-ENV PATH="/usr/local/lib/node_modules/.bin:$PATH"
+ENV PATH="/opt/py-venv/bin:/usr/local/lib/node_modules/.bin:$PATH"
 EXPOSE 5173 8080
 CMD ["/bin/bash"]
