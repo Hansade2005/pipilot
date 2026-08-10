@@ -3,7 +3,8 @@
 # lean: NO Expo/EAS, NO xfce/VNC desktop (those belong to the old image).
 #
 # What it provides:
-#   - Node 22 LTS + pnpm (npm/npx are rewritten -> pnpm by builder-src/api/e2b.mjs)
+#   - Node 22 LTS + pnpm + nubx (npm -> pnpm and npx -> nubx, both rewritten by
+#     builder-src/api/e2b.mjs)
 #     22.x is required: wrangler (+ other deploy CLIs) want Node 20+/22+; 20 was
 #     too old for our target and 25 (the old image) was non-LTS and broke wrangler.
 #   - git, python3/make/g++ (node-gyp safety for arbitrary npm deps the agent adds)
@@ -56,10 +57,22 @@ RUN ARCH=$(dpkg --print-architecture) \
 # Node toolchain + provider CLIs (global, on PATH for every user) + Claude Code
 # (so this same template powers Mission Runners — headless `claude` agents that
 # also need the deploy CLIs below).
-RUN npm install -g npm@latest pnpm@9.15.0 \
+# @nubjs/nub ships `nubx`, which replaces `npx` in the command rewriter. The old rewrite sent npx
+# to `pnpm dlx`, and that was not merely slow but WRONG: pnpm dlx ALWAYS fetches from the registry,
+# so `npx vite build` ran whatever is latest instead of the version the project pins. Measured on
+# this very starter:
+#   pnpm dlx vite --version   13.4s  ->  vite 8.2.1   (fetched from the registry)
+#   nubx     vite --version    1.6s  ->  vite 5.4.21  (the project's installed copy)
+# A different MAJOR than the app was written against, with nothing in the output saying so.
+#
+# pnpm STAYS the package manager. nub's own installer measured SLOWER on the warm path this image
+# is built around (2.9s vs pnpm's 1.7s against the baked store), and it runs postinstall build
+# scripts by default — not something we want in a sandbox holding the user's provider tokens.
+RUN npm install -g npm@latest pnpm@9.15.0 @nubjs/nub@latest \
       wrangler@latest vercel@latest netlify-cli@latest neonctl@latest \
       @anthropic-ai/claude-code@latest \
- && npm cache clean --force
+ && npm cache clean --force \
+ && nubx --version
 
 # Python venv for the doc/canvas-generation skills (canvas-design, pdf-documents,
 # pptx-documents) — pre-warmed at BUILD time so no sandbox ever pays the pip-install
@@ -106,6 +119,16 @@ WORKDIR /home/user/project
 # builder-src/src/builder/template.ts STARTER_FILES['package.json'].
 COPY --chown=user:user e2b-v4-template/package.json /home/user/project/package.json
 RUN pnpm install
+
+# Warm nubx and ASSERT it resolves the project's own bin rather than fetching one — that is the
+# entire reason it replaces npx. Deliberately a build-time smoke test: if a future nub release stops
+# reading a pnpm-installed node_modules, the image fails to build here instead of quietly
+# reintroducing "npx runs the wrong major" at runtime. Version-agnostic, so bumping the starter's
+# vite does not break the build.
+RUN INSTALLED="$(node -p "require('/home/user/project/node_modules/vite/package.json').version")" \
+ && echo "[template] installed vite: $INSTALLED" \
+ && nubx vite --version | grep -q "vite/$INSTALLED" \
+ && echo "[template] nubx resolves the project-local vite — ok"
 
 ENV PATH="/opt/py-venv/bin:/usr/local/lib/node_modules/.bin:$PATH"
 EXPOSE 5173 8080

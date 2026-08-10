@@ -66,3 +66,5 @@ e2e/
 
 # Supabase CLI scratch dir
 supabase/.temp/
+# 48MB build artifact — rebuilt by the video template job, never source.
+e2b-video-template/videoengine.zip
