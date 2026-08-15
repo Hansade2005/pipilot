@@ -50,7 +50,7 @@ function getCodestral() {
     _codestral = createOpenAICompatible({
       name: 'codestral',
       baseURL: 'https://codestral.mistral.ai/v1',
-      apiKey: process.env.CODESTRAL_API_KEY || 'DXfXAjwNIZcAv1ESKtoDwWZZF98lJxho',
+      apiKey: process.env.CODESTRAL_API_KEY || '',
     });
   }
   return _codestral;
@@ -68,7 +68,7 @@ function getOpenAIProvider() {
 function getMistralProvider() {
   if (!_mistralProvider) {
     _mistralProvider = createMistral({
-      apiKey: process.env.MISTRAL_API_KEY || 'W8txIqwcJnyHBTthSlouN2w3mQciqAUr',
+      apiKey: process.env.MISTRAL_API_KEY || '',
     });
   }
   return _mistralProvider;
@@ -87,7 +87,7 @@ function getMistralGatewayProvider() {
 function getXaiProvider() {
   if (!_xaiProvider) {
     _xaiProvider = createXai({
-      apiKey: process.env.XAI_API_KEY || 'xai-your-api-key-here',
+      apiKey: process.env.XAI_API_KEY || '',
     });
   }
   return _xaiProvider;
@@ -108,7 +108,7 @@ function getOpenRouterProvider() {
     _openrouterProvider = createOpenAICompatible({
       name: 'openrouter',
       baseURL: 'https://openrouter.ai/api/v1',
-      apiKey: process.env.OPENROUTER_API_KEY || 'sk-or-v1-your-openrouter-api-key',
+      apiKey: process.env.OPENROUTER_API_KEY || '',
       headers: {
         'HTTP-Referer': 'https://pipilot.dev',
         'X-Title': 'PiPilot',
