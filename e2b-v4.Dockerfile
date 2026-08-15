@@ -3,7 +3,8 @@
 # lean: NO Expo/EAS, NO xfce/VNC desktop (those belong to the old image).
 #
 # What it provides:
-#   - Node 22 LTS + pnpm (npm/npx are rewritten -> pnpm by builder-src/api/e2b.mjs)
+#   - Node 22 LTS + pnpm + nubx (npm -> pnpm and npx -> nubx, rewritten by
+#     builder-src/api/e2b.mjs)
 #     22.x is required: wrangler (+ other deploy CLIs) want Node 20+/22+; 20 was
 #     too old for our target and 25 (the old image) was non-LTS and broke wrangler.
 #   - git, python3/make/g++ (node-gyp safety for arbitrary npm deps the agent adds)
@@ -56,10 +57,20 @@ RUN ARCH=$(dpkg --print-architecture) \
 # Node toolchain + provider CLIs (global, on PATH for every user) + Claude Code
 # (so this same template powers Mission Runners — headless `claude` agents that
 # also need the deploy CLIs below).
-RUN npm install -g npm@latest pnpm@9.15.0 \
+# @nubjs/nub provides `nubx`, which replaces `npx` in the command rewriter (see
+# builder-src/api/e2b.mjs). We keep pnpm as the package manager — nub's own installer was
+# measured SLOWER on the warm path that matters here (2.9s vs pnpm 1.7s with the baked store)
+# and it runs postinstall build scripts by default, which we do not want in a sandbox holding
+# the user's provider tokens. `nubx` is adopted purely as the bin runner:
+#   pnpm dlx vite --version  →  13.4s, and fetched vite 8.2.1 FROM THE REGISTRY
+#   nubx     vite --version  →   1.6s, and used the project's pinned vite 5.4.21
+# The version difference is the real reason: `pnpm dlx` always fetches, so rewriting npx to it
+# silently ran a different major than the project pins. nubx prefers the local bin like npx does.
+RUN npm install -g npm@latest pnpm@9.15.0 @nubjs/nub@latest \
       wrangler@latest vercel@latest netlify-cli@latest neonctl@latest \
       @anthropic-ai/claude-code@latest \
- && npm cache clean --force
+ && npm cache clean --force \
+ && nubx --version
 
 # Python venv for the doc/canvas-generation skills (canvas-design, pdf-documents,
 # pptx-documents) — pre-warmed at BUILD time so no sandbox ever pays the pip-install
