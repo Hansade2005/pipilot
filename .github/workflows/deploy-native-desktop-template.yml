@@ -67,11 +67,12 @@ jobs:
           --dockerfile e2b-native-desktop.Dockerfile \
           --cpu-count "$CPU" \
           --memory-mb "$MEM" \
-          -c "/start_command.sh"; then
+          -c "/start_command.sh" \
+          --ready-cmd "curl -sf -o /dev/null http://localhost:6080"; then
           echo "Build failed — retrying once after another delete + wait (stale-alias propagation)..."
           e2b template delete "$NAME" -y || true
           sleep 10
-          e2b template create "$NAME" --dockerfile e2b-native-desktop.Dockerfile --cpu-count "$CPU" --memory-mb "$MEM" -c "/start_command.sh"
+          e2b template create "$NAME" --dockerfile e2b-native-desktop.Dockerfile --cpu-count "$CPU" --memory-mb "$MEM" -c "/start_command.sh" --ready-cmd "curl -sf -o /dev/null http://localhost:6080"
         fi
       env:
         E2B_API_KEY: ${{ inputs.e2b_access_token || secrets.E2B_API_KEY }}

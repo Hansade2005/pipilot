@@ -68,7 +68,11 @@ RUN apt-get update \
 
 # Start command that brings up Xvfb -> XFCE -> x11vnc -> noVNC.
 COPY start_command.sh /start_command.sh
-RUN sed -i 's/$//' /start_command.sh && chmod +x /start_command.sh
+# No line-ending fixup here. This line used to carry a RAW CR byte inside the sed
+# expression; E2B's v2 Dockerfile parser splits on it and reads the remainder as a new
+# instruction, failing the build. Line endings are enforced at the repo level instead:
+# .gitattributes pins *.sh to LF, so there is nothing left to strip.
+RUN chmod +x /start_command.sh
 
 # --- Warm Electron deps: first preview's `npm install` is near-instant ---------
 # E2B runs the sandbox as `user`. Create it, then prefetch the Electron binary +
