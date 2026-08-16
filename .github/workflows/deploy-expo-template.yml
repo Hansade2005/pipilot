@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       e2b_access_token:
-        description: 'E2B Access Token (leave blank to use the repo E2B_ACCESS_TOKEN secret)'
+        description: 'E2B API key (leave blank to use the repo E2B_API_KEY secret). Access tokens are deprecated and rejected.'
         required: false
         type: string
       template_name:
@@ -70,7 +70,12 @@ jobs:
           --cmd "/usr/local/bin/expo-start.sh" \
           --ready-cmd "curl -sf -o /dev/null http://localhost:8081/status"
       env:
-        E2B_ACCESS_TOKEN: ${{ inputs.e2b_access_token || secrets.E2B_ACCESS_TOKEN }}
+        # E2B_ACCESS_TOKEN is DEPRECATED and no longer accepted — it now 401s on every call
+        # ("Invalid Access token"), which silently broke template rebuilds. E2B requires an API
+        # key instead; the E2B_API_KEY repo secret already exists.
+        # The other deploy-*-template workflows still carry the old variable and will fail the
+        # same way until they are migrated too.
+        E2B_API_KEY: ${{ inputs.e2b_access_token || secrets.E2B_API_KEY }}
 
     - name: Display template info
       run: |
