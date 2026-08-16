@@ -39,7 +39,9 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
  && rm -rf /var/lib/apt/lists/*
 
 # Non-root user.
-RUN useradd -m -s /bin/bash user \
+# Idempotent: the E2B v2 build backend can pre-provision a 'user' account itself before
+# our Dockerfile RUNs, and a bare `useradd` then fails with "already exists" (exit 9).
+RUN (id -u user >/dev/null 2>&1 || useradd -m -s /bin/bash user) \
  && mkdir -p /home/user/project /home/user/.cache /home/user/.native \
  && chown -R user:user /home/user
 USER user

@@ -48,7 +48,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a user with proper setup like E2B Expo template
-RUN useradd -m -s /bin/bash user
+# Idempotent: the E2B v2 build backend can pre-provision a 'user' account itself before
+# our Dockerfile RUNs, and a bare `useradd` then fails with "already exists" (exit 9).
+RUN (id -u user >/dev/null 2>&1 || useradd -m -s /bin/bash user)
 
 # Create necessary directories with correct ownership before switching user
 RUN mkdir -p /home/user/.expo /home/user/.npm /home/user/.cache \

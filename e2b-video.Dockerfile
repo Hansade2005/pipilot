@@ -159,7 +159,9 @@ RUN for f in /opt/avatars/*.webp; do [ -e "$f" ] && ffmpeg -y -loglevel error -i
 RUN chmod -R a+rwX /opt/pipilot-video /opt/stockdb /opt/ms-playwright /opt/wav2lip /opt/u2net /opt/avatars /opt/matte-venv /opt/yt-venv
 
 # E2B non-root runtime user.
-RUN useradd -m -s /bin/bash user
+# Idempotent: the E2B v2 build backend can pre-provision a 'user' account itself before
+# our Dockerfile RUNs, and a bare `useradd` then fails with "already exists" (exit 9).
+RUN (id -u user >/dev/null 2>&1 || useradd -m -s /bin/bash user)
 RUN chmod -R a+rwX /home/user && chown -R user:user /home/user
 
 USER user

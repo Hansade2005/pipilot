@@ -71,7 +71,9 @@ RUN PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
 RUN chmod a+rwX /app
 
 # Create a user with proper setup (matching E2B conventions)
-RUN useradd -m -s /bin/bash user
+# Idempotent: the E2B v2 build backend can pre-provision a 'user' account itself before
+# our Dockerfile RUNs, and a bare `useradd` then fails with "already exists" (exit 9).
+RUN (id -u user >/dev/null 2>&1 || useradd -m -s /bin/bash user)
 
 # Give full permissions to the user on their home directory
 RUN chmod -R a+rwX /home/user && chown -R user:user /home/user

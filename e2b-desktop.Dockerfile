@@ -79,7 +79,9 @@ RUN chmod +x /start_command.sh
 # vite/react/electron-builder into /home/user/app/node_modules. Keep this
 # package.json in sync with the ELECTRON scaffold in
 # builder-src/src/builder/frameworks.ts (deps + devDependencies).
-RUN useradd -m -s /bin/bash user \
+# Idempotent: the E2B v2 build backend can pre-provision a 'user' account itself before
+# our Dockerfile RUNs, and a bare `useradd` then fails with "already exists" (exit 9).
+RUN (id -u user >/dev/null 2>&1 || useradd -m -s /bin/bash user) \
  && mkdir -p /home/user/app /home/user/.npm /home/user/.cache \
  && chown -R user:user /home/user
 USER user

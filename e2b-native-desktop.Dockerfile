@@ -48,7 +48,9 @@ COPY start_command.sh /start_command.sh
 RUN sed -i 's/[[:space:]]*$//' /start_command.sh && chmod +x /start_command.sh
 
 # Non-root user + warm the Zig 0.16 toolchain + SDK by building the counter starter.
-RUN useradd -m -s /bin/bash user \
+# Idempotent: the E2B v2 build backend can pre-provision a 'user' account itself before
+# our Dockerfile RUNs, and a bare `useradd` then fails with "already exists" (exit 9).
+RUN (id -u user >/dev/null 2>&1 || useradd -m -s /bin/bash user) \
  && mkdir -p /home/user/app /home/user/.cache /home/user/.native \
  && chown -R user:user /home/user
 COPY --chown=user:user native-starter/ /home/user/app/
