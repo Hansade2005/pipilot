@@ -17,9 +17,19 @@ ENV DEBIAN_FRONTEND=noninteractive \
     NODE_ENV=development \
     EXPO_NO_TELEMETRY=1
 
-# node-gyp / native-module safety for arbitrary deps the agent may add at runtime.
+# node-gyp / native-module safety for arbitrary deps the agent may add at runtime,
+# PLUS the Chromium runtime libraries Playwright needs (see the Playwright step below).
+# The chromium libs are the same set as e2b-playwright.Dockerfile / e2b-video.Dockerfile;
+# a font set is included so screenshots render with real typography instead of falling
+# back to Times, which makes every captured screen look wrong.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates curl git python3 make g++ \
+      ca-certificates curl git python3 make g++ wget \
+      fonts-liberation fonts-dejavu-core fonts-noto-core fonts-noto-color-emoji \
+      libasound2 libatk-bridge2.0-0 libatk1.0-0 libatspi2.0-0 libcairo2 libcups2 \
+      libdbus-1-3 libdrm2 libexpat1 libgbm1 libglib2.0-0 libgtk-3-0 libnspr4 libnss3 \
+      libpango-1.0-0 libpangocairo-1.0-0 libx11-6 libx11-xcb1 libxcb1 libxcomposite1 \
+      libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxkbcommon0 libxrandr2 \
+      libxrender1 libxshmfence1 libxss1 libxtst6 xdg-utils libu2f-udev libvulkan1 \
  && rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g npm@latest pnpm@9.15.0
@@ -59,7 +69,44 @@ RUN chmod +x /usr/local/bin/expo-start.sh
 # Record the baked SDK for observability.
 RUN node -e "console.log('baked expo:', require('/home/user/node_modules/expo/package.json').version)" > /home/user/.expo-sdk-version 2>/dev/null || true
 
-# 6) The image is built as ROOT but sandboxes run as a non-root user (uid ~1001). Make the
+# 6) Playwright + Chromium, mirroring e2b-video.Dockerfile.
+#
+# WHY IT LIVES IN /opt AND NOT THE EXPO PROJECT: installing playwright into
+# /home/user/node_modules would add it to the Expo app's dependency tree, where Metro
+# would try to resolve it in bundles and the agent's `pnpm add` could hoist or dedupe it.
+# A separate prefix keeps the preview app's tree exactly as create-expo-app produced it.
+#
+# WHY THE BROWSER PATH IS ABSOLUTE: E2B's SDK command execution does not reliably inherit
+# the image's Docker ENV, so a browser installed to the default ~/.cache location can be
+# invisible at runtime. Pinning PLAYWRIGHT_BROWSERS_PATH at install time AND exporting it
+# means it resolves whether or not the env survives. Callers that spawn their own shell
+# should still pass PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright explicitly.
+#
+# COST: this adds roughly 400MB to the image and some cold-start pull time on every mobile
+# preview. That is the deliberate trade for having browser automation available in-place.
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+WORKDIR /opt/pipilot-playwright
+RUN npm init -y >/dev/null 2>&1 && npm install playwright \
+ && PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright npx playwright install chromium
+WORKDIR /home/user
+
+# Sandboxes run as a NON-ROOT user (uid ~1001) while this image is built as root, so the
+# browser and the playwright package must be world-readable/executable or every launch
+# fails with EACCES. /home/user gets its own chmod in the last layer; these live outside it.
+RUN chmod -R a+rX /opt/ms-playwright /opt/pipilot-playwright
+
+# Build-time assertion. Fails the image here rather than letting a broken browser surface
+# at runtime, when it looks like an application bug. It really LAUNCHES chromium and renders
+# a page: a binary that exists but cannot start (missing system lib) is the exact failure
+# this guards against, and merely checking the file exists would miss it.
+#
+# Run as the UNPRIVILEGED `node` user, never root. Sandboxes execute as a non-root uid, and
+# root can read the browser regardless of the chmod above — so a root-only check would pass
+# on an image where every real launch dies with EACCES. HOME is pointed somewhere writable
+# because chromium wants a home dir for its profile/crash paths.
+RUN su node -s /bin/sh -c "HOME=/tmp PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright node -e \"const{chromium}=require('/opt/pipilot-playwright/node_modules/playwright');(async()=>{const b=await chromium.launch();const p=await b.newPage();await p.setContent('<h1>ok</h1>');const t=await p.textContent('h1');await b.close();if(t!=='ok')throw new Error('chromium ran but returned '+t);console.log('[template] chromium launches and renders as non-root — ok')})().catch(e=>{console.error('[template] PLAYWRIGHT CHECK FAILED:',e.message);process.exit(1)})\""
+
+# 7) The image is built as ROOT but sandboxes run as a non-root user (uid ~1001). Make the
 #    whole project — node_modules, the pnpm store and caches — group/other writable so the
 #    runtime user can `expo install`/`pnpm add` the user's extra libraries (Fast Refresh then
 #    picks them up). Without this, runtime installs fail on permissions even with the store
