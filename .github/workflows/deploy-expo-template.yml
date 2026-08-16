@@ -44,9 +44,10 @@ jobs:
         node-version: '22'
 
     - name: Install E2B CLI
-      # Pinned to 2.2.4 like the other templates: newer CLIs drop the v1
-      # `template build --name --dockerfile` flags. 2.2.4 still runs v1.
-      run: npm install -g @e2b/cli@2.2.4
+      # @e2b/cli@latest + the v2 `template create` surface. E2B retired v1 server-side:
+      # ACCESS_TOKEN is hard-rejected and 2.2.4's `template build` does not read E2B_API_KEY,
+      # so this is the only path that still builds. Matches deploy-v4-template.yml.
+      run: npm install -g @e2b/cli@latest
 
     - name: Build and deploy pipilot-expo E2B template
       run: |
@@ -62,13 +63,20 @@ jobs:
         # responding - fast (~30-60s) and reliable. The exp:// tunnel is resolved in a
         # background loop inside expo-start.sh (slow/flaky external dep) and MUST NOT
         # gate readiness, else builds time out waiting on ngrok.
-        e2b template build \
-          --name "$NAME" \
+        # The alias can take a moment to free up after the delete above, so a failed
+        # create is retried once behind another delete rather than failing the run.
+        sleep 5
+        if ! e2b template create "$NAME" \
           --dockerfile e2b-expo.Dockerfile \
           --cpu-count "$CPU" \
           --memory-mb "$MEM" \
           --cmd "/usr/local/bin/expo-start.sh" \
-          --ready-cmd "curl -sf -o /dev/null http://localhost:8081/status"
+          --ready-cmd "curl -sf -o /dev/null http://localhost:8081/status"; then
+          echo "Build failed — retrying once after another delete + wait (stale-alias propagation)..."
+          e2b template delete "$NAME" -y || true
+          sleep 10
+          e2b template create "$NAME" --dockerfile e2b-expo.Dockerfile --cpu-count "$CPU" --memory-mb "$MEM" --cmd "/usr/local/bin/expo-start.sh" --ready-cmd "curl -sf -o /dev/null http://localhost:8081/status"
+        fi
       env:
         # E2B_ACCESS_TOKEN is DEPRECATED and no longer accepted — it now 401s on every call
         # ("Invalid Access token"), which silently broke template rebuilds. E2B requires an API

@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       e2b_access_token:
-        description: 'E2B Access Token (leave blank to use the repo E2B_ACCESS_TOKEN secret)'
+        description: 'E2B API key (leave blank to use the repo E2B_API_KEY secret). Access tokens are deprecated and rejected.'
         required: false
         type: string
       template_name:
@@ -31,11 +31,11 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '22'
-    # Pin @e2b/cli@2.2.4: newer CLIs HARD-FAIL the deprecated v1 `template build`
-    # (deprecation banner -> exit 1). Use npm -g (not pnpm add -g) so pnpm v10's
-    # ignored-build-scripts check doesn't exit non-zero at the repo root.
     - name: Install E2B CLI
-      run: npm install -g @e2b/cli@2.2.4
+      # @e2b/cli@latest + the v2 `template create` surface. E2B retired v1 server-side:
+      # ACCESS_TOKEN is hard-rejected and 2.2.4's `template build` does not read E2B_API_KEY,
+      # so this is the only path that still builds. Matches deploy-v4-template.yml.
+      run: npm install -g @e2b/cli@latest
     - name: Build and deploy E2B template
       run: |
         NAME="${{ inputs.template_name }}"; NAME="${NAME:-pipilot}"
@@ -50,6 +50,17 @@ jobs:
         if [ -n "$TID" ]; then echo "Found id $TID for $NAME — deleting by id"; e2b template delete "$TID" -y || true; fi
         e2b template delete "$NAME" -y || true
         echo "Building '$NAME' from e2b.Dockerfile with ${CPU} vCPU / ${MEM} MB"
-        e2b template build --name "$NAME" --dockerfile e2b.Dockerfile --cpu-count "$CPU" --memory-mb "$MEM"
+        # The alias can take a moment to free up after the delete above, so a failed
+        # create is retried once behind another delete rather than failing the run.
+        sleep 5
+        if ! e2b template create "$NAME" \
+          --dockerfile e2b.Dockerfile \
+          --cpu-count "$CPU" \
+          --memory-mb "$MEM"; then
+          echo "Build failed — retrying once after another delete + wait (stale-alias propagation)..."
+          e2b template delete "$NAME" -y || true
+          sleep 10
+          e2b template create "$NAME" --dockerfile e2b.Dockerfile --cpu-count "$CPU" --memory-mb "$MEM"
+        fi
       env:
-        E2B_ACCESS_TOKEN: ${{ inputs.e2b_access_token || secrets.E2B_ACCESS_TOKEN }}
+        E2B_API_KEY: ${{ inputs.e2b_access_token || secrets.E2B_API_KEY }}

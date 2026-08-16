@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       e2b_access_token:
-        description: 'E2B key (leave blank to use the repo E2B_ACCESS_TOKEN secret)'
+        description: 'E2B key (leave blank to use the repo E2B_API_KEY secret)'
         required: false
         type: string
 
@@ -36,7 +36,7 @@ jobs:
         node render-test.mjs
         cp video.mp4 "$GITHUB_WORKSPACE/video.mp4"
       env:
-        E2B_API_KEY: ${{ inputs.e2b_access_token || secrets.E2B_ACCESS_TOKEN }}
+        E2B_API_KEY: ${{ inputs.e2b_access_token || secrets.E2B_API_KEY }}
 
     - name: Upload the rendered video
       if: always()

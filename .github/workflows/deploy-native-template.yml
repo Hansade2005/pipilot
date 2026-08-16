@@ -1,12 +1,12 @@
 name: Deploy PiPilot Native E2B Template
 
 # Builds the pipilot-native E2B sandbox template (Native SDK authoring runtime).
-# Mirrors deploy-v4-template.yml. Needs the repo E2B_ACCESS_TOKEN secret.
+# Mirrors deploy-v4-template.yml. Needs the repo E2B_API_KEY secret.
 on:
   workflow_dispatch:
     inputs:
       e2b_access_token:
-        description: 'E2B Access Token (leave blank to use the repo E2B_ACCESS_TOKEN secret)'
+        description: 'E2B API key (leave blank to use the repo E2B_API_KEY secret). Access tokens are deprecated and rejected.'
         required: false
         type: string
       template_name:
@@ -38,9 +38,10 @@ jobs:
         node-version: '22'
 
     - name: Install E2B CLI
-      # Pinned to 2.2.4 (same as v4): newer CLIs hard-fail the v1
-      # `template build --name --dockerfile` flags.
-      run: npm install -g @e2b/cli@2.2.4
+      # @e2b/cli@latest + the v2 `template create` surface. E2B retired v1 server-side:
+      # ACCESS_TOKEN is hard-rejected and 2.2.4's `template build` does not read E2B_API_KEY,
+      # so this is the only path that still builds. Matches deploy-v4-template.yml.
+      run: npm install -g @e2b/cli@latest
 
     - name: Build and deploy PiPilot native E2B template
       run: |
@@ -59,13 +60,20 @@ jobs:
         ID=$(e2b template list 2>/dev/null | perl -pe 's/\e\[[0-9;]*[A-Za-z]//g' | awk -v n="$NAME" '$3==n {print $2; exit}')
         if [ -n "$ID" ]; then echo "Deleting by resolved id: $ID"; e2b template delete "$ID" -y || true; else echo "No owned template id resolved for alias $NAME"; fi
         echo "Building '$NAME' with ${CPU} vCPU / ${MEM} MB"
-        e2b template build \
-          --name "$NAME" \
+        # The alias can take a moment to free up after the delete above, so a failed
+        # create is retried once behind another delete rather than failing the run.
+        sleep 5
+        if ! e2b template create "$NAME" \
           --dockerfile e2b-native.Dockerfile \
           --cpu-count "$CPU" \
-          --memory-mb "$MEM"
+          --memory-mb "$MEM"; then
+          echo "Build failed — retrying once after another delete + wait (stale-alias propagation)..."
+          e2b template delete "$NAME" -y || true
+          sleep 10
+          e2b template create "$NAME" --dockerfile e2b-native.Dockerfile --cpu-count "$CPU" --memory-mb "$MEM"
+        fi
       env:
-        E2B_ACCESS_TOKEN: ${{ inputs.e2b_access_token || secrets.E2B_ACCESS_TOKEN }}
+        E2B_API_KEY: ${{ inputs.e2b_access_token || secrets.E2B_API_KEY }}
 
     - name: Display template info
       run: |

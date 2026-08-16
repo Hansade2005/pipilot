@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       e2b_access_token:
-        description: 'E2B Access Token (from https://e2b.dev/dashboard?tab=personal)'
-        required: true
+        description: 'E2B API key (leave blank to use the repo E2B_API_KEY secret). Access tokens are deprecated and rejected.'
+        required: false
         type: string
       template_name:
         description: 'Template Name'
@@ -36,24 +36,33 @@ jobs:
       with:
         node-version: '20'
 
-    - name: Install pnpm
-      run: npm install -g pnpm
-
     - name: Install E2B CLI
-      run: pnpm add @e2b/cli
-
-    - name: Set E2B Access Token
-      run: echo "E2B_ACCESS_TOKEN=${{ inputs.e2b_access_token }}" >> $GITHUB_ENV
+      # @e2b/cli@latest + the v2 `template create` surface. E2B retired v1 server-side:
+      # ACCESS_TOKEN is hard-rejected and 2.2.4's `template build` does not read E2B_API_KEY,
+      # so this is the only path that still builds. Matches deploy-v4-template.yml.
+      run: npm install -g @e2b/cli@latest
 
     - name: Build and deploy Agent Cloud E2B template
       run: |
-        npx e2b template build \
-          --name ${{ inputs.template_name }} \
+        NAME="${{ inputs.template_name }}"; NAME="${NAME:-pipilot-agent}"
+        CPU="$(printf '%s' "${{ inputs.cpu_count }}" | tr -cd '0-9')"; CPU="${CPU:-2}"
+        MEM="$(printf '%s' "${{ inputs.memory_mb }}" | tr -cd '0-9')"; MEM="${MEM:-4096}"
+        # Idempotent: drop any existing alias so a re-build never 403s on "alias already used".
+        e2b template delete "$NAME" -y || true
+        # The alias can take a moment to free up after the delete above, so a failed
+        # create is retried once behind another delete rather than failing the run.
+        sleep 5
+        if ! e2b template create "$NAME" \
           --dockerfile e2b-agent-cloud.Dockerfile \
-          --cpu-count ${{ inputs.cpu_count }} \
-          --memory-mb ${{ inputs.memory_mb }}
+          --cpu-count "$CPU" \
+          --memory-mb "$MEM"; then
+          echo "Build failed — retrying once after another delete + wait (stale-alias propagation)..."
+          e2b template delete "$NAME" -y || true
+          sleep 10
+          e2b template create "$NAME" --dockerfile e2b-agent-cloud.Dockerfile --cpu-count "$CPU" --memory-mb "$MEM"
+        fi
       env:
-        E2B_ACCESS_TOKEN: ${{ inputs.e2b_access_token }}
+        E2B_API_KEY: ${{ inputs.e2b_access_token || secrets.E2B_API_KEY }}
 
     - name: Display template info
       run: |
