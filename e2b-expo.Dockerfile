@@ -55,7 +55,7 @@ WORKDIR /home/user
 RUN npx --yes create-expo-app@latest /tmp/expo-app --template blank-typescript --no-install \
  && cp -a /tmp/expo-app/. /home/user/ \
  && rm -rf /tmp/expo-app \
- && printf 'store-dir=/home/user/.pnpm-store\n' > /home/user/.npmrc \
+ && echo store-dir=/home/user/.pnpm-store > /home/user/.npmrc \
  && pnpm install
 
 # 2) Add the WEB (metro) + TUNNEL deps. `expo install` picks SDK-matched versions;
@@ -66,8 +66,8 @@ RUN npx --yes expo install react-dom react-native-web @expo/metro-runtime \
 # 3) Metro web bundler + a universal entry: native AppEntry imports root ./App, web
 #    resolves ./index — so add index.js (registerRootComponent) and point main at it.
 RUN node -e "const f='app.json',j=require('./'+f);j.expo=j.expo||{};j.expo.web=Object.assign({bundler:'metro'},j.expo.web);j.expo.name='PiPilot App';j.expo.slug='pipilot-app';require('fs').writeFileSync(f,JSON.stringify(j,null,2))" \
- && printf "import { registerRootComponent } from 'expo'\nimport App from './App'\nregisterRootComponent(App)\n" > index.js \
  && node -e "const f='package.json',j=require('./'+f);j.main='index.js';require('fs').writeFileSync(f,JSON.stringify(j,null,2))"
+COPY e2b-expo-index.js /home/user/index.js
 
 # 4) Warm the Metro web cache so the FIRST real bundle is fast (best-effort; never
 #    fail the build on it).
@@ -116,7 +116,8 @@ RUN chmod -R a+rX /opt/ms-playwright /opt/pipilot-playwright
 # root can read the browser regardless of the chmod above — so a root-only check would pass
 # on an image where every real launch dies with EACCES. HOME is pointed somewhere writable
 # because chromium wants a home dir for its profile/crash paths.
-RUN su node -s /bin/sh -c "HOME=/tmp PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright node -e \"const{chromium}=require('/opt/pipilot-playwright/node_modules/playwright');(async()=>{const b=await chromium.launch();const p=await b.newPage();await p.setContent('<h1>ok</h1>');const t=await p.textContent('h1');await b.close();if(t!=='ok')throw new Error('chromium ran but returned '+t);console.log('[template] chromium launches and renders as non-root — ok')})().catch(e=>{console.error('[template] PLAYWRIGHT CHECK FAILED:',e.message);process.exit(1)})\""
+COPY e2b-pw-check.js /usr/local/bin/pw-check.js
+RUN su node -s /bin/sh -c "HOME=/tmp PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright node /usr/local/bin/pw-check.js"
 
 # 7) The image is built as ROOT but sandboxes run as a non-root user (uid ~1001). Make the
 #    whole project — node_modules, the pnpm store and caches — group/other writable so the
