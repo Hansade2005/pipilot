@@ -101,6 +101,20 @@ RUN python3 -m venv /opt/py-venv \
  && echo 'export PATH="/opt/py-venv/bin:$PATH"' > /etc/profile.d/py-venv.sh \
  && chmod +x /etc/profile.d/py-venv.sh
 
+# Shadow `npx` itself with `nubx -y`, not just the JS-side rewrite builder-src/api/e2b.mjs
+# does for run_command. That rewrite only covers commands the BROWSER builder agent issues
+# through run_command — Mission Runners and Crew issue their OWN bash-tool commands straight
+# into the sandbox (the Claude Agent SDK's bash tool, running server-side inside here), which
+# never pass through that JS layer. Without this, a mission's `npx <cli>` still silently
+# fetches latest-from-registry instead of resolving the project's own installed version —
+# exactly the bug nubx exists to fix, just missed for every caller except run_command.
+# Root, BEFORE the `USER user` switch below — /etc/profile.d is root-owned.
+RUN mkdir -p /opt/pipilot-bin \
+ && printf '#!/bin/sh\nexec nubx -y "$@"\n' > /opt/pipilot-bin/npx \
+ && chmod -R a+rX /opt/pipilot-bin && chmod a+x /opt/pipilot-bin/npx \
+ && echo 'export PATH="/opt/pipilot-bin:$PATH"' > /etc/profile.d/pipilot-nubx.sh \
+ && chmod +x /etc/profile.d/pipilot-nubx.sh
+
 # Non-root user + pre-created CLI config dirs (avoid first-write failures).
 # Idempotent: the E2B v2 build backend can pre-provision a 'user' account itself
 # before our Dockerfile RUNs — a bare `useradd` then fails with "already exists"
@@ -124,12 +138,14 @@ RUN pnpm install
 # entire reason it replaces npx. Deliberately a build-time smoke test: if a future nub release stops
 # reading a pnpm-installed node_modules, the image fails to build here instead of quietly
 # reintroducing "npx runs the wrong major" at runtime. Version-agnostic, so bumping the starter's
-# vite does not break the build.
-RUN INSTALLED="$(node -p "require('/home/user/project/node_modules/vite/package.json').version")" \
+# vite does not break the build. Tests the SHIMMED `npx`, not `nubx` directly — that's what every
+# caller (run_command, Crew, Mission Runners) actually invokes.
+RUN . /etc/profile.d/pipilot-nubx.sh \
+ && INSTALLED="$(node -p "require('/home/user/project/node_modules/vite/package.json').version")" \
  && echo "[template] installed vite: $INSTALLED" \
- && nubx vite --version | grep -q "vite/$INSTALLED" \
- && echo "[template] nubx resolves the project-local vite — ok"
+ && npx vite --version | grep -q "vite/$INSTALLED" \
+ && echo "[template] npx (shadowed by nubx) resolves the project-local vite — ok"
 
-ENV PATH="/opt/py-venv/bin:/usr/local/lib/node_modules/.bin:$PATH"
+ENV PATH="/opt/pipilot-bin:/opt/py-venv/bin:/usr/local/lib/node_modules/.bin:$PATH"
 EXPOSE 5173 8080
 CMD ["/bin/bash"]
