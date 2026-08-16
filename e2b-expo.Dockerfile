@@ -42,7 +42,14 @@ WORKDIR /home/user
 #    node_modules AND at a path the RUNTIME user (uid ~1001, NOT the root build user) can
 #    reach — otherwise runtime `pnpm add`/`expo install` fail with ERR_PNPM_UNEXPECTED_STORE
 #    (store was at /root/... from the root build) and the agent can't add extra deps.
-RUN npx --yes create-expo-app@latest . --template blank-typescript --no-install \
+#    Scaffold into an EMPTY temp dir, then copy in. create-expo-app refuses to run in a
+#    non-empty directory, and E2B's v2 builder hands us a /home/user that already contains
+#    the base image's .bashrc/.profile/.bash_logout — so scaffolding in place aborts with
+#    "The directory user has files that might be overwritten". Copying with `cp -a .../.`
+#    merges over those dotfiles instead of fighting them.
+RUN npx --yes create-expo-app@latest /tmp/expo-app --template blank-typescript --no-install \
+ && cp -a /tmp/expo-app/. /home/user/ \
+ && rm -rf /tmp/expo-app \
  && printf 'store-dir=/home/user/.pnpm-store\n' > /home/user/.npmrc \
  && pnpm install
 
@@ -53,7 +60,7 @@ RUN npx --yes expo install react-dom react-native-web @expo/metro-runtime \
 
 # 3) Metro web bundler + a universal entry: native AppEntry imports root ./App, web
 #    resolves ./index — so add index.js (registerRootComponent) and point main at it.
-RUN node -e "const f='app.json',j=require('./'+f);j.expo=j.expo||{};j.expo.web=Object.assign({bundler:'metro'},j.expo.web);j.expo.name=j.expo.name||'PiPilot App';j.expo.slug=j.expo.slug||'pipilot-app';require('fs').writeFileSync(f,JSON.stringify(j,null,2))" \
+RUN node -e "const f='app.json',j=require('./'+f);j.expo=j.expo||{};j.expo.web=Object.assign({bundler:'metro'},j.expo.web);j.expo.name='PiPilot App';j.expo.slug='pipilot-app';require('fs').writeFileSync(f,JSON.stringify(j,null,2))" \
  && printf "import { registerRootComponent } from 'expo'\nimport App from './App'\nregisterRootComponent(App)\n" > index.js \
  && node -e "const f='package.json',j=require('./'+f);j.main='index.js';require('fs').writeFileSync(f,JSON.stringify(j,null,2))"
 
