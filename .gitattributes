@@ -1,0 +1,7 @@
+# These files are consumed by Linux container builds, so they must be LF in the repo
+# regardless of the platform they were authored on. Without this, a Windows commit can
+# introduce CRLF, which reaches the image as `#!/bin/bash\r` and fails at boot with a
+# "bad interpreter" error that looks nothing like a line-ending problem.
+*.sh            text eol=lf
+*.Dockerfile    text eol=lf
+Dockerfile      text eol=lf

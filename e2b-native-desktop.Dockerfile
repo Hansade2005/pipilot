@@ -41,7 +41,11 @@ RUN npm install -g @native-sdk/cli@0.5.4 && npm cache clean --force
 
 # noVNC bring-up script (Xvfb -> XFCE -> x11vnc -> noVNC :6080).
 COPY start_command.sh /start_command.sh
-RUN sed -i 's/\r$//' /start_command.sh && chmod +x /start_command.sh
+# Strip CRLF line endings (the repo is authored on Windows). Matches trailing whitespace
+# rather than a literal \r: E2B's v2 builder strips backslash escapes from RUN commands,
+# which would turn 's/\r$//' into 's/r$//' and silently delete a trailing letter "r" from
+# every line of the script instead of fixing its line endings.
+RUN sed -i 's/[[:space:]]*$//' /start_command.sh && chmod +x /start_command.sh
 
 # Non-root user + warm the Zig 0.16 toolchain + SDK by building the counter starter.
 RUN useradd -m -s /bin/bash user \

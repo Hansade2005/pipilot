@@ -94,7 +94,7 @@ USER root
 ENV RUSTUP_HOME=/usr/local/rustup CARGO_HOME=/usr/local/cargo
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
       | sh -s -- -y --no-modify-path --default-toolchain stable --profile minimal \
- && printf '%s\n' 'export RUSTUP_HOME=/usr/local/rustup' 'export CARGO_HOME=/usr/local/cargo' 'export PATH=/usr/local/cargo/bin:$PATH' > /etc/profile.d/cargo.sh \
+ && { echo 'export RUSTUP_HOME=/usr/local/rustup'; echo 'export CARGO_HOME=/usr/local/cargo'; echo 'export PATH=/usr/local/cargo/bin:$PATH'; } > /etc/profile.d/cargo.sh \
  && chmod 0644 /etc/profile.d/cargo.sh \
  && chmod -R a+rwX /usr/local/rustup /usr/local/cargo \
  && /usr/local/cargo/bin/cargo --version && /usr/local/cargo/bin/rustc --version
