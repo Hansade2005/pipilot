@@ -32,7 +32,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libxrender1 libxshmfence1 libxss1 libxtst6 xdg-utils libu2f-udev libvulkan1 \
  && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g npm@latest pnpm@9.15.0
+# npm is PINNED, not @latest. Current npm prints "npm notice run npx" style run-notices
+# into the stream create-expo-app parses as JSON, so the scaffold dies with
+# 'Could not parse JSON returned from "npm pack expo-template-blank-typescript"'.
+# 10.9.2 predates those notices. This pins the TOOL only — the Expo SDK itself is still
+# resolved at build time by create-expo-app@latest, so the image stays always-latest.
+RUN npm install -g npm@10.9.2 pnpm@9.15.0
 
 WORKDIR /home/user
 
