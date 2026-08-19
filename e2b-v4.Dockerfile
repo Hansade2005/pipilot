@@ -109,8 +109,14 @@ RUN python3 -m venv /opt/py-venv \
 # fetches latest-from-registry instead of resolving the project's own installed version —
 # exactly the bug nubx exists to fix, just missed for every caller except run_command.
 # Root, BEFORE the `USER user` switch below — /etc/profile.d is root-owned.
+#
+# `{ echo ...; echo ...; } > file`, NOT printf '...\n...': E2B's v2 template builder
+# silently strips backslash escapes inside RUN-command strings, which would collapse
+# printf's \n into a literal "n" — corrupting the shebang into "#!/bin/shnexec ..." and
+# failing every invocation with "cannot execute: required file not found". Bit this repo
+# before (1ad5ea0); same trap, different file.
 RUN mkdir -p /opt/pipilot-bin \
- && printf '#!/bin/sh\nexec nubx -y "$@"\n' > /opt/pipilot-bin/npx \
+ && { echo '#!/bin/sh'; echo 'exec nubx -y "$@"'; } > /opt/pipilot-bin/npx \
  && chmod -R a+rX /opt/pipilot-bin && chmod a+x /opt/pipilot-bin/npx \
  && echo 'export PATH="/opt/pipilot-bin:$PATH"' > /etc/profile.d/pipilot-nubx.sh \
  && chmod +x /etc/profile.d/pipilot-nubx.sh
