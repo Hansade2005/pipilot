@@ -113,6 +113,25 @@ WORKDIR /home/user
 # fails with EACCES. /home/user gets its own chmod in the last layer; these live outside it.
 RUN chmod -R a+rX /opt/ms-playwright /opt/pipilot-playwright
 
+# 7) Mission Runner / Crew stream server deps (express, the Claude Agent SDK, zod), baked so
+# api/e2b.mjs's mission_stream setup finds them already installed instead of pnpm-installing on
+# every cold start — this is Crew's template (crew.ts spawns it with template:'pipilot-expo'), so
+# this is the box that actually pays that install cost on every dispatch today. A separate /opt
+# prefix for the same reason Playwright gets one above: kept out of the Expo project's own tree.
+# api/e2b.mjs still PROBES `tool`/`createSdkMcpServer` at runtime and reinstalls if a baked
+# version ever goes stale, so this is a pure cold-start speed win, not a hard pin — a future SDK
+# bump on the server side just costs one slow dispatch instead of every dispatch forever.
+WORKDIR /opt/pipilot-stream
+RUN echo '{"type":"module"}' > package.json \
+ && npm install express @anthropic-ai/claude-agent-sdk zod \
+ && chmod -R a+rX /opt/pipilot-stream
+WORKDIR /home/user
+
+# Build-time assertion, same spirit as the Playwright launch check above: fail the image here
+# if the baked SDK doesn't export the custom-tool API the stream server needs, rather than
+# finding out at a live mission's first dispatch.
+RUN cd /opt/pipilot-stream && node -e "import('@anthropic-ai/claude-agent-sdk').then(m=>{if(!m.tool||!m.createSdkMcpServer){console.error('[template] baked claude-agent-sdk is missing tool/createSdkMcpServer exports');process.exit(1)}console.log('[template] baked claude-agent-sdk exports tool+createSdkMcpServer - ok')})"
+
 # Build-time assertion. Fails the image here rather than letting a broken browser surface
 # at runtime, when it looks like an application bug. It really LAUNCHES chromium and renders
 # a page: a binary that exists but cannot start (missing system lib) is the exact failure

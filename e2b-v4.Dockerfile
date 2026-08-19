@@ -121,6 +121,22 @@ RUN mkdir -p /opt/pipilot-bin \
  && echo 'export PATH="/opt/pipilot-bin:$PATH"' > /etc/profile.d/pipilot-nubx.sh \
  && chmod +x /etc/profile.d/pipilot-nubx.sh
 
+# Mission Runner / Crew stream server deps (express, the Claude Agent SDK, zod), baked so
+# api/e2b.mjs's mission_stream setup finds them already installed instead of pnpm-installing on
+# every cold start. Separate /opt prefix, same reason as everything else here: kept out of the
+# project's own tree so an agent's `pnpm install` in /home/user/project can never touch it.
+# api/e2b.mjs still PROBES `tool`/`createSdkMcpServer` at runtime and reinstalls if a baked
+# version ever goes stale, so this is a pure cold-start speed win, not a hard pin.
+RUN mkdir -p /opt/pipilot-stream && cd /opt/pipilot-stream \
+ && echo '{"type":"module"}' > package.json \
+ && npm install express @anthropic-ai/claude-agent-sdk zod \
+ && chmod -R a+rX /opt/pipilot-stream
+
+# Build-time assertion, same spirit as the nubx check above: fail the image here if the baked
+# SDK doesn't export the custom-tool API the stream server needs, rather than finding out at a
+# live mission's first dispatch.
+RUN cd /opt/pipilot-stream && node -e "import('@anthropic-ai/claude-agent-sdk').then(m=>{if(!m.tool||!m.createSdkMcpServer){console.error('[template] baked claude-agent-sdk is missing tool/createSdkMcpServer exports');process.exit(1)}console.log('[template] baked claude-agent-sdk exports tool+createSdkMcpServer - ok')})"
+
 # Non-root user + pre-created CLI config dirs (avoid first-write failures).
 # Idempotent: the E2B v2 build backend can pre-provision a 'user' account itself
 # before our Dockerfile RUNs — a bare `useradd` then fails with "already exists"
