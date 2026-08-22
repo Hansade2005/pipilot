@@ -57,22 +57,15 @@ RUN ARCH=$(dpkg --print-architecture) \
 # Node toolchain + provider CLIs (global, on PATH for every user) + Claude Code
 # (so this same template powers Mission Runners — headless `claude` agents that
 # also need the deploy CLIs below).
-# @nubjs/nub ships `nubx`, which replaces `npx` in the command rewriter. The old rewrite sent npx
-# to `pnpm dlx`, and that was not merely slow but WRONG: pnpm dlx ALWAYS fetches from the registry,
-# so `npx vite build` ran whatever is latest instead of the version the project pins. Measured on
-# this very starter:
-#   pnpm dlx vite --version   13.4s  ->  vite 8.2.1   (fetched from the registry)
-#   nubx     vite --version    1.6s  ->  vite 5.4.21  (the project's installed copy)
-# A different MAJOR than the app was written against, with nothing in the output saying so.
-#
-# pnpm STAYS the package manager. nub's own installer measured SLOWER on the warm path this image
-# is built around (2.9s vs pnpm's 1.7s against the baked store), and it runs postinstall build
-# scripts by default — not something we want in a sandbox holding the user's provider tokens.
-RUN npm install -g npm@latest pnpm@9.15.0 @nubjs/nub@latest \
+# @nubjs/nub REMOVED — see the note at the old npx-shim site further down for why (it corrupted
+# module resolution on real projects with runtime-installed deps). Not just unshimmed but
+# uninstalled entirely: leaving `nub` on PATH is itself a hazard, since an agent that notices it
+# there has been known to call it directly (`nub install`) even when told not to, with the same
+# failure mode as the shim. pnpm remains the only package manager in this image.
+RUN npm install -g npm@latest pnpm@9.15.0 \
       wrangler@latest vercel@latest netlify-cli@latest neonctl@latest \
       @anthropic-ai/claude-code@latest \
- && npm cache clean --force \
- && nubx --version
+ && npm cache clean --force
 
 # Python venv for the doc/canvas-generation skills (canvas-design, pdf-documents,
 # pptx-documents) — pre-warmed at BUILD time so no sandbox ever pays the pip-install
@@ -101,25 +94,15 @@ RUN python3 -m venv /opt/py-venv \
  && echo 'export PATH="/opt/py-venv/bin:$PATH"' > /etc/profile.d/py-venv.sh \
  && chmod +x /etc/profile.d/py-venv.sh
 
-# Shadow `npx` itself with `nubx -y`, not just the JS-side rewrite builder-src/api/e2b.mjs
-# does for run_command. That rewrite only covers commands the BROWSER builder agent issues
-# through run_command — Mission Runners and Crew issue their OWN bash-tool commands straight
-# into the sandbox (the Claude Agent SDK's bash tool, running server-side inside here), which
-# never pass through that JS layer. Without this, a mission's `npx <cli>` still silently
-# fetches latest-from-registry instead of resolving the project's own installed version —
-# exactly the bug nubx exists to fix, just missed for every caller except run_command.
-# Root, BEFORE the `USER user` switch below — /etc/profile.d is root-owned.
-#
-# `{ echo ...; echo ...; } > file`, NOT printf '...\n...': E2B's v2 template builder
-# silently strips backslash escapes inside RUN-command strings, which would collapse
-# printf's \n into a literal "n" — corrupting the shebang into "#!/bin/shnexec ..." and
-# failing every invocation with "cannot execute: required file not found". Bit this repo
-# before (1ad5ea0); same trap, different file.
-RUN mkdir -p /opt/pipilot-bin \
- && { echo '#!/bin/sh'; echo 'exec nubx -y "$@"'; } > /opt/pipilot-bin/npx \
- && chmod -R a+rX /opt/pipilot-bin && chmod a+x /opt/pipilot-bin/npx \
- && echo 'export PATH="/opt/pipilot-bin:$PATH"' > /etc/profile.d/pipilot-nubx.sh \
- && chmod +x /etc/profile.d/pipilot-nubx.sh
+# REVERTED: this used to shadow `npx` with `nubx -y` for every shell, so Mission Runner/Crew
+# bash-tool commands (which bypass the JS-side rewrite in builder-src/api/e2b.mjs entirely —
+# see the removed comment this replaced) also resolved the project-local package. Removed after
+# a real build on the SISTER pipilot-expo template proved this class of shim corrupts module
+# resolution: nub maintains its own `.nub` virtual store that diverges from the prebaked pnpm
+# tree, and once a project has real runtime-installed dependencies, Node's require() cannot
+# follow the resulting symlink chain — silent, total breakage a shallow build-time smoke test
+# (`nubx --version` resolving) never caught. Root cause is generic to nub, not Expo-specific, so
+# reverted here too rather than waiting for the same failure to show up in a web mission.
 
 # Mission Runner / Crew stream server deps (express, the Claude Agent SDK, zod), baked so
 # api/e2b.mjs's mission_stream setup finds them already installed instead of pnpm-installing on
@@ -156,18 +139,14 @@ WORKDIR /home/user/project
 COPY --chown=user:user e2b-v4-template/package.json /home/user/project/package.json
 RUN pnpm install
 
-# Warm nubx and ASSERT it resolves the project's own bin rather than fetching one — that is the
-# entire reason it replaces npx. Deliberately a build-time smoke test: if a future nub release stops
-# reading a pnpm-installed node_modules, the image fails to build here instead of quietly
-# reintroducing "npx runs the wrong major" at runtime. Version-agnostic, so bumping the starter's
-# vite does not break the build. Tests the SHIMMED `npx`, not `nubx` directly — that's what every
-# caller (run_command, Crew, Mission Runners) actually invokes.
-RUN . /etc/profile.d/pipilot-nubx.sh \
- && INSTALLED="$(node -p "require('/home/user/project/node_modules/vite/package.json').version")" \
+# Plain-npx build-time smoke test (nubx removed — see the reverted-shim note above): confirm the
+# starter's own npx resolves the project-local vite rather than something unexpected. Version-
+# agnostic, so bumping the starter's vite does not break the build.
+RUN INSTALLED="$(node -p "require('/home/user/project/node_modules/vite/package.json').version")" \
  && echo "[template] installed vite: $INSTALLED" \
- && npx vite --version | grep -q "vite/$INSTALLED" \
- && echo "[template] npx (shadowed by nubx) resolves the project-local vite — ok"
+ && cd /home/user/project && npx vite --version | grep -q "vite/$INSTALLED" \
+ && echo "[template] npx resolves the project-local vite — ok"
 
-ENV PATH="/opt/pipilot-bin:/opt/py-venv/bin:/usr/local/lib/node_modules/.bin:$PATH"
+ENV PATH="/opt/py-venv/bin:/usr/local/lib/node_modules/.bin:$PATH"
 EXPOSE 5173 8080
 CMD ["/bin/bash"]

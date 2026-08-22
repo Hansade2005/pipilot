@@ -38,12 +38,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # 10.9.2 predates those notices. This pins the TOOL only — the Expo SDK itself is still
 # resolved at build time by create-expo-app@latest, so the image stays always-latest.
 #
-# @nubjs/nub, same as e2b-v4.Dockerfile: `nubx` replaces `npx` because `npx <cli>` on an
-# already-installed project ignores the locally pinned version and fetches whatever is
-# latest from the registry (e.g. `npx expo` or `npx playwright` pulling a DIFFERENT major
-# than what's actually in node_modules, with nothing in the output saying so). nubx resolves
-# the project-local bin first. pnpm stays the installer — this only replaces npx.
-RUN npm install -g npm@10.9.2 pnpm@9.15.0 @nubjs/nub@latest
+# @nubjs/nub REMOVED — see the note at the old `npx` shim site below (step 8) for why. Not just
+# unshimmed but uninstalled entirely: an agent poking around this sandbox found `nub` on PATH
+# and started calling it directly even after being told not to, and `nub install` proved just as
+# capable of corrupting the prebaked tree as the npx shim was. Leaving it off PATH is a stronger
+# guardrail than a prompt instruction not to use it.
+RUN npm install -g npm@10.9.2 pnpm@9.15.0
 
 WORKDIR /home/user
 
@@ -151,43 +151,25 @@ RUN su node -s /bin/sh -c "HOME=/tmp PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 #    fixed above. Last layer so it covers everything created earlier.
 RUN chmod -R a+rwX /home/user
 
-# 8) Shadow `npx` with `nubx -y` for EVERY shell in the sandbox, not just commands the
-# browser-agent's run_command pre-processes (builder-src/api/e2b.mjs rewrites npx->nubx
-# there, but Crew and Mission Runners issue their OWN bash-tool commands straight into the
-# sandbox — those never pass through that rewrite, so `npx expo export` / `npx playwright
-# test` inside a Crew run has been hitting the registry for whatever is latest instead of
-# the SDK-matched version actually installed, silently). Placed AFTER scaffolding (steps
-# 1-2 above genuinely need the registry, before anything is installed locally) so this only
-# affects runtime usage.
+# 8) REVERTED: this used to shadow `npx` with `nubx -y` for every shell (so it resolved the
+# project-local package instead of hitting the registry for latest). REMOVED after a real
+# production build proved it corrupts module resolution for real projects: nub maintains its
+# OWN virtual store (a `.nub` directory) that diverges from the prebaked pnpm tree crewRecipe's
+# `ln -sfn /home/user/node_modules node_modules` sets up, and once a project has real deps
+# beyond the starter (expo-router, @expo/metro-runtime, etc — exactly what any built app adds),
+# Node's require() cannot follow the resulting symlink chain: "Cannot find module
+# 'metro-runtime/package.json'", `.pnpm` missing where expected, `entry.js` unresolvable. The
+# build-time smoke test this shim shipped with (`npx expo --version`) only exercised a trivial
+# resolve and never caught it — real breakage only showed up on `npx expo export` against a
+# project with actual dependencies installed at runtime, which no smoke test here does. Back to
+# plain npx: it can fetch a wrong-version fallback in the rare case a caller runs `npx <cli>`
+# for something not in node_modules, but that is a correctness risk this template's prebaked
+# tree rarely triggers — far better than nub's failure mode, which is silent and total.
 #
-# A wrapper script, not a symlink to nubx: nubx REFUSES to fetch an uninstalled package
-# under `-y` semantics that differ subtly from real npx's fallback, and different callers
-# pass args differently — `exec nubx -y "$@"` keeps that translation in one place.
-# /opt/pipilot-bin is put AHEAD of the real npx on PATH via /etc/profile.d — `bash -lc`
-# (what run_command AND the mission bash tool both invoke) is a LOGIN shell, and Debian's
-# /etc/profile unconditionally resets PATH before sourcing profile.d scripts, so exporting
-# PATH anywhere else (Docker ENV, .bashrc) gets silently wiped before the command ever runs.
-#
-# `{ echo ...; echo ...; } > file`, NOT printf '...\n...': E2B's v2 template builder
-# silently strips backslash escapes inside RUN-command strings, which collapses printf's
-# \n into a literal "n" — corrupting the shebang into "#!/bin/shnexec ..." and failing
-# every invocation with "cannot execute: required file not found". Bit this repo before
-# (1ad5ea0); same trap, different file.
-RUN mkdir -p /opt/pipilot-bin \
- && { echo '#!/bin/sh'; echo 'exec nubx -y "$@"'; } > /opt/pipilot-bin/npx \
- && chmod -R a+rX /opt/pipilot-bin && chmod a+x /opt/pipilot-bin/npx \
- && echo 'export PATH="/opt/pipilot-bin:$PATH"' > /etc/profile.d/pipilot-nubx.sh \
- && chmod +x /etc/profile.d/pipilot-nubx.sh
-
-# Build-time assertion, same shape as e2b-v4.Dockerfile's: fail the image HERE if nubx stops
-# resolving the project-local expo rather than finding out at runtime that every mobile
-# preview/mission is quietly running the wrong SDK version.
-RUN . /etc/profile.d/pipilot-nubx.sh \
- && INSTALLED="$(node -p "require('/home/user/node_modules/expo/package.json').version")" \
- && echo "[template] installed expo: $INSTALLED" \
- && npx expo --version \
- && echo "[template] npx (shadowed by nubx) resolves the project-local expo — ok"
-
-# Belt-and-suspenders for any non-login shell that skips /etc/profile.d (e.g. E2B's own
-# --cmd invocation of expo-start.sh) — same PATH, set at the Docker layer too.
-ENV PATH="/opt/pipilot-bin:$PATH"
+# Real smoke test, not just a version check: actually EXPORT the starter, the exact command the
+# old shim's shallow `npx expo --version` check never ran and so never caught the regression.
+# Fail the build here if plain npx can't resolve expo-router/metro end to end.
+RUN cd /home/user && npx expo export --platform web --output-dir /tmp/build-check 2>&1 | tail -30 \
+ && test -f /tmp/build-check/index.html \
+ && rm -rf /tmp/build-check .expo dist \
+ && echo "[template] npx expo export resolves + builds the starter — ok"
