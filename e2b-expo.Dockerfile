@@ -169,7 +169,13 @@ RUN chmod -R a+rwX /home/user
 # Real smoke test, not just a version check: actually EXPORT the starter, the exact command the
 # old shim's shallow `npx expo --version` check never ran and so never caught the regression.
 # Fail the build here if plain npx can't resolve expo-router/metro end to end.
-RUN cd /home/user && npx expo export --platform web --output-dir /tmp/build-check 2>&1 | tail -30 \
+#
+# CI=1 forces every Expo/Metro CLI prompt (telemetry consent, update checks, etc) into its
+# non-interactive default instead of waiting on a TTY that a Docker RUN doesn't have — the FIRST
+# version of this check omitted it and hung the build past 17 minutes (8x any prior run) with no
+# output, almost certainly stuck on a prompt with closed stdin. `timeout 180` is the hard
+# backstop regardless: fail loud in 3 minutes rather than hang the whole template pipeline again.
+RUN cd /home/user && CI=1 timeout 180 npx expo export --platform web --output-dir /tmp/build-check 2>&1 | tail -40 \
  && test -f /tmp/build-check/index.html \
  && rm -rf /tmp/build-check .expo dist \
  && echo "[template] npx expo export resolves + builds the starter — ok"
