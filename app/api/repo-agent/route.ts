@@ -13,11 +13,7 @@ import JSZip from 'jszip'
 
 // Tavily API configuration for web search
 const tavilyConfig = {
-  apiKeys: [
-    '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',
-    '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',
-    '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'
-  ],
+  apiKeys: (process.env.TAVILY_API_KEYS || '').split(',').filter(Boolean),
   searchUrl: 'https://api.tavily.com/search',
   extractUrl: 'https://api.tavily.com/extract',
   currentKeyIndex: 0
