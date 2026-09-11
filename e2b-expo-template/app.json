@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "PiPilot App",
+    "slug": "pipilot-app",
+    "version": "1.0.0",
+    "scheme": "app",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "web": { "bundler": "metro", "output": "single" },
+    "plugins": ["expo-router"]
+  }
+}

@@ -1,9 +1,10 @@
 name: Deploy PiPilot Expo E2B Template
 
-# Builds the `pipilot-expo` sandbox template: a COMPLETE latest-SDK Expo app that
-# self-starts its dev server (web :8081 + Expo Go tunnel) on boot and publishes the
-# exp:// URL to /tmp/expUrl. Scaffolded with create-expo-app@latest, so each build
-# tracks the newest stable Expo SDK.
+# Builds the `pipilot-expo` sandbox template: a COMPLETE Expo app installed with npm
+# at /home/user/workspace that self-starts Metro on :8081 and publishes the exp:// URL
+# to /tmp/expUrl. Scaffolded from e2b-expo-template/, which is PINNED to the same SDK
+# and versions as the builder's own scaffold (frameworks.ts EXPO) — an SDK drift between
+# the two is what previously made expo-router resolve across a major and break Metro.
 on:
   workflow_dispatch:
     inputs:
@@ -26,8 +27,9 @@ on:
         required: false
         type: string
         default: '4096'
-  # ALWAYS-LATEST: rebuild on the 1st of each month so the baked Expo SDK stays
-  # current (store Expo Go connects with no downgrade). Uses the repo secret token.
+  # Monthly rebuild picks up patch releases within the PINNED ranges in
+  # e2b-expo-template/package.json. Bumping the SDK itself is a deliberate edit there,
+  # made together with frameworks.ts EXPO — never a drift the schedule introduces.
   schedule:
     - cron: '0 6 1 * *'
 
@@ -88,6 +90,6 @@ jobs:
     - name: Display template info
       run: |
         echo "pipilot-expo template deployed."
-        echo "Self-starts: expo start --tunnel (web :8081 + Expo Go tunnel) → /tmp/expUrl"
-        echo "Scaffold: create-expo-app@latest (blank-typescript) + react-native-web + @expo/metro-runtime + @expo/ngrok"
+        echo "Self-starts: expo start --port 8081 (web + Expo Go via the E2B public host) → /tmp/expUrl"
+        echo "Scaffold: e2b-expo-template/ (Expo SDK 54 + expo-router 6), npm-installed at /home/user/workspace"
         echo 'Usage: const sandbox = await Sandbox.create("pipilot-expo")  // server already up; read /tmp/expUrl'

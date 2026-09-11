@@ -15,7 +15,7 @@
 # publish exp://<host> to /tmp/expUrl and point Metro at it via EXPO_PACKAGER_PROXY_URL.
 # NOTE: no CI=1 - CI mode disables Metro's file watcher (kills Fast Refresh).
 set -uo pipefail
-cd /home/user
+cd /home/user/workspace
 rm -f /tmp/expUrl
 echo start > /tmp/expo.phase
 # If the sandbox exposes its id, make Metro advertise the public E2B host so Expo Go
